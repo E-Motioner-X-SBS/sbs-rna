@@ -1,0 +1,776 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{float}
+
+\definecolor{measured}{RGB}{54,83,20}
+\definecolor{risk}{RGB}{127,29,29}
+\newcommand{\meas}{\textcolor{measured}{\textbf{[measured]}}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small PHAROS: A Physics-Grounded MoE Architecture for RNA Structure}
+\rhead{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\textbf{PHAROS}\\[0.3em]
+\large A Physics-Hybrid, Attention-Routed Mixture-of-Experts Architecture\\
+for RNA Structure and Contact-Map Prediction\\[0.6em]
+\normalsize Architecture Design Report --- Version 0.1}
+\author{Shuvam Banerji Seal\\\small SBS-RNA Project}
+\date{12 September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+RNA three-dimensional structure prediction has not had its AlphaFold2 moment.
+The best current methods reach a mean TM-score of approximately $0.55$ on
+non-redundant benchmarks, which is the threshold for recovering roughly the
+correct fold, against routine scores above $0.9$ for proteins. This report
+argues that the bottleneck is not model scale but \emph{inductive bias}, and
+specifies an architecture, \textbf{PHAROS}, built around that claim.
+
+Three empirical findings drive the design. First, ERNIE-RNA (86M parameters)
+outperforms RiNALMo (650M) and UNI-RNA (400M) on secondary-structure prediction,
+and nearly doubles cross-family generalisation relative to RiNALMo ($F_1 = 0.646$
+versus $0.355$), on the strength of a single hand-set, three-valued base-pairing
+prior added to its attention logits. Second, we measure on 117 non-redundant RNA
+chains that contacts per nucleotide \emph{saturates} at $4.4$--$4.9$ while
+contact-map density falls from $6.5\%$ at $L \approx 56$ to $0.353\%$ at
+$L \approx 2900$: RNA contact maps scale as $O(L)$, not $O(L^2)$, so a dense
+pair representation spends over $99\%$ of its compute on empty space and would
+require $309$~GB of activations at $L=2048$. Third, we measure a monotonic
+$1.76\sigma$ gradient in normalised crystallographic B-factor as a function of
+distance to the nearest $\mathrm{Mg}^{2+}$ ion across $24{,}623$ nucleotides,
+establishing that ion coordination and local rigidity are not independent
+features but two readouts of one phenomenon.
+
+PHAROS accordingly (i) accepts \textbf{ionic conditions as a model input},
+which no existing RNA structure predictor does, propagating them to attention
+logits through a Manning-renormalised screened-Coulomb bias; (ii) replaces the
+dense pair track with an \textbf{adaptive sparse pair track} retaining
+$K = 32L$ candidate edges, giving sixfold headroom over the measured contact
+requirement at $1.56\%$ of dense cost; (iii) routes a \textbf{sparse
+mixture-of-experts} on local structural regime rather than sequence context,
+supported by our negative result that GNRA $k$-mer context predicts rigidity at
+only $0.073\sigma$; and (iv) supplies motif geometry through a \textbf{frozen
+retrieval bank} of 667 RNA 3D Motif Atlas classes rather than expecting the
+model to learn it from 6{,}661 structurally-resolved sequences. We also identify
+two supervision channels---$\mathrm{Mg}^{2+}$ sites and B-factor
+rigidity---that are already present in every mmCIF file the field downloads and
+are currently used by no structure predictor.
+
+This is a design specification. No model has been trained. All quantitative
+claims are either marked \meas{} and reproducible from the scripts in this
+repository, or cited to the literature.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%========================================================
+\section{Problem statement}
+
+\subsection{The accuracy gap}
+
+Table~\ref{tab:sota} gives the state of the art on a non-redundant RNA test set
+as of November 2025.
+
+\begin{table}[h]
+\centering
+\caption{Current state of the art in RNA 3D structure prediction.}
+\label{tab:sota}
+\begin{tabular}{lcl}
+\toprule
+\textbf{Method} & \textbf{Mean TM-score} & \textbf{Approach} \\
+\midrule
+trRosettaRNA   & $\mathbf{0.548}$ & MSA $\rightarrow$ restraints $\rightarrow$ folding \\
+NuFold         & $0.525$ & AlphaFold2-style nucleotide frames \\
+AlphaFold3 (server) & $0.510$ & all-atom diffusion \\
+AlphaFold3 (local)  & $0.504$ & all-atom diffusion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A TM-score near $0.5$ means the topology is approximately right and little else.
+The CASP16 signal is equally instructive: leading RNA groups won by integrating
+AlphaFold3 \emph{into physics-based modelling} rather than by scaling a neural
+network. Physics-plus-machine-learning hybrids are currently ahead in RNA,
+which is the premise this architecture is built on.
+
+\subsection{Why RNA lags}
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=0.2em]
+\item \textbf{Data scarcity.} Our catalogue records $6{,}661$ unique sequences
+with experimental 3D structure against $1.37$ billion sequences, a coverage of
+$0.0005\%$. Proteins had roughly $220{,}000$ structures at the AlphaFold2
+moment.
+\item \textbf{Redundancy within that data.} $15{,}441$ RNA3DB chains collapse to
+$3{,}157$ unique sequences; 5S rRNA alone accounts for $5{,}976$ BGSU
+equivalence classes.
+\item \textbf{Family coverage.} Only $100$ of $4{,}227$ Rfam families ($2.4\%$)
+have any 3D representative.
+\item \textbf{Conformational plasticity.} Riboswitches are \emph{defined} by
+adopting multiple functional folds; single-structure prediction is the wrong
+target for a large fraction of functional RNA.
+\item \textbf{Ion dependence.} RNA is a polyanion. Its fold is not defined
+without specifying the ionic environment, yet no mainstream predictor accepts
+ionic conditions as an input.
+\item \textbf{Target noise.} Median resolution in our catalogue is $3.10$~\AA{},
+with only $13\%$ of chains at $2.5$~\AA{} or better.
+\end{enumerate}
+
+%========================================================
+\section{The central argument: bias beats scale}
+
+Table~\ref{tab:ernie} contains the most important result in the recent RNA
+language-model literature.
+
+\begin{table}[h]
+\centering
+\caption{ERNIE-RNA versus larger dense models. A 7.5$\times$ parameter deficit
+is overturned by one hand-set prior.}
+\label{tab:ernie}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{Params} & \textbf{bpRNA-1m $F_1$} & \textbf{bpRNA-new $F_1$} \\
+\midrule
+ERNIE-RNA (attention map) & 86M  & $\mathbf{0.873}$ & --- \\
+ERNIE-RNA (embedding)     & 86M  & $0.862$ & $\mathbf{0.646}$ \\
+RiNALMo                   & 650M & $0.850$ & $0.355$ \\
+UNI-RNA                   & 400M & $0.821$ & --- \\
+RNA-FM                    & 100M & $0.808$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ERNIE-RNA's entire architectural advantage is an additive bias on attention
+logits. In its first layer,
+\begin{equation}
+\mathrm{Attention}(Q,K) = \frac{QK^{\top}}{\sqrt{d}} + B_{\text{pair}}(i,j),
+\qquad
+\mathrm{Attention}_{l}(Q,K) = \frac{QK^{\top}}{\sqrt{d}} + \mathrm{Attention}_{l-1}(Q,K),
+\end{equation}
+with $B_{\text{pair}}$ set by hand to $3$ for C--G, $2$ for A--U, a tunable
+$\alpha \approx 0.8$ for G--U, and $0$ on the diagonal.
+
+The cross-family result is the decisive one: $0.646$ versus $0.355$. A fixed
+physical prior nearly doubles generalisation to unseen families, because the
+prior is true regardless of family whereas learned family statistics are not.
+
+\begin{quote}
+\textbf{Thesis.} If a crude three-valued prior buys more than $7\times$ the
+parameters, the marginal return on \emph{better physics} exceeds the marginal
+return on \emph{more scale}. PHAROS replaces that hand-set prior with a learned,
+ion-aware, motif-aware, coevolution-aware one.
+\end{quote}
+
+Its limitations define our openings. The prior is static, so a G--U pair inside
+a kink-turn is treated identically to one in a free helix. It is
+nearest-neighbour-blind, whereas real pairing energy is stacking-dependent. It
+encodes only canonical pairing, while non-canonical pairs define RNA 3D motifs
+and carry most tertiary information. And it ignores ions entirely.
+
+%========================================================
+\section{Empirical analysis}
+
+All results in this section were measured for this report on 180 BGSU
+non-redundant representative structures at $\leq 3.0$~\AA{}, downloaded and
+analysed by scripts in \texttt{scripts/sampling/}. Raw outputs are in
+\texttt{data/samples/analysis/}.
+
+\subsection{RNA contact maps scale linearly, not quadratically}
+
+Contacts are defined as nucleotide pairs with any heavy-atom pair within
+$8.0$~\AA{} and sequence separation $|i-j| \geq 4$.
+
+\begin{table}[h]
+\centering
+\caption{Contact density by chain length across 117 chains. \meas}
+\label{tab:sparsity}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Chain length} & \textbf{$n$} & \textbf{median $L$} & \textbf{contacts/nt} & \textbf{map density} \\
+\midrule
+32--100    & 38 & 56   & $1.784$ & $6.523\%$ \\
+100--200   & 6  & 124  & $2.851$ & $4.043\%$ \\
+200--500   & 3  & 393  & $4.216$ & $2.151\%$ \\
+500--1500  & 9  & 1038 & $4.532$ & $0.974\%$ \\
+$\geq 1500$ & 61 & 2901 & $4.854$ & $\mathbf{0.353\%}$ \\
+\midrule
+\multicolumn{2}{l}{\textbf{Overall}} & & median $4.397$, p95 $5.422$, max $5.497$ & median $0.389\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Contacts per nucleotide saturates at $4.4$--$4.9$ and is bounded by RNA
+coordination geometry, independent of length; density falls approximately as
+$1/L$. The number of contacts therefore grows \emph{linearly} in $L$.
+
+The consequence for architecture is immediate. A dense pair representation of
+dimension $c=128$ requires, for 48 blocks holding roughly six intermediate
+tensors each and without gradient checkpointing:
+\[
+L=512 \rightarrow 19.3~\text{GB}, \qquad
+L=1024 \rightarrow 77.3~\text{GB}, \qquad
+L=2048 \rightarrow 309.2~\text{GB}.
+\]
+A dense pair track is not merely wasteful at RNA lengths; it is infeasible.
+Retaining $K = cL$ candidate edges with $c=32$ costs $1.56\%$ of dense at
+$L=2048$ ($65{,}536$ edges, $16.8$~MB per tensor) while providing roughly
+sixfold headroom over the measured p95 requirement of $5.42$ contacts per
+nucleotide.
+
+\subsection{Ion coordination and local rigidity are one phenomenon}
+
+We z-normalise crystallographic B-factors within each structure so that
+refinement protocols are comparable, and restrict this analysis to the 31 X-ray
+structures among the sample; cryo-EM atomic displacement parameters are not
+comparable and were excluded. Lower $z_B$ indicates greater rigidity.
+
+\begin{table}[h]
+\centering
+\caption{Normalised B-factor versus distance to the nearest $\mathrm{Mg}^{2+}$,
+over $24{,}623$ nucleotides. \meas}
+\label{tab:mgrigid}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Distance to nearest $\mathrm{Mg}^{2+}$} & \textbf{$n$ nucleotides} & \textbf{mean $z_B$} \\
+\midrule
+$0$--$4$~\AA{}    & 319   & $\mathbf{-0.883}$ \\
+$4$--$6$~\AA{}    & 2{,}441 & $-0.673$ \\
+$6$--$8$~\AA{}    & 7{,}590 & $-0.415$ \\
+$8$--$12$~\AA{}   & 8{,}115 & $+0.004$ \\
+$12$--$20$~\AA{}  & 2{,}984 & $+0.756$ \\
+$> 20$~\AA{}      & 3{,}174 & $\mathbf{+0.877}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The gradient is monotonic and spans $1.76$ standard deviations. Local packing
+density independently correlates with rigidity at Pearson $r = -0.294$.
+
+\begin{quote}
+\textbf{Architectural consequence.} Ion effects and motif rigidity, which the
+project brief treats as two separate physical ingredients, are strongly coupled.
+A model that predicts $\mathrm{Mg}^{2+}$ sites obtains a rigidity map nearly for
+free and vice versa. That mutual information justifies routing them into a
+\emph{shared} physics expert rather than two disconnected heads.
+\end{quote}
+
+\paragraph{Caveats.} B-factor also absorbs resolution, occupancy and refinement
+choices. $\mathrm{Mg}^{2+}$ proximity and dense packing are themselves
+correlated, since both mark folded cores, so this is association rather than
+isolated causation; the gradient partly restates that structured cores both bind
+ions and are ordered. The closest bin contains only $319$ nucleotides. This is
+strong evidence for \emph{using} the coupling as a prior, not a proof of
+mechanism.
+
+\subsection{Ion inventory and coordination chemistry}
+
+\begin{table}[h]
+\centering
+\caption{Cation inventory across 179 parsed structures. \meas}
+\label{tab:ions}
+\begin{tabular}{lr@{\hskip 2em}lr}
+\toprule
+\textbf{Ion} & \textbf{Count} & \textbf{Inner-sphere partner} & \textbf{Count} \\
+\midrule
+$\mathrm{Mg}^{2+}$ & $\mathbf{17{,}428}$ & OP2 (phosphate) & 5{,}890 \\
+$\mathrm{K}^{+}$   & 1{,}868 & OP1 (phosphate) & 5{,}144 \\
+$\mathrm{Zn}^{2+}$ & 359   & O6 (guanine)    & 757 \\
+$\mathrm{Na}^{+}$  & 161   & O4 (uracil)     & 511 \\
+$\mathrm{Ca}^{2+}$ & 29    & N7 (purine)     & 447 \\
+$\mathrm{Mn}^{2+}$ & 12    & O2$'$ (ribose)  & 196 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\mathrm{Mg}^{2+}$ outnumbers all other cations by roughly $9\!:\!1$, so an
+ion-aware model that handles a single species should handle $\mathrm{Mg}^{2+}$.
+Some $83\%$ of direct coordination is to the two non-bridging phosphate oxygens;
+the next largest class, G(O6)/G(N7), is the textbook major-groove guanine site.
+
+Coordination is predominantly water-mediated: a mean of $0.77$ inner-sphere
+against $7.00$ outer-sphere RNA contacts per $\mathrm{Mg}^{2+}$. Crucially the
+inner-sphere fraction is itself a function of tertiary compactness: $0.511$
+overall but only $0.296$ for chains shorter than $500$~nt. The inner/outer ratio
+is therefore a \emph{predictable readout} of compactness, not merely an input.
+
+\paragraph{Stratification warning.} These aggregates are ribosome-dominated and
+must not be quoted flat. The five largest structures hold $39.4\%$ of all
+$\mathrm{Mg}^{2+}$. Per structure the median is $72.5$ ions against a mean of
+$181.5$; per nucleotide the median is $0.046$, roughly one $\mathrm{Mg}^{2+}$
+per $22$ nucleotides.
+
+\paragraph{What crystallography cannot see.} Resolved $\mathrm{Mg}^{2+}$ are
+site-bound ions only. The diffuse Manning atmosphere, which neutralises roughly
+$76\%$ of backbone charge, is invisible to crystallography. The two channels
+must be modelled separately and never conflated.
+
+\subsection{A negative result that constrains the design}
+
+We tested whether GNRA-like tetraloop sequence context alone predicts rigidity,
+matching the 4-mers \{GAAA, GCAA, GAGA, GUGA, GGAA, GCGA, GUAA, GAAG\} anywhere
+in a chain.
+
+\begin{table}[h]
+\centering
+\caption{GNRA $k$-mer context versus rigidity. \meas{} Effect size $0.073\sigma$.}
+\label{tab:gnra}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Context} & \textbf{$n$ nucleotides} & \textbf{mean $z_B$} \\
+\midrule
+GNRA-like 4-mer & 4{,}944 & $-0.082$ \\
+All other       & 95{,}768 & $-0.009$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effect is negligible. The likely cause is methodological: a GNRA
+\emph{sequence} is a GNRA \emph{tetraloop} only when it actually caps a hairpin,
+and linear 4-mer matching counts mostly helical and junction occurrences.
+
+\begin{quote}
+\textbf{Architectural consequence.} Sequence context alone does not identify a
+motif. Motif identity requires the interaction graph. The motif machinery must
+therefore be conditioned on the pair representation after secondary structure is
+available, never on raw $k$-mers. This rules out the naive
+``learn motifs from sequence $n$-grams'' design.
+\end{quote}
+
+%========================================================
+\section{The PHAROS architecture}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth,keepaspectratio]{../architecture/diagrams/rendered/01-system-overview.png}
+\caption{PHAROS system overview. Orange denotes novel components, green denotes
+frozen retrieval, blue denotes adapted standard components.}
+\end{figure}
+
+\subsection{Inputs}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llp{6.5cm}}
+\toprule
+\textbf{Input} & \textbf{Required} & \textbf{Note} \\
+\midrule
+Sequence, $L$ tokens, vocab 5 & yes & elDORS is DNA-alphabet; $T \rightarrow U$ at load \\
+Ionic condition $c_{\text{ion}}$ & yes, defaulted & $([\mathrm{Mg}^{2+}],[\mathrm{K}^{+}],[\mathrm{Na}^{+}],T,\mathrm{pH})$; \textbf{novel} \\
+MSA / Rfam alignment & optional & graceful degradation when shallow \\
+Chemical probing profile & optional & not yet acquired (Section~\ref{sec:gap}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ionic condition enters as a FiLM-style conditioning vector, analogous to a
+diffusion timestep embedding. The same sequence at $0$~mM and $10$~mM
+$\mathrm{Mg}^{2+}$ must produce different predictions; this is the clearest
+novelty claim in the design.
+
+\subsection{Token trunk: hybrid attention with MoE}
+
+\begin{figure}[p]
+\centering
+\includegraphics[height=0.82\textheight,keepaspectratio]{../architecture/diagrams/rendered/02-token-trunk.png}
+\caption{Period-8 mixer interleaving, repeated four times for 32 blocks.}
+\end{figure}
+
+The trunk uses 32 blocks at $d=768$ with the repeating pattern
+\[
+[\,\mathrm{GDN},\ \mathrm{GDN},\ \mathrm{SWA},\ \mathrm{GDN},\ \mathrm{GDN},\ \mathrm{SWA},\ \mathrm{GDN},\ \mathrm{FULL}\,],
+\]
+where GDN is Gated DeltaNet linear attention ($O(L)$, 20 of 32 blocks), SWA is
+sliding-window softmax attention with window 128 ($O(Lw)$, 8 blocks), and FULL
+is full attention with physics bias ($O(L^2)$, only 4 blocks).
+
+The justification is both architectural and biological. Jamba interleaves
+Mamba, attention and MoE at a $7\!:\!1$ ratio and reaches 256K context with a
+$4$~GB KV cache; Gated DeltaNet outperforms Mamba2 and DeltaNet on in-context
+retrieval and length extrapolation; Oryx varies the mixer type \emph{within} a
+sequence. RNA has exactly the structure this exploits: long stretches of regular
+A-form helix that are locally periodic and low-information, punctuated by rare
+junctions, pseudoknots and kissing loops that require global mixing. At
+$L=4096$, an all-dense 32-block trunk would perform $537$M pair evaluations;
+PHAROS performs $67$M, an $8\times$ reduction.
+
+\subsubsection{Physics-biased attention}
+
+In SWA and FULL blocks the attention logits carry four additive terms:
+\begin{equation}
+A_{ij} = \frac{Q_i K_j^{\top}}{\sqrt{d}}
+       + B_{\mathrm{wc}}(i,j)
+       + B_{\mathrm{elec}}(i,j;\,c_{\text{ion}})
+       + B_{\mathrm{motif}}(i,j)
+       + A^{(l-1)}_{ij}.
+\end{equation}
+
+$B_{\mathrm{wc}}$ generalises ERNIE-RNA's fixed prior to a learned pair-type
+embedding modulated by stacking context, since real pairing energy is
+nearest-neighbour dependent. It is initialised at the ERNIE-RNA values so
+training begins from a known-good prior. The term $A^{(l-1)}$ retains
+ERNIE-RNA's attention accumulation.
+
+$B_{\mathrm{elec}}$ is the novel term. With Bjerrum length
+$\ell_B = e^2/(4\pi\varepsilon_0\varepsilon_r k_B T) \approx 7.1$~\AA{} in water
+at $298$~K, Manning parameter $\xi = \ell_B/b$ for axial charge spacing $b$,
+condensed fraction and renormalised charge
+\begin{equation}
+\theta = 1 - \frac{1}{z\xi}, \qquad q_{\text{eff}} = -(1-\theta),
+\end{equation}
+and Debye screening parameter
+$\kappa = \sqrt{2 N_A e^2 I / (\varepsilon\varepsilon_0 k_B T)}$ from ionic
+strength $I$, the bias is
+\begin{equation}
+B_{\mathrm{elec}}(i,j) = -\lambda\, q_{\text{eff}}^{2}\, \ell_B\,
+\frac{\exp(-\kappa d_{ij})}{d_{ij}}.
+\label{eq:belec}
+\end{equation}
+For monovalent RNA $\theta \approx 0.76$, so roughly three quarters of backbone
+charge is screened before any structure-specific electrostatics is considered.
+Only $\lambda$ is learned; $q_{\text{eff}}$, $\kappa$ and $\ell_B$ follow in
+closed form from $c_{\text{ion}}$ and temperature. Equation~\eqref{eq:belec} is
+the mechanism by which salt concentration changes the prediction.
+
+\paragraph{Resolving the circularity.} Equation~\eqref{eq:belec} requires
+$d_{ij}$, which is unknown on the first pass. $B_{\mathrm{elec}}$ is therefore
+disabled at recycle 0 and enabled from recycle 1 using the current predicted
+distance map. Recycling is thus structural to the design rather than an
+optimisation: the physics term needs a geometry estimate to evaluate, and each
+recycle sharpens both.
+
+\subsubsection{Mixture-of-experts feed-forward}
+
+\begin{figure}[p]
+\centering
+\includegraphics[height=0.78\textheight,keepaspectratio]{../architecture/diagrams/rendered/03-moe-routing.png}
+\caption{Expert routing. Routing keys on local structural regime, not sequence.}
+\end{figure}
+
+Following DeepSeekMoE, the design uses 32 fine-grained routed experts at
+$d_{\text{ff}} = 512$ plus 2 always-on shared experts, with top-4 routing giving
+6 active experts of 34, in every second block.
+
+Shared-expert isolation matters for a specific reason here: Watson--Crick helix
+formation is the highest-frequency pattern in all RNA. Placing it in an
+always-on shared expert prevents all 32 routed experts from separately
+relearning it, freeing them to specialise on what is rare and hard---junctions,
+pseudoknots and ion pockets.
+
+Load balancing is auxiliary-loss-free, adjusting a per-expert bias each step
+rather than adding a loss term. This matters acutely here because our 3D data is
+pathologically imbalanced: 5S rRNA alone accounts for $5{,}976$ BGSU clusters,
+so an auxiliary balance loss would actively fight the biology.
+
+The router input is the token hidden state concatenated with the current local
+structural estimate---pairing probability, predicted rigidity, local density.
+This follows directly from the GNRA negative result of Table~\ref{tab:gnra}:
+routing on sequence $k$-mers does not work. It also prevents router collapse
+onto rRNA, because structural regimes are far more evenly distributed across the
+corpus than families are.
+
+\subsubsection{Parameter budget}
+
+\begin{table}[h]
+\centering
+\caption{PHAROS-Base parameter budget against NucleicBERT.}
+\label{tab:params}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Component} & \textbf{Total} & \textbf{Active} \\
+\midrule
+Embeddings (vocab 5)                 & 0.01M & 0.01M \\
+Attention, 32 blocks, $d=768$        & 75.5M & 75.5M \\
+MoE FFN, 16 blocks $\times$ 34 experts & 642M  & 113M \\
+Dense FFN, 16 non-MoE blocks         & 113M  & 113M \\
+Sparse pair track and triangle updates & 45M  & 45M \\
+Motif bank, heads, decoder           & 35M   & 35M \\
+\midrule
+\textbf{PHAROS-Base total}           & $\mathbf{\sim 911M}$ & $\mathbf{\sim 382M}$ \\
+NucleicBERT (dense)                  & 404M & 404M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+PHAROS-Base carries $2.3\times$ the capacity of NucleicBERT at slightly lower
+active compute, with an attention term roughly $8\times$ cheaper at long context.
+
+\subsection{Adaptive sparse pair track}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth,keepaspectratio]{../architecture/diagrams/rendered/04-sparse-pair-track.png}
+\caption{The sparse pair track and its measured justification.}
+\end{figure}
+
+The track proceeds in four steps. A proposal stage computes candidate pair
+scores in $O(Lw)$ from a low-rank outer product plus a Turner nearest-neighbour
+prior, never materialising an $L \times L$ tensor. A selection stage retains
+$K = 32L$ candidates. Sparse triangle updates then enforce the triangle
+inequality on the induced subgraph. Finally candidates are re-scored after every
+recycle, making the top-$K$ a soft, revisable commitment rather than a hard
+early prune.
+
+\paragraph{Failure mode.} A contact never proposed can never be predicted. The
+mitigations are the sixfold headroom of Table~\ref{tab:sparsity}, per-recycle
+re-selection, and a recall-oriented auxiliary loss on the proposal stage.
+\textcolor{risk}{\textbf{Proposal recall must be reported per length bin.}} A
+sparse track that silently drops five percent of true contacts would impose an
+invisible accuracy ceiling, and must be measured rather than assumed.
+
+\subsection{Motif retrieval bank}
+
+The RNA 3D Motif Atlas 4.12 compresses $4{,}992$ loop instances into $667$ motif
+classes, $413$ internal and $254$ hairpin: a $7.5\!:\!1$ ratio indicating that
+RNA tertiary structure is far more repetitive than its sequence diversity
+suggests. PHAROS precomputes a frozen key--value bank over these classes, with
+keys encoding the non-canonical interaction-graph signature and values encoding
+internal geometry as distance-matrix eigenfeatures plus a backbone torsion
+profile. The pair track cross-attends into this bank.
+
+This is the appropriate response to data scarcity. With only $6{,}661$ unique
+sequences carrying 3D structure, a model cannot reliably learn motif geometry
+implicitly. The bank supplies the geometry explicitly, leaving the model to
+learn only \emph{where} motifs occur---a substantially easier problem than
+learning what they look like. The bank is roughly $10^3$ fixed entries shared
+across a batch, so its cost is negligible. Consistent with
+Table~\ref{tab:gnra}, retrieval is keyed on the interaction graph, never on
+sequence $k$-mers.
+
+\subsection{Physics module}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{../architecture/diagrams/rendered/05-physics-hamiltonian.png}
+\caption{The hybrid implicit/explicit electrostatic treatment.}
+\end{figure}
+
+A differentiable energy is evaluated on the predicted geometry:
+\begin{equation}
+E_{\text{total}} = E_{\text{stack}} + E_{\text{pair}}
++ E_{\text{elec}}^{\text{implicit}} + E_{\mathrm{Mg}}^{\text{explicit}}
++ E_{\text{excl}} + E_{\text{rigid}}.
+\end{equation}
+
+The implicit/explicit split follows STEM, which establishes that mean-field
+theory captures monovalent KCl well but fails for $\mathrm{Mg}^{2+}$, where
+ion--ion correlation and site-specific chelation dominate. Our own inventory
+agrees on which species matters: $\mathrm{Mg}^{2+}$ outnumbers $\mathrm{K}^{+}$
+by $9\!:\!1$.
+
+Inner/outer-sphere classification is a first-class output because STEM's central
+claim is that folding dynamics are driven by \emph{exchange between} direct and
+water-mediated coordination---the mode, not the presence, is decisive. Our
+measurements supply both channels directly and show the inner fraction varies
+with compactness ($0.511$ overall, $0.296$ below $500$~nt).
+
+The term $E_{\text{rigid}}$ closes the loop with Table~\ref{tab:mgrigid}:
+predicted $\mathrm{Mg}^{2+}$ sites raise local rigidity, which stiffens harmonic
+restraints, which constrains the decoder. That pathway is the architectural
+encoding of the measured $1.76\sigma$ gradient.
+
+\subsection{Heads and decoder}
+
+\begin{table}[h]
+\centering
+\caption{Prediction heads and their supervision. Two channels are effectively free.}
+\label{tab:heads}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Head} & \textbf{Supervision source} & \textbf{Status} & \textbf{Labels} \\
+\midrule
+Secondary structure & bpRNA, ArchiveII, RNAStrAlign & in catalogue & $\sim$160k \\
+Contact / distance  & RNA3DB, gRNAde & in catalogue & 27{,}452 chains \\
+$\mathrm{Mg}^{2+}$ sites & \textbf{extracted from mmCIF} & \textbf{free} & 17{,}428 (180 structs) \\
+Rigidity ($z_B$, RMSF) & \textbf{B-factors in mmCIF} & \textbf{free} & every X-ray struct \\
+Reactivity (SHAPE/DMS) & Ribonanza / RMDB & \textbf{not acquired} & --- \\
+3D coordinates & RNA3DB & in catalogue & 6{,}661 unique seqs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The decoder is frame-based diffusion. We retain an explicit geometric and
+energetic stage rather than going fully generative, consistent with the CASP16
+observation that physics-plus-ML hybrids currently lead in RNA and with
+trRosettaRNA's restraint-then-fold approach outscoring AlphaFold3's raw-atom
+diffusion.
+
+$\mathrm{Mg}^{2+}$ sites and B-factor rigidity deserve emphasis: both are
+already present inside every mmCIF file the field routinely downloads, are used
+by no current structure predictor, and were extracted end-to-end in preparing
+this report.
+
+%========================================================
+\section{Data mapping and the acquisition gap}
+\label{sec:gap}
+
+\begin{figure}[p]
+\centering
+\includegraphics[height=0.82\textheight,keepaspectratio]{../architecture/diagrams/rendered/06-training-curriculum.png}
+\caption{Training curriculum, data sources, and the chemical-probing gap.}
+\end{figure}
+
+Six of seven training stages are fully served by the existing catalogue. The
+exception is chemical probing, and it is the most valuable missing asset.
+Ribonanza provides $2.1$M sequences with DMS and SHAPE measurements---roughly
+$315\times$ more supervised examples than the $6{,}661$ unique sequences with 3D
+structure. It is the only label source that is simultaneously abundant,
+structure-informative and already public. This is the highest-priority
+acquisition.
+
+\paragraph{Corpus weighting.} The elDORS chunks are source-partitioned rather
+than homogeneous: 9 of 20 chunks have a median length of exactly $151$~nt,
+indicating unassembled sequencing reads, while chunks 6 and 9 (median
+$2{,}193$--$2{,}389$~nt) are the only substantial source of long-context signal.
+Uniform sampling in Stage 1 would allow read fragments to dominate pretraining,
+so per-chunk weighting is required.
+
+%========================================================
+\section{Novelty claims}
+
+\begin{table}[h]
+\centering
+\caption{Novelty claims stated precisely, with prior-art status.}
+\begin{tabular}{p{6.6cm}p{8.2cm}}
+\toprule
+\textbf{Claim} & \textbf{Prior-art status} \\
+\midrule
+Ionic conditions as a model input, reaching attention logits through a
+Manning-screened Coulomb bias & No existing RNA structure predictor accepts
+ionic conditions. \\
+First sparse-MoE architecture for RNA structure & AIDO.Protein is MoE for
+protein; no RNA equivalent exists. \\
+$O(L)$ sparse pair track justified by measured contact scaling &
+AlphaFold3 and Rhoformer are dense $O(L^2)$. \\
+Frozen motif KV bank as a retrieval-based geometry prior & The Motif Atlas is
+published but wired into no large model. \\
+$\mathrm{Mg}^{2+}$ sites and B-factor rigidity as free auxiliary supervision &
+Present in mmCIF; used by no structure predictor. \\
+Coupled ion--rigidity expert justified by a measured $1.76\sigma$ gradient &
+Treated separately or not at all elsewhere. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%========================================================
+\section{Risks and open questions}
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=0.25em]
+\item \textbf{Proposal recall ceiling.} If the sparse proposal stage misses true
+contacts, nothing downstream recovers them. Must be measured per length bin.
+\item \textbf{Ionic metadata sparsity.} mmCIF records crystallisation conditions
+inconsistently. Stage 5 may have far fewer usable ionic labels than hoped. This
+requires an audit before committing to that stage, and is currently
+\textbf{open}.
+\item \textbf{Crystallographic ions are not the solution ensemble.} The explicit
+head learns site binding, not the diffuse atmosphere. These must not be
+conflated.
+\item \textbf{B-factor is a noisy rigidity proxy.} Excluding cryo-EM left only
+31 of 137 parsed structures usable, which materially shrinks the rigidity label
+set.
+\item \textbf{Association, not isolated causation.} $\mathrm{Mg}^{2+}$ proximity
+and packing density both track folded cores.
+\item \textbf{Infrastructure.} NucleicBERT used 192 A100s densely. MoE improves
+FLOP efficiency but adds routing and communication complexity.
+\item \textbf{Evaluation honesty.} The field ceiling is TM $\approx 0.55$. Any
+improvement claim must be made on blind sets---CASP15/16 and RNA-Puzzles---never
+on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.
+\end{enumerate}
+
+%========================================================
+\section{Status}
+
+This is a design specification. No model has been trained and no predictive
+performance is claimed. What has been established is the evidentiary basis:
+the contact-scaling law, the ion--rigidity coupling, the ion inventory and
+coordination chemistry, and the GNRA negative result, all measured on 180
+non-redundant structures with reproducible scripts. The next phase is to
+implement the sparse pair track and validate proposal recall before any
+large-scale training is attempted.
+
+\appendix
+\section{Reproducing the measurements}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Script} & \textbf{Output} \\
+\midrule
+\texttt{scripts/sampling/fetch\_samples.py} & 180 mmCIF, 12 Rfam seeds \\
+\texttt{scripts/sampling/analyze\_ions\_motifs.py} & \texttt{ion\_summary.json} \\
+\texttt{scripts/sampling/analyze\_rigidity.py} & \texttt{rigidity\_summary.json} \\
+\texttt{scripts/sampling/analyze\_contact\_sparsity.py} & \texttt{contact\_sparsity.json} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{thebibliography}{99}
+\small
+\bibitem{ernie} ERNIE-RNA: an RNA language model with structure-enhanced
+representations. \emph{Nature Communications}, 2025.
+\url{https://pmc.ncbi.nlm.nih.gov/articles/PMC12627772/}
+\bibitem{rhofold} Accurate RNA 3D structure prediction using a language
+model-based deep learning approach (RhoFold+). \emph{Nature Methods}, 2024.
+\url{https://pmc.ncbi.nlm.nih.gov/articles/PMC11621015/}
+\bibitem{af3} Accurate structure prediction of biomolecular interactions with
+AlphaFold 3. \emph{Nature}, 2024.
+\url{https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11168924/}
+\bibitem{stem} Structural Topology-based Electrostatic Model (STEM) Reveals
+Ion-Coordination Exchange as a Driver of RNA Folding Dynamics, 2026.
+\url{https://pmc.ncbi.nlm.nih.gov/articles/PMC13345221/}
+\bibitem{manning} Generalized Manning Condensation Model Captures the RNA Ion
+Atmosphere, 2015. \url{https://pubmed.ncbi.nlm.nih.gov/26197147/}
+\bibitem{motif} The RNA 3D Motif Atlas: Computational methods for extraction,
+organization and evaluation of RNA motifs. \emph{Methods}, 2016.
+\url{https://pmc.ncbi.nlm.nih.gov/articles/PMC4921307/}
+\bibitem{ribonanza} Ribonanza: deep learning of RNA structure through dual
+crowdsourcing, 2024.
+\url{https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10925082/}
+\bibitem{deepseekmoe} DeepSeekMoE: Towards Ultimate Expert Specialization in
+Mixture-of-Experts Language Models, 2024.
+\url{https://arxiv.org/html/2401.06066v1}
+\bibitem{dsv3} DeepSeek-V3 Technical Report, 2024.
+\url{https://arxiv.org/pdf/2412.19437}
+\bibitem{gdn} Gated Delta Networks: Improving Mamba2 with Delta Rule.
+\emph{ICLR}, 2025. \url{https://arxiv.org/pdf/2412.06464}
+\bibitem{aido} Mixture of Experts Enable Efficient and Effective Protein
+Understanding and Design (AIDO.Protein). \emph{bioRxiv}, 2024.
+\url{https://www.biorxiv.org/content/10.1101/2024.11.29.625425v1}
+\bibitem{dlreview} Deep learning for RNA structure prediction.
+\emph{Current Opinion in Structural Biology}, 2025.
+\url{https://www.sciencedirect.com/science/article/pii/S0959440X25000090}
+\bibitem{casp16} Enhancing RNA 3D Structure Prediction in CASP16: Integrating
+Physics-Based Modeling with Machine Learning, 2025.
+\url{https://pmc.ncbi.nlm.nih.gov/articles/PMC12354339/}
+\bibitem{enm} Elastic network models for RNA: a comparative assessment with
+molecular dynamics and SHAPE experiments. \emph{NAR}, 2015.
+\url{https://academic.oup.com/nar/article/43/15/7260/2414435}
+\bibitem{mgnet} Graph deep learning locates magnesium ions in RNA, 2023.
+\url{https://pubmed.ncbi.nlm.nih.gov/37292390/}
+\bibitem{bench2d} Comprehensive benchmarking of large language models for RNA
+secondary structure prediction. \emph{Briefings in Bioinformatics}, 2025.
+\url{https://academic.oup.com/bib/article/26/2/bbaf137/8109668}
+\end{thebibliography}
+
+\end{document}
