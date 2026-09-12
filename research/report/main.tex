@@ -328,6 +328,82 @@ site-bound ions only. The diffuse Manning atmosphere, which neutralises roughly
 $76\%$ of backbone charge, is invisible to crystallography. The two channels
 must be modelled separately and never conflated.
 
+\subsection{Coevolution is strong, but gated by alignment depth}
+\label{sec:coev}
+
+Coevolution is the oldest structural signal in the field: a base pair tolerates
+mutation at one position only when compensated at the other, so paired columns
+covary across a family alignment. We measured how much of that signal is
+actually recoverable, computing sequence-reweighted, pseudocounted,
+APC-corrected mutual information on the 12 downloaded Rfam seed alignments and
+scoring it against each family's curated consensus secondary structure
+(\texttt{\#=GC SS\_cons}), restricted to $|i-j| \geq 4$.
+
+\begin{table}[h]
+\centering
+\caption{APC-corrected MI against curated consensus base pairs. \meas}
+\label{tab:coev}
+\small
+\begin{tabular}{lrrrcc}
+\toprule
+\textbf{Family} & \textbf{$N$} & \textbf{$N_{\text{eff}}$} & \textbf{$L$} & \textbf{prec@$L/5$} & \textbf{rec@$L$} \\
+\midrule
+tRNA (RF00005)              & 954 & $245.9$ & 71  & $\mathbf{1.000}$ & $\mathbf{1.000}$ \\
+THF riboswitch (RF01831)    & 101 & $27.9$  & 100 & $1.000$ & $0.906$ \\
+Purine riboswitch (RF00167) & 133 & $102.7$ & 102 & $0.950$ & $0.955$ \\
+5S rRNA (RF00001)           & 712 & $10.3$  & 119 & $0.826$ & $0.765$ \\
+RNase P bacterial (RF00010) & 458 & $11.6$  & 367 & $0.753$ & $0.784$ \\
+SAM riboswitch (RF00162)    & 457 & $19.9$  & 108 & $0.714$ & $0.697$ \\
+Cobalamin (RF00174)         & 434 & $63.1$  & 189 & $0.676$ & $0.667$ \\
+Glutamine (RF01739)         & 940 & $15.6$  & 53  & $0.500$ & $0.692$ \\
+ydaO/yuaA (RF00379)         & 106 & $18.4$  & 134 & $0.462$ & $0.615$ \\
+TPP riboswitch (RF00059)    & 115 & $41.3$  & 105 & $0.429$ & $0.926$ \\
+tmRNA (RF00023)             & 477 & $74.6$  & 378 & $0.400$ & $0.670$ \\
+FMN riboswitch (RF00050)    & 146 & $21.2$  & 139 & $0.333$ & $0.536$ \\
+\midrule
+\textbf{mean}               &     &         &     & $\mathbf{0.670}$ & $\mathbf{0.768}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The decisive pattern is the depth dependence. Splitting on $N_{\text{eff}}/L$:
+families at $N_{\text{eff}}/L \geq 1$ ($n=2$) reach mean precision@$L/5$ of
+$\mathbf{0.975}$, while those below ($n=10$) reach $0.609$. tRNA, at
+$N_{\text{eff}}/L = 3.5$, is perfect on both precision and recall.
+
+Note how \emph{few} families are deep: only 2 of 12, and these are hand-curated
+Rfam seed alignments, among the best-conditioned RNA alignments in existence.
+Automatic homology search on an arbitrary sequence will generally do worse.
+
+\begin{quote}
+\textbf{Architectural consequence, and the strongest argument for MoE in this
+design.} Coevolution is not a weak feature to be blended in at fixed weight---where
+the alignment is deep it is very nearly sufficient on its own. But its
+availability is conditional, and the condition $N_{\text{eff}}/L$ is
+\emph{cheaply computable before the model runs}. The correct expert therefore
+depends on an observable property of the input, which is exactly what a mixture
+of experts is for. $N_{\text{eff}}/L$ becomes an explicit router feature, and
+the coevolution expert is gated on it. This also explains why RhoFold+ pairs a
+language model \emph{with} MSA features rather than choosing between them: the
+two have complementary failure modes. PHAROS makes that complementarity routed
+and explicit instead of concatenated.
+\end{quote}
+
+\paragraph{An implementation note worth recording.} A first version of this
+measurement reported mean precision $0.039$. That was a defect, not a property
+of RNA: the outer-product term in the MI normalisation broadcast to shape
+$(C,q,1)$ rather than $(C,q,q)$, so only diagonal terms contributed. After
+correcting it and adding standard DCA sequence reweighting at $80\%$ identity
+with pseudocounts, precision rose seventeenfold to $0.670$. A plausible-looking
+weak result was a silent bug.
+
+\paragraph{Caveats.} The ground truth here is Rfam's consensus \emph{secondary}
+structure, not 3D contacts, so this measures recovery of curated pairing rather
+than direct tertiary contact accuracy. Twelve curated seed families is a small
+and favourable sample. APC-corrected MI is also a simplification of full DCA;
+pseudo-likelihood DCA would do better, so these values are a reasonable lower
+bound on the available signal.
+
 \subsection{A negative result that constrains the design}
 
 We tested whether GNRA-like tetraloop sequence context alone predicts rigidity,
@@ -486,9 +562,10 @@ pathologically imbalanced: 5S rRNA alone accounts for $5{,}976$ BGSU clusters,
 so an auxiliary balance loss would actively fight the biology.
 
 The router input is the token hidden state concatenated with the current local
-structural estimate---pairing probability, predicted rigidity, local density.
-This follows directly from the GNRA negative result of Table~\ref{tab:gnra}:
-routing on sequence $k$-mers does not work. It also prevents router collapse
+structural estimate---pairing probability, predicted rigidity, local density---and
+the alignment depth $N_{\text{eff}}/L$, which gates the coevolution expert
+(Section~\ref{sec:coev}). This follows directly from the GNRA negative result of
+Table~\ref{tab:gnra}: routing on sequence $k$-mers does not work. It also prevents router collapse
 onto rRNA, because structural regimes are far more evenly distributed across the
 corpus than families are.
 
@@ -917,6 +994,7 @@ large-scale training is attempted.
 \texttt{scripts/sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
 \texttt{scripts/sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
 \texttt{scripts/sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
+\texttt{scripts/sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
 \bottomrule
 \end{tabular}
 \end{table}

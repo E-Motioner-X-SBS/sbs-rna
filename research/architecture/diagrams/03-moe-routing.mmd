@@ -1,10 +1,12 @@
 graph TB
     TOK["token hidden state h_i, d=768"]
     CTX["local structural context<br/>pairing prob, predicted rigidity, local density"]
-    ROUTER{"ROUTER<br/>input = h_i CONCAT context<br/>NOT sequence k-mers"}
+    DEPTH["alignment depth Neff/L<br/>computed BEFORE the model runs"]
+    ROUTER{"ROUTER<br/>input = h_i CONCAT context CONCAT Neff/L<br/>NOT sequence k-mers"}
 
     TOK --> ROUTER
     CTX --> ROUTER
+    DEPTH --> ROUTER
 
     subgraph SHARED["ALWAYS-ON SHARED EXPERTS (2)"]
         S1["Shared 1<br/>Watson-Crick helix<br/>the highest-frequency pattern"]
@@ -15,7 +17,7 @@ graph TB
         E1["Junction /<br/>multiloop"]
         E2["Pseudoknot /<br/>long-range"]
         E3["Ion pocket /<br/>Mg2+ coordination"]
-        E4["Coevolution /<br/>MSA"]
+        E4["Coevolution / MSA<br/>GATED on Neff/L"]
         E5["Motif<br/>geometry"]
         E6["Flexibility /<br/>dynamics"]
         EN["... 26 more"]
@@ -33,9 +35,14 @@ graph TB
     RAT["WHY ROUTE ON STRUCTURE<br/>measured: GNRA k-mer context predicts<br/>rigidity at only 0.073 sigma = negligible.<br/>Routing on family would collapse onto rRNA."]
     RAT -.-> ROUTER
 
+    COEV["WHY THE DEPTH GATE - MEASURED<br/>APC-corrected MI vs curated base pairs,<br/>12 Rfam seed alignments:<br/>Neff/L >= 1 (n=2): precision 0.975<br/>Neff/L &lt; 1 (n=10): precision 0.609<br/>tRNA at Neff/L=3.5 scores 1.000 / 1.000<br/><br/>Coevolution is near-sufficient when deep and<br/>materially weaker when shallow. The correct<br/>expert depends on an OBSERVABLE property of<br/>the input - which is what MoE is actually for."]
+    COEV -.-> DEPTH
+
     classDef shared fill:#365314,stroke:#a3e635,stroke-width:3px,color:#fff
     classDef routed fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
     classDef ctrl fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff
     class S1,S2 shared
     class E1,E2,E3,E4,E5,E6,EN routed
     class ROUTER,BAL,RAT ctrl
+    classDef meas fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    class COEV,DEPTH meas

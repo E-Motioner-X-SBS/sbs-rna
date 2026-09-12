@@ -51,6 +51,22 @@ predicts rigidity at 0.073 sigma — negligible.** **[measured]** Motif identity
 requires the interaction graph, not sequence n-grams. Motif routing therefore
 happens in the *pair* track after pairing is estimated, never from raw k-mers.
 
+**Fact 4 — Coevolution is a strong signal, but only when the alignment is deep.** **[measured]**
+APC-corrected, sequence-reweighted mutual information on 12 Rfam seed alignments
+recovers curated consensus base pairs at mean precision@L/5 = **0.670** and
+recall@L = **0.768**. tRNA (Neff/L = 3.5) reaches **1.000 / 1.000**. But the
+signal is gated by depth:
+
+| Alignment depth | n families | mean precision@L/5 |
+|---|---|---|
+| Neff/L >= 1 | 2 | **0.975** |
+| Neff/L < 1 | 10 | 0.609 |
+
+Only 2 of 12 curated *seed* alignments clear Neff/L >= 1.
+=> *The correct expert genuinely depends on an observable, cheaply computed
+property of the input (`Neff/L`). That is precisely what a mixture of experts is
+for, and it makes routing a principled choice rather than a capacity trick.*
+
 ---
 
 ## 2. What PHAROS accepts as input
@@ -182,7 +198,14 @@ equalises utilisation without adding a competing gradient.
 
 **Router input is structural, not lexical.** The router sees the token hidden
 state *concatenated with* the current local structural estimate (pairing
-probability, predicted rigidity, local density). This is a direct consequence of
+probability, predicted rigidity, local density) **and the alignment depth
+`Neff/L`**. The depth feature is what lets the router gate the coevolution
+expert: Fact 4 shows coevolution is near-sufficient at Neff/L >= 1
+(precision 0.975) and materially weaker below it (0.609), so the model should
+trust it conditionally rather than blending it in at fixed weight. This is also
+why RhoFold+ pairs a language model *with* MSA features — the two have
+complementary failure modes; PHAROS makes that complementarity routed and
+explicit instead of concatenated. This is a direct consequence of
 the GNRA negative result: **routing on sequence k-mers does not work.** It also
 prevents router collapse onto rRNA, because structural regimes (helix /
 junction / ion pocket / single-strand) are far more evenly distributed across the
@@ -517,6 +540,7 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 | 4 | **Frozen motif KV bank** as retrieval-based geometry prior | Motif Atlas is published but wired into no large model |
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
+| 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature), justified by measured 0.975 vs 0.609 precision split | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth |
 
 ## 12. Risks and open questions
 

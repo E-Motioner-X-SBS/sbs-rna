@@ -402,6 +402,68 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       </div>
     </div>
   </div>
+
+  <!-- Finding 4 -->
+  <div class="panel" style="margin-top:20px">
+    <h3>Finding 4 — coevolution is strong, but gated by alignment depth</h3>
+    <p class="note">APC-corrected, sequence-reweighted mutual information vs curated Rfam consensus base pairs · 12 seed alignments · |i−j| ≥ 4</p>
+    <div class="grid2">
+      <figure style="margin:0">
+        <svg viewBox="0 0 440 250" role="img" aria-label="Coevolution precision rises with alignment depth; families with Neff over L above one reach 0.975">
+          <line x1="56" y1="200" x2="424" y2="200" stroke="var(--rule)"/>
+          <line x1="56" y1="24" x2="56" y2="200" stroke="var(--rule)"/>
+          <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
+            <text x="50" y="204" text-anchor="end">0.0</text>
+            <text x="50" y="160" text-anchor="end">0.25</text>
+            <text x="50" y="116" text-anchor="end">0.50</text>
+            <text x="50" y="72" text-anchor="end">0.75</text>
+            <text x="50" y="28" text-anchor="end">1.00</text>
+            <text x="240" y="242" text-anchor="middle">alignment depth regime</text>
+          </g>
+          <rect x="110" y="92.8" width="90" height="107.2" fill="var(--ink-3)" opacity=".55"/>
+          <rect x="265" y="28.4" width="90" height="171.6" fill="var(--mg)"/>
+          <g font-family="var(--mono)" font-size="13" fill="var(--ink)" text-anchor="middle" font-weight="600">
+            <text x="155" y="85">0.609</text><text x="310" y="21">0.975</text>
+          </g>
+          <g font-family="var(--mono)" font-size="10" fill="var(--ink-2)" text-anchor="middle">
+            <text x="155" y="216">Neff/L &lt; 1</text><text x="310" y="216">Neff/L ≥ 1</text>
+            <text x="155" y="229" fill="var(--ink-3)">10 families</text><text x="310" y="229" fill="var(--ink-3)">2 families</text>
+          </g>
+        </svg>
+        <figcaption>precision@L/5 by depth regime</figcaption>
+      </figure>
+      <div>
+        <div class="tablewrap" style="border:none">
+          <table style="min-width:0">
+            <thead><tr><th>Family</th><th class="num">Neff</th><th class="num">L</th><th class="num">prec@L/5</th></tr></thead>
+            <tbody>
+              <tr class="total"><td>tRNA</td><td class="num">245.9</td><td class="num">71</td><td class="num">1.000</td></tr>
+              <tr><td>THF riboswitch</td><td class="num">27.9</td><td class="num">100</td><td class="num">1.000</td></tr>
+              <tr><td>Purine riboswitch</td><td class="num">102.7</td><td class="num">102</td><td class="num">0.950</td></tr>
+              <tr><td>5S rRNA</td><td class="num">10.3</td><td class="num">119</td><td class="num">0.826</td></tr>
+              <tr><td>RNase P</td><td class="num">11.6</td><td class="num">367</td><td class="num">0.753</td></tr>
+              <tr><td style="color:var(--ink-3)">… 6 more</td><td class="num"></td><td class="num"></td><td class="num"></td></tr>
+              <tr><td>FMN riboswitch</td><td class="num">21.2</td><td class="num">139</td><td class="num">0.333</td></tr>
+              <tr class="total"><td>mean (12 families)</td><td class="num"></td><td class="num"></td><td class="num">0.670</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="finding" style="margin-top:16px">
+      <span class="tag">Forces</span>
+      <p><b>This is the strongest argument for MoE in the whole design.</b> Coevolution is not
+      a weak feature to blend in at fixed weight — where the alignment is deep it is very
+      nearly sufficient alone. But availability is conditional, and the condition
+      <span class="mono">Neff/L</span> is computable <i>before the model runs</i>. The correct
+      expert therefore depends on an observable property of the input, which is precisely
+      what a mixture of experts is for. <span class="mono">Neff/L</span> becomes a router
+      feature and the coevolution expert is gated on it.
+      <span style="color:var(--ink-3)">Caveat: ground truth is Rfam consensus <i>secondary</i>
+      structure, not 3D contacts; 12 curated seed families is a small, favourable sample; and
+      APC-MI is a simplification of full DCA, so these are a lower bound.</span></p>
+    </div>
+  </div>
 </section>
 
 <!-- ================= 3. PIPELINE ================= -->
@@ -464,7 +526,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         6 active of 34. Watson–Crick helix lives in a <i>shared</i> expert so the routed 32
         never relearn it. Balancing is auxiliary-loss-free — 5S rRNA alone is 5,976 BGSU
         clusters, so a balance loss would fight the biology. <b>The router reads structural
-        regime, not sequence.</b></p>
+        regime plus alignment depth <span class="mono">Neff/L</span>, never sequence k-mers</b>
+        — the depth feature is what gates the coevolution expert (§02, Finding 4).</p>
       </div>
       <div class="cost"><b>6 / 34 active</b>every 2nd block<br>bias-based balancing</div>
     </div>
@@ -576,6 +639,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
     <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere.</div></div>
+    <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature, justified by a measured 0.975 vs 0.609 precision split</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth.</div></div>
   </div>
 </section>
 

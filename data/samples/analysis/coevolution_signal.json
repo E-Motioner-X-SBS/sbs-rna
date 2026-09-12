@@ -1,0 +1,191 @@
+{
+  "summary": {
+    "families": 12,
+    "metric": "APC-corrected MI vs Rfam SS_cons base pairs, |i-j|>=4",
+    "mean_prec_topL_5": 0.6702,
+    "mean_prec_topL": 0.2019,
+    "mean_rec_topL": 0.7677,
+    "best": "rfam_RF00005_tRNA",
+    "worst": "rfam_RF00050_FMN_riboswitch",
+    "depth_dependence": {
+      "shallow_neff_per_col_lt_1": {
+        "n": 10,
+        "mean_prec_topL_5": 0.6093
+      },
+      "deep_neff_per_col_ge_1": {
+        "n": 2,
+        "mean_prec_topL_5": 0.975
+      }
+    }
+  },
+  "families": [
+    {
+      "family": "rfam_RF00001_5S_rRNA",
+      "n_seqs": 712,
+      "neff": 10.3,
+      "n_cols": 119,
+      "n_true_pairs": 34,
+      "prec_topL": 0.2185,
+      "rec_topL": 0.7647,
+      "prec_topL_2": 0.4068,
+      "rec_topL_2": 0.7059,
+      "prec_topL_5": 0.8261,
+      "rec_topL_5": 0.5588,
+      "neff_per_col": 0.087
+    },
+    {
+      "family": "rfam_RF00005_tRNA",
+      "n_seqs": 954,
+      "neff": 245.9,
+      "n_cols": 71,
+      "n_true_pairs": 21,
+      "prec_topL": 0.2958,
+      "rec_topL": 1.0,
+      "prec_topL_2": 0.6,
+      "rec_topL_2": 1.0,
+      "prec_topL_5": 1.0,
+      "rec_topL_5": 0.6667,
+      "neff_per_col": 3.463
+    },
+    {
+      "family": "rfam_RF00010_RNaseP_bact_a",
+      "n_seqs": 458,
+      "neff": 11.6,
+      "n_cols": 367,
+      "n_true_pairs": 102,
+      "prec_topL": 0.218,
+      "rec_topL": 0.7843,
+      "prec_topL_2": 0.3607,
+      "rec_topL_2": 0.6471,
+      "prec_topL_5": 0.7534,
+      "rec_topL_5": 0.5392,
+      "neff_per_col": 0.032
+    },
+    {
+      "family": "rfam_RF00023_tmRNA",
+      "n_seqs": 477,
+      "neff": 74.6,
+      "n_cols": 378,
+      "n_true_pairs": 94,
+      "prec_topL": 0.1667,
+      "rec_topL": 0.6702,
+      "prec_topL_2": 0.254,
+      "rec_topL_2": 0.5106,
+      "prec_topL_5": 0.4,
+      "rec_topL_5": 0.3191,
+      "neff_per_col": 0.197
+    },
+    {
+      "family": "rfam_RF00050_FMN_riboswitch",
+      "n_seqs": 146,
+      "neff": 21.2,
+      "n_cols": 139,
+      "n_true_pairs": 28,
+      "prec_topL": 0.1079,
+      "rec_topL": 0.5357,
+      "prec_topL_2": 0.1594,
+      "rec_topL_2": 0.3929,
+      "prec_topL_5": 0.3333,
+      "rec_topL_5": 0.3214,
+      "neff_per_col": 0.153
+    },
+    {
+      "family": "rfam_RF00059_TPP_riboswitch",
+      "n_seqs": 115,
+      "neff": 41.3,
+      "n_cols": 105,
+      "n_true_pairs": 27,
+      "prec_topL": 0.2381,
+      "rec_topL": 0.9259,
+      "prec_topL_2": 0.4423,
+      "rec_topL_2": 0.8519,
+      "prec_topL_5": 0.4286,
+      "rec_topL_5": 0.3333,
+      "neff_per_col": 0.393
+    },
+    {
+      "family": "rfam_RF00162_SAM_riboswitch",
+      "n_seqs": 457,
+      "neff": 19.9,
+      "n_cols": 108,
+      "n_true_pairs": 33,
+      "prec_topL": 0.213,
+      "rec_topL": 0.697,
+      "prec_topL_2": 0.3704,
+      "rec_topL_2": 0.6061,
+      "prec_topL_5": 0.7143,
+      "rec_topL_5": 0.4545,
+      "neff_per_col": 0.184
+    },
+    {
+      "family": "rfam_RF00167_Purine_riboswitch",
+      "n_seqs": 133,
+      "neff": 102.7,
+      "n_cols": 102,
+      "n_true_pairs": 22,
+      "prec_topL": 0.2059,
+      "rec_topL": 0.9545,
+      "prec_topL_2": 0.4118,
+      "rec_topL_2": 0.9545,
+      "prec_topL_5": 0.95,
+      "rec_topL_5": 0.8636,
+      "neff_per_col": 1.007
+    },
+    {
+      "family": "rfam_RF00174_Cobalamin_riboswitch",
+      "n_seqs": 434,
+      "neff": 63.1,
+      "n_cols": 189,
+      "n_true_pairs": 51,
+      "prec_topL": 0.1799,
+      "rec_topL": 0.6667,
+      "prec_topL_2": 0.3617,
+      "rec_topL_2": 0.6667,
+      "prec_topL_5": 0.6757,
+      "rec_topL_5": 0.4902,
+      "neff_per_col": 0.334
+    },
+    {
+      "family": "rfam_RF00379_ydaO_yuaA",
+      "n_seqs": 106,
+      "neff": 18.4,
+      "n_cols": 134,
+      "n_true_pairs": 26,
+      "prec_topL": 0.1194,
+      "rec_topL": 0.6154,
+      "prec_topL_2": 0.209,
+      "rec_topL_2": 0.5385,
+      "prec_topL_5": 0.4615,
+      "rec_topL_5": 0.4615,
+      "neff_per_col": 0.137
+    },
+    {
+      "family": "rfam_RF01739_Glutamine_riboswitch",
+      "n_seqs": 940,
+      "neff": 15.6,
+      "n_cols": 53,
+      "n_true_pairs": 13,
+      "prec_topL": 0.1698,
+      "rec_topL": 0.6923,
+      "prec_topL_2": 0.2692,
+      "rec_topL_2": 0.5385,
+      "prec_topL_5": 0.5,
+      "rec_topL_5": 0.3846,
+      "neff_per_col": 0.294
+    },
+    {
+      "family": "rfam_RF01831_THF_riboswitch",
+      "n_seqs": 101,
+      "neff": 27.9,
+      "n_cols": 100,
+      "n_true_pairs": 32,
+      "prec_topL": 0.29,
+      "rec_topL": 0.9062,
+      "prec_topL_2": 0.54,
+      "rec_topL_2": 0.8438,
+      "prec_topL_5": 1.0,
+      "rec_topL_5": 0.625,
+      "neff_per_col": 0.279
+    }
+  ]
+}

@@ -97,6 +97,8 @@ hand-set 3-valued base-pairing bias. Inductive bias, not scale, is the lever.
 | **Block occupancy** | **1.34% at b=4 on long chains; falls as L grows; effective c = 17.2** |
 | **Ionic metadata (R2)** | **~36% coverage; cryo-EM 23.9% structured, X-ray 58.7% free text** |
 | **PDB ionic survivorship bias** | **recorded Mg²⁺ spans only 5-15 mM — nobody deposits unfolded RNA** |
+| **Coevolution signal** | APC-MI recovers curated base pairs at prec@L/5 **0.670**, rec@L 0.768 |
+| **Coevolution depth gate** | **Neff/L >= 1: 0.975 precision; Neff/L < 1: 0.609.** tRNA = 1.000/1.000 |
 
 **Architecture** -> `research/architecture/ARCHITECTURE.md` (PHAROS v0.1).
 The efficiency claim was tested rather than assumed, and **the original flat sparse pair
@@ -131,8 +133,15 @@ Highest value first:
       the titration ladders in RMDB do.
 - [ ] **Acquire chemical probing data** (Ribonanza 2.1M DMS/SHAPE). ~315x more supervised
       examples than the 6,661 unique 3D sequences; the single largest missing asset.
-- [ ] Write `research/prior-art/06-coevolution.md` (material gathered, not yet written:
-      RNAcmap/rMSA, CoCoNet, DIRECT, MSA-depth limits, CS-Fold).
+- [x] ~~Write `research/prior-art/06-coevolution.md`~~ **DONE, with measurements.**
+      APC-corrected MI on the 12 Rfam seeds recovers curated base pairs at mean
+      prec@L/5 = 0.670 / rec@L = 0.768; tRNA is perfect (1.000/1.000). The depth split
+      (Neff/L >= 1 -> 0.975 vs < 1 -> 0.609) is now the **strongest argument for MoE in
+      the design**: the right expert depends on an observable, pre-computable property of
+      the input. `Neff/L` added as a router feature; coevolution expert gated on it.
+      *Caution recorded*: the first run reported 0.039 precision due to a broadcast bug
+      in the MI outer product ((C,q,1) instead of (C,q,q)) plus missing sequence
+      reweighting. Fixing it moved the number 17x. Verify before believing weak results.
 - [ ] Extract Mg²⁺-site and B-factor labels at scale from the server's 27,452 chains to
       size the two "free" supervision channels properly (180 structures is a pilot).
 - [ ] Fix the four repo issues listed above (MANIFEST caps, `total_sequences()`,
@@ -150,5 +159,6 @@ python3 scripts/sampling/analyze_contact_separation.py # contact_separation.json
 python3 scripts/sampling/analyze_block_sparsity.py     # block_sparsity.json
 python3 scripts/sampling/audit_ionic_metadata.py       # ionic_metadata_audit.json
 python3 scripts/sampling/audit_em_buffers.py           # em_buffer_audit.json
+python3 scripts/sampling/measure_coevolution.py        # coevolution_signal.json
 cd research/report && pdflatex main.tex                # 18pp report
 ```
