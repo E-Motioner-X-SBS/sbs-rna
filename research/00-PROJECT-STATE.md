@@ -95,6 +95,8 @@ hand-set 3-valued base-pairing bias. Inductive bias, not scale, is the lever.
 | **Flat top-K recall (negative)** | **0.200 on 500-1200 nt chains; random scorer gets 0.746 mean** |
 | Contact separation | median 78 nt on long chains; +/-512 band still misses 19% |
 | **Block occupancy** | **1.34% at b=4 on long chains; falls as L grows; effective c = 17.2** |
+| **Ionic metadata (R2)** | **~36% coverage; cryo-EM 23.9% structured, X-ray 58.7% free text** |
+| **PDB ionic survivorship bias** | **recorded Mg²⁺ spans only 5-15 mM — nobody deposits unfolded RNA** |
 
 **Architecture** -> `research/architecture/ARCHITECTURE.md` (PHAROS v0.1).
 The efficiency claim was tested rather than assumed, and **the original flat sparse pair
@@ -116,9 +118,17 @@ Highest value first:
 - [ ] **Prototype the hierarchical pair track in torch** and measure block-detection
       recall with a *learned* scorer, not the sequence-only heuristic. This is the one
       unproven load-bearing claim (risk R1).
-- [ ] **Audit ionic metadata availability** in mmCIF (`_exptl_crystal_grow`). Risk R2 is
-      still open: if crystallisation conditions are too sparse/inconsistent, training
-      stage 5 is not viable as specified and the ion-conditioning claim weakens.
+- [x] ~~Audit ionic metadata availability~~ **DONE, and it rescoped the headline claim.**
+      Cryo-EM stores buffers as *structured* `_em_buffer_component` (concentration + units),
+      X-ray as free-text `_exptl_crystal_grow.pdbx_details`. Coverage ~36%. The deeper
+      problem is **survivorship bias**: recorded Mg²⁺ spans only 5-15 mM because nobody
+      deposits unfolded RNA, so the [Mg²⁺]->structure *response* cannot be learned from the
+      PDB at all. The closed-form `B_elec` term and the Mg²⁺ site head are unaffected;
+      training stage 5 was rewritten to condition on RMDB titration series instead.
+      See ARCHITECTURE.md §7b and report §6.
+- [ ] **Acquire RMDB Mg²⁺ titration series** — now a *prerequisite* for the headline
+      ion-conditioning claim, not merely a nice-to-have. Ribonanza does NOT supply this;
+      the titration ladders in RMDB do.
 - [ ] **Acquire chemical probing data** (Ribonanza 2.1M DMS/SHAPE). ~315x more supervised
       examples than the 6,661 unique 3D sequences; the single largest missing asset.
 - [ ] Write `research/prior-art/06-coevolution.md` (material gathered, not yet written:
@@ -138,5 +148,7 @@ python3 scripts/sampling/analyze_contact_sparsity.py   # contact_sparsity.json
 python3 scripts/sampling/validate_proposal_recall.py   # proposal_recall.json
 python3 scripts/sampling/analyze_contact_separation.py # contact_separation.json
 python3 scripts/sampling/analyze_block_sparsity.py     # block_sparsity.json
+python3 scripts/sampling/audit_ionic_metadata.py       # ionic_metadata_audit.json
+python3 scripts/sampling/audit_em_buffers.py           # em_buffer_audit.json
 cd research/report && pdflatex main.tex                # 18pp report
 ```

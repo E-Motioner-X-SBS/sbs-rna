@@ -1,0 +1,1152 @@
+{
+  "summary": {
+    "em_structures": 117,
+    "with_buffer_components": 29,
+    "frac_with_buffer_components": 0.2479,
+    "with_pH": 0.9402,
+    "with_any_ion_concentration": 0.2393,
+    "with_Mg_concentration": 0.1795,
+    "with_full_conditioning_vector": 0.2393,
+    "ion_mentions": {
+      "Mg": 21,
+      "Na": 15,
+      "K": 13,
+      "Ca": 2,
+      "spermine": 2
+    },
+    "concentration_mM": {
+      "Mg": {
+        "n": 21,
+        "median": 7.5,
+        "p10": 5.0,
+        "p90": 15.0
+      },
+      "K": {
+        "n": 13,
+        "median": 100.0,
+        "p10": 30.0,
+        "p90": 150.0
+      },
+      "Na": {
+        "n": 12,
+        "median": 150.0,
+        "p10": 100.0,
+        "p90": 150.0
+      },
+      "Ca": {
+        "n": 2,
+        "median": 0.5,
+        "p10": 0.5,
+        "p90": 0.5
+      },
+      "spermine": {
+        "n": 2,
+        "median": 1.0,
+        "p10": 1.0,
+        "p90": 1.0
+      }
+    },
+    "examples": [
+      {
+        "pdb": "7MQF",
+        "pH": 7.5,
+        "ions_mM": {
+          "Na": 150.0
+        }
+      },
+      {
+        "pdb": "7O1C",
+        "pH": 7.5,
+        "ions_mM": {
+          "K": 100.0,
+          "Mg": 25.0
+        }
+      },
+      {
+        "pdb": "7OB9",
+        "pH": 7.5,
+        "ions_mM": {
+          "Mg": 5.0
+        }
+      },
+      {
+        "pdb": "7ORN",
+        "pH": 8.0,
+        "ions_mM": {
+          "Na": 150.0,
+          "Mg": 5.0
+        }
+      },
+      {
+        "pdb": "7ORO",
+        "pH": 8.0,
+        "ions_mM": {
+          "Na": 150.0,
+          "Mg": 5.0
+        }
+      },
+      {
+        "pdb": "7OYB",
+        "pH": 7.6,
+        "ions_mM": {
+          "K": 100.0,
+          "Mg": 5.0
+        }
+      }
+    ]
+  },
+  "structures": [
+    {
+      "pdb": "7MQF",
+      "pH": 7.5,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 150.0
+      },
+      "component_names": [
+        "Solium chloride",
+        "Tris",
+        "NP-40"
+      ]
+    },
+    {
+      "pdb": "7N06",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7N2V",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7NHN",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7O1C",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {
+        "K": 100.0,
+        "Mg": 25.0
+      },
+      "component_names": [
+        "HEPES-potasium buffer",
+        "potassium acetate",
+        "magnesium acetate",
+        "L-tryptophan"
+      ]
+    },
+    {
+      "pdb": "7O7Z",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7OB9",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {
+        "Mg": 5.0
+      },
+      "component_names": [
+        "HEPES",
+        "ammonium sulfate",
+        "magnesium chloride",
+        "dithiothreitol"
+      ]
+    },
+    {
+      "pdb": "7OEA",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7OIF",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7OIZ",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7OJN",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ONU",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {},
+      "component_names": [
+        "Sodium Chloride",
+        "Na-HEPES (Sodium 4-(2-hydroxyethyl)-1-piperazineethanesulfonate)",
+        "Ethylenediaminetetraacetic acid disodium salt",
+        "Dithiothreitol"
+      ]
+    },
+    {
+      "pdb": "7ORN",
+      "pH": 8.0,
+      "n_components": 6,
+      "ions_mM": {
+        "Na": 150.0,
+        "Mg": 5.0
+      },
+      "component_names": [
+        "Tris-Hcl",
+        "NaCl",
+        "beta-mercaptoethanol",
+        "ATP",
+        "UTP",
+        "MgCl2"
+      ]
+    },
+    {
+      "pdb": "7ORO",
+      "pH": 8.0,
+      "n_components": 7,
+      "ions_mM": {
+        "Na": 150.0,
+        "Mg": 5.0
+      },
+      "component_names": [
+        "Tris-HCl",
+        "NaCl",
+        "beta-mercaptoethanol",
+        "ATP",
+        "GTP",
+        "UTP",
+        "MgCl2"
+      ]
+    },
+    {
+      "pdb": "7OYB",
+      "pH": 7.6,
+      "n_components": 5,
+      "ions_mM": {
+        "K": 100.0,
+        "Mg": 5.0
+      },
+      "component_names": [
+        "HEPES",
+        "potassium chloride",
+        "magnesium acetate",
+        "dithiothreitol",
+        "ammonium chloride"
+      ]
+    },
+    {
+      "pdb": "7OYC",
+      "pH": 7.6,
+      "n_components": 5,
+      "ions_mM": {
+        "Mg": 5.0,
+        "K": 100.0
+      },
+      "component_names": [
+        "Magnesium acetate",
+        "HEPES",
+        "potassium cholride",
+        "Dithiotreitol",
+        "ammonium cholride"
+      ]
+    },
+    {
+      "pdb": "7P7T",
+      "pH": 9.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7PKT",
+      "pH": 7.6,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7PU7",
+      "pH": 7.0,
+      "n_components": 4,
+      "ions_mM": {
+        "K": 50.0
+      },
+      "component_names": [
+        "PIPES",
+        "potassium glutammate",
+        "DTT",
+        "tween20"
+      ]
+    },
+    {
+      "pdb": "7PWG",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7PZY",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QCA",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QEP",
+      "pH": 7.5,
+      "n_components": 3,
+      "ions_mM": {
+        "Mg": 25.0,
+        "K": 130.0
+      },
+      "component_names": [
+        "HEPES-KOH",
+        "magnesium chloride",
+        "potassium chloride"
+      ]
+    },
+    {
+      "pdb": "7QGG",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {
+        "K": 150.0,
+        "Mg": 4.0
+      },
+      "component_names": [
+        "4-(2-hydroxyethyl)-1-piperazineethanesulfonic acid",
+        "potassium acetate",
+        "magnesium acetate",
+        "tris(2-carboxyethyl)phosphine"
+      ]
+    },
+    {
+      "pdb": "7QH7",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QI4",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QIW",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QIZ",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7QVP",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7R6Q",
+      "pH": 8.0,
+      "n_components": 5,
+      "ions_mM": {
+        "Na": 150.0,
+        "Mg": 10.0
+      },
+      "component_names": [
+        "Bis-Tris-Propane",
+        "Sodium Chloride",
+        "Magnesium Chloride",
+        "TCEP",
+        "NP-40"
+      ]
+    },
+    {
+      "pdb": "7R81",
+      "pH": 7.6,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7RYF",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7SBA",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {
+        "Na": 100.0
+      },
+      "component_names": [
+        "sodium chloride",
+        "HEPES",
+        "DTT",
+        "Glycerol"
+      ]
+    },
+    {
+      "pdb": "7UCK",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7UOB",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7UQB",
+      "pH": 8.0,
+      "n_components": 7,
+      "ions_mM": {
+        "Na": 125.0,
+        "K": 25.0,
+        "Mg": 10.0
+      },
+      "component_names": [
+        "Bis-Tris-Propane",
+        "Sodium Chloride",
+        "Potassium Chloride",
+        "Magnesium Chloride",
+        "TCEP",
+        "NP-40",
+        "Aluminium Fluoride"
+      ]
+    },
+    {
+      "pdb": "7UR5",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7VTN",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7WAY",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7WJU",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7WV3",
+      "pH": 5.5,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 150.0
+      },
+      "component_names": [
+        "2-(N-morpholino)ethanesulfonic acid",
+        "sodium chloride",
+        "n-Tetradecylphosphocholine"
+      ]
+    },
+    {
+      "pdb": "7XSP",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7Y7G",
+      "pH": 7.6,
+      "n_components": 4,
+      "ions_mM": {
+        "Mg": 10.0
+      },
+      "component_names": [
+        "HEPES, 4-(2-hydroxyethyl)-1-piperazineethanesulfonic acid",
+        "Magnesium acetate",
+        "Ammonium chloride",
+        "2-mercaptoethanol"
+      ]
+    },
+    {
+      "pdb": "7Y82",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7YGB",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7YGC",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZGP",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZHG",
+      "pH": 6.7,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZJW",
+      "pH": 7.6,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZTA",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZUX",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "7ZW0",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8A22",
+      "pH": 7.45,
+      "n_components": 3,
+      "ions_mM": {
+        "Mg": 5.0,
+        "K": 50.0
+      },
+      "component_names": [
+        "HEPES",
+        "Magnesium Chloride",
+        "Potassium Chloride"
+      ]
+    },
+    {
+      "pdb": "8A3W",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8A5I",
+      "pH": 7.5,
+      "n_components": 8,
+      "ions_mM": {
+        "Mg": 15.0,
+        "K": 95.0,
+        "Ca": 0.5,
+        "spermine": 1.0
+      },
+      "component_names": [
+        "HEPES",
+        "Magnesium acetate",
+        "Potassium chloride",
+        "Ammonium chloride",
+        "Calcium chloride",
+        "Putrescine",
+        "Spermidine",
+        "EDTA"
+      ]
+    },
+    {
+      "pdb": "8AS7",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8AUV",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8B2L",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8B6Z",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8B9I",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8BE0",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8BF9",
+      "pH": 7.4,
+      "n_components": 5,
+      "ions_mM": {
+        "K": 300.0,
+        "Mg": 10.0
+      },
+      "component_names": [
+        "Hepes",
+        "Potassium acetate",
+        "Magnesium acetate",
+        "Dithiothritol",
+        "Lauryl maltose neopentyl glycol"
+      ]
+    },
+    {
+      "pdb": "8BHN",
+      "pH": 7.5,
+      "n_components": 4,
+      "ions_mM": {
+        "K": 30.0,
+        "Mg": 7.0
+      },
+      "component_names": [
+        "tris(hydroxymethyl)aminomethane",
+        "ammonium chloride",
+        "potassium chloride",
+        "magnesium chloride"
+      ]
+    },
+    {
+      "pdb": "8BUU",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8CBK",
+      "pH": 8.0,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 100.0
+      },
+      "component_names": [
+        "2-Amino-2-hydroxymethyl-propane-1,3-diol",
+        "Sodium chloride",
+        "TCEP"
+      ]
+    },
+    {
+      "pdb": "8CWO",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8D4A",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8DFA",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8DFS",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8DZJ",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8E2A",
+      "pH": 7.5,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 150.0
+      },
+      "component_names": [
+        "4-(2-hydroxyethyl)-1-piperazineethanesulfonic acid",
+        "Sodium Chloride",
+        "Dithiothreitol"
+      ]
+    },
+    {
+      "pdb": "8E74",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8EHQ",
+      "pH": 7.9,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8ESQ",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8EUG",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8EVS",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8EWG",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8EX9",
+      "pH": 8.0,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 125.0,
+        "Mg": 10.0
+      },
+      "component_names": [
+        "sodium chloride",
+        "magnesium chloride",
+        "Tris"
+      ]
+    },
+    {
+      "pdb": "8FKW",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8FMW",
+      "pH": 7.5,
+      "n_components": 3,
+      "ions_mM": {
+        "Mg": 10.0
+      },
+      "component_names": [
+        "HEPES",
+        "Ammonium chloride",
+        "Magnesium chloride"
+      ]
+    },
+    {
+      "pdb": "8FR8",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8FRU",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8FVY",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8GKH",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8GS2",
+      "pH": 7.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8H0I",
+      "pH": 8.0,
+      "n_components": 3,
+      "ions_mM": {
+        "Na": 150.0
+      },
+      "component_names": [
+        "Tris",
+        "sodium chloride",
+        "TCEP"
+      ]
+    },
+    {
+      "pdb": "8HHL",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8HKU",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8HMY",
+      "pH": 7.9,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8HMZ",
+      "pH": 7.9,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8IAZ",
+      "pH": 7.2,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8IYQ",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8JDJ",
+      "pH": 7.4,
+      "n_components": 3,
+      "ions_mM": {
+        "K": 100.0,
+        "Mg": 7.5
+      },
+      "component_names": [
+        "HEPES, 4-(2-hydroxyethyl)-1-piperazineethanesulfonic acid",
+        "Potassium Acetate",
+        "Magnesium acetate"
+      ]
+    },
+    {
+      "pdb": "8K0P",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8K34",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8KD9",
+      "pH": 8.0,
+      "n_components": 4,
+      "ions_mM": {
+        "Na": 100.0,
+        "Mg": 5.0
+      },
+      "component_names": [
+        "?",
+        "?",
+        "?",
+        "?"
+      ]
+    },
+    {
+      "pdb": "8OP2",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8P8B",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8PV7",
+      "pH": null,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8R6C",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "8WRP",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9AXU",
+      "pH": 7.4,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9BUP",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9EY2",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9FCO",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9FHL",
+      "pH": 6.7,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9FXO",
+      "pH": 7.6,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9G6J",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9GHE",
+      "pH": 7.5,
+      "n_components": 9,
+      "ions_mM": {
+        "K": 95.0,
+        "Mg": 5.0,
+        "Ca": 0.5,
+        "spermine": 1.0
+      },
+      "component_names": [
+        "HEPES-KOH",
+        "Potassium chloride",
+        "Ammonium chloride",
+        "Magnesium acetate",
+        "Calcium chloride",
+        "Putrescine",
+        "Spermidine",
+        "Fusidic acid"
+      ]
+    },
+    {
+      "pdb": "9GYT",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9JPP",
+      "pH": 7.6,
+      "n_components": 4,
+      "ions_mM": {
+        "Mg": 10.0
+      },
+      "component_names": [
+        "HEPES, 4-(2-hydroxyethyl)-1-piperazineethanesulfonic acid",
+        "Magnesium acetate",
+        "Ammonium chloride",
+        "2-mercaptoethanol"
+      ]
+    },
+    {
+      "pdb": "9KZU",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9N3Y",
+      "pH": 8.0,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9O3V",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9PJ7",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9PJ9",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    },
+    {
+      "pdb": "9Q2P",
+      "pH": 7.5,
+      "n_components": 0,
+      "ions_mM": {},
+      "component_names": []
+    }
+  ]
+}

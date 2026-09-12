@@ -421,7 +421,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p>L nucleotides, vocab 5 (A C G U N), L ≤ 4096 — plus
         <b>c<sub>ion</sub> = ([Mg²⁺], [K⁺], [Na⁺], T, pH)</b> as a FiLM-style conditioning
         vector. The same sequence at 0 mM and 10 mM Mg²⁺ must predict differently.
-        No existing RNA predictor accepts this input.</p>
+        No existing RNA predictor accepts this input. <b>The physics term needs no labels;
+        the <i>learned</i> response cannot be trained on the PDB</b> — see §08.</p>
       </div>
       <div class="cost"><b>novel input</b>MSA optional<br>probing optional</div>
     </div>
@@ -569,7 +570,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
 <section>
   <div class="sechead"><span class="secnum">05</span><h2>Novelty claims</h2></div>
   <div class="claims">
-    <div class="claim"><div class="what">Ionic conditions as a model input, reaching attention logits via a Manning-screened Coulomb bias</div><div class="status">No existing RNA structure predictor accepts ionic conditions.</div></div>
+    <div class="claim"><div class="what">Ionic conditions as a model input, reaching attention logits via a Manning-screened Coulomb bias</div><div class="status">No existing RNA structure predictor accepts ionic conditions. The physics term needs no labels; the learned response requires titration data (§08).</div></div>
     <div class="claim"><div class="what">First sparse-MoE architecture for RNA structure</div><div class="status">AIDO.Protein is MoE for protein; no RNA equivalent exists.</div></div>
     <div class="claim"><div class="what">Hierarchical coarse-to-fine pair track selecting blocks rather than pairs, justified by measured 1.34% block occupancy</div><div class="status">AlphaFold3 and Rhoformer are dense O(L²); flat top-K sparsification is measured here to fail at ~20% recall on long chains.</div></div>
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
@@ -583,7 +584,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   <div class="sechead"><span class="secnum">06</span><h2>What could sink it</h2></div>
   <div class="risks">
     <div class="risk"><span class="n">R1</span><p><b>Block-detection recall.</b> Superseded but not eliminated — the flat design was measured at ~20% recall and replaced (§07). The hierarchical track has a 100% recall <i>ceiling</i> by construction, but whether a trained model attains it is unproven. Recall must be reported per length bin <i>and per level</i>.</p></div>
-    <div class="risk"><span class="n">R2</span><p><b>Ionic metadata is sparse and inconsistent.</b> mmCIF records crystallisation conditions unevenly. The ion-conditioned training stage may have far fewer usable labels than hoped. <b>This needs an audit before the stage is committed to — currently open.</b></p></div>
+    <div class="risk"><span class="n">R2</span><p><b>Ionic metadata — audited, partially confirmed (§08).</b> ~36% of structures yield a recoverable ionic condition. Worse, recorded Mg²⁺ spans only 5–15 mM because the PDB is survivorship-biased. The learned ionic response must come from RMDB titration series, not the PDB. The closed-form physics term and the Mg²⁺ site head are unaffected.</p></div>
     <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~76% of backbone charge is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
     <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs left only 31 of 137 parsed structures usable.</p></div>
     <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
@@ -691,6 +692,76 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     blocks — that needs training. The nearest external evidence is ERNIE-RNA's zero-shot
     Top-L/1 contact precision of 0.68 from attention alone, which suggests learned
     representations rank contacts far better than the sequence-only heuristic tested here.</p>
+  </div>
+</section>
+
+<!-- ================= 8. IONIC AUDIT ================= -->
+<section>
+  <div class="sechead"><span class="secnum">08</span><h2>The audit that rescoped the headline claim</h2></div>
+  <p class="lede">Accepting ionic conditions as an input requires structures labelled with
+  the ionic environment they were solved in. We audited all 180. The claim did not survive
+  intact.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Coverage is about one third</h3>
+      <p class="note">The two methods store conditions in completely different ways</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Method</th><th class="num">n</th><th>mmCIF location</th><th class="num">usable</th></tr></thead>
+          <tbody>
+            <tr><td>Cryo-EM</td><td class="num">117</td><td><span class="mono" style="font-size:11.5px">_em_buffer_component</span><br><span style="color:var(--mg)">structured</span></td><td class="num">23.9%</td></tr>
+            <tr><td>X-ray</td><td class="num">63</td><td><span class="mono" style="font-size:11.5px">_exptl_crystal_grow</span><br><span style="color:var(--warn)">free text</span></td><td class="num">58.7%*</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;color:var(--ink-3);margin:10px 0 0">* mention an ion; extraction
+      from prose is noisy. Cryo-EM records pH for 94% of entries but populates buffer
+      components for only 24.8%.</p>
+    </div>
+
+    <div class="panel">
+      <h3>And the range is far too narrow</h3>
+      <p class="note">Recorded buffer concentrations, cryo-EM entries</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Ion</th><th class="num">n</th><th class="num">p10</th><th class="num">median</th><th class="num">p90</th></tr></thead>
+          <tbody>
+            <tr class="total"><td>Mg²⁺</td><td class="num">21</td><td class="num">5.0 mM</td><td class="num">7.5 mM</td><td class="num">15.0 mM</td></tr>
+            <tr><td>K⁺</td><td class="num">13</td><td class="num">30 mM</td><td class="num">100 mM</td><td class="num">150 mM</td></tr>
+            <tr><td>Na⁺</td><td class="num">12</td><td class="num">100 mM</td><td class="num">150 mM</td><td class="num">150 mM</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="finding" style="margin-top:14px;border-left-color:var(--warn)">
+        <span class="tag" style="color:var(--warn)">Survivorship bias</span>
+        <p>Mg²⁺ spans only 5–15 mM, and this is not a sampling accident. <b>Nobody deposits a
+        structure of unfolded RNA.</b> Every PDB entry was solved under conditions chosen
+        <i>because</i> the RNA folds there, so the archive holds almost no contrast between
+        folding and non-folding ionic regimes. A model trained on deposited structures alone
+        would see ionic condition as near-constant and correctly learn to ignore it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <thead><tr><th>Component of the claim</th><th>Evidentiary support</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>B<sub>elec</sub> Manning/Debye screening</td><td>closed-form physics; needs no training labels</td><td style="color:var(--mg);font-weight:600">Unaffected</td></tr>
+        <tr><td>Mg²⁺ site head + inner/outer classifier</td><td>17,428 labelled ions from 180 structures</td><td style="color:var(--mg);font-weight:600">Well supported</td></tr>
+        <tr><td>Learned <i>response</i> to varying ionic conditions</td><td>requires titration series; the PDB has none</td><td style="color:var(--warn);font-weight:600">Not supported</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="recycle" style="border-style:solid;margin-top:18px">
+    CONSEQUENCE — Training stage 5 as originally specified is <b>not viable on PDB data
+    alone</b>. It is rewritten to condition on <b>RMDB Mg²⁺ titration series</b> (SHAPE/DMS
+    across an Mg²⁺ ladder on the same sequence), with deposited structures supplying only
+    site-level supervision. This promotes chemical-probing acquisition from "most valuable
+    missing asset" to <b>prerequisite for the headline claim</b> — and note that Ribonanza
+    alone does not supply it; the titration series in RMDB do.
   </div>
 </section>
 

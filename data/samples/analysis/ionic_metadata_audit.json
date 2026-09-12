@@ -1,0 +1,2117 @@
+{
+  "summary": {
+    "structures": 180,
+    "by_method": {
+      "ELECTRON MICROSCOPY": 117,
+      "X-RAY DIFFRACTION": 63
+    },
+    "overall": {
+      "with_crystal_growth_details": 0.35,
+      "with_pH": 0.2056,
+      "with_temp": 0.35,
+      "with_any_ion_mentioned": 0.2056,
+      "with_parseable_concentration": 0.3111
+    },
+    "xray_only": {
+      "n": 63,
+      "with_crystal_growth_details": 1.0,
+      "with_pH": 0.5873,
+      "with_any_ion_mentioned": 0.5873,
+      "with_parseable_concentration": 0.8889
+    },
+    "cryoem_only": {
+      "n": 117,
+      "with_crystal_growth_details": 0.0,
+      "with_any_ion_mentioned": 0.0
+    },
+    "species_mentions": {
+      "Na": 24,
+      "Mg": 10,
+      "K": 8,
+      "spermine": 6,
+      "Li": 3,
+      "Ca": 2,
+      "Ir/Os/hexammine": 1
+    },
+    "examples": [
+      "0.1-0.2 M Arginine-HCl, 0.1M Tris-HCl pH 7.6, 2.6-3.0% PEG-20K, 7-10% MPD, 0.5mM BME",
+      "1.7 M Lithium sulfate, 10 % w/v Glycerol",
+      "Crystals grown by vapor diffusion as sitting drops. Drops were equal volumes of a 6 mg/ml STMV stock solution buffered at pH 6.5 with 0.1 M phosphate. The reservoirs were 16% satur",
+      "Crystals grown by sitting drop vapor diffusion in Cryschem plates with 0.6 ml reservoirs and 6 to 8 ul drops. Drops were equal amounts of a 5 mg/ml virus stock solution buffered at",
+      "Crystals were grown by sitting drop vapor diffusion in Cryschem plates using 0.6 ml reservoirs. Drops were 6 to 8 ul and were composed of equal volumes of a 5 mg/ml virus stock sol"
+    ]
+  },
+  "structures": [
+    {
+      "pdb": "5J8B",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 84,
+      "species": [],
+      "n_conc_tokens": 5,
+      "pH": "7.6",
+      "temp": "292",
+      "details_excerpt": "0.1-0.2 M Arginine-HCl, 0.1M Tris-HCl pH 7.6, 2.6-3.0% PEG-20K, 7-10% MPD, 0.5mM BME"
+    },
+    {
+      "pdb": "7LNE",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 40,
+      "species": [
+        "Li"
+      ],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "1.7 M Lithium sulfate, 10 % w/v Glycerol"
+    },
+    {
+      "pdb": "7M2T",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 331,
+      "species": [
+        "Mg"
+      ],
+      "n_conc_tokens": 4,
+      "pH": "6.5",
+      "temp": "279",
+      "details_excerpt": "Crystals grown by vapor diffusion as sitting drops. Drops were equal volumes of a 6 mg/ml STMV stock solution buffered at pH 6.5 with 0.1 M phosphate. The reservoirs were 16% satur"
+    },
+    {
+      "pdb": "7M2V",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 342,
+      "species": [
+        "Mg",
+        "Na"
+      ],
+      "n_conc_tokens": 4,
+      "pH": "6.0",
+      "temp": "279",
+      "details_excerpt": "Crystals grown by sitting drop vapor diffusion in Cryschem plates with 0.6 ml reservoirs and 6 to 8 ul drops. Drops were equal amounts of a 5 mg/ml virus stock solution buffered at"
+    },
+    {
+      "pdb": "7M50",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 377,
+      "species": [
+        "Mg"
+      ],
+      "n_conc_tokens": 4,
+      "pH": "6.0",
+      "temp": "279",
+      "details_excerpt": "Crystals were grown by sitting drop vapor diffusion in Cryschem plates using 0.6 ml reservoirs. Drops were 6 to 8 ul and were composed of equal volumes of a 5 mg/ml virus stock sol"
+    },
+    {
+      "pdb": "7MJV",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 80,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": null,
+      "temp": "298",
+      "details_excerpt": "100 mM Na-cacodylate, pH 5.5, 13% PEG 4000 and 3% (+/-)-2-methyl-2,4-pentanediol"
+    },
+    {
+      "pdb": "7MKT",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 371,
+      "species": [
+        "K"
+      ],
+      "n_conc_tokens": 8,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "The RNA smaple was prepared by mixing 1.44mM (GU)11G RNA and 1.44 mM NMM in 10 mM Tris, pH 7.03, and 100 mM KCl. An equal volume of RNA sample solution and reservoir solution were "
+    },
+    {
+      "pdb": "7MLX",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 97,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 1,
+      "pH": null,
+      "temp": "298",
+      "details_excerpt": "2 % v/v tacsimate pH 4, 0.1 M sodium acetate trihydrate pH 4.6, 16 % w/v polyethylene glycol 3350"
+    },
+    {
+      "pdb": "7MQF",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7MSF",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 213,
+      "species": [],
+      "n_conc_tokens": 8,
+      "pH": "7.4",
+      "temp": "300",
+      "details_excerpt": "PROTEIN IN 1.25% OR 1.5% PEG 8000, 0.1M NA PHOSPHATE PH 7.4 AND 0.02% NA AZIDE WAS EQUILIBRATED AGAINST 0.35M OR 0.4M NA PHOSPHATE PH 7.4, 0.02% NA AZIDE AT 300 OR 370 C. WASHED CR"
+    },
+    {
+      "pdb": "7N06",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7N2V",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7NDJ",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 33,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "277",
+      "details_excerpt": "18% PEG 3350 and 0.2 M NaF pH 6.9"
+    },
+    {
+      "pdb": "7NHN",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7O1C",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7O7Z",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OAX",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 41,
+      "species": [
+        "spermine"
+      ],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": "293.15",
+      "details_excerpt": "PEG 400, MES, Spermine tetrahydrochloride"
+    },
+    {
+      "pdb": "7OB9",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OEA",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OG0",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 62,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "22% (w/v) PEG 3350, 0.25 M NaBr, 0.1 M Bis-Tris Propane pH 7.5"
+    },
+    {
+      "pdb": "7OIF",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OIZ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OJN",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ONU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ORN",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ORO",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OUO",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 372,
+      "species": [
+        "K",
+        "Na",
+        "spermine"
+      ],
+      "n_conc_tokens": 6,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "The crystal of the r(UCGUGCGA)2 duplex was obtained in the presence of its complementary strand UCGCACGA. The crystals grew in the 12th condition of nucleic acid mini-screen from H"
+    },
+    {
+      "pdb": "7OYB",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OYC",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7OZQ",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 27,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": "4.6",
+      "temp": "291",
+      "details_excerpt": "JCSG Core I, condition G12:"
+    },
+    {
+      "pdb": "7P7T",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7PKT",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7PLI",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 53,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": "8.0",
+      "temp": "293",
+      "details_excerpt": "20 % (v/v) PEG 3350, 400 mM KSCN, 100 mM Tris, pH 8.0"
+    },
+    {
+      "pdb": "7PMM",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 43,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "7.3",
+      "temp": "293",
+      "details_excerpt": "0.2 M di-Sodium tartate, 20 %(w/v) PEG 3350"
+    },
+    {
+      "pdb": "7PU7",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7PWG",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7PZY",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QCA",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QEP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QGG",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QH7",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QI4",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QIW",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QIZ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7QQP",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 57,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": "8.5",
+      "temp": "293.15",
+      "details_excerpt": "0.1 M Tris-acetate pH 8.5, 0.3-0.5 M KSCN, 17-19% PEG3350"
+    },
+    {
+      "pdb": "7QR8",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 57,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": "8.5",
+      "temp": "293.15",
+      "details_excerpt": "0.1 M Tris-acetate pH 8.5, 0.3-0.5 M KSCN, 17-19% PEG3350"
+    },
+    {
+      "pdb": "7QTN",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 45,
+      "species": [
+        "Mg"
+      ],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "Magnesium sulfate, TRIS HCl, Ammonium sulfate"
+    },
+    {
+      "pdb": "7QVP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7R6Q",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7R81",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7R9G",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 79,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": "6.0",
+      "temp": "277",
+      "details_excerpt": "0.05 M Ammonium sulfate, 0.05 M Bis-Tris pH 6.0, 26% Pentaerythritol ethoxylate"
+    },
+    {
+      "pdb": "7REX",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 101,
+      "species": [
+        "K",
+        "Na"
+      ],
+      "n_conc_tokens": 5,
+      "pH": "5.5",
+      "temp": "293",
+      "details_excerpt": "0.08 M KCl, 0.012 M NaCl, 30% MPD, 0.04 M NaCacodylate pH 5.5, 0.002 M Hexamine Cobalt (III) Chloride"
+    },
+    {
+      "pdb": "7RQB",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 81,
+      "species": [],
+      "n_conc_tokens": 5,
+      "pH": "7.6",
+      "temp": "292",
+      "details_excerpt": "0.1-0.2 M Arginine-HCl, 0.1M Tris-HCl pH 7.6, 2.5% PEG-20K, 7-12% MPD, 0.5 mM BME"
+    },
+    {
+      "pdb": "7RQE",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 81,
+      "species": [],
+      "n_conc_tokens": 5,
+      "pH": "7.6",
+      "temp": "292",
+      "details_excerpt": "0.1-0.2 M Arginine-HCl, 0.1M Tris-HCl pH 7.6, 2.5% PEG-20K, 7-12% MPD, 0.5 mM BME"
+    },
+    {
+      "pdb": "7RYF",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7S3B",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 78,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "277.15",
+      "details_excerpt": "0.24 M Na Malonate, 26% Peg 3350,  n-dodecyl-N,N-dimethylamine-N-oxide (=LDAO)"
+    },
+    {
+      "pdb": "7SBA",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7SOV",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 43,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "0.1 M BICINE pH 9.0, 1.6 M ammonium sulfate"
+    },
+    {
+      "pdb": "7TUV",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 37,
+      "species": [],
+      "n_conc_tokens": 1,
+      "pH": null,
+      "temp": "291",
+      "details_excerpt": "15% (w/v) PEG 20000, 0.1 M MES pH 6.0"
+    },
+    {
+      "pdb": "7UCK",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7UOB",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7UQB",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7UR5",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7UU5",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 28,
+      "species": [],
+      "n_conc_tokens": 1,
+      "pH": null,
+      "temp": "291",
+      "details_excerpt": "1.8 M Na/K phosphate, pH 6.9"
+    },
+    {
+      "pdb": "7V4G",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 52,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "7.5",
+      "temp": "293",
+      "details_excerpt": "0.2 M sodium sulfate decahydrate, 20% (w/v) PEG 3350"
+    },
+    {
+      "pdb": "7VKI",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 62,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "7.0",
+      "temp": "293",
+      "details_excerpt": "0.2 M Sodium malonate pH 7.0, 20% w/v Polyethylene glycol 3350"
+    },
+    {
+      "pdb": "7VNV",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 64,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 4,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "80mM NaCl, 12mM Speremin-4HCl, 30% MPD, 40mM NaCacodylate pH 6.5"
+    },
+    {
+      "pdb": "7VSJ",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 104,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "5.6",
+      "temp": "293",
+      "details_excerpt": "0.2 M Ammonium acetate, 0.1 M Sodium citrate tribasic dihydrate pH 5.6, 30% w/v Polyethylene glycol 4000"
+    },
+    {
+      "pdb": "7VTN",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7WAY",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7WJU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7WV3",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7XPL",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 83,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "8.3",
+      "temp": "291",
+      "details_excerpt": "0.2M sodium citrate tribasic dehydrate, 20% (w/v) polyethylene glycol 3350 (pH 8.3)"
+    },
+    {
+      "pdb": "7XSP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7Y2P",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 87,
+      "species": [
+        "spermine"
+      ],
+      "n_conc_tokens": 4,
+      "pH": "6.5",
+      "temp": "277",
+      "details_excerpt": "0.4 mM Oligonucleotide, 50 mM HEPES pH 6.5, 0.5 mM Spermine tetrahydrochloride, 10% MPD"
+    },
+    {
+      "pdb": "7Y7G",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7Y7P",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 20,
+      "species": [
+        "K"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "6.3",
+      "temp": "291",
+      "details_excerpt": "PEG 4000, 200 mM KCl"
+    },
+    {
+      "pdb": "7Y7Q",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 20,
+      "species": [
+        "K"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "6.3",
+      "temp": "291",
+      "details_excerpt": "PEG 4000, 200 mM KCl"
+    },
+    {
+      "pdb": "7Y82",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7Y8P",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 40,
+      "species": [
+        "Na",
+        "Ir/Os/hexammine"
+      ],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "MPD, sodium cacodylate, hexammine cobalt"
+    },
+    {
+      "pdb": "7YEW",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 104,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "5.6",
+      "temp": "293",
+      "details_excerpt": "0.2 M Ammonium acetate, 0.1 M Sodium citrate tribasic dihydrate pH 5.6, 30% w/v Polyethylene glycol 4000"
+    },
+    {
+      "pdb": "7YEX",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 112,
+      "species": [
+        "Mg",
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "6.5",
+      "temp": "293",
+      "details_excerpt": "0.2 M Magnesium acetate tetrahydrate, 0.1 M Sodium cacodylate trihydrate pH 6.5, 20%w/v Polyethylene glycol 8000"
+    },
+    {
+      "pdb": "7YGB",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7YGC",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7Z42",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 299,
+      "species": [
+        "Mg",
+        "Na"
+      ],
+      "n_conc_tokens": 7,
+      "pH": "7.5",
+      "temp": "293",
+      "details_excerpt": "FluPolB PA mutant K135A at 9 mg per ml was mixed with 40 microM of nucleotides 1-13 vRNA 5prime end, 5-pAGUAGUAACAAGA-3, and 1.8 mM 28-mer CTD peptide, YSPTpSPS x 4 in a buffer con"
+    },
+    {
+      "pdb": "7ZGP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ZHG",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ZHH",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 22,
+      "species": [],
+      "n_conc_tokens": 1,
+      "pH": "7.0",
+      "temp": "293",
+      "details_excerpt": "0.1 M Tris-Cl (pH 7.0)"
+    },
+    {
+      "pdb": "7ZJW",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ZTA",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ZUX",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "7ZW0",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8A22",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8A3W",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8A5I",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8AF0",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 52,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "277.15",
+      "details_excerpt": "200 mM NaCl, 20 % (w/v) PEG6000, 100 mM Hepes pH 7.0"
+    },
+    {
+      "pdb": "8AMI",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 11,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "6.0",
+      "temp": "292",
+      "details_excerpt": "0.08 M NaCl"
+    },
+    {
+      "pdb": "8AS7",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8AUV",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8B2L",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8B6Z",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8B9I",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8BE0",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8BF9",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8BHN",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8BUU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8CBK",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8CWO",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8D29",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 34,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": "8.8",
+      "temp": "293",
+      "details_excerpt": "PEG 3350, citrate bis-Tris propane"
+    },
+    {
+      "pdb": "8D4A",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8DFA",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8DFS",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8DZJ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8DZK",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 47,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": "5.5",
+      "temp": "293",
+      "details_excerpt": "15% PEG3350, 0.4 M LiSO4, 0.1 M bis-tris pH 5.5"
+    },
+    {
+      "pdb": "8E2A",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8E74",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EHQ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EPK",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 58,
+      "species": [],
+      "n_conc_tokens": 3,
+      "pH": null,
+      "temp": "298",
+      "details_excerpt": "60 mM Na Citrate pH 5.0; 4% Tacsimate pH 7.0; 23% PEG 8000"
+    },
+    {
+      "pdb": "8ESQ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EUG",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EVS",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EWG",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EX9",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8EY7",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 53,
+      "species": [
+        "K",
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "294",
+      "details_excerpt": "0.056 M sodium phosphate, 1.344 M potassium phosphate"
+    },
+    {
+      "pdb": "8EYU",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 35,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": "7",
+      "temp": "294.15",
+      "details_excerpt": "2 M Ammonium sulfate, 5% 2-propanol"
+    },
+    {
+      "pdb": "8F5G",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 46,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "5.2",
+      "temp": "294.15",
+      "details_excerpt": "0.25 M sodium acetate, pH 5.2, 12% w/v PEG3350"
+    },
+    {
+      "pdb": "8FEQ",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 146,
+      "species": [
+        "Na",
+        "Ca",
+        "spermine"
+      ],
+      "n_conc_tokens": 4,
+      "pH": "6.0",
+      "temp": "293",
+      "details_excerpt": "0.075 M Sodium chloride, 0.002 M Calcium chloride dihydrate, 0.05 M Sodium cacodylate trihydrate pH 6.0, 30% w/v 1,6 Hexanediol, 0.0005 M Spermine"
+    },
+    {
+      "pdb": "8FER",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 148,
+      "species": [
+        "Mg",
+        "Na",
+        "spermine"
+      ],
+      "n_conc_tokens": 5,
+      "pH": "7.5",
+      "temp": "293",
+      "details_excerpt": "0.02 M Magnesium chloride hexahydrate, 0.002 M Cobalt(II) chloride hexahydrate, 0.05 M HEPES sodium pH 7.5, 2.0 M Ammonium sulfate, 0.001 M Spermine"
+    },
+    {
+      "pdb": "8FKW",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8FMW",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8FR8",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8FRU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8FVY",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8FZA",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 113,
+      "species": [
+        "Mg",
+        "K",
+        "spermine"
+      ],
+      "n_conc_tokens": 5,
+      "pH": "6.0",
+      "temp": "293",
+      "details_excerpt": "31% MPD, 0.05 M Na-cacodylate pH 6.0, 0.012 spermine-HCl, 0.1 M KCl and 0.002 M MgCl2, 0.005 M MnCl2-tetrahydrate"
+    },
+    {
+      "pdb": "8G90",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 45,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "294",
+      "details_excerpt": "0.1 M Bis-Tris pH 6.5, 28% (w/v) PEG 2000 MME"
+    },
+    {
+      "pdb": "8GKH",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8GS2",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8H0I",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8H0S",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 23,
+      "species": [],
+      "n_conc_tokens": 1,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "0.2 M Ammonium acetate,"
+    },
+    {
+      "pdb": "8H1B",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 97,
+      "species": [
+        "Mg",
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "0.2 M magnesium acetate tetrahydrate, 0.1 M sodium cacodylate trihydrate, pH 6.5, 20% w/v PEG8000"
+    },
+    {
+      "pdb": "8HHL",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8HKU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8HMY",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8HMZ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8I3Z",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 22,
+      "species": [],
+      "n_conc_tokens": 1,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "2.0 M Ammonium Sulfate"
+    },
+    {
+      "pdb": "8IAZ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8ID2",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 40,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "277",
+      "details_excerpt": "100 mM MIB buffer (pH 5.0), 25% PEG 1500"
+    },
+    {
+      "pdb": "8IYQ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8JDJ",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8JOZ",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 121,
+      "species": [
+        "Mg",
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": "6.0",
+      "temp": "293",
+      "details_excerpt": "0.04 M Magnesium acetate tetrahydrate, 0.05 M Sodium cacodylate trihydrate pH 6.0, 30% v/v (+/-)-2-Methyl-2,4-pentanediol"
+    },
+    {
+      "pdb": "8JY0",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 74,
+      "species": [
+        "Na"
+      ],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "291",
+      "details_excerpt": "0.2 M Sodium citrate tribasic dihydrate, 20% w/v Polyethylene glycol 3,350"
+    },
+    {
+      "pdb": "8K0P",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8K1E",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 24,
+      "species": [
+        "Li"
+      ],
+      "n_conc_tokens": 1,
+      "pH": "7.0",
+      "temp": "291",
+      "details_excerpt": "0.04 M Lithium chloride,"
+    },
+    {
+      "pdb": "8K34",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8KD9",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8OIV",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 25,
+      "species": [
+        "Li"
+      ],
+      "n_conc_tokens": 0,
+      "pH": "7.4",
+      "temp": "293",
+      "details_excerpt": "Lithium citrate, PEG 3350"
+    },
+    {
+      "pdb": "8OP2",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8P8B",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8PV7",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8R6C",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "8SJ7",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 30,
+      "species": [],
+      "n_conc_tokens": 2,
+      "pH": null,
+      "temp": "293",
+      "details_excerpt": "30% PEG400, 0.1 M Tris, pH 8.5"
+    },
+    {
+      "pdb": "8V1I",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 90,
+      "species": [
+        "Na",
+        "Ca"
+      ],
+      "n_conc_tokens": 3,
+      "pH": "7",
+      "temp": "293",
+      "details_excerpt": "0.2 M calcium chloride dihydrate, 0.1 M sodium acetate trihydrate and 20% (v/v) 2-propanol"
+    },
+    {
+      "pdb": "8WRP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9AXU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9BUP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9EY2",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9FCO",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9FHL",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9FXO",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9G6J",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9GHE",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9GYT",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9JKD",
+      "method": "X-RAY DIFFRACTION",
+      "has_details": true,
+      "details_len": 58,
+      "species": [
+        "K"
+      ],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": "289",
+      "details_excerpt": "potassium acetate, pentaerythritol propoxylate (5/4 PO/OH)"
+    },
+    {
+      "pdb": "9JPP",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9KZU",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9N3Y",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9O3V",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9PJ7",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9PJ9",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    },
+    {
+      "pdb": "9Q2P",
+      "method": "ELECTRON MICROSCOPY",
+      "has_details": false,
+      "details_len": 0,
+      "species": [],
+      "n_conc_tokens": 0,
+      "pH": null,
+      "temp": null,
+      "details_excerpt": ""
+    }
+  ]
+}

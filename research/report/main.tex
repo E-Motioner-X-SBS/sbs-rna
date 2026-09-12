@@ -63,7 +63,10 @@ features but two readouts of one phenomenon.
 
 PHAROS accordingly (i) accepts \textbf{ionic conditions as a model input},
 which no existing RNA structure predictor does, propagating them to attention
-logits through a Manning-renormalised screened-Coulomb bias; (ii) replaces the
+logits through a Manning-renormalised screened-Coulomb bias---though an audit
+reported here shows the \emph{learned} part of that claim cannot be trained on
+the PDB, whose recorded Mg\textsuperscript{2+} spans only 5--15 mM because
+nobody deposits unfolded RNA; (ii) replaces the
 dense pair track with a \textbf{hierarchical coarse-to-fine pair track} that
 selects contact-bearing \emph{blocks} rather than pairs, at $2.2\%$ of dense
 cost---adopted after we measured a flat top-$K$ design recovering only
@@ -712,6 +715,95 @@ by no current structure predictor, and were extracted end-to-end in preparing
 this report.
 
 %========================================================
+\section{Ionic-condition supervision: an audit that rescoped the claim}
+\label{sec:r2}
+
+The headline novelty is accepting ionic conditions as an input. That requires
+structures labelled with the ionic environment they were solved in, so we
+audited all 180 sampled structures. The result changed the claim.
+
+\subsection{Coverage is roughly one third, split across two storage conventions}
+
+\begin{table}[h]
+\centering
+\caption{Where ionic conditions live, and how often they are populated. \meas}
+\begin{tabular}{lclc}
+\toprule
+\textbf{Method} & \textbf{$n$} & \textbf{mmCIF location} & \textbf{usable ionic vector} \\
+\midrule
+Cryo-EM & 117 & \texttt{\_em\_buffer\_component} (structured) & $\mathbf{23.9\%}$ \\
+X-ray   & 63  & \texttt{\_exptl\_crystal\_grow.pdbx\_details} (free text) & $58.7\%$ mention an ion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Cryo-EM entries record pH for $94\%$ of structures but populate
+\texttt{\_em\_buffer\_component} for only $24.8\%$. X-ray entries always carry
+crystallisation details, but as prose---``0.1--0.2 M Arginine-HCl, 0.1M Tris-HCl
+pH 7.6, 2.6--3.0\% PEG-20K''---so extraction is noisy. Combined, about $36\%$ of
+structures yield any recoverable ionic condition: trainable, but a threefold
+reduction in usable 3D data for that stage.
+
+\subsection{The deeper problem: the PDB is survivorship-biased on ionic conditions}
+
+Where Mg\textsuperscript{2+} concentration \emph{is} recorded, its range is narrow.
+
+\begin{table}[h]
+\centering
+\caption{Recorded buffer concentrations in cryo-EM entries. \meas}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Ion} & \textbf{$n$} & \textbf{p10} & \textbf{median} & \textbf{p90} \\
+\midrule
+Mg\textsuperscript{2+} & 21 & 5.0 mM & $\mathbf{7.5}$ mM & 15.0 mM \\
+K\textsuperscript{+}   & 13 & 30 mM  & 100 mM & 150 mM \\
+Na\textsuperscript{+}  & 12 & 100 mM & 150 mM & 150 mM \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mg\textsuperscript{2+} spans only 5--15 mM. This is not a sampling accident:
+\textbf{nobody deposits a structure of unfolded RNA}. Every PDB entry was solved
+under conditions chosen \emph{because} the RNA folds there, so the archive
+contains almost no contrast between folding and non-folding ionic regimes.
+
+\begin{quote}
+\textcolor{risk}{\textbf{Consequence.}} The $[\mathrm{Mg}^{2+}] \rightarrow$
+structure response cannot be learned from the PDB. A model trained only on
+deposited structures would observe ionic condition as a near-constant and would
+correctly learn to ignore it.
+\end{quote}
+
+\subsection{How the claim is rescoped}
+
+The novelty splits into three components with very different evidentiary support.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{5.6cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\textbf{Component} & \textbf{Support} & \textbf{Status} \\
+\midrule
+$B_{\mathrm{elec}}$ Manning/Debye screening & closed-form physics; needs no training labels & \textbf{unaffected} \\
+Mg\textsuperscript{2+} site head and inner/outer classifier & 17{,}428 labelled ions from 180 structures & \textbf{well supported} \\
+Learned \emph{response} to varying ionic conditions & requires titration series; the PDB has none & \textcolor{risk}{\textbf{not supported}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The first two stand unchanged. The third must be dropped or supplied from data
+the PDB cannot provide: \textbf{RMDB Mg\textsuperscript{2+} titration series}
+(SHAPE/DMS probing across an Mg\textsuperscript{2+} ladder on the same sequence)
+and SAXS Mg\textsuperscript{2+} titrations measuring compaction. Training stage 5
+as originally specified---ion-conditioned refinement on structures stratified by
+ionic condition---\textbf{is not viable on PDB data alone} and is rewritten to
+condition on probing titrations, with deposited structures supplying only
+site-level supervision.
+
+This promotes chemical-probing acquisition from ``most valuable missing asset''
+to \textbf{prerequisite for the headline claim}. Note that Ribonanza alone does
+not supply it; the Mg\textsuperscript{2+} titration series in RMDB do.
+
 \section{Data mapping and the acquisition gap}
 \label{sec:gap}
 
@@ -748,7 +840,8 @@ so per-chunk weighting is required.
 \midrule
 Ionic conditions as a model input, reaching attention logits through a
 Manning-screened Coulomb bias & No existing RNA structure predictor accepts
-ionic conditions. \\
+ionic conditions. The physics term needs no labels; the learned response
+requires titration data (Section~\ref{sec:r2}). \\
 First sparse-MoE architecture for RNA structure & AIDO.Protein is MoE for
 protein; no RNA equivalent exists. \\
 Hierarchical coarse-to-fine pair track selecting blocks rather than pairs,
@@ -774,10 +867,12 @@ top-$K$ design was measured at $\sim$20\% recall on long chains and replaced
 (Section~\ref{sec:hpt}). The hierarchical track has a $100\%$ recall
 \emph{ceiling} by construction, but whether a trained model attains it is
 unproven. Recall must be reported per length bin and per level.
-\item \textbf{Ionic metadata sparsity.} mmCIF records crystallisation conditions
-inconsistently. Stage 5 may have far fewer usable ionic labels than hoped. This
-requires an audit before committing to that stage, and is currently
-\textbf{open}.
+\item \textbf{Ionic metadata sparsity---audited, partially confirmed}
+(Section~\ref{sec:r2}). About $36\%$ of structures yield a recoverable ionic
+condition. Worse, recorded Mg\textsuperscript{2+} spans only 5--15 mM because
+the PDB is survivorship-biased. The learned ionic response must come from RMDB
+titration series, not the PDB. The closed-form physics term and the
+Mg\textsuperscript{2+} site head are unaffected.
 \item \textbf{Crystallographic ions are not the solution ensemble.} The explicit
 head learns site binding, not the diffuse atmosphere. These must not be
 conflated.
@@ -820,6 +915,8 @@ large-scale training is attempted.
 \texttt{scripts/sampling/validate\_proposal\_recall.py} & \texttt{proposal\_recall.json} \\
 \texttt{scripts/sampling/analyze\_contact\_separation.py} & \texttt{contact\_separation.json} \\
 \texttt{scripts/sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
+\texttt{scripts/sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
+\texttt{scripts/sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
 \bottomrule
 \end{tabular}
 \end{table}

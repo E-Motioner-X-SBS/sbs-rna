@@ -58,7 +58,7 @@ happens in the *pair* track after pairing is estimated, never from raw k-mers.
 | Input | Shape | Required | Note |
 |---|---|---|---|
 | Sequence | L, vocab 5 (A,C,G,U,N) | yes | elDORS is DNA-alphabet; T->U at load |
-| **Ionic condition** | ([Mg²⁺],[K⁺],[Na⁺],T,pH) | **yes, defaulted** | **novel — nothing else takes this** |
+| **Ionic condition** | ([Mg²⁺],[K⁺],[Na⁺],T,pH) | **yes, defaulted** | **novel — nothing else takes this.** Physics term is closed-form; the *learned* response needs titration data the PDB lacks (§7b) |
 | MSA / Rfam alignment | M x L | optional | graceful degradation |
 | Chemical probing | L (SHAPE/DMS) | optional | acquisition target, see §9 |
 
@@ -370,6 +370,73 @@ That pathway is the architectural encoding of the measured 1.76 sigma gradient.
 
 ---
 
+## 7b. Ionic-condition supervision: audited, and the claim rescoped [measured]
+
+Risk R2 asked whether enough recorded ionic metadata exists to train the
+ion-conditioning claim. It was audited on all 180 sampled structures
+(`audit_ionic_metadata.py`, `audit_em_buffers.py`). The answer changed the claim.
+
+### Coverage is about one third, and the two methods store it differently
+
+| Method | n | where conditions live | usable ionic vector |
+|---|---|---|---|
+| Cryo-EM | 117 | `_em_buffer_component` — **structured** (concentration + units + formula) | **23.9%** |
+| X-ray | 63 | `_exptl_crystal_grow.pdbx_details` — **free text** | 58.7% mention an ion |
+
+Cryo-EM entries carry pH for **94%** of structures, but only 24.8% populate
+`_em_buffer_component` at all. X-ray entries always carry crystallisation
+details, but as unparsed prose ("0.1-0.2 M Arginine-HCl, 0.1M Tris-HCl pH 7.6,
+2.6-3.0% PEG-20K..."), so extraction is noisy.
+
+Combined, roughly **36% of structures yield any recoverable ionic condition** —
+enough to train on, but a 3x reduction in usable 3D data for that stage.
+
+### The deeper problem: the PDB is survivorship-biased on ionic conditions
+
+Where Mg²⁺ concentration *is* recorded (n=21), the distribution is narrow:
+
+| Ion | n | p10 | median | p90 |
+|---|---|---|---|---|
+| Mg²⁺ | 21 | 5.0 mM | **7.5 mM** | 15.0 mM |
+| K⁺ | 13 | 30 mM | 100 mM | 150 mM |
+| Na⁺ | 12 | 100 mM | 150 mM | 150 mM |
+
+Mg²⁺ spans only 5-15 mM. This is not an accident of sampling: **nobody deposits
+a structure of unfolded RNA.** Every entry in the PDB was solved under conditions
+chosen *because* the RNA folds there. The dataset therefore contains almost no
+contrast between folding and non-folding ionic regimes.
+
+**Consequence: the [Mg²⁺] -> structure response cannot be learned from the PDB.**
+A model trained only on deposited structures would see ionic condition as a
+near-constant and correctly learn to ignore it.
+
+### How the claim is rescoped
+
+The ion-conditioning novelty splits into three parts with very different support:
+
+| Component | Support | Status |
+|---|---|---|
+| `B_elec` Manning/Debye screening term | **closed-form physics**, no training data needed | **unaffected** — holds regardless of label coverage |
+| Mg²⁺ site head + inner/outer classifier | 17,428 labelled ions from 180 structures alone | **well supported** |
+| Learned *response* to varying ionic conditions | needs titration series; PDB has none | **NOT supported by current data** |
+
+The first two stand. The third must be either dropped or fed by data the PDB
+cannot provide:
+
+- **RMDB Mg²⁺ titration series** — SHAPE/DMS probing across an Mg²⁺ ladder on
+  the same sequence. This is exactly the missing contrast, and it is public.
+- **SAXS Mg²⁺ titrations** — radius of gyration versus [Mg²⁺], the classic
+  compaction measurement.
+
+This raises the priority of chemical-probing acquisition (§9) from "most
+valuable missing asset" to **prerequisite for the headline novelty claim**.
+Ribonanza alone does not supply it; the titration series in RMDB do.
+
+**Training stage 5 as originally specified (ion-conditioned refinement on
+structures stratified by ionic condition) is not viable on PDB data alone** and
+is rewritten accordingly: it becomes conditioning on *probing titrations*, with
+deposited structures supplying only site-level supervision.
+
 ## 8. [F]+[G] Heads and decoder
 
 | Head | Output | Supervision | Labels available |
@@ -405,6 +472,7 @@ to end in this session.
 | D. 3D + ions + rigidity | RNA3DB + gRNAde, 27,452 chains | yes |
 | E. Motif bank | BGSU Motif Atlas 4.12, 6,326 records | yes |
 | **F. Chemical probing** | **Ribonanza 2.1M / RMDB** | **NO — must acquire** |
+| **F2. Mg²⁺ titration series** | **RMDB SHAPE/DMS across an Mg²⁺ ladder** | **NO — prerequisite for the ion-conditioning claim (§7b)** |
 | G. Blind eval | CASP15/16, RNA-Puzzles | yes |
 
 **The gap is chemical probing, and it is the most valuable missing asset.**
@@ -443,7 +511,7 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 
 | # | Claim | Prior art status |
 |---|---|---|
-| 1 | **Ionic condition as a model input**, reaching attention logits via a Manning-screened Coulomb bias | **No existing RNA structure predictor accepts ionic conditions.** |
+| 1 | **Ionic condition as a model input**, reaching attention logits via a Manning-screened Coulomb bias | **No existing RNA structure predictor accepts ionic conditions.** Physics term needs no labels; the learned response requires titration data (§7b) |
 | 2 | First **sparse-MoE** architecture for RNA structure | AIDO.Protein is MoE for protein; no RNA equivalent |
 | 3 | **Hierarchical coarse-to-fine pair track** selecting blocks not pairs, justified by measured 1.34% block occupancy | AF3/Rhoformer are dense O(L²); flat top-K sparsification measured here to fail at ~20% recall on long chains |
 | 4 | **Frozen motif KV bank** as retrieval-based geometry prior | Motif Atlas is published but wired into no large model |
@@ -457,9 +525,12 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
    The hierarchical track has a 100% recall *ceiling* by construction, but
    whether a trained model hits it is unproven. Block-detection recall must be
    reported per length bin and per level.
-2. **Ionic metadata sparsity.** mmCIF records crystallisation conditions
-   inconsistently. Stage 5 may have far fewer usable ionic labels than hoped —
-   needs an audit before committing to that stage. **Open.**
+2. **Ionic metadata sparsity — AUDITED, partially confirmed (§7b).** ~36% of
+   structures yield a recoverable ionic condition (cryo-EM 23.9% structured,
+   X-ray 58.7% free-text). Worse, recorded Mg²⁺ spans only 5-15 mM because the
+   PDB is survivorship-biased: nobody deposits unfolded RNA. **The learned
+   ionic response cannot come from the PDB**; it requires RMDB Mg²⁺ titration
+   series. The closed-form physics term and the Mg²⁺ site head are unaffected.
 3. **Crystallographic ions are not the solution ensemble.** Resolved Mg²⁺ are
    site-bound only; the diffuse Manning atmosphere is invisible to
    crystallography. The explicit head learns site binding, *not* the atmosphere —
