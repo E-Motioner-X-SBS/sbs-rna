@@ -1,0 +1,187 @@
+{
+  "note": "CPU-only machine (no CUDA); peak RSS is process-level and approximate",
+  "hpt_params_M": 0.657,
+  "config": {
+    "b1": 16,
+    "b2": 4,
+    "d_pair": 128,
+    "keep_frac_l1": 0.12,
+    "target_c": 20.0
+  },
+  "runs": [
+    {
+      "L": 128,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.007,
+        "torch_peak_rss_gb": 0.021,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 64,
+          "l1_entries_needed": 36,
+          "l1_kept_blocks": 3,
+          "l2_candidate_blocks": 48,
+          "l2_budget_blocks": 160,
+          "l2_kept_blocks": 48,
+          "l3_pairs": 750,
+          "dense_pairs": 8128,
+          "frac_of_dense": 0.0922736220472441,
+          "effective_c": 5.859375
+        }
+      },
+      "dense": {
+        "ok": true,
+        "seconds": 0.067,
+        "torch_peak_rss_gb": 0.105,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "dense_pairs": 16384
+        }
+      }
+    },
+    {
+      "L": 256,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.015,
+        "torch_peak_rss_gb": 0.0,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 256,
+          "l1_entries_needed": 136,
+          "l1_kept_blocks": 14,
+          "l2_candidate_blocks": 224,
+          "l2_budget_blocks": 320,
+          "l2_kept_blocks": 224,
+          "l3_pairs": 3506,
+          "dense_pairs": 32640,
+          "frac_of_dense": 0.1074142156862745,
+          "effective_c": 13.6953125
+        }
+      },
+      "dense": {
+        "ok": true,
+        "seconds": 0.279,
+        "torch_peak_rss_gb": 0.332,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "dense_pairs": 65536
+        }
+      }
+    },
+    {
+      "L": 512,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.048,
+        "torch_peak_rss_gb": 0.0,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 1024,
+          "l1_entries_needed": 528,
+          "l1_kept_blocks": 59,
+          "l2_candidate_blocks": 944,
+          "l2_budget_blocks": 640,
+          "l2_kept_blocks": 640,
+          "l3_pairs": 10054,
+          "dense_pairs": 130816,
+          "frac_of_dense": 0.07685604207436399,
+          "effective_c": 19.63671875
+        }
+      },
+      "dense": {
+        "ok": true,
+        "seconds": 1.223,
+        "torch_peak_rss_gb": 1.302,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "dense_pairs": 262144
+        }
+      }
+    },
+    {
+      "L": 1024,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.1,
+        "torch_peak_rss_gb": 0.0,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 4096,
+          "l1_entries_needed": 2080,
+          "l1_kept_blocks": 241,
+          "l2_candidate_blocks": 3856,
+          "l2_budget_blocks": 1280,
+          "l2_kept_blocks": 1280,
+          "l3_pairs": 20102,
+          "dense_pairs": 523776,
+          "frac_of_dense": 0.038379001710654934,
+          "effective_c": 19.630859375
+        }
+      },
+      "dense": {
+        "ok": true,
+        "seconds": 8.257,
+        "torch_peak_rss_gb": 5.149,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "dense_pairs": 1048576
+        }
+      }
+    },
+    {
+      "L": 2048,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.326,
+        "torch_peak_rss_gb": 0.0,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 16384,
+          "l1_entries_needed": 8256,
+          "l1_kept_blocks": 975,
+          "l2_candidate_blocks": 15600,
+          "l2_budget_blocks": 2560,
+          "l2_kept_blocks": 2560,
+          "l3_pairs": 40198,
+          "dense_pairs": 2096128,
+          "frac_of_dense": 0.019177263983878846,
+          "effective_c": 19.6279296875
+        }
+      },
+      "dense": {
+        "ok": false,
+        "skipped": true,
+        "predicted_min_gb": 12.88,
+        "reason": "predicted >4.0 GB for activations alone"
+      }
+    },
+    {
+      "L": 4096,
+      "hierarchical": {
+        "ok": true,
+        "seconds": 0.445,
+        "torch_peak_rss_gb": 0.0,
+        "py_peak_mb": 0.0,
+        "stats": {
+          "l1_entries_scored": 65536,
+          "l1_entries_needed": 32896,
+          "l1_kept_blocks": 3916,
+          "l2_candidate_blocks": 62656,
+          "l2_budget_blocks": 5120,
+          "l2_kept_blocks": 5120,
+          "l3_pairs": 80390,
+          "dense_pairs": 8386560,
+          "frac_of_dense": 0.009585575015262516,
+          "effective_c": 19.62646484375
+        }
+      },
+      "dense": {
+        "ok": false,
+        "skipped": true,
+        "predicted_min_gb": 51.54,
+        "reason": "predicted >4.0 GB for activations alone"
+      }
+    }
+  ]
+}
