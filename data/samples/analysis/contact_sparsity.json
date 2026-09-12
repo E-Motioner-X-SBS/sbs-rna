@@ -1,0 +1,871 @@
+{
+  "summary": {
+    "chains_analyzed": 117,
+    "contact_def": "any heavy-atom pair <= 8.0 A, |i-j| >= 4",
+    "L_median": 1624,
+    "L_max": 3679,
+    "contacts_per_nt_median": 4.397,
+    "contacts_per_nt_mean": 3.657,
+    "contacts_per_nt_p95": 5.422,
+    "contacts_per_nt_max": 5.497,
+    "map_density_median": 0.00389,
+    "by_length_bin": [
+      {
+        "L_range": "32-100",
+        "n": 38,
+        "median_L": 56.0,
+        "median_contacts_per_nt": 1.784,
+        "median_density_pct": 6.523
+      },
+      {
+        "L_range": "100-200",
+        "n": 6,
+        "median_L": 124.0,
+        "median_contacts_per_nt": 2.851,
+        "median_density_pct": 4.043
+      },
+      {
+        "L_range": "200-500",
+        "n": 3,
+        "median_L": 393,
+        "median_contacts_per_nt": 4.216,
+        "median_density_pct": 2.151
+      },
+      {
+        "L_range": "500-1500",
+        "n": 9,
+        "median_L": 1038,
+        "median_contacts_per_nt": 4.532,
+        "median_density_pct": 0.974
+      },
+      {
+        "L_range": "1500-+",
+        "n": 61,
+        "median_L": 2901,
+        "median_contacts_per_nt": 4.854,
+        "median_density_pct": 0.353
+      }
+    ]
+  },
+  "chains": [
+    {
+      "pdb": "7OZQ",
+      "L": 32,
+      "contacts": 72,
+      "contacts_per_nt": 2.25,
+      "density": 0.14516
+    },
+    {
+      "pdb": "8E74",
+      "L": 32,
+      "contacts": 42,
+      "contacts_per_nt": 1.312,
+      "density": 0.08468
+    },
+    {
+      "pdb": "7REX",
+      "L": 34,
+      "contacts": 119,
+      "contacts_per_nt": 3.5,
+      "density": 0.21212
+    },
+    {
+      "pdb": "8D29",
+      "L": 34,
+      "contacts": 68,
+      "contacts_per_nt": 2.0,
+      "density": 0.12121
+    },
+    {
+      "pdb": "7XSP",
+      "L": 35,
+      "contacts": 3,
+      "contacts_per_nt": 0.086,
+      "density": 0.00504
+    },
+    {
+      "pdb": "7UOB",
+      "L": 36,
+      "contacts": 0,
+      "contacts_per_nt": 0.0,
+      "density": 0.0
+    },
+    {
+      "pdb": "8GS2",
+      "L": 38,
+      "contacts": 3,
+      "contacts_per_nt": 0.079,
+      "density": 0.00427
+    },
+    {
+      "pdb": "8WRP",
+      "L": 39,
+      "contacts": 32,
+      "contacts_per_nt": 0.821,
+      "density": 0.04318
+    },
+    {
+      "pdb": "7Y82",
+      "L": 41,
+      "contacts": 6,
+      "contacts_per_nt": 0.146,
+      "density": 0.00732
+    },
+    {
+      "pdb": "8D4A",
+      "L": 41,
+      "contacts": 50,
+      "contacts_per_nt": 1.22,
+      "density": 0.06098
+    },
+    {
+      "pdb": "7SBA",
+      "L": 43,
+      "contacts": 2,
+      "contacts_per_nt": 0.047,
+      "density": 0.00221
+    },
+    {
+      "pdb": "7PMM",
+      "L": 44,
+      "contacts": 89,
+      "contacts_per_nt": 2.023,
+      "density": 0.09408
+    },
+    {
+      "pdb": "8HMZ",
+      "L": 44,
+      "contacts": 62,
+      "contacts_per_nt": 1.409,
+      "density": 0.06554
+    },
+    {
+      "pdb": "8DFA",
+      "L": 46,
+      "contacts": 2,
+      "contacts_per_nt": 0.043,
+      "density": 0.00193
+    },
+    {
+      "pdb": "8DFS",
+      "L": 48,
+      "contacts": 3,
+      "contacts_per_nt": 0.062,
+      "density": 0.00266
+    },
+    {
+      "pdb": "8EYU",
+      "L": 49,
+      "contacts": 159,
+      "contacts_per_nt": 3.245,
+      "density": 0.1352
+    },
+    {
+      "pdb": "8HHL",
+      "L": 49,
+      "contacts": 90,
+      "contacts_per_nt": 1.837,
+      "density": 0.07653
+    },
+    {
+      "pdb": "7OAX",
+      "L": 51,
+      "contacts": 160,
+      "contacts_per_nt": 3.137,
+      "density": 0.12549
+    },
+    {
+      "pdb": "7VTN",
+      "L": 56,
+      "contacts": 97,
+      "contacts_per_nt": 1.732,
+      "density": 0.06299
+    },
+    {
+      "pdb": "8EWG",
+      "L": 56,
+      "contacts": 67,
+      "contacts_per_nt": 1.196,
+      "density": 0.04351
+    },
+    {
+      "pdb": "8V1I",
+      "L": 56,
+      "contacts": 168,
+      "contacts_per_nt": 3.0,
+      "density": 0.10909
+    },
+    {
+      "pdb": "8K1E",
+      "L": 57,
+      "contacts": 194,
+      "contacts_per_nt": 3.404,
+      "density": 0.12155
+    },
+    {
+      "pdb": "7VNV",
+      "L": 61,
+      "contacts": 144,
+      "contacts_per_nt": 2.361,
+      "density": 0.07869
+    },
+    {
+      "pdb": "9N3Y",
+      "L": 61,
+      "contacts": 30,
+      "contacts_per_nt": 0.492,
+      "density": 0.01639
+    },
+    {
+      "pdb": "8JY0",
+      "L": 64,
+      "contacts": 163,
+      "contacts_per_nt": 2.547,
+      "density": 0.08085
+    },
+    {
+      "pdb": "7MLX",
+      "L": 65,
+      "contacts": 184,
+      "contacts_per_nt": 2.831,
+      "density": 0.08846
+    },
+    {
+      "pdb": "7ONU",
+      "L": 66,
+      "contacts": 146,
+      "contacts_per_nt": 2.212,
+      "density": 0.06807
+    },
+    {
+      "pdb": "9EY2",
+      "L": 68,
+      "contacts": 163,
+      "contacts_per_nt": 2.397,
+      "density": 0.07155
+    },
+    {
+      "pdb": "8OP2",
+      "L": 70,
+      "contacts": 3,
+      "contacts_per_nt": 0.043,
+      "density": 0.00124
+    },
+    {
+      "pdb": "8KD9",
+      "L": 73,
+      "contacts": 260,
+      "contacts_per_nt": 3.562,
+      "density": 0.09893
+    },
+    {
+      "pdb": "8GKH",
+      "L": 76,
+      "contacts": 126,
+      "contacts_per_nt": 1.658,
+      "density": 0.04421
+    },
+    {
+      "pdb": "8JOZ",
+      "L": 79,
+      "contacts": 242,
+      "contacts_per_nt": 3.063,
+      "density": 0.07855
+    },
+    {
+      "pdb": "7WV3",
+      "L": 80,
+      "contacts": 0,
+      "contacts_per_nt": 0.0,
+      "density": 0.0
+    },
+    {
+      "pdb": "7QQP",
+      "L": 84,
+      "contacts": 116,
+      "contacts_per_nt": 1.381,
+      "density": 0.03328
+    },
+    {
+      "pdb": "7QR8",
+      "L": 85,
+      "contacts": 118,
+      "contacts_per_nt": 1.388,
+      "density": 0.03305
+    },
+    {
+      "pdb": "7UR5",
+      "L": 90,
+      "contacts": 260,
+      "contacts_per_nt": 2.889,
+      "density": 0.06492
+    },
+    {
+      "pdb": "8HMY",
+      "L": 90,
+      "contacts": 279,
+      "contacts_per_nt": 3.1,
+      "density": 0.06966
+    },
+    {
+      "pdb": "8CBK",
+      "L": 93,
+      "contacts": 191,
+      "contacts_per_nt": 2.054,
+      "density": 0.04465
+    },
+    {
+      "pdb": "8EX9",
+      "L": 102,
+      "contacts": 302,
+      "contacts_per_nt": 2.961,
+      "density": 0.05863
+    },
+    {
+      "pdb": "8IYQ",
+      "L": 109,
+      "contacts": 200,
+      "contacts_per_nt": 1.835,
+      "density": 0.03398
+    },
+    {
+      "pdb": "7WAY",
+      "L": 115,
+      "contacts": 286,
+      "contacts_per_nt": 2.487,
+      "density": 0.04363
+    },
+    {
+      "pdb": "7WJU",
+      "L": 133,
+      "contacts": 384,
+      "contacts_per_nt": 2.887,
+      "density": 0.04375
+    },
+    {
+      "pdb": "8DZJ",
+      "L": 153,
+      "contacts": 433,
+      "contacts_per_nt": 2.83,
+      "density": 0.03724
+    },
+    {
+      "pdb": "8IAZ",
+      "L": 163,
+      "contacts": 468,
+      "contacts_per_nt": 2.871,
+      "density": 0.03545
+    },
+    {
+      "pdb": "7R6Q",
+      "L": 295,
+      "contacts": 924,
+      "contacts_per_nt": 3.132,
+      "density": 0.02131
+    },
+    {
+      "pdb": "7YGB",
+      "L": 393,
+      "contacts": 1692,
+      "contacts_per_nt": 4.305,
+      "density": 0.02197
+    },
+    {
+      "pdb": "7YGC",
+      "L": 393,
+      "contacts": 1657,
+      "contacts_per_nt": 4.216,
+      "density": 0.02151
+    },
+    {
+      "pdb": "8A22",
+      "L": 534,
+      "contacts": 1752,
+      "contacts_per_nt": 3.281,
+      "density": 0.01231
+    },
+    {
+      "pdb": "8K0P",
+      "L": 542,
+      "contacts": 2263,
+      "contacts_per_nt": 4.175,
+      "density": 0.01544
+    },
+    {
+      "pdb": "7PKT",
+      "L": 578,
+      "contacts": 1925,
+      "contacts_per_nt": 3.33,
+      "density": 0.01154
+    },
+    {
+      "pdb": "8CWO",
+      "L": 1024,
+      "contacts": 5100,
+      "contacts_per_nt": 4.98,
+      "density": 0.00974
+    },
+    {
+      "pdb": "9FCO",
+      "L": 1038,
+      "contacts": 5290,
+      "contacts_per_nt": 5.096,
+      "density": 0.00983
+    },
+    {
+      "pdb": "7QH7",
+      "L": 1256,
+      "contacts": 5692,
+      "contacts_per_nt": 4.532,
+      "density": 0.00722
+    },
+    {
+      "pdb": "9FHL",
+      "L": 1397,
+      "contacts": 6898,
+      "contacts_per_nt": 4.938,
+      "density": 0.00707
+    },
+    {
+      "pdb": "7ZHG",
+      "L": 1429,
+      "contacts": 6342,
+      "contacts_per_nt": 4.438,
+      "density": 0.00622
+    },
+    {
+      "pdb": "8FVY",
+      "L": 1441,
+      "contacts": 6567,
+      "contacts_per_nt": 4.557,
+      "density": 0.00633
+    },
+    {
+      "pdb": "8AUV",
+      "L": 1545,
+      "contacts": 6841,
+      "contacts_per_nt": 4.428,
+      "density": 0.00574
+    },
+    {
+      "pdb": "7QI4",
+      "L": 1553,
+      "contacts": 7464,
+      "contacts_per_nt": 4.806,
+      "density": 0.00619
+    },
+    {
+      "pdb": "8A3W",
+      "L": 1624,
+      "contacts": 6961,
+      "contacts_per_nt": 4.286,
+      "density": 0.00528
+    },
+    {
+      "pdb": "8BF9",
+      "L": 1766,
+      "contacts": 8484,
+      "contacts_per_nt": 4.804,
+      "density": 0.00544
+    },
+    {
+      "pdb": "9FXO",
+      "L": 1798,
+      "contacts": 7849,
+      "contacts_per_nt": 4.365,
+      "density": 0.00486
+    },
+    {
+      "pdb": "8ESQ",
+      "L": 2230,
+      "contacts": 9085,
+      "contacts_per_nt": 4.074,
+      "density": 0.00366
+    },
+    {
+      "pdb": "8FKW",
+      "L": 2277,
+      "contacts": 7997,
+      "contacts_per_nt": 3.512,
+      "density": 0.00309
+    },
+    {
+      "pdb": "7QEP",
+      "L": 2319,
+      "contacts": 10713,
+      "contacts_per_nt": 4.62,
+      "density": 0.00399
+    },
+    {
+      "pdb": "7PWG",
+      "L": 2426,
+      "contacts": 11437,
+      "contacts_per_nt": 4.714,
+      "density": 0.00389
+    },
+    {
+      "pdb": "7QCA",
+      "L": 2499,
+      "contacts": 11769,
+      "contacts_per_nt": 4.709,
+      "density": 0.00377
+    },
+    {
+      "pdb": "8FRU",
+      "L": 2551,
+      "contacts": 12019,
+      "contacts_per_nt": 4.711,
+      "density": 0.0037
+    },
+    {
+      "pdb": "7RYF",
+      "L": 2673,
+      "contacts": 13241,
+      "contacts_per_nt": 4.954,
+      "density": 0.00371
+    },
+    {
+      "pdb": "7Y7G",
+      "L": 2729,
+      "contacts": 14090,
+      "contacts_per_nt": 5.163,
+      "density": 0.00379
+    },
+    {
+      "pdb": "8R6C",
+      "L": 2729,
+      "contacts": 14801,
+      "contacts_per_nt": 5.424,
+      "density": 0.00398
+    },
+    {
+      "pdb": "7OIZ",
+      "L": 2730,
+      "contacts": 14283,
+      "contacts_per_nt": 5.232,
+      "density": 0.00383
+    },
+    {
+      "pdb": "9JPP",
+      "L": 2737,
+      "contacts": 14199,
+      "contacts_per_nt": 5.188,
+      "density": 0.00379
+    },
+    {
+      "pdb": "8BHN",
+      "L": 2758,
+      "contacts": 13041,
+      "contacts_per_nt": 4.728,
+      "density": 0.00343
+    },
+    {
+      "pdb": "9GHE",
+      "L": 2758,
+      "contacts": 14845,
+      "contacts_per_nt": 5.383,
+      "density": 0.0039
+    },
+    {
+      "pdb": "8BUU",
+      "L": 2850,
+      "contacts": 15351,
+      "contacts_per_nt": 5.386,
+      "density": 0.00378
+    },
+    {
+      "pdb": "7RQB",
+      "L": 2861,
+      "contacts": 15636,
+      "contacts_per_nt": 5.465,
+      "density": 0.00382
+    },
+    {
+      "pdb": "7RQE",
+      "L": 2861,
+      "contacts": 15513,
+      "contacts_per_nt": 5.422,
+      "density": 0.00379
+    },
+    {
+      "pdb": "8EUG",
+      "L": 2869,
+      "contacts": 14437,
+      "contacts_per_nt": 5.032,
+      "density": 0.00351
+    },
+    {
+      "pdb": "5J8B",
+      "L": 2874,
+      "contacts": 15779,
+      "contacts_per_nt": 5.49,
+      "density": 0.00382
+    },
+    {
+      "pdb": "7O1C",
+      "L": 2874,
+      "contacts": 14592,
+      "contacts_per_nt": 5.077,
+      "density": 0.00353
+    },
+    {
+      "pdb": "7ZTA",
+      "L": 2879,
+      "contacts": 14641,
+      "contacts_per_nt": 5.085,
+      "density": 0.00353
+    },
+    {
+      "pdb": "7N2V",
+      "L": 2881,
+      "contacts": 15036,
+      "contacts_per_nt": 5.219,
+      "density": 0.00362
+    },
+    {
+      "pdb": "7OIF",
+      "L": 2881,
+      "contacts": 15119,
+      "contacts_per_nt": 5.248,
+      "density": 0.00364
+    },
+    {
+      "pdb": "9PJ7",
+      "L": 2885,
+      "contacts": 15006,
+      "contacts_per_nt": 5.201,
+      "density": 0.00361
+    },
+    {
+      "pdb": "9PJ9",
+      "L": 2885,
+      "contacts": 15051,
+      "contacts_per_nt": 5.217,
+      "density": 0.00362
+    },
+    {
+      "pdb": "8P8B",
+      "L": 2890,
+      "contacts": 14986,
+      "contacts_per_nt": 5.185,
+      "density": 0.00359
+    },
+    {
+      "pdb": "7P7T",
+      "L": 2901,
+      "contacts": 15636,
+      "contacts_per_nt": 5.39,
+      "density": 0.00372
+    },
+    {
+      "pdb": "7NHN",
+      "L": 2908,
+      "contacts": 15710,
+      "contacts_per_nt": 5.402,
+      "density": 0.00372
+    },
+    {
+      "pdb": "8A5I",
+      "L": 2908,
+      "contacts": 15766,
+      "contacts_per_nt": 5.422,
+      "density": 0.00373
+    },
+    {
+      "pdb": "9GYT",
+      "L": 2910,
+      "contacts": 13789,
+      "contacts_per_nt": 4.738,
+      "density": 0.00326
+    },
+    {
+      "pdb": "8FMW",
+      "L": 2929,
+      "contacts": 15556,
+      "contacts_per_nt": 5.311,
+      "density": 0.00363
+    },
+    {
+      "pdb": "7UQB",
+      "L": 2936,
+      "contacts": 12507,
+      "contacts_per_nt": 4.26,
+      "density": 0.0029
+    },
+    {
+      "pdb": "7QIW",
+      "L": 2975,
+      "contacts": 13644,
+      "contacts_per_nt": 4.586,
+      "density": 0.00308
+    },
+    {
+      "pdb": "7QIZ",
+      "L": 2975,
+      "contacts": 13638,
+      "contacts_per_nt": 4.584,
+      "density": 0.00308
+    },
+    {
+      "pdb": "8HKU",
+      "L": 2995,
+      "contacts": 15206,
+      "contacts_per_nt": 5.077,
+      "density": 0.00339
+    },
+    {
+      "pdb": "8PV7",
+      "L": 3044,
+      "contacts": 13175,
+      "contacts_per_nt": 4.328,
+      "density": 0.00284
+    },
+    {
+      "pdb": "9G6J",
+      "L": 3064,
+      "contacts": 14850,
+      "contacts_per_nt": 4.847,
+      "density": 0.00316
+    },
+    {
+      "pdb": "8B2L",
+      "L": 3066,
+      "contacts": 13717,
+      "contacts_per_nt": 4.474,
+      "density": 0.00292
+    },
+    {
+      "pdb": "8FR8",
+      "L": 3119,
+      "contacts": 17144,
+      "contacts_per_nt": 5.497,
+      "density": 0.00353
+    },
+    {
+      "pdb": "7R81",
+      "L": 3123,
+      "contacts": 15150,
+      "contacts_per_nt": 4.851,
+      "density": 0.00311
+    },
+    {
+      "pdb": "8EVS",
+      "L": 3156,
+      "contacts": 15225,
+      "contacts_per_nt": 4.824,
+      "density": 0.00306
+    },
+    {
+      "pdb": "7ZUX",
+      "L": 3163,
+      "contacts": 15362,
+      "contacts_per_nt": 4.857,
+      "density": 0.00307
+    },
+    {
+      "pdb": "9BUP",
+      "L": 3193,
+      "contacts": 15501,
+      "contacts_per_nt": 4.855,
+      "density": 0.00304
+    },
+    {
+      "pdb": "7PZY",
+      "L": 3207,
+      "contacts": 15729,
+      "contacts_per_nt": 4.905,
+      "density": 0.00306
+    },
+    {
+      "pdb": "9AXU",
+      "L": 3212,
+      "contacts": 15654,
+      "contacts_per_nt": 4.874,
+      "density": 0.00304
+    },
+    {
+      "pdb": "7ZW0",
+      "L": 3217,
+      "contacts": 15616,
+      "contacts_per_nt": 4.854,
+      "density": 0.00302
+    },
+    {
+      "pdb": "7OYC",
+      "L": 3245,
+      "contacts": 16070,
+      "contacts_per_nt": 4.952,
+      "density": 0.00305
+    },
+    {
+      "pdb": "7OYB",
+      "L": 3263,
+      "contacts": 16171,
+      "contacts_per_nt": 4.956,
+      "density": 0.00304
+    },
+    {
+      "pdb": "8JDJ",
+      "L": 3399,
+      "contacts": 14942,
+      "contacts_per_nt": 4.396,
+      "density": 0.00259
+    },
+    {
+      "pdb": "9O3V",
+      "L": 3417,
+      "contacts": 15187,
+      "contacts_per_nt": 4.445,
+      "density": 0.0026
+    },
+    {
+      "pdb": "7UCK",
+      "L": 3446,
+      "contacts": 15114,
+      "contacts_per_nt": 4.386,
+      "density": 0.00255
+    },
+    {
+      "pdb": "9Q2P",
+      "L": 3543,
+      "contacts": 16564,
+      "contacts_per_nt": 4.675,
+      "density": 0.00264
+    },
+    {
+      "pdb": "7QVP",
+      "L": 3611,
+      "contacts": 16725,
+      "contacts_per_nt": 4.632,
+      "density": 0.00257
+    },
+    {
+      "pdb": "7O7Z",
+      "L": 3640,
+      "contacts": 16189,
+      "contacts_per_nt": 4.448,
+      "density": 0.00244
+    },
+    {
+      "pdb": "7ZJW",
+      "L": 3641,
+      "contacts": 16011,
+      "contacts_per_nt": 4.397,
+      "density": 0.00242
+    },
+    {
+      "pdb": "9KZU",
+      "L": 3663,
+      "contacts": 16748,
+      "contacts_per_nt": 4.572,
+      "density": 0.0025
+    },
+    {
+      "pdb": "7QGG",
+      "L": 3679,
+      "contacts": 16596,
+      "contacts_per_nt": 4.511,
+      "density": 0.00245
+    }
+  ]
+}
