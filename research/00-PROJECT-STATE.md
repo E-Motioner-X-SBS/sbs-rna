@@ -68,19 +68,75 @@ blueprint diagram (HTML/CSS, LaTeX/TikZ, and/or Mermaid), all re-checked.
 ## Session log
 
 ### Session 1 (2026-09-12)
-- Oriented in the repo; found the four issues above.
-- Built `scripts/sampling/fetch_samples.py`; downloading ~180 BGSU
-  non-redundant representative mmCIF structures + 12 Rfam seed alignments +
-  RNAcentral sequence sample into `data/samples/`.
-  - First run failed silently: BGSU `/nrlist/release/...` returns HTML, not CSV.
-    Correct endpoint is `/rna3dhub/nrlist/download/current/3.0A/csv`. Script now
-    validates PDB-id shape and aborts if the feed is HTML.
-- Prior-art research in progress -> `research/prior-art/`.
 
-## Next actions
+**Orientation.** Found four repo issues (above). Repo is catalog-only; bulk data absent.
 
-- [ ] Finish prior-art survey (see `research/prior-art/`)
-- [ ] Quantify motif rigidity + ion coordination from the downloaded structures
-- [ ] Draft architecture spec -> `research/architecture/ARCHITECTURE.md`
-- [ ] Blueprint diagrams -> `research/architecture/diagrams/`
-- [ ] LaTeX report -> `research/report/main.tex`
+**Data acquired** -> `data/samples/` (gitignored except `analysis/`):
+- 180 BGSU non-redundant representative mmCIF structures (<=3.0 A), 344 MB
+- 12 Rfam seed alignments (families with 3D representatives)
+- 200 RNAcentral sequences
+- Two fetch bugs found and fixed: BGSU `/nrlist/release/...` returns HTML not CSV
+  (correct path is `/rna3dhub/nrlist/download/current/3.0A/csv`; the script now aborts
+  if the feed is HTML), and RNAcentral's API stalls at `page_size=200` — paginate at 100
+  via curl, since urllib stalls on that endpoint regardless.
+
+**Prior art** -> `research/prior-art/01-05`. The pivotal finding: ERNIE-RNA (86M) beats
+RiNALMo (650M) and nearly doubles cross-family F1 (0.646 vs 0.355) on the strength of one
+hand-set 3-valued base-pairing bias. Inductive bias, not scale, is the lever.
+
+**Measurements made** (scripts in `scripts/sampling/`, outputs in `data/samples/analysis/`):
+
+| Finding | Result |
+|---|---|
+| Contact scaling | contacts/nt saturates 4.4-4.9; density falls 6.52% -> 0.353%. **O(L), not O(L²)** |
+| Ion inventory | 17,428 Mg²⁺ vs 1,868 K⁺ (9:1); 83% of inner-sphere coordination to OP1/OP2 |
+| Ion-rigidity coupling | monotonic **1.76 sigma** B-factor gradient vs Mg²⁺ distance, 24,623 nt |
+| GNRA k-mers (negative) | 0.073 sigma — motif ID needs the interaction graph, not n-grams |
+| **Flat top-K recall (negative)** | **0.200 on 500-1200 nt chains; random scorer gets 0.746 mean** |
+| Contact separation | median 78 nt on long chains; +/-512 band still misses 19% |
+| **Block occupancy** | **1.34% at b=4 on long chains; falls as L grows; effective c = 17.2** |
+
+**Architecture** -> `research/architecture/ARCHITECTURE.md` (PHAROS v0.1).
+The efficiency claim was tested rather than assumed, and **the original flat sparse pair
+track failed and was replaced** by a 3-level hierarchical coarse-to-fine track
+(2.202% of dense at L=2861, 100% recall ceiling). This is the most important result of
+the session: a load-bearing design decision was falsified by its own validation.
+
+**Deliverables produced**:
+- `research/report/main.pdf` — 18pp LaTeX report, builds clean (no over/underfull boxes)
+- `research/architecture/diagrams/` — 6 Mermaid diagrams, all verified to render
+  (mermaid-cli needs `-p puppeteer-config.json` pointing at `/usr/bin/chromium`)
+- `research/architecture/blueprint.html` — published Artifact (v2):
+  https://claude.ai/code/artifact/1756a459-45c7-4908-9cef-bcde72aab33e
+
+## Next actions (session 2+)
+
+Highest value first:
+
+- [ ] **Prototype the hierarchical pair track in torch** and measure block-detection
+      recall with a *learned* scorer, not the sequence-only heuristic. This is the one
+      unproven load-bearing claim (risk R1).
+- [ ] **Audit ionic metadata availability** in mmCIF (`_exptl_crystal_grow`). Risk R2 is
+      still open: if crystallisation conditions are too sparse/inconsistent, training
+      stage 5 is not viable as specified and the ion-conditioning claim weakens.
+- [ ] **Acquire chemical probing data** (Ribonanza 2.1M DMS/SHAPE). ~315x more supervised
+      examples than the 6,661 unique 3D sequences; the single largest missing asset.
+- [ ] Write `research/prior-art/06-coevolution.md` (material gathered, not yet written:
+      RNAcmap/rMSA, CoCoNet, DIRECT, MSA-depth limits, CS-Fold).
+- [ ] Extract Mg²⁺-site and B-factor labels at scale from the server's 27,452 chains to
+      size the two "free" supervision channels properly (180 structures is a pilot).
+- [ ] Fix the four repo issues listed above (MANIFEST caps, `total_sequences()`,
+      hardcoded paths, README median-length inconsistency).
+
+## Reproducing everything
+
+```bash
+python3 scripts/sampling/fetch_samples.py 180          # data
+python3 scripts/sampling/analyze_ions_motifs.py        # ion_summary.json
+python3 scripts/sampling/analyze_rigidity.py           # rigidity_summary.json
+python3 scripts/sampling/analyze_contact_sparsity.py   # contact_sparsity.json
+python3 scripts/sampling/validate_proposal_recall.py   # proposal_recall.json
+python3 scripts/sampling/analyze_contact_separation.py # contact_separation.json
+python3 scripts/sampling/analyze_block_sparsity.py     # block_sparsity.json
+cd research/report && pdflatex main.tex                # 18pp report
+```
