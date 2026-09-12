@@ -1,0 +1,33 @@
+graph TB
+    IN["trunk output: L x 768"]
+
+    subgraph WHY["WHY SPARSE - MEASURED ON 117 CHAINS"]
+        M1["L 32-100: 1.78 contacts/nt, density 6.52 pct"]
+        M2["L 200-500: 4.22 contacts/nt, density 2.15 pct"]
+        M3["L 1500+: 4.85 contacts/nt, density 0.353 pct"]
+        M4["contacts/nt SATURATES at 4.4-4.9<br/>=> contacts scale O(L), NOT O(L^2)"]
+        M5["dense pair track at L=2048 = 309 GB activations<br/>= not viable on any hardware"]
+        M1 --> M4
+        M2 --> M4
+        M3 --> M4
+        M4 --> M5
+    end
+
+    P1["STEP 1 - PROPOSAL O(L*w)<br/>low-rank outer product + Turner<br/>nearest-neighbour prior<br/>no L x L tensor materialised"]
+    P2["STEP 2 - SELECT K = c*L, c=32<br/>need 4.40 median, 5.42 p95, 5.50 max<br/>=> 6x headroom<br/>L=2048: 65536 edges = 1.56 pct dense<br/>16.8 MB not 1.07 GB"]
+    P3["STEP 3 - SPARSE TRIANGLE UPDATES<br/>triangle inequality enforced on<br/>induced K-edge subgraph only"]
+    P4["STEP 4 - RE-SELECT EACH RECYCLE<br/>top-K is a soft revisable commitment,<br/>not a hard early prune"]
+
+    IN --> P1 --> P2 --> P3 --> P4
+    P4 -->|recycle| P1
+    P3 --> OUT["to physics module + heads"]
+
+    RISK["FAILURE MODE<br/>a contact never proposed can never be predicted.<br/>Mitigations: 6x headroom, per-recycle re-selection,<br/>recall-oriented auxiliary loss on the proposal stage.<br/>PROPOSAL RECALL MUST BE REPORTED PER LENGTH BIN -<br/>silently dropping 5 pct of contacts would be an<br/>invisible accuracy ceiling."]
+    P2 -.-> RISK
+
+    classDef meas fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    classDef step fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef risk fill:#7f1d1d,stroke:#f87171,stroke-width:3px,color:#fff
+    class M1,M2,M3,M4,M5 meas
+    class P1,P2,P3,P4,IN,OUT step
+    class RISK risk

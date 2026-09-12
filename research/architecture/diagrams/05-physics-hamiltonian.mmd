@@ -1,0 +1,53 @@
+graph TB
+    ION["c_ion = Mg2+, K+, Na+, T, pH"]
+    GEOM["predicted geometry<br/>distance map from recycle n-1"]
+
+    subgraph IMPL["IMPLICIT CHANNEL - monovalent, mean-field"]
+        BJ["Bjerrum length l_B = e^2/(4 pi eps0 epsr kB T)<br/>= 7.1 A in water at 298 K"]
+        XI["Manning parameter xi = l_B / b<br/>b = axial charge spacing"]
+        TH["condensed fraction theta = 1 - 1/(z xi)<br/>~0.76 for monovalent RNA<br/>=> q_eff = -(1 - theta) per phosphate"]
+        KA["Debye screening kappa<br/>from ionic strength I"]
+        BE["B_elec(i,j) = -lambda q_eff^2 l_B exp(-kappa d_ij)/d_ij<br/>ADDED TO ATTENTION LOGITS"]
+        BJ --> XI --> TH --> BE
+        KA --> BE
+    end
+
+    subgraph EXPL["EXPLICIT CHANNEL - Mg2+, correlation + chelation"]
+        MGH["Mg2+ site head<br/>density prediction"]
+        INOUT["inner vs outer sphere classifier<br/>STEM: the MODE not the presence is decisive"]
+        MGH --> INOUT
+    end
+
+    subgraph EVID["MEASURED EVIDENCE - 180 structures"]
+        V1["Mg2+ 17428 vs K+ 1868 = 9:1<br/>=> Mg2+ is the ion that matters"]
+        V2["83 pct of inner-sphere coordination<br/>is to phosphate OP1/OP2"]
+        V3["0.77 inner vs 7.00 outer contacts per Mg2+<br/>inner fraction 0.511 overall<br/>but 0.296 for chains under 500 nt<br/>=> inner/outer ratio reads out compactness"]
+        V4["B-factor vs Mg2+ distance, 24623 nt:<br/>-0.883 at 0-4 A ... +0.877 beyond 20 A<br/>= MONOTONIC 1.76 SIGMA GRADIENT"]
+    end
+
+    ION --> BJ
+    ION --> KA
+    ION --> MGH
+    GEOM --> BE
+
+    ETOT["E_total = E_stack + E_pair<br/>+ E_elec_implicit + E_Mg_explicit<br/>+ E_excl + E_rigid"]
+    BE --> ETOT
+    INOUT --> ETOT
+
+    RIG["E_rigid - harmonic restraints<br/>weighted by predicted rigidity"]
+    V4 -.->|"justifies the coupling"| RIG
+    INOUT -->|"Mg2+ sites raise local rigidity"| RIG
+    RIG --> ETOT
+    ETOT --> DEC["constrains structure decoder"]
+
+    CAV["CAVEAT THAT MUST BE STATED<br/>crystallographic Mg2+ are SITE-BOUND only.<br/>The diffuse Manning atmosphere is invisible to<br/>crystallography. The explicit head learns site<br/>binding, NOT the atmosphere. Do not conflate."]
+    EXPL -.-> CAV
+
+    classDef impl fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef expl fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff
+    classDef meas fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    classDef cav fill:#7f1d1d,stroke:#f87171,stroke-width:3px,color:#fff
+    class BJ,XI,TH,KA,BE impl
+    class MGH,INOUT expl
+    class V1,V2,V3,V4 meas
+    class CAV cav

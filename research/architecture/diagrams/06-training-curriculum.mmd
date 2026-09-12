@@ -1,0 +1,22 @@
+graph TB
+    S1["STAGE 1 - MLM PRETRAINING<br/>elDORS 1.32B + RNAcentral 46M<br/>WEIGHTED per chunk: 9 of 20 chunks have<br/>median length exactly 151 nt (raw reads).<br/>Uniform sampling would let fragments dominate.<br/>Chunks 6 and 9 (median 2193-2389 nt) are the<br/>only real long-context signal."]
+    S2["STAGE 2 - SECONDARY STRUCTURE<br/>bpRNA-1m, bpRNA-spot, ArchiveII,<br/>RNAStrAlign, bpRNA-new<br/>~160k annotations"]
+    S3["STAGE 3 - MOTIF BANK INIT<br/>BGSU Motif Atlas 4.12<br/>4992 instances to 667 classes<br/>bank computed then FROZEN"]
+    S4["STAGE 4 - MULTI-TASK 3D<br/>RNA3DB 15441 + gRNAde 12011<br/>contacts + Mg2+ sites + rigidity<br/>Mg2+ and B-factor labels extracted<br/>from mmCIF at zero marginal cost"]
+    S5["STAGE 5 - ION-CONDITIONED REFINEMENT<br/>structures stratified by ionic condition<br/>RISK: mmCIF records crystallisation<br/>conditions inconsistently - AUDIT FIRST"]
+    S6["STAGE 6 - 3D DECODER<br/>frame diffusion, RNA3DB documented split"]
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6
+
+    GAP["CRITICAL DATA GAP<br/>Chemical probing NOT in catalog.<br/>Ribonanza = 2.1M sequences with DMS+SHAPE<br/>= 315x more supervised examples than the<br/>6661 unique sequences with 3D.<br/>HIGHEST-PRIORITY ACQUISITION."]
+    GAP -.->|"would slot between stages 2 and 4"| S2
+
+    EVAL["EVALUATION - BLIND ONLY<br/>CASP15 (15), CASP16 (10), RNA-Puzzles<br/>held out entirely.<br/>Sequence-identity dedup MANDATORY:<br/>5S rRNA alone is 5976 of the BGSU clusters,<br/>so a random split is meaningless.<br/>Field ceiling is TM ~0.55 (trRosettaRNA 0.548)."]
+    S6 --> EVAL
+
+    classDef stage fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef warn fill:#7f1d1d,stroke:#f87171,stroke-width:3px,color:#fff
+    classDef eval fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    class S1,S2,S3,S4,S5,S6 stage
+    class GAP,S5 warn
+    class EVAL eval

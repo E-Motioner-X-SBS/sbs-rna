@@ -1,0 +1,54 @@
+graph TB
+    subgraph INPUTS["INPUTS"]
+        SEQ["RNA sequence<br/>L nt, vocab 5 A C G U N<br/>L up to 4096"]
+        ION["Ionic condition c_ion<br/>Mg2+, K+, Na+, T, pH<br/>NOVEL: no predictor accepts this"]
+        MSA["MSA / Rfam alignment<br/>optional, 4227 families"]
+        CHEM["Chemical probing<br/>optional, SHAPE/DMS<br/>NOT YET ACQUIRED"]
+    end
+
+    subgraph TRUNK["A. TOKEN TRUNK - 32 hybrid blocks, d=768"]
+        HYB["Interleaved mixers per period-8 cycle<br/>20x GatedDeltaNet O(L)<br/>8x SlidingWindow O(L*w)<br/>4x FullAttention O(L^2)"]
+        BIAS["Physics-biased attention logits<br/>B_wc + B_elec + B_motif + A_prev"]
+        MOE["MoE FFN every 2nd block<br/>32 fine-grained + 2 shared experts<br/>top-4 routing, bias-based balancing"]
+        HYB --> BIAS --> MOE
+    end
+
+    subgraph PAIR["B+C. ADAPTIVE SPARSE PAIR TRACK"]
+        PROP["Pair proposal O(L*w)<br/>low-rank outer product + Turner prior"]
+        SEL["Select K = 32L candidates<br/>measured need: 4.4 contacts/nt<br/>= 1.56 pct of dense at L=2048"]
+        TRI["Sparse triangle updates<br/>on induced K-edge subgraph"]
+        PROP --> SEL --> TRI
+    end
+
+    MOTIF["D. MOTIF KV BANK - FROZEN<br/>667 classes from 4992 instances<br/>Key: interaction-graph signature<br/>Value: geometry eigenfeatures"]
+
+    PHYS["E. PHYSICS / HAMILTONIAN<br/>E_stack + E_pair + E_elec_implicit<br/>+ E_Mg_explicit + E_excl + E_rigid<br/>Manning implicit K+, explicit Mg2+"]
+
+    subgraph HEADS["F. PREDICTION HEADS"]
+        H2D["Secondary structure"]
+        HC["Contact / distance map"]
+        HMG["Mg2+ sites + inner/outer class<br/>FREE LABELS from mmCIF"]
+        HR["Per-nt rigidity z_B / RMSF<br/>FREE LABELS from B-factors"]
+        HRX["SHAPE / DMS reactivity"]
+    end
+
+    DEC["G. STRUCTURE DECODER<br/>frame diffusion to all-atom 3D"]
+
+    SEQ --> TRUNK
+    ION --> BIAS
+    ION --> PHYS
+    MSA --> PAIR
+    CHEM --> HRX
+    TRUNK --> PAIR
+    MOTIF <-.->|cross-attention| TRI
+    TRI --> PHYS
+    PHYS --> HEADS
+    HEADS --> DEC
+    DEC -->|"recycle x3<br/>distance estimate enables B_elec"| BIAS
+
+    classDef novel fill:#7c2d12,stroke:#fb923c,stroke-width:3px,color:#fff
+    classDef std fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef frozen fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    class ION,PHYS,HMG,HR,SEL novel
+    class SEQ,MSA,HYB,MOE,TRI,H2D,HC,DEC,PROP,BIAS,HRX,CHEM std
+    class MOTIF frozen

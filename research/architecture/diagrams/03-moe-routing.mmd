@@ -1,0 +1,41 @@
+graph TB
+    TOK["token hidden state h_i, d=768"]
+    CTX["local structural context<br/>pairing prob, predicted rigidity, local density"]
+    ROUTER{"ROUTER<br/>input = h_i CONCAT context<br/>NOT sequence k-mers"}
+
+    TOK --> ROUTER
+    CTX --> ROUTER
+
+    subgraph SHARED["ALWAYS-ON SHARED EXPERTS (2)"]
+        S1["Shared 1<br/>Watson-Crick helix<br/>the highest-frequency pattern"]
+        S2["Shared 2<br/>generic backbone"]
+    end
+
+    subgraph ROUTED["ROUTED EXPERTS (32 fine-grained, d_ff=512, top-4)"]
+        E1["Junction /<br/>multiloop"]
+        E2["Pseudoknot /<br/>long-range"]
+        E3["Ion pocket /<br/>Mg2+ coordination"]
+        E4["Coevolution /<br/>MSA"]
+        E5["Motif<br/>geometry"]
+        E6["Flexibility /<br/>dynamics"]
+        EN["... 26 more"]
+    end
+
+    ROUTER -->|always| SHARED
+    ROUTER -->|"top-4"| ROUTED
+    SHARED --> SUM["weighted sum<br/>6 active of 34"]
+    ROUTED --> SUM
+    SUM --> NEXT["to next block"]
+
+    BAL["AUX-LOSS-FREE BALANCING<br/>per-expert bias b_e updated each step<br/>no competing gradient<br/>critical: 5S rRNA is 5976 of 3D clusters,<br/>an aux loss would fight the biology"]
+    BAL -.->|adjusts gate logits| ROUTER
+
+    RAT["WHY ROUTE ON STRUCTURE<br/>measured: GNRA k-mer context predicts<br/>rigidity at only 0.073 sigma = negligible.<br/>Routing on family would collapse onto rRNA."]
+    RAT -.-> ROUTER
+
+    classDef shared fill:#365314,stroke:#a3e635,stroke-width:3px,color:#fff
+    classDef routed fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef ctrl fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff
+    class S1,S2 shared
+    class E1,E2,E3,E4,E5,E6,EN routed
+    class ROUTER,BAL,RAT ctrl

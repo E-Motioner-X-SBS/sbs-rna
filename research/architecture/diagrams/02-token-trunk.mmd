@@ -1,0 +1,30 @@
+graph LR
+    subgraph CYCLE["ONE PERIOD-8 CYCLE - repeated 4x for 32 blocks"]
+        B1["Blk 1<br/>GDN"]
+        B2["Blk 2<br/>GDN<br/>+MoE"]
+        B3["Blk 3<br/>SWA"]
+        B4["Blk 4<br/>GDN<br/>+MoE"]
+        B5["Blk 5<br/>GDN"]
+        B6["Blk 6<br/>SWA<br/>+MoE"]
+        B7["Blk 7<br/>GDN"]
+        B8["Blk 8<br/>FULL<br/>+MoE"]
+        B1 --> B2 --> B3 --> B4 --> B5 --> B6 --> B7 --> B8
+    end
+
+    B8 --> OUT["to pair track"]
+
+    subgraph LEGEND["MIXER COST"]
+        L1["GDN = Gated DeltaNet, linear O(L), 20 of 32 blocks"]
+        L2["SWA = sliding window w=128, O(L*w), 8 of 32 blocks"]
+        L3["FULL = full attention O(L^2), only 4 of 32 blocks"]
+        L4["at L=4096: 67M pair evals vs 537M if all-dense = 8x cheaper"]
+    end
+
+    classDef gdn fill:#164e63,stroke:#22d3ee,stroke-width:2px,color:#fff
+    classDef swa fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef full fill:#7c2d12,stroke:#fb923c,stroke-width:3px,color:#fff
+    classDef leg fill:#0f172a,stroke:#475569,stroke-width:1px,color:#cbd5e1
+    class B1,B2,B4,B5,B7 gdn
+    class B3,B6 swa
+    class B8 full
+    class L1,L2,L3,L4 leg
