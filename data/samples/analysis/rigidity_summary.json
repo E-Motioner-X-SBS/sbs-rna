@@ -1,0 +1,58 @@
+{
+  "structures_analyzed": 137,
+  "xray_structures": 31,
+  "note": "z_B = B-factor z-normalised within each structure; LOWER = more rigid",
+  "pearson_density_vs_zB": -0.2943,
+  "rigidity_by_packing_density": [
+    {
+      "density_bin": "0-10",
+      "n": 23932,
+      "mean_zB": 0.03,
+      "median_zB": -0.054
+    },
+    {
+      "density_bin": "10-20",
+      "n": 1828,
+      "mean_zB": -0.394,
+      "median_zB": -0.513
+    }
+  ],
+  "rigidity_by_mg_distance": [
+    {
+      "mg_dist_A": "0-4",
+      "n": 319,
+      "mean_zB": -0.883
+    },
+    {
+      "mg_dist_A": "4-6",
+      "n": 2441,
+      "mean_zB": -0.673
+    },
+    {
+      "mg_dist_A": "6-8",
+      "n": 7590,
+      "mean_zB": -0.415
+    },
+    {
+      "mg_dist_A": "8-12",
+      "n": 8115,
+      "mean_zB": 0.004
+    },
+    {
+      "mg_dist_A": "12-20",
+      "n": 2984,
+      "mean_zB": 0.756
+    },
+    {
+      "mg_dist_A": "20-+",
+      "n": 3174,
+      "mean_zB": 0.877
+    }
+  ],
+  "gnra_tetraloop": {
+    "n_GNRA": 4944,
+    "mean_zB_GNRA": -0.082,
+    "n_other": 95768,
+    "mean_zB_other": -0.009
+  }
+}

@@ -22,3 +22,9 @@ data/structures/
 data/families/
 data/benchmarks/
 data/derived/
+
+# Keep the small analysis outputs (evidence for the architecture work);
+# the sampled mmCIF bulk under data/samples/ stays ignored.
+!data/samples/
+data/samples/*
+!data/samples/analysis/

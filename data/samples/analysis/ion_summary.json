@@ -1,0 +1,48 @@
+{
+  "structures_parsed": 179,
+  "structures_with_any_ion": 127,
+  "structures_with_mg": 96,
+  "total_ions_by_type": {
+    "MG": 17428,
+    "K": 1868,
+    "ZN": 359,
+    "NA": 161,
+    "CA": 29,
+    "MN": 12,
+    "BA": 3
+  },
+  "total_mg_ions": 17428,
+  "mg_with_inner_sphere_contact": 8904,
+  "frac_mg_inner_sphere": 0.5109,
+  "mean_inner_contacts_per_mg": 0.767,
+  "mean_outer_contacts_per_mg": 7.004,
+  "top_inner_sphere_partners": {
+    "OP2": 5890,
+    "OP1": 5144,
+    "O6": 757,
+    "O4": 511,
+    "N7": 447,
+    "O2'": 196,
+    "O2": 147,
+    "O3'": 79,
+    "O5'": 60,
+    "N1": 39
+  },
+  "top_outer_sphere_partners": {
+    "OP2": 22164,
+    "OP1": 18187,
+    "O5'": 17440,
+    "O3'": 15119,
+    "N7": 12655,
+    "O6": 8375,
+    "O2'": 5403,
+    "N1": 4835,
+    "N3": 4192,
+    "N4": 3478
+  },
+  "rna_residues_total": 307965,
+  "chain_len_median": 111,
+  "chain_len_p10": 9,
+  "chain_len_p90": 5198,
+  "chain_len_max": 11478
+}
