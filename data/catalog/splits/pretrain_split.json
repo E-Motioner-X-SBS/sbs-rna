@@ -1,0 +1,13 @@
+{
+  "corpus": "elDORS_v1",
+  "total_sequences": 1320000000,
+  "total_chunks": 20,
+  "split_rule": {
+    "description": "Per-sequence deterministic split by MD5 of the sequence header",
+    "train": "md5(header).int % 100 < 80  (80%)",
+    "validation": "md5(header).int % 100 in [80, 90)  (10%)",
+    "test": "md5(header).int % 100 in [90, 100)  (10%)",
+    "rationale": "Homology-independent, reproducible, no data movement; mirrors NucleicBERT's 80/20 with an explicit held-out test tier."
+  },
+  "note": "Headers are the FASTA description lines; implement by streaming with Bio.SeqIO or `zcat | awk '/^>/{...}'`."
+}

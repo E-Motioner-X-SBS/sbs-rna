@@ -1,0 +1,287 @@
+{
+  "generated": "2026-09-12 14:20:55",
+  "eldors_sample": {
+    "sequences_sampled": 1000000,
+    "median_len": 245.0,
+    "mean_len": 657.4,
+    "min_len": 10,
+    "max_len": 4096,
+    "composition_pct": {
+      "A": 25.816,
+      "T": 25.527,
+      "G": 24.346,
+      "C": 24.205,
+      "N": 0.106
+    },
+    "per_chunk": [
+      {
+        "chunk": "elDORS_v1_001.fasta.gz",
+        "sampled": 50000,
+        "median_len": 910.0,
+        "mean_len": 1220.4,
+        "max_len": 4096,
+        "gc_pct": 46.07,
+        "n_pct": 0.619
+      },
+      {
+        "chunk": "elDORS_v1_002.fasta.gz",
+        "sampled": 50000,
+        "median_len": 192.0,
+        "mean_len": 354.4,
+        "max_len": 4093,
+        "gc_pct": 55.65,
+        "n_pct": 0.085
+      },
+      {
+        "chunk": "elDORS_v1_003.fasta.gz",
+        "sampled": 50000,
+        "median_len": 1101.0,
+        "mean_len": 1359.0,
+        "max_len": 4096,
+        "gc_pct": 41.26,
+        "n_pct": 0.195
+      },
+      {
+        "chunk": "elDORS_v1_004.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 290.3,
+        "max_len": 4094,
+        "gc_pct": 51.55,
+        "n_pct": 0.043
+      },
+      {
+        "chunk": "elDORS_v1_005.fasta.gz",
+        "sampled": 50000,
+        "median_len": 147.0,
+        "mean_len": 535.1,
+        "max_len": 4093,
+        "gc_pct": 47.49,
+        "n_pct": 0.247
+      },
+      {
+        "chunk": "elDORS_v1_006.fasta.gz",
+        "sampled": 50000,
+        "median_len": 2201.0,
+        "mean_len": 2273.9,
+        "max_len": 4096,
+        "gc_pct": 48.3,
+        "n_pct": 0.008
+      },
+      {
+        "chunk": "elDORS_v1_007.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 255.8,
+        "max_len": 4084,
+        "gc_pct": 61.9,
+        "n_pct": 0.034
+      },
+      {
+        "chunk": "elDORS_v1_008.fasta.gz",
+        "sampled": 50000,
+        "median_len": 211.0,
+        "mean_len": 295.9,
+        "max_len": 4058,
+        "gc_pct": 55.03,
+        "n_pct": 0.009
+      },
+      {
+        "chunk": "elDORS_v1_009.fasta.gz",
+        "sampled": 50000,
+        "median_len": 2196.0,
+        "mean_len": 2270.0,
+        "max_len": 4096,
+        "gc_pct": 48.28,
+        "n_pct": 0.008
+      },
+      {
+        "chunk": "elDORS_v1_010.fasta.gz",
+        "sampled": 50000,
+        "median_len": 378.0,
+        "mean_len": 432.3,
+        "max_len": 3702,
+        "gc_pct": 64.01,
+        "n_pct": 0.003
+      },
+      {
+        "chunk": "elDORS_v1_011.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 240.8,
+        "max_len": 4094,
+        "gc_pct": 57.69,
+        "n_pct": 0.016
+      },
+      {
+        "chunk": "elDORS_v1_012.fasta.gz",
+        "sampled": 50000,
+        "median_len": 595.0,
+        "mean_len": 756.0,
+        "max_len": 4095,
+        "gc_pct": 42.53,
+        "n_pct": 0.09
+      },
+      {
+        "chunk": "elDORS_v1_013.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 164.4,
+        "max_len": 3965,
+        "gc_pct": 53.63,
+        "n_pct": 0.0
+      },
+      {
+        "chunk": "elDORS_v1_014.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 172.9,
+        "max_len": 4039,
+        "gc_pct": 63.04,
+        "n_pct": 0.001
+      },
+      {
+        "chunk": "elDORS_v1_015.fasta.gz",
+        "sampled": 50000,
+        "median_len": 630.0,
+        "mean_len": 755.2,
+        "max_len": 4096,
+        "gc_pct": 42.8,
+        "n_pct": 0.022
+      },
+      {
+        "chunk": "elDORS_v1_016.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 224.9,
+        "max_len": 4088,
+        "gc_pct": 57.67,
+        "n_pct": 0.0
+      },
+      {
+        "chunk": "elDORS_v1_017.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 214.1,
+        "max_len": 4095,
+        "gc_pct": 59.11,
+        "n_pct": 0.024
+      },
+      {
+        "chunk": "elDORS_v1_018.fasta.gz",
+        "sampled": 50000,
+        "median_len": 644.0,
+        "mean_len": 774.8,
+        "max_len": 4095,
+        "gc_pct": 41.73,
+        "n_pct": 0.018
+      },
+      {
+        "chunk": "elDORS_v1_019.fasta.gz",
+        "sampled": 50000,
+        "median_len": 318.0,
+        "mean_len": 397.2,
+        "max_len": 4096,
+        "gc_pct": 55.64,
+        "n_pct": 0.092
+      },
+      {
+        "chunk": "elDORS_v1_020.fasta.gz",
+        "sampled": 50000,
+        "median_len": 151.0,
+        "mean_len": 160.1,
+        "max_len": 3598,
+        "gc_pct": 53.64,
+        "n_pct": 0.0
+      }
+    ]
+  },
+  "structures": {
+    "n_chains": 15441,
+    "n_with_res": 15441,
+    "median_res": 3.1,
+    "le4": 13750,
+    "le2_5": 1991,
+    "le2": 303,
+    "methods": {
+      "cryo-EM": 9627,
+      "X-ray": 5814
+    },
+    "median_len": 121,
+    "n_families": 100,
+    "top_families": [
+      [
+        "5S_rRNA",
+        5976
+      ],
+      [
+        "tRNA",
+        636
+      ],
+      [
+        "SSU_rRNA_bacteria",
+        354
+      ],
+      [
+        "LSU_rRNA_bacteria",
+        130
+      ],
+      [
+        "U2",
+        101
+      ],
+      [
+        "SSU_rRNA_eukarya",
+        98
+      ],
+      [
+        "5_8S_rRNA",
+        77
+      ],
+      [
+        "Purine",
+        57
+      ],
+      [
+        "Fungi_U3",
+        41
+      ],
+      [
+        "glmS",
+        38
+      ]
+    ]
+  },
+  "benchmarks_2d": {
+    "ArchiveII": {
+      "n": 3975,
+      "median": 120,
+      "mean": 213.3,
+      "max": 2968
+    },
+    "bpRNA-spot train": {
+      "n": 10934,
+      "median": 104.0,
+      "mean": 133.2,
+      "max": 498
+    },
+    "bpRNA-spot test": {
+      "n": 1411,
+      "median": 104,
+      "mean": 130.8,
+      "max": 499
+    },
+    "bpRNA-new": {
+      "n": 5401,
+      "median": 92,
+      "mean": 110.0,
+      "max": 489
+    },
+    "RNAStrAlign": {
+      "n": 27125
+    },
+    "bpRNA-1m": {
+      "n": 66715
+    }
+  }
+}

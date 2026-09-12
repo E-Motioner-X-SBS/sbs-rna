@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Locks/logs
+*.log
+*.part
+
+# Data bulk: only the small metadata is versioned
+data/*
+!data/catalog/
+!data/exploration/
+!data/README.md
+
+# Keep large archives out even if a negation above would catch a subtree
+data/sequences/
+data/structures/
+data/families/
+data/benchmarks/
+data/derived/

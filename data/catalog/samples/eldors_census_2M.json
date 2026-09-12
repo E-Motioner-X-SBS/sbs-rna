@@ -1,0 +1,26 @@
+{
+  "source": "elDORS_v1 chunk 001 (first 2,000,000 sequences)",
+  "sequences": 2000000,
+  "nucleotides": 2052343440,
+  "alphabet": {
+    "A": 27.97522,
+    "T": 26.80894,
+    "G": 22.79997,
+    "C": 22.10248,
+    "N": 0.31339
+  },
+  "alphabet_size_unique": 5,
+  "length": {
+    "min": 10,
+    "median": 730,
+    "mean": 1026.2,
+    "max": 4096,
+    "p99.9": 4071,
+    "frac_lt_20nt": 0.00029
+  },
+  "implications": {
+    "vocabulary": "5 symbols sufficient (A,C,G,T,N); T->U for RNA. No IUPAC ambiguity codes observed in elDORS_v1 sequences.",
+    "context_window": "max 4096 nt; median 730 / mean 1026. A 2048-nt window covers the majority; 4096 is fully lossless.",
+    "note": "NucleicBERT used vocab 25 (IUPAC ambiguity chars) and maxlen 1024; elDORS already normalizes non-ACGT to N during construction."
+  }
+}

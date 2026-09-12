@@ -1,0 +1,49 @@
+{
+  "analysis": "RNA sequences with experimental 3D structural data (local collection)",
+  "generated": "2026-09-11",
+  "raw_sources": {
+    "RNA3DB": {
+      "parsed_chains": 26532,
+      "filtered_chains": 15441,
+      "unique_sequences": 3157,
+      "cif_files": 15441,
+      "documented_split_chains": 2199,
+      "split_detail": "1,539 train + 660 test (Rfam-labeled components)"
+    },
+    "gRNAde_RNASolo": {
+      "clusters": 4223,
+      "chains_covered": 12011,
+      "unique_sequences": 4223,
+      "snapshot": "2023-11"
+    },
+    "CASP15_16_targets": 25
+  },
+  "union": {
+    "chain_level_structures": 27452,
+    "unique_sequences": 6661,
+    "sequence_overlap_between_sources": 719,
+    "pdb_entries_covered": 6846
+  },
+  "quality_tiers": {
+    "all_filtered_chains": {"chains": 15441, "unique_sequences": 3157},
+    "length_32_1024": {"chains": 10681, "unique_sequences": 2370},
+    "resolution_le_4A": {"chains": 13750, "unique_sequences": 2884},
+    "resolution_le_2.5A": {"chains": 1991, "unique_sequences": 673},
+    "xray_le4A_len32_1024": {"chains": 3982, "unique_sequences": 838},
+    "cryoem_len32_1024": {"chains": 6590, "unique_sequences": 1565}
+  },
+  "non_redundant_bgsu_456": {
+    "all": 5161, "le_4.0A": 3953, "le_2.5A": 1410, "le_2.0A": 604
+  },
+  "comparison": {
+    "nucleicbert_3d_training": "~408 (NucleoSeeker) + ~467 (BGSU-filtered) = ~875 structures",
+    "our_unique_sequences": 6661,
+    "improvement": "~7.6x more unique sequences; 31x more chain-level structures"
+  },
+  "notes": [
+    "Median resolution 3.10 A across RNA3DB filtered set; 1,991 chains at <=2.5 A",
+    "Length median 121 nt (dominated by short rRNA/tRNA fragments); union length range 11-19000",
+    "gRNAde clusters are sequence-identity groups designed for ML; RNA3DB split is Rfam-labeled",
+    "For contact-map training, the practical window is length 32-1024 + resolution filter (~2.4k-2.9k unique seqs)"
+  ]
+}

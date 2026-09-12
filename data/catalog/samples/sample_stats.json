@@ -1,0 +1,18 @@
+{
+  "file": "/store/shuvam/E-motioner-X-SBS/co-evolution-analysis/data/rna_training_db/samples/eldors_001_first5000.fasta",
+  "sequences": 5000,
+  "nucleotides": 4524059,
+  "composition": {
+    "A": 0.2751,
+    "T": 0.2515,
+    "G": 0.2449,
+    "C": 0.2271,
+    "N": 0.0015
+  },
+  "length": {
+    "min": 16,
+    "max": 4080,
+    "mean": 904.8,
+    "median": 642
+  }
+}
