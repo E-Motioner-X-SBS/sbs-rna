@@ -99,6 +99,7 @@ hand-set 3-valued base-pairing bias. Inductive bias, not scale, is the lever.
 | **PDB ionic survivorship bias** | **recorded Mg²⁺ spans only 5-15 mM — nobody deposits unfolded RNA** |
 | **Coevolution signal** | APC-MI recovers curated base pairs at prec@L/5 **0.670**, rec@L 0.768 |
 | **Coevolution depth gate** | **Neff/L >= 1: 0.975 precision; Neff/L < 1: 0.609.** tRNA = 1.000/1.000 |
+| **HPT reference impl.** | L=4096 in **0.45 s**, 0.96% of dense; dense **not runnable** past L=1024 here |
 
 **Architecture** -> `research/architecture/ARCHITECTURE.md` (PHAROS v0.1).
 The efficiency claim was tested rather than assumed, and **the original flat sparse pair
@@ -117,9 +118,15 @@ the session: a load-bearing design decision was falsified by its own validation.
 
 Highest value first:
 
-- [ ] **Prototype the hierarchical pair track in torch** and measure block-detection
-      recall with a *learned* scorer, not the sequence-only heuristic. This is the one
-      unproven load-bearing claim (risk R1).
+- [x] ~~Prototype the hierarchical pair track in torch~~ **DONE (structure + cost).**
+      `research/architecture/reference/` implements HPT and benchmarks it against a dense
+      AF3-style baseline: L=1024 HPT 0.10 s vs dense 8.26 s / 5.15 GB (~83x); dense is
+      **not runnable** at L=2048 (12.9 GB predicted) or L=4096 (51.5 GB) on this 14 GB
+      machine, while HPT does L=4096 in 0.45 s at 0.96% of dense. Two silent indexing/
+      budget bugs found and fixed (see ARCHITECTURE.md §5.4).
+- [ ] **STILL OPEN (R1): train the block-detection scorer** and measure block recall with
+      learned weights. The reference impl. proves the *cost and structure*; it does not
+      prove a model can find the occupied blocks. This needs the probing/3D data pipeline.
 - [x] ~~Audit ionic metadata availability~~ **DONE, and it rescoped the headline claim.**
       Cryo-EM stores buffers as *structured* `_em_buffer_component` (concentration + units),
       X-ray as free-text `_exptl_crystal_grow.pdbx_details`. Coverage ~36%. The deeper
@@ -160,5 +167,6 @@ python3 scripts/sampling/analyze_block_sparsity.py     # block_sparsity.json
 python3 scripts/sampling/audit_ionic_metadata.py       # ionic_metadata_audit.json
 python3 scripts/sampling/audit_em_buffers.py           # em_buffer_audit.json
 python3 scripts/sampling/measure_coevolution.py        # coevolution_signal.json
-cd research/report && pdflatex main.tex                # 18pp report
+cd research/report && pdflatex main.tex                # 21pp report
+python3 research/architecture/reference/benchmark_pair_track.py  # pair_track_benchmark.json
 ```

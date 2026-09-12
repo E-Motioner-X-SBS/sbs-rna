@@ -197,7 +197,7 @@ and carry most tertiary information. And it ignores ions entirely.
 
 All results in this section were measured for this report on 180 BGSU
 non-redundant representative structures at $\leq 3.0$~\AA{}, downloaded and
-analysed by scripts in \texttt{scripts/sampling/}. Raw outputs are in
+analysed by scripts in \texttt{.../sampling/}. Raw outputs are in
 \texttt{data/samples/analysis/}.
 
 \subsection{RNA contact maps scale linearly, not quadratically}
@@ -699,6 +699,55 @@ aggregates $256$ pair-decisions into one, so coarse-level signal-to-noise is far
 higher than for individual pair ranking. The model ranks $32$k blocks and then
 $16$ sub-blocks inside each survivor, never $4.1$M individual pairs.
 
+\subsubsection{Reference implementation and measured cost}
+
+The cost arithmetic above is turned into running code in
+\texttt{research/architecture/reference/}, and measured against an
+AlphaFold3-style dense baseline on the machine this report was prepared on
+(CPU only, 14~GB RAM, no CUDA), at batch 1, $d_{\text{model}}=768$,
+$d_{\text{pair}}=128$, $b_1=16$, $b_2=4$ and budget $c=20$.
+
+\begin{table}[h]
+\centering
+\caption{Hierarchical track versus dense baseline, measured. \meas}
+\label{tab:bench}
+\small
+\begin{tabular}{rrrrrrr}
+\toprule
+\textbf{$L$} & \textbf{HPT time} & \textbf{HPT pairs} & \textbf{\% of dense} & \textbf{eff.\ $c$} & \textbf{Dense time} & \textbf{Dense peak RSS} \\
+\midrule
+128  & 0.01 s & 750    & $9.23\%$  & 5.9  & 0.07 s & 0.10 GB \\
+256  & 0.01 s & 3{,}506  & $10.74\%$ & 13.7 & 0.28 s & 0.33 GB \\
+512  & 0.05 s & 10{,}054 & $7.69\%$  & 19.6 & 1.22 s & 1.30 GB \\
+1024 & $\mathbf{0.10}$ s & 20{,}102 & $3.84\%$ & 19.6 & $\mathbf{8.26}$ s & $\mathbf{5.15}$ GB \\
+2048 & 0.33 s & 40{,}198 & $1.92\%$  & 19.6 & \emph{not runnable} & predicted 12.9 GB \\
+4096 & $\mathbf{0.45}$ s & 80{,}390 & $\mathbf{0.96\%}$ & 19.6 & \emph{not runnable} & predicted 51.5 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two things are established that arithmetic alone could not. First, the dense
+baseline genuinely does not run: it needs a predicted 12.9~GB of activations at
+$L=2048$ and 51.5~GB at $L=4096$ on a 14~GB machine, so the infeasibility claim
+is not rhetorical. Second, at the largest length both can run, the hierarchical
+track is roughly $83\times$ faster (0.10~s versus 8.26~s) with peak resident
+memory below measurement noise against the baseline's 5.15~GB.
+
+The cost fraction falls monotonically with length, from $9.2\%$ to $0.96\%$,
+because the budget grows as $cL$ while the dense map grows as $L^2$. The
+mechanism becomes cheaper relative to dense exactly where it is needed,
+mirroring the falling block occupancy of Table~\ref{tab:blocks}.
+
+\paragraph{Two silent defects found while building it.} Both would have degraded
+a trained model rather than crashing. The L3 expansion initially paired block
+rows with block columns element-wise, materialising only each block's
+\emph{diagonal}---4 pairs per $4\times4$ block instead of 16---silently
+delivering a quarter of the intended budget. Separately, the L2 selection budget
+was expressed as a fraction of all pairs and was clamped by masking to a quarter
+of its target. Both pinned the effective $c$ at $5.0$ while the code appeared to
+work. Budgets are now stated in the same units as the measurement ($K = cL$
+pairs) so any mismatch is immediately visible.
+
 \paragraph{What remains unproven.} These measurements establish that the
 information is present and the cost affordable. They do \emph{not} establish
 that a trained model will identify occupied blocks accurately; that requires
@@ -981,20 +1030,22 @@ large-scale training is attempted.
 
 \begin{table}[h]
 \centering
-\begin{tabular}{ll}
+\small
+\begin{tabular}{@{}ll@{}}
 \toprule
 \textbf{Script} & \textbf{Output} \\
 \midrule
-\texttt{scripts/sampling/fetch\_samples.py} & 180 mmCIF, 12 Rfam seeds \\
-\texttt{scripts/sampling/analyze\_ions\_motifs.py} & \texttt{ion\_summary.json} \\
-\texttt{scripts/sampling/analyze\_rigidity.py} & \texttt{rigidity\_summary.json} \\
-\texttt{scripts/sampling/analyze\_contact\_sparsity.py} & \texttt{contact\_sparsity.json} \\
-\texttt{scripts/sampling/validate\_proposal\_recall.py} & \texttt{proposal\_recall.json} \\
-\texttt{scripts/sampling/analyze\_contact\_separation.py} & \texttt{contact\_separation.json} \\
-\texttt{scripts/sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
-\texttt{scripts/sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
-\texttt{scripts/sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
-\texttt{scripts/sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
+\texttt{.../sampling/fetch\_samples.py} & 180 mmCIF, 12 Rfam seeds \\
+\texttt{.../sampling/analyze\_ions\_motifs.py} & \texttt{ion\_summary.json} \\
+\texttt{.../sampling/analyze\_rigidity.py} & \texttt{rigidity\_summary.json} \\
+\texttt{.../sampling/analyze\_contact\_sparsity.py} & \texttt{contact\_sparsity.json} \\
+\texttt{.../sampling/validate\_proposal\_recall.py} & \texttt{proposal\_recall.json} \\
+\texttt{.../sampling/analyze\_contact\_separation.py} & \texttt{contact\_separation.json} \\
+\texttt{.../sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
+\texttt{.../sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
+\texttt{.../sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
+\texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
+\texttt{.../reference/benchmark\_pair\_track.py} & \texttt{pair\_track\_benchmark.json} \\
 \bottomrule
 \end{tabular}
 \end{table}

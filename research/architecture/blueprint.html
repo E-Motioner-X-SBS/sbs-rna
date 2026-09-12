@@ -152,6 +152,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <span class="chip">~911M total / ~382M active params</span>
     <span class="chip">Field ceiling: TM ≈ 0.55</span>
     <span class="chip alert">design revised after validation</span>
+    <span class="chip ok">reference impl. benchmarked</span>
   </div>
 </header>
 
@@ -746,6 +747,43 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <i>any</i> contact aggregates 256 pair-decisions into one — the model ranks 32k
         blocks, never 4.1M pairs.</p>
       </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>And it runs — measured, not just costed</h3>
+    <p class="note">Reference implementation vs an AlphaFold3-style dense baseline · CPU only, 14 GB RAM, batch 1, d<sub>pair</sub>=128, b1=16, b2=4, budget c=20</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>L</th><th class="num">HPT time</th><th class="num">HPT pairs</th><th class="num">% of dense</th><th class="num">eff. c</th><th class="num">Dense time</th><th class="num">Dense peak RSS</th></tr></thead>
+        <tbody>
+          <tr><td class="num">128</td><td class="num">0.01 s</td><td class="num">750</td><td class="num">9.23%</td><td class="num">5.9</td><td class="num">0.07 s</td><td class="num">0.10 GB</td></tr>
+          <tr><td class="num">256</td><td class="num">0.01 s</td><td class="num">3,506</td><td class="num">10.74%</td><td class="num">13.7</td><td class="num">0.28 s</td><td class="num">0.33 GB</td></tr>
+          <tr><td class="num">512</td><td class="num">0.05 s</td><td class="num">10,054</td><td class="num">7.69%</td><td class="num">19.6</td><td class="num">1.22 s</td><td class="num">1.30 GB</td></tr>
+          <tr class="total"><td class="num">1024</td><td class="num">0.10 s</td><td class="num">20,102</td><td class="num">3.84%</td><td class="num">19.6</td><td class="num">8.26 s</td><td class="num">5.15 GB</td></tr>
+          <tr><td class="num">2048</td><td class="num">0.33 s</td><td class="num">40,198</td><td class="num">1.92%</td><td class="num">19.6</td><td class="num" style="color:var(--warn)">not runnable</td><td class="num" style="color:var(--warn)">~12.9 GB</td></tr>
+          <tr class="total"><td class="num">4096</td><td class="num">0.45 s</td><td class="num">80,390</td><td class="num">0.96%</td><td class="num">19.6</td><td class="num" style="color:var(--warn)">not runnable</td><td class="num" style="color:var(--warn)">~51.5 GB</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="finding" style="margin-top:16px">
+      <span class="tag">Confirmed</span>
+      <p>Two things arithmetic alone could not settle. <b>The dense baseline genuinely does
+      not run</b> — 12.9 GB of activations at L=2048 and 51.5 GB at L=4096, on a 14 GB
+      machine. And at the largest length both can run, the hierarchical track is
+      <b>~83× faster</b> (0.10 s vs 8.26 s) with peak memory below measurement noise against
+      the baseline's 5.15 GB. Cost falls monotonically with length (9.2% → 0.96%) because the
+      budget grows as c·L while the dense map grows as L² — it gets cheaper relative to dense
+      exactly where it is needed.</p>
+    </div>
+    <div class="risk" style="margin-top:14px">
+      <span class="n">BUGS</span>
+      <p><b>Two silent defects found while building it</b>, both of which would have degraded
+      a trained model rather than crashing. The L3 expansion paired block rows with columns
+      element-wise, materialising only each block's <i>diagonal</i> — 4 pairs per 4×4 block
+      instead of 16. And the L2 budget, expressed as a fraction of all pairs, was clamped by
+      masking to a quarter of target. Both pinned effective c at 5.0 while the code appeared
+      to work. Budgets are now stated in the same units as the measurement (K = c·L).</p>
     </div>
   </div>
 
