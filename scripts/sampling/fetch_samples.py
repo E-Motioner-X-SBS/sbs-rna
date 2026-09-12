@@ -11,7 +11,7 @@ Targets:
   4. RNAcentral sequence sample
 """
 from __future__ import annotations
-import csv, json, re, sys, time, urllib.request, urllib.error
+import csv, json, re, subprocess, sys, time, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -121,17 +121,35 @@ def fetch_rfam() -> None:
 
 # ---------- 4. RNAcentral sequences ----------
 def fetch_rnacentral(n: int = 200) -> None:
+    """RNAcentral's API stalls on large page sizes; paginate at 100."""
     d = OUT / "sequences"; d.mkdir(parents=True, exist_ok=True)
     dest = d / "rnacentral_sample.json"
     if dest.exists():
         return
-    try:
-        raw = get(f"https://rnacentral.org/api/v1/rna/?page_size={n}&format=json")
-        dest.write_bytes(raw)
-        obj = json.loads(raw)
-        log(f"  rnacentral: {len(obj.get('results', []))} sequences")
-    except Exception as e:
-        log(f"  rnacentral FAIL {e}")
+    PAGE = 100
+    results, page = [], 1
+    while len(results) < n:
+        url = (f"https://rnacentral.org/api/v1/rna/"
+               f"?page_size={PAGE}&page={page}&format=json")
+        try:
+            raw = subprocess.run(
+                ["curl", "-sS", "--fail", "--compressed", "--max-time", "90", url],
+                capture_output=True, check=True).stdout
+            batch = json.loads(raw).get("results", [])
+        except Exception as e:
+            log(f"  rnacentral page {page} FAIL {e}")
+            break
+        if not batch:
+            break
+        results.extend(batch)
+        log(f"  rnacentral page {page}: +{len(batch)} (total {len(results)})")
+        page += 1
+        time.sleep(0.5)
+    if not results:
+        log("  rnacentral: nothing fetched")
+        return
+    dest.write_text(json.dumps({"count": len(results), "results": results[:n]}, indent=2))
+    log(f"  rnacentral: {len(results[:n])} sequences -> {dest.name}")
 
 
 if __name__ == "__main__":

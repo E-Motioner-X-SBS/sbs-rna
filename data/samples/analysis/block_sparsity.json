@@ -1,0 +1,3398 @@
+{
+  "summary": {
+    "chains": 69,
+    "block_sizes": [
+      4,
+      8,
+      16,
+      32
+    ],
+    "by_length_bin": [
+      {
+        "L_range": "64-200",
+        "n": 18,
+        "median_L": 87.5,
+        "per_block": {
+          "4": {
+            "mean_occupancy_frac": 0.16335,
+            "mean_coarse_vs_dense": 0.06863,
+            "mean_fine_vs_dense": 0.17999,
+            "mean_effective_c": 7.87,
+            "max_effective_c": 10.74
+          },
+          "8": {
+            "mean_occupancy_frac": 0.32095,
+            "mean_coarse_vs_dense": 0.01887,
+            "mean_fine_vs_dense": 0.38969,
+            "mean_effective_c": 17.16,
+            "max_effective_c": 23.56
+          },
+          "16": {
+            "mean_occupancy_frac": 0.57336,
+            "mean_coarse_vs_dense": 0.00552,
+            "mean_fine_vs_dense": 0.81141,
+            "mean_effective_c": 35.98,
+            "max_effective_c": 50.26
+          },
+          "32": {
+            "mean_occupancy_frac": 0.79603,
+            "mean_coarse_vs_dense": 0.00187,
+            "mean_fine_vs_dense": 1.50021,
+            "mean_effective_c": 66.95,
+            "max_effective_c": 100.52
+          }
+        }
+      },
+      {
+        "L_range": "200-500",
+        "n": 3,
+        "median_L": 393,
+        "per_block": {
+          "4": {
+            "mean_occupancy_frac": 0.06865,
+            "mean_coarse_vs_dense": 0.06417,
+            "mean_fine_vs_dense": 0.07049,
+            "mean_effective_c": 12.6,
+            "max_effective_c": 13.6
+          },
+          "8": {
+            "mean_occupancy_frac": 0.15371,
+            "mean_coarse_vs_dense": 0.01644,
+            "mean_fine_vs_dense": 0.16166,
+            "mean_effective_c": 28.96,
+            "max_effective_c": 31.59
+          },
+          "16": {
+            "mean_occupancy_frac": 0.33028,
+            "mean_coarse_vs_dense": 0.00427,
+            "mean_fine_vs_dense": 0.36177,
+            "mean_effective_c": 64.26,
+            "max_effective_c": 67.75
+          },
+          "32": {
+            "mean_occupancy_frac": 0.57982,
+            "mean_coarse_vs_dense": 0.00121,
+            "mean_fine_vs_dense": 0.71815,
+            "mean_effective_c": 128.8,
+            "max_effective_c": 140.7
+          }
+        }
+      },
+      {
+        "L_range": "500-1500",
+        "n": 9,
+        "median_L": 1038,
+        "per_block": {
+          "4": {
+            "mean_occupancy_frac": 0.03174,
+            "mean_coarse_vs_dense": 0.06313,
+            "mean_fine_vs_dense": 0.03209,
+            "mean_effective_c": 14.77,
+            "max_effective_c": 16.83
+          },
+          "8": {
+            "mean_occupancy_frac": 0.06916,
+            "mean_coarse_vs_dense": 0.01589,
+            "mean_fine_vs_dense": 0.07043,
+            "mean_effective_c": 32.65,
+            "max_effective_c": 37.5
+          },
+          "16": {
+            "mean_occupancy_frac": 0.1558,
+            "mean_coarse_vs_dense": 0.00405,
+            "mean_fine_vs_dense": 0.16199,
+            "mean_effective_c": 75.68,
+            "max_effective_c": 90.09
+          },
+          "32": {
+            "mean_occupancy_frac": 0.31705,
+            "mean_coarse_vs_dense": 0.00105,
+            "mean_fine_vs_dense": 0.34039,
+            "mean_effective_c": 160.43,
+            "max_effective_c": 209.53
+          }
+        }
+      },
+      {
+        "L_range": "1500-3000",
+        "n": 39,
+        "median_L": 2861,
+        "per_block": {
+          "4": {
+            "mean_occupancy_frac": 0.01341,
+            "mean_coarse_vs_dense": 0.06272,
+            "mean_fine_vs_dense": 0.01346,
+            "mean_effective_c": 17.24,
+            "max_effective_c": 19.03
+          },
+          "8": {
+            "mean_occupancy_frac": 0.03053,
+            "mean_coarse_vs_dense": 0.01573,
+            "mean_fine_vs_dense": 0.03074,
+            "mean_effective_c": 39.39,
+            "max_effective_c": 42.96
+          },
+          "16": {
+            "mean_occupancy_frac": 0.07256,
+            "mean_coarse_vs_dense": 0.00396,
+            "mean_fine_vs_dense": 0.07359,
+            "mean_effective_c": 94.32,
+            "max_effective_c": 101.31
+          },
+          "32": {
+            "mean_occupancy_frac": 0.16283,
+            "mean_coarse_vs_dense": 0.001,
+            "mean_fine_vs_dense": 0.16726,
+            "mean_effective_c": 215.01,
+            "max_effective_c": 233.54
+          }
+        }
+      }
+    ]
+  },
+  "chains": [
+    {
+      "pdb": "5J8B",
+      "L": 2874,
+      "n_contacts": 15781,
+      "blocks": {
+        "4": {
+          "n_block_rows": 719,
+          "occupied": 3418,
+          "occupancy_frac": 0.01321,
+          "coarse_map_entries": 258840,
+          "coarse_vs_dense": 0.0627,
+          "fine_pairs_if_kept": 54688,
+          "fine_vs_dense": 0.01325,
+          "effective_c": 19.03
+        },
+        "8": {
+          "n_block_rows": 360,
+          "occupied": 1929,
+          "occupancy_frac": 0.02969,
+          "coarse_map_entries": 64980,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 123456,
+          "fine_vs_dense": 0.0299,
+          "effective_c": 42.96
+        },
+        "16": {
+          "n_block_rows": 180,
+          "occupied": 1130,
+          "occupancy_frac": 0.06937,
+          "coarse_map_entries": 16290,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 289280,
+          "fine_vs_dense": 0.07007,
+          "effective_c": 100.65
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 617,
+          "occupancy_frac": 0.15067,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 631808,
+          "fine_vs_dense": 0.15304,
+          "effective_c": 219.84
+        }
+      }
+    },
+    {
+      "pdb": "7MLX",
+      "L": 65,
+      "n_contacts": 184,
+      "blocks": {
+        "4": {
+          "n_block_rows": 17,
+          "occupied": 32,
+          "occupancy_frac": 0.20915,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.07356,
+          "fine_pairs_if_kept": 512,
+          "fine_vs_dense": 0.24615,
+          "effective_c": 7.88
+        },
+        "8": {
+          "n_block_rows": 9,
+          "occupied": 15,
+          "occupancy_frac": 0.33333,
+          "coarse_map_entries": 45,
+          "coarse_vs_dense": 0.02163,
+          "fine_pairs_if_kept": 960,
+          "fine_vs_dense": 0.46154,
+          "effective_c": 14.77
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 8,
+          "occupancy_frac": 0.53333,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00721,
+          "fine_pairs_if_kept": 2048,
+          "fine_vs_dense": 0.98462,
+          "effective_c": 31.51
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 4,
+          "occupancy_frac": 0.66667,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00288,
+          "fine_pairs_if_kept": 4096,
+          "fine_vs_dense": 1.96923,
+          "effective_c": 63.02
+        }
+      }
+    },
+    {
+      "pdb": "7N2V",
+      "L": 2881,
+      "n_contacts": 15038,
+      "blocks": {
+        "4": {
+          "n_block_rows": 721,
+          "occupied": 3269,
+          "occupancy_frac": 0.01256,
+          "coarse_map_entries": 260281,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 52304,
+          "fine_vs_dense": 0.01261,
+          "effective_c": 18.15
+        },
+        "8": {
+          "n_block_rows": 361,
+          "occupied": 1876,
+          "occupancy_frac": 0.02871,
+          "coarse_map_entries": 65341,
+          "coarse_vs_dense": 0.01575,
+          "fine_pairs_if_kept": 120064,
+          "fine_vs_dense": 0.02894,
+          "effective_c": 41.67
+        },
+        "16": {
+          "n_block_rows": 181,
+          "occupied": 1112,
+          "occupancy_frac": 0.06751,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 284672,
+          "fine_vs_dense": 0.06862,
+          "effective_c": 98.81
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 632,
+          "occupancy_frac": 0.15098,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 647168,
+          "fine_vs_dense": 0.156,
+          "effective_c": 224.63
+        }
+      }
+    },
+    {
+      "pdb": "7NHN",
+      "L": 2908,
+      "n_contacts": 15712,
+      "blocks": {
+        "4": {
+          "n_block_rows": 727,
+          "occupied": 3342,
+          "occupancy_frac": 0.01263,
+          "coarse_map_entries": 264628,
+          "coarse_vs_dense": 0.06261,
+          "fine_pairs_if_kept": 53472,
+          "fine_vs_dense": 0.01265,
+          "effective_c": 18.39
+        },
+        "8": {
+          "n_block_rows": 364,
+          "occupied": 1877,
+          "occupancy_frac": 0.02826,
+          "coarse_map_entries": 66430,
+          "coarse_vs_dense": 0.01572,
+          "fine_pairs_if_kept": 120128,
+          "fine_vs_dense": 0.02842,
+          "effective_c": 41.31
+        },
+        "16": {
+          "n_block_rows": 182,
+          "occupied": 1110,
+          "occupancy_frac": 0.06665,
+          "coarse_map_entries": 16653,
+          "coarse_vs_dense": 0.00394,
+          "fine_pairs_if_kept": 284160,
+          "fine_vs_dense": 0.06723,
+          "effective_c": 97.72
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 643,
+          "occupancy_frac": 0.15361,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 658432,
+          "fine_vs_dense": 0.15578,
+          "effective_c": 226.42
+        }
+      }
+    },
+    {
+      "pdb": "7O1C",
+      "L": 2874,
+      "n_contacts": 14592,
+      "blocks": {
+        "4": {
+          "n_block_rows": 719,
+          "occupied": 3163,
+          "occupancy_frac": 0.01222,
+          "coarse_map_entries": 258840,
+          "coarse_vs_dense": 0.0627,
+          "fine_pairs_if_kept": 50608,
+          "fine_vs_dense": 0.01226,
+          "effective_c": 17.61
+        },
+        "8": {
+          "n_block_rows": 360,
+          "occupied": 1810,
+          "occupancy_frac": 0.02785,
+          "coarse_map_entries": 64980,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 115840,
+          "fine_vs_dense": 0.02806,
+          "effective_c": 40.31
+        },
+        "16": {
+          "n_block_rows": 180,
+          "occupied": 1081,
+          "occupancy_frac": 0.06636,
+          "coarse_map_entries": 16290,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 276736,
+          "fine_vs_dense": 0.06703,
+          "effective_c": 96.29
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 618,
+          "occupancy_frac": 0.15092,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 632832,
+          "fine_vs_dense": 0.15328,
+          "effective_c": 220.19
+        }
+      }
+    },
+    {
+      "pdb": "7OIF",
+      "L": 2881,
+      "n_contacts": 15121,
+      "blocks": {
+        "4": {
+          "n_block_rows": 721,
+          "occupied": 3252,
+          "occupancy_frac": 0.01249,
+          "coarse_map_entries": 260281,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 52032,
+          "fine_vs_dense": 0.01254,
+          "effective_c": 18.06
+        },
+        "8": {
+          "n_block_rows": 361,
+          "occupied": 1873,
+          "occupancy_frac": 0.02867,
+          "coarse_map_entries": 65341,
+          "coarse_vs_dense": 0.01575,
+          "fine_pairs_if_kept": 119872,
+          "fine_vs_dense": 0.02889,
+          "effective_c": 41.61
+        },
+        "16": {
+          "n_block_rows": 181,
+          "occupied": 1105,
+          "occupancy_frac": 0.06709,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 282880,
+          "fine_vs_dense": 0.06819,
+          "effective_c": 98.19
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 623,
+          "occupancy_frac": 0.14883,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 637952,
+          "fine_vs_dense": 0.15377,
+          "effective_c": 221.43
+        }
+      }
+    },
+    {
+      "pdb": "7OIZ",
+      "L": 2730,
+      "n_contacts": 14284,
+      "blocks": {
+        "4": {
+          "n_block_rows": 683,
+          "occupied": 3129,
+          "occupancy_frac": 0.0134,
+          "coarse_map_entries": 233586,
+          "coarse_vs_dense": 0.06271,
+          "fine_pairs_if_kept": 50064,
+          "fine_vs_dense": 0.01344,
+          "effective_c": 18.34
+        },
+        "8": {
+          "n_block_rows": 342,
+          "occupied": 1775,
+          "occupancy_frac": 0.03026,
+          "coarse_map_entries": 58653,
+          "coarse_vs_dense": 0.01575,
+          "fine_pairs_if_kept": 113600,
+          "fine_vs_dense": 0.0305,
+          "effective_c": 41.61
+        },
+        "16": {
+          "n_block_rows": 171,
+          "occupied": 1065,
+          "occupancy_frac": 0.07242,
+          "coarse_map_entries": 14706,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 272640,
+          "fine_vs_dense": 0.07319,
+          "effective_c": 99.87
+        },
+        "32": {
+          "n_block_rows": 86,
+          "occupied": 617,
+          "occupancy_frac": 0.16493,
+          "coarse_map_entries": 3741,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 631808,
+          "fine_vs_dense": 0.16961,
+          "effective_c": 231.43
+        }
+      }
+    },
+    {
+      "pdb": "7ONU",
+      "L": 66,
+      "n_contacts": 146,
+      "blocks": {
+        "4": {
+          "n_block_rows": 17,
+          "occupied": 31,
+          "occupancy_frac": 0.20261,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.07133,
+          "fine_pairs_if_kept": 496,
+          "fine_vs_dense": 0.23124,
+          "effective_c": 7.52
+        },
+        "8": {
+          "n_block_rows": 9,
+          "occupied": 16,
+          "occupancy_frac": 0.35556,
+          "coarse_map_entries": 45,
+          "coarse_vs_dense": 0.02098,
+          "fine_pairs_if_kept": 1024,
+          "fine_vs_dense": 0.47739,
+          "effective_c": 15.52
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 9,
+          "occupancy_frac": 0.6,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00699,
+          "fine_pairs_if_kept": 2304,
+          "fine_vs_dense": 1.07413,
+          "effective_c": 34.91
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 4,
+          "occupancy_frac": 0.66667,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.0028,
+          "fine_pairs_if_kept": 4096,
+          "fine_vs_dense": 1.90956,
+          "effective_c": 62.06
+        }
+      }
+    },
+    {
+      "pdb": "7P7T",
+      "L": 2901,
+      "n_contacts": 15638,
+      "blocks": {
+        "4": {
+          "n_block_rows": 726,
+          "occupied": 3331,
+          "occupancy_frac": 0.01262,
+          "coarse_map_entries": 263901,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 53296,
+          "fine_vs_dense": 0.01267,
+          "effective_c": 18.37
+        },
+        "8": {
+          "n_block_rows": 363,
+          "occupied": 1886,
+          "occupancy_frac": 0.02855,
+          "coarse_map_entries": 66066,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 120704,
+          "fine_vs_dense": 0.02869,
+          "effective_c": 41.61
+        },
+        "16": {
+          "n_block_rows": 182,
+          "occupied": 1135,
+          "occupancy_frac": 0.06816,
+          "coarse_map_entries": 16653,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 290560,
+          "fine_vs_dense": 0.06907,
+          "effective_c": 100.16
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 629,
+          "occupancy_frac": 0.15026,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 644096,
+          "fine_vs_dense": 0.15312,
+          "effective_c": 222.03
+        }
+      }
+    },
+    {
+      "pdb": "7PKT",
+      "L": 578,
+      "n_contacts": 1925,
+      "blocks": {
+        "4": {
+          "n_block_rows": 145,
+          "occupied": 406,
+          "occupancy_frac": 0.03836,
+          "coarse_map_entries": 10585,
+          "coarse_vs_dense": 0.06348,
+          "fine_pairs_if_kept": 6496,
+          "fine_vs_dense": 0.03896,
+          "effective_c": 11.24
+        },
+        "8": {
+          "n_block_rows": 73,
+          "occupied": 213,
+          "occupancy_frac": 0.07886,
+          "coarse_map_entries": 2701,
+          "coarse_vs_dense": 0.0162,
+          "fine_pairs_if_kept": 13632,
+          "fine_vs_dense": 0.08175,
+          "effective_c": 23.58
+        },
+        "16": {
+          "n_block_rows": 37,
+          "occupied": 122,
+          "occupancy_frac": 0.17354,
+          "coarse_map_entries": 703,
+          "coarse_vs_dense": 0.00422,
+          "fine_pairs_if_kept": 31232,
+          "fine_vs_dense": 0.18729,
+          "effective_c": 54.03
+        },
+        "32": {
+          "n_block_rows": 19,
+          "occupied": 60,
+          "occupancy_frac": 0.31579,
+          "coarse_map_entries": 190,
+          "coarse_vs_dense": 0.00114,
+          "fine_pairs_if_kept": 61440,
+          "fine_vs_dense": 0.36845,
+          "effective_c": 106.3
+        }
+      }
+    },
+    {
+      "pdb": "7PWG",
+      "L": 2426,
+      "n_contacts": 11440,
+      "blocks": {
+        "4": {
+          "n_block_rows": 607,
+          "occupied": 2526,
+          "occupancy_frac": 0.01369,
+          "coarse_map_entries": 184528,
+          "coarse_vs_dense": 0.06273,
+          "fine_pairs_if_kept": 40416,
+          "fine_vs_dense": 0.01374,
+          "effective_c": 16.66
+        },
+        "8": {
+          "n_block_rows": 304,
+          "occupied": 1478,
+          "occupancy_frac": 0.03188,
+          "coarse_map_entries": 46360,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 94592,
+          "fine_vs_dense": 0.03216,
+          "effective_c": 38.99
+        },
+        "16": {
+          "n_block_rows": 152,
+          "occupied": 895,
+          "occupancy_frac": 0.07697,
+          "coarse_map_entries": 11628,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 229120,
+          "fine_vs_dense": 0.07789,
+          "effective_c": 94.44
+        },
+        "32": {
+          "n_block_rows": 76,
+          "occupied": 523,
+          "occupancy_frac": 0.17874,
+          "coarse_map_entries": 2926,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 535552,
+          "fine_vs_dense": 0.18207,
+          "effective_c": 220.76
+        }
+      }
+    },
+    {
+      "pdb": "7QCA",
+      "L": 2499,
+      "n_contacts": 11774,
+      "blocks": {
+        "4": {
+          "n_block_rows": 625,
+          "occupied": 2599,
+          "occupancy_frac": 0.01329,
+          "coarse_map_entries": 195625,
+          "coarse_vs_dense": 0.06268,
+          "fine_pairs_if_kept": 41584,
+          "fine_vs_dense": 0.01332,
+          "effective_c": 16.64
+        },
+        "8": {
+          "n_block_rows": 313,
+          "occupied": 1508,
+          "occupancy_frac": 0.03069,
+          "coarse_map_entries": 49141,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 96512,
+          "fine_vs_dense": 0.03092,
+          "effective_c": 38.62
+        },
+        "16": {
+          "n_block_rows": 157,
+          "occupied": 921,
+          "occupancy_frac": 0.07426,
+          "coarse_map_entries": 12403,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 235776,
+          "fine_vs_dense": 0.07554,
+          "effective_c": 94.35
+        },
+        "32": {
+          "n_block_rows": 79,
+          "occupied": 509,
+          "occupancy_frac": 0.16108,
+          "coarse_map_entries": 3160,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 521216,
+          "fine_vs_dense": 0.16699,
+          "effective_c": 208.57
+        }
+      }
+    },
+    {
+      "pdb": "7QEP",
+      "L": 2319,
+      "n_contacts": 10713,
+      "blocks": {
+        "4": {
+          "n_block_rows": 580,
+          "occupied": 2366,
+          "occupancy_frac": 0.01404,
+          "coarse_map_entries": 168490,
+          "coarse_vs_dense": 0.06269,
+          "fine_pairs_if_kept": 37856,
+          "fine_vs_dense": 0.01408,
+          "effective_c": 16.32
+        },
+        "8": {
+          "n_block_rows": 290,
+          "occupied": 1383,
+          "occupancy_frac": 0.03278,
+          "coarse_map_entries": 42195,
+          "coarse_vs_dense": 0.0157,
+          "fine_pairs_if_kept": 88512,
+          "fine_vs_dense": 0.03293,
+          "effective_c": 38.17
+        },
+        "16": {
+          "n_block_rows": 145,
+          "occupied": 835,
+          "occupancy_frac": 0.07889,
+          "coarse_map_entries": 10585,
+          "coarse_vs_dense": 0.00394,
+          "fine_pairs_if_kept": 213760,
+          "fine_vs_dense": 0.07953,
+          "effective_c": 92.18
+        },
+        "32": {
+          "n_block_rows": 73,
+          "occupied": 475,
+          "occupancy_frac": 0.17586,
+          "coarse_map_entries": 2701,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 486400,
+          "fine_vs_dense": 0.18097,
+          "effective_c": 209.75
+        }
+      }
+    },
+    {
+      "pdb": "7QH7",
+      "L": 1256,
+      "n_contacts": 5693,
+      "blocks": {
+        "4": {
+          "n_block_rows": 314,
+          "occupied": 1271,
+          "occupancy_frac": 0.0257,
+          "coarse_map_entries": 49455,
+          "coarse_vs_dense": 0.06275,
+          "fine_pairs_if_kept": 20336,
+          "fine_vs_dense": 0.0258,
+          "effective_c": 16.19
+        },
+        "8": {
+          "n_block_rows": 157,
+          "occupied": 736,
+          "occupancy_frac": 0.05934,
+          "coarse_map_entries": 12403,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 47104,
+          "fine_vs_dense": 0.05977,
+          "effective_c": 37.5
+        },
+        "16": {
+          "n_block_rows": 79,
+          "occupied": 442,
+          "occupancy_frac": 0.13987,
+          "coarse_map_entries": 3160,
+          "coarse_vs_dense": 0.00401,
+          "fine_pairs_if_kept": 113152,
+          "fine_vs_dense": 0.14357,
+          "effective_c": 90.09
+        },
+        "32": {
+          "n_block_rows": 40,
+          "occupied": 257,
+          "occupancy_frac": 0.31341,
+          "coarse_map_entries": 820,
+          "coarse_vs_dense": 0.00104,
+          "fine_pairs_if_kept": 263168,
+          "fine_vs_dense": 0.33391,
+          "effective_c": 209.53
+        }
+      }
+    },
+    {
+      "pdb": "7QI4",
+      "L": 1553,
+      "n_contacts": 7464,
+      "blocks": {
+        "4": {
+          "n_block_rows": 389,
+          "occupied": 1680,
+          "occupancy_frac": 0.02215,
+          "coarse_map_entries": 75855,
+          "coarse_vs_dense": 0.06294,
+          "fine_pairs_if_kept": 26880,
+          "fine_vs_dense": 0.0223,
+          "effective_c": 17.31
+        },
+        "8": {
+          "n_block_rows": 195,
+          "occupied": 950,
+          "occupancy_frac": 0.04971,
+          "coarse_map_entries": 19110,
+          "coarse_vs_dense": 0.01586,
+          "fine_pairs_if_kept": 60800,
+          "fine_vs_dense": 0.05045,
+          "effective_c": 39.15
+        },
+        "16": {
+          "n_block_rows": 98,
+          "occupied": 567,
+          "occupancy_frac": 0.11688,
+          "coarse_map_entries": 4851,
+          "coarse_vs_dense": 0.00403,
+          "fine_pairs_if_kept": 145152,
+          "fine_vs_dense": 0.12045,
+          "effective_c": 93.47
+        },
+        "32": {
+          "n_block_rows": 49,
+          "occupied": 319,
+          "occupancy_frac": 0.26041,
+          "coarse_map_entries": 1225,
+          "coarse_vs_dense": 0.00102,
+          "fine_pairs_if_kept": 326656,
+          "fine_vs_dense": 0.27106,
+          "effective_c": 210.34
+        }
+      }
+    },
+    {
+      "pdb": "7QIW",
+      "L": 2975,
+      "n_contacts": 13645,
+      "blocks": {
+        "4": {
+          "n_block_rows": 744,
+          "occupied": 3059,
+          "occupancy_frac": 0.01104,
+          "coarse_map_entries": 277140,
+          "coarse_vs_dense": 0.06265,
+          "fine_pairs_if_kept": 48944,
+          "fine_vs_dense": 0.01106,
+          "effective_c": 16.45
+        },
+        "8": {
+          "n_block_rows": 372,
+          "occupied": 1758,
+          "occupancy_frac": 0.02534,
+          "coarse_map_entries": 69378,
+          "coarse_vs_dense": 0.01568,
+          "fine_pairs_if_kept": 112512,
+          "fine_vs_dense": 0.02543,
+          "effective_c": 37.82
+        },
+        "16": {
+          "n_block_rows": 186,
+          "occupied": 1066,
+          "occupancy_frac": 0.0613,
+          "coarse_map_entries": 17391,
+          "coarse_vs_dense": 0.00393,
+          "fine_pairs_if_kept": 272896,
+          "fine_vs_dense": 0.06169,
+          "effective_c": 91.73
+        },
+        "32": {
+          "n_block_rows": 93,
+          "occupied": 623,
+          "occupancy_frac": 0.14253,
+          "coarse_map_entries": 4371,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 637952,
+          "fine_vs_dense": 0.14421,
+          "effective_c": 214.44
+        }
+      }
+    },
+    {
+      "pdb": "7QIZ",
+      "L": 2975,
+      "n_contacts": 13639,
+      "blocks": {
+        "4": {
+          "n_block_rows": 744,
+          "occupied": 3053,
+          "occupancy_frac": 0.01102,
+          "coarse_map_entries": 277140,
+          "coarse_vs_dense": 0.06265,
+          "fine_pairs_if_kept": 48848,
+          "fine_vs_dense": 0.01104,
+          "effective_c": 16.42
+        },
+        "8": {
+          "n_block_rows": 372,
+          "occupied": 1753,
+          "occupancy_frac": 0.02527,
+          "coarse_map_entries": 69378,
+          "coarse_vs_dense": 0.01568,
+          "fine_pairs_if_kept": 112192,
+          "fine_vs_dense": 0.02536,
+          "effective_c": 37.71
+        },
+        "16": {
+          "n_block_rows": 186,
+          "occupied": 1068,
+          "occupancy_frac": 0.06141,
+          "coarse_map_entries": 17391,
+          "coarse_vs_dense": 0.00393,
+          "fine_pairs_if_kept": 273408,
+          "fine_vs_dense": 0.0618,
+          "effective_c": 91.9
+        },
+        "32": {
+          "n_block_rows": 93,
+          "occupied": 624,
+          "occupancy_frac": 0.14276,
+          "coarse_map_entries": 4371,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 638976,
+          "fine_vs_dense": 0.14444,
+          "effective_c": 214.78
+        }
+      }
+    },
+    {
+      "pdb": "7QQP",
+      "L": 84,
+      "n_contacts": 116,
+      "blocks": {
+        "4": {
+          "n_block_rows": 21,
+          "occupied": 24,
+          "occupancy_frac": 0.1039,
+          "coarse_map_entries": 231,
+          "coarse_vs_dense": 0.06627,
+          "fine_pairs_if_kept": 384,
+          "fine_vs_dense": 0.11015,
+          "effective_c": 4.57
+        },
+        "8": {
+          "n_block_rows": 11,
+          "occupied": 18,
+          "occupancy_frac": 0.27273,
+          "coarse_map_entries": 66,
+          "coarse_vs_dense": 0.01893,
+          "fine_pairs_if_kept": 1152,
+          "fine_vs_dense": 0.33046,
+          "effective_c": 13.71
+        },
+        "16": {
+          "n_block_rows": 6,
+          "occupied": 9,
+          "occupancy_frac": 0.42857,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00602,
+          "fine_pairs_if_kept": 2304,
+          "fine_vs_dense": 0.66093,
+          "effective_c": 27.43
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00172,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 1.46873,
+          "effective_c": 60.95
+        }
+      }
+    },
+    {
+      "pdb": "7QR8",
+      "L": 85,
+      "n_contacts": 118,
+      "blocks": {
+        "4": {
+          "n_block_rows": 22,
+          "occupied": 24,
+          "occupancy_frac": 0.09486,
+          "coarse_map_entries": 253,
+          "coarse_vs_dense": 0.07087,
+          "fine_pairs_if_kept": 384,
+          "fine_vs_dense": 0.10756,
+          "effective_c": 4.52
+        },
+        "8": {
+          "n_block_rows": 11,
+          "occupied": 18,
+          "occupancy_frac": 0.27273,
+          "coarse_map_entries": 66,
+          "coarse_vs_dense": 0.01849,
+          "fine_pairs_if_kept": 1152,
+          "fine_vs_dense": 0.32269,
+          "effective_c": 13.55
+        },
+        "16": {
+          "n_block_rows": 6,
+          "occupied": 9,
+          "occupancy_frac": 0.42857,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00588,
+          "fine_pairs_if_kept": 2304,
+          "fine_vs_dense": 0.64538,
+          "effective_c": 27.11
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00168,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 1.43417,
+          "effective_c": 60.24
+        }
+      }
+    },
+    {
+      "pdb": "7R6Q",
+      "L": 295,
+      "n_contacts": 924,
+      "blocks": {
+        "4": {
+          "n_block_rows": 74,
+          "occupied": 201,
+          "occupancy_frac": 0.07243,
+          "coarse_map_entries": 2775,
+          "coarse_vs_dense": 0.06399,
+          "fine_pairs_if_kept": 3216,
+          "fine_vs_dense": 0.07416,
+          "effective_c": 10.9
+        },
+        "8": {
+          "n_block_rows": 37,
+          "occupied": 113,
+          "occupancy_frac": 0.16074,
+          "coarse_map_entries": 703,
+          "coarse_vs_dense": 0.01621,
+          "fine_pairs_if_kept": 7232,
+          "fine_vs_dense": 0.16677,
+          "effective_c": 24.52
+        },
+        "16": {
+          "n_block_rows": 19,
+          "occupied": 69,
+          "occupancy_frac": 0.36316,
+          "coarse_map_entries": 190,
+          "coarse_vs_dense": 0.00438,
+          "fine_pairs_if_kept": 17664,
+          "fine_vs_dense": 0.40733,
+          "effective_c": 59.88
+        },
+        "32": {
+          "n_block_rows": 10,
+          "occupied": 31,
+          "occupancy_frac": 0.56364,
+          "coarse_map_entries": 55,
+          "coarse_vs_dense": 0.00127,
+          "fine_pairs_if_kept": 31744,
+          "fine_vs_dense": 0.73202,
+          "effective_c": 107.61
+        }
+      }
+    },
+    {
+      "pdb": "7RQB",
+      "L": 2861,
+      "n_contacts": 15638,
+      "blocks": {
+        "4": {
+          "n_block_rows": 716,
+          "occupied": 3339,
+          "occupancy_frac": 0.01301,
+          "coarse_map_entries": 256686,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 53424,
+          "fine_vs_dense": 0.01306,
+          "effective_c": 18.67
+        },
+        "8": {
+          "n_block_rows": 358,
+          "occupied": 1898,
+          "occupancy_frac": 0.02954,
+          "coarse_map_entries": 64261,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 121472,
+          "fine_vs_dense": 0.02969,
+          "effective_c": 42.46
+        },
+        "16": {
+          "n_block_rows": 179,
+          "occupied": 1121,
+          "occupancy_frac": 0.06958,
+          "coarse_map_entries": 16110,
+          "coarse_vs_dense": 0.00394,
+          "fine_pairs_if_kept": 286976,
+          "fine_vs_dense": 0.07014,
+          "effective_c": 100.31
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 629,
+          "occupancy_frac": 0.1536,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 644096,
+          "fine_vs_dense": 0.15743,
+          "effective_c": 225.13
+        }
+      }
+    },
+    {
+      "pdb": "7RQE",
+      "L": 2861,
+      "n_contacts": 15516,
+      "blocks": {
+        "4": {
+          "n_block_rows": 716,
+          "occupied": 3318,
+          "occupancy_frac": 0.01293,
+          "coarse_map_entries": 256686,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 53088,
+          "fine_vs_dense": 0.01298,
+          "effective_c": 18.56
+        },
+        "8": {
+          "n_block_rows": 358,
+          "occupied": 1887,
+          "occupancy_frac": 0.02936,
+          "coarse_map_entries": 64261,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 120768,
+          "fine_vs_dense": 0.02952,
+          "effective_c": 42.21
+        },
+        "16": {
+          "n_block_rows": 179,
+          "occupied": 1114,
+          "occupancy_frac": 0.06915,
+          "coarse_map_entries": 16110,
+          "coarse_vs_dense": 0.00394,
+          "fine_pairs_if_kept": 285184,
+          "fine_vs_dense": 0.06971,
+          "effective_c": 99.68
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 621,
+          "occupancy_frac": 0.15165,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 635904,
+          "fine_vs_dense": 0.15543,
+          "effective_c": 222.27
+        }
+      }
+    },
+    {
+      "pdb": "7RYF",
+      "L": 2673,
+      "n_contacts": 13242,
+      "blocks": {
+        "4": {
+          "n_block_rows": 669,
+          "occupied": 2959,
+          "occupancy_frac": 0.0132,
+          "coarse_map_entries": 224115,
+          "coarse_vs_dense": 0.06276,
+          "fine_pairs_if_kept": 47344,
+          "fine_vs_dense": 0.01326,
+          "effective_c": 17.71
+        },
+        "8": {
+          "n_block_rows": 335,
+          "occupied": 1694,
+          "occupancy_frac": 0.0301,
+          "coarse_map_entries": 56280,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 108416,
+          "fine_vs_dense": 0.03036,
+          "effective_c": 40.56
+        },
+        "16": {
+          "n_block_rows": 168,
+          "occupied": 1028,
+          "occupancy_frac": 0.07241,
+          "coarse_map_entries": 14196,
+          "coarse_vs_dense": 0.00398,
+          "fine_pairs_if_kept": 263168,
+          "fine_vs_dense": 0.07369,
+          "effective_c": 98.45
+        },
+        "32": {
+          "n_block_rows": 84,
+          "occupied": 596,
+          "occupancy_frac": 0.16695,
+          "coarse_map_entries": 3570,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 610304,
+          "fine_vs_dense": 0.1709,
+          "effective_c": 228.32
+        }
+      }
+    },
+    {
+      "pdb": "7UQB",
+      "L": 2936,
+      "n_contacts": 12510,
+      "blocks": {
+        "4": {
+          "n_block_rows": 734,
+          "occupied": 2794,
+          "occupancy_frac": 0.01036,
+          "coarse_map_entries": 269745,
+          "coarse_vs_dense": 0.06261,
+          "fine_pairs_if_kept": 44704,
+          "fine_vs_dense": 0.01038,
+          "effective_c": 15.23
+        },
+        "8": {
+          "n_block_rows": 367,
+          "occupied": 1626,
+          "occupancy_frac": 0.02408,
+          "coarse_map_entries": 67528,
+          "coarse_vs_dense": 0.01567,
+          "fine_pairs_if_kept": 104064,
+          "fine_vs_dense": 0.02415,
+          "effective_c": 35.44
+        },
+        "16": {
+          "n_block_rows": 184,
+          "occupied": 1011,
+          "occupancy_frac": 0.0594,
+          "coarse_map_entries": 17020,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 258816,
+          "fine_vs_dense": 0.06007,
+          "effective_c": 88.15
+        },
+        "32": {
+          "n_block_rows": 92,
+          "occupied": 569,
+          "occupancy_frac": 0.13301,
+          "coarse_map_entries": 4278,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 582656,
+          "fine_vs_dense": 0.13523,
+          "effective_c": 198.45
+        }
+      }
+    },
+    {
+      "pdb": "7UR5",
+      "L": 90,
+      "n_contacts": 260,
+      "blocks": {
+        "4": {
+          "n_block_rows": 23,
+          "occupied": 50,
+          "occupancy_frac": 0.18116,
+          "coarse_map_entries": 276,
+          "coarse_vs_dense": 0.06891,
+          "fine_pairs_if_kept": 800,
+          "fine_vs_dense": 0.19975,
+          "effective_c": 8.89
+        },
+        "8": {
+          "n_block_rows": 12,
+          "occupied": 27,
+          "occupancy_frac": 0.34615,
+          "coarse_map_entries": 78,
+          "coarse_vs_dense": 0.01948,
+          "fine_pairs_if_kept": 1728,
+          "fine_vs_dense": 0.43146,
+          "effective_c": 19.2
+        },
+        "16": {
+          "n_block_rows": 6,
+          "occupied": 15,
+          "occupancy_frac": 0.71429,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00524,
+          "fine_pairs_if_kept": 3840,
+          "fine_vs_dense": 0.9588,
+          "effective_c": 42.67
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 6,
+          "occupancy_frac": 1.0,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.0015,
+          "fine_pairs_if_kept": 6144,
+          "fine_vs_dense": 1.53408,
+          "effective_c": 68.27
+        }
+      }
+    },
+    {
+      "pdb": "7WAY",
+      "L": 115,
+      "n_contacts": 286,
+      "blocks": {
+        "4": {
+          "n_block_rows": 29,
+          "occupied": 56,
+          "occupancy_frac": 0.12874,
+          "coarse_map_entries": 435,
+          "coarse_vs_dense": 0.06636,
+          "fine_pairs_if_kept": 896,
+          "fine_vs_dense": 0.13669,
+          "effective_c": 7.79
+        },
+        "8": {
+          "n_block_rows": 15,
+          "occupied": 28,
+          "occupancy_frac": 0.23333,
+          "coarse_map_entries": 120,
+          "coarse_vs_dense": 0.01831,
+          "fine_pairs_if_kept": 1792,
+          "fine_vs_dense": 0.27338,
+          "effective_c": 15.58
+        },
+        "16": {
+          "n_block_rows": 8,
+          "occupied": 15,
+          "occupancy_frac": 0.41667,
+          "coarse_map_entries": 36,
+          "coarse_vs_dense": 0.00549,
+          "fine_pairs_if_kept": 3840,
+          "fine_vs_dense": 0.58581,
+          "effective_c": 33.39
+        },
+        "32": {
+          "n_block_rows": 4,
+          "occupied": 7,
+          "occupancy_frac": 0.7,
+          "coarse_map_entries": 10,
+          "coarse_vs_dense": 0.00153,
+          "fine_pairs_if_kept": 7168,
+          "fine_vs_dense": 1.09352,
+          "effective_c": 62.33
+        }
+      }
+    },
+    {
+      "pdb": "7WJU",
+      "L": 133,
+      "n_contacts": 384,
+      "blocks": {
+        "4": {
+          "n_block_rows": 34,
+          "occupied": 78,
+          "occupancy_frac": 0.13109,
+          "coarse_map_entries": 595,
+          "coarse_vs_dense": 0.06778,
+          "fine_pairs_if_kept": 1248,
+          "fine_vs_dense": 0.14217,
+          "effective_c": 9.38
+        },
+        "8": {
+          "n_block_rows": 17,
+          "occupied": 40,
+          "occupancy_frac": 0.26144,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.01743,
+          "fine_pairs_if_kept": 2560,
+          "fine_vs_dense": 0.29164,
+          "effective_c": 19.25
+        },
+        "16": {
+          "n_block_rows": 9,
+          "occupied": 22,
+          "occupancy_frac": 0.48889,
+          "coarse_map_entries": 45,
+          "coarse_vs_dense": 0.00513,
+          "fine_pairs_if_kept": 5632,
+          "fine_vs_dense": 0.6416,
+          "effective_c": 42.35
+        },
+        "32": {
+          "n_block_rows": 5,
+          "occupied": 9,
+          "occupancy_frac": 0.6,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00171,
+          "fine_pairs_if_kept": 9216,
+          "fine_vs_dense": 1.0499,
+          "effective_c": 69.29
+        }
+      }
+    },
+    {
+      "pdb": "7Y7G",
+      "L": 2729,
+      "n_contacts": 14092,
+      "blocks": {
+        "4": {
+          "n_block_rows": 683,
+          "occupied": 3069,
+          "occupancy_frac": 0.01314,
+          "coarse_map_entries": 233586,
+          "coarse_vs_dense": 0.06275,
+          "fine_pairs_if_kept": 49104,
+          "fine_vs_dense": 0.01319,
+          "effective_c": 17.99
+        },
+        "8": {
+          "n_block_rows": 342,
+          "occupied": 1750,
+          "occupancy_frac": 0.02984,
+          "coarse_map_entries": 58653,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 112000,
+          "fine_vs_dense": 0.03009,
+          "effective_c": 41.04
+        },
+        "16": {
+          "n_block_rows": 171,
+          "occupied": 1048,
+          "occupancy_frac": 0.07126,
+          "coarse_map_entries": 14706,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 268288,
+          "fine_vs_dense": 0.07207,
+          "effective_c": 98.31
+        },
+        "32": {
+          "n_block_rows": 86,
+          "occupied": 607,
+          "occupancy_frac": 0.16226,
+          "coarse_map_entries": 3741,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 621568,
+          "fine_vs_dense": 0.16698,
+          "effective_c": 227.76
+        }
+      }
+    },
+    {
+      "pdb": "7YGB",
+      "L": 393,
+      "n_contacts": 1692,
+      "blocks": {
+        "4": {
+          "n_block_rows": 99,
+          "occupied": 334,
+          "occupancy_frac": 0.06747,
+          "coarse_map_entries": 4950,
+          "coarse_vs_dense": 0.06426,
+          "fine_pairs_if_kept": 5344,
+          "fine_vs_dense": 0.06938,
+          "effective_c": 13.6
+        },
+        "8": {
+          "n_block_rows": 50,
+          "occupied": 194,
+          "occupancy_frac": 0.15216,
+          "coarse_map_entries": 1275,
+          "coarse_vs_dense": 0.01655,
+          "fine_pairs_if_kept": 12416,
+          "fine_vs_dense": 0.16119,
+          "effective_c": 31.59
+        },
+        "16": {
+          "n_block_rows": 25,
+          "occupied": 104,
+          "occupancy_frac": 0.32,
+          "coarse_map_entries": 325,
+          "coarse_vs_dense": 0.00422,
+          "fine_pairs_if_kept": 26624,
+          "fine_vs_dense": 0.34564,
+          "effective_c": 67.75
+        },
+        "32": {
+          "n_block_rows": 13,
+          "occupied": 54,
+          "occupancy_frac": 0.59341,
+          "coarse_map_entries": 91,
+          "coarse_vs_dense": 0.00118,
+          "fine_pairs_if_kept": 55296,
+          "fine_vs_dense": 0.71787,
+          "effective_c": 140.7
+        }
+      }
+    },
+    {
+      "pdb": "7YGC",
+      "L": 393,
+      "n_contacts": 1657,
+      "blocks": {
+        "4": {
+          "n_block_rows": 99,
+          "occupied": 327,
+          "occupancy_frac": 0.06606,
+          "coarse_map_entries": 4950,
+          "coarse_vs_dense": 0.06426,
+          "fine_pairs_if_kept": 5232,
+          "fine_vs_dense": 0.06792,
+          "effective_c": 13.31
+        },
+        "8": {
+          "n_block_rows": 50,
+          "occupied": 189,
+          "occupancy_frac": 0.14824,
+          "coarse_map_entries": 1275,
+          "coarse_vs_dense": 0.01655,
+          "fine_pairs_if_kept": 12096,
+          "fine_vs_dense": 0.15703,
+          "effective_c": 30.78
+        },
+        "16": {
+          "n_block_rows": 25,
+          "occupied": 100,
+          "occupancy_frac": 0.30769,
+          "coarse_map_entries": 325,
+          "coarse_vs_dense": 0.00422,
+          "fine_pairs_if_kept": 25600,
+          "fine_vs_dense": 0.33235,
+          "effective_c": 65.14
+        },
+        "32": {
+          "n_block_rows": 13,
+          "occupied": 53,
+          "occupancy_frac": 0.58242,
+          "coarse_map_entries": 91,
+          "coarse_vs_dense": 0.00118,
+          "fine_pairs_if_kept": 54272,
+          "fine_vs_dense": 0.70457,
+          "effective_c": 138.1
+        }
+      }
+    },
+    {
+      "pdb": "7ZHG",
+      "L": 1429,
+      "n_contacts": 6342,
+      "blocks": {
+        "4": {
+          "n_block_rows": 358,
+          "occupied": 1362,
+          "occupancy_frac": 0.02119,
+          "coarse_map_entries": 64261,
+          "coarse_vs_dense": 0.06298,
+          "fine_pairs_if_kept": 21792,
+          "fine_vs_dense": 0.02136,
+          "effective_c": 15.25
+        },
+        "8": {
+          "n_block_rows": 179,
+          "occupied": 748,
+          "occupancy_frac": 0.04643,
+          "coarse_map_entries": 16110,
+          "coarse_vs_dense": 0.01579,
+          "fine_pairs_if_kept": 47872,
+          "fine_vs_dense": 0.04692,
+          "effective_c": 33.5
+        },
+        "16": {
+          "n_block_rows": 90,
+          "occupied": 442,
+          "occupancy_frac": 0.10794,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.00401,
+          "fine_pairs_if_kept": 113152,
+          "fine_vs_dense": 0.1109,
+          "effective_c": 79.18
+        },
+        "32": {
+          "n_block_rows": 45,
+          "occupied": 238,
+          "occupancy_frac": 0.22995,
+          "coarse_map_entries": 1035,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 243712,
+          "fine_vs_dense": 0.23886,
+          "effective_c": 170.55
+        }
+      }
+    },
+    {
+      "pdb": "7ZTA",
+      "L": 2879,
+      "n_contacts": 14643,
+      "blocks": {
+        "4": {
+          "n_block_rows": 720,
+          "occupied": 3178,
+          "occupancy_frac": 0.01224,
+          "coarse_map_entries": 259560,
+          "coarse_vs_dense": 0.06265,
+          "fine_pairs_if_kept": 50848,
+          "fine_vs_dense": 0.01227,
+          "effective_c": 17.66
+        },
+        "8": {
+          "n_block_rows": 360,
+          "occupied": 1848,
+          "occupancy_frac": 0.02844,
+          "coarse_map_entries": 64980,
+          "coarse_vs_dense": 0.01568,
+          "fine_pairs_if_kept": 118272,
+          "fine_vs_dense": 0.02855,
+          "effective_c": 41.08
+        },
+        "16": {
+          "n_block_rows": 180,
+          "occupied": 1102,
+          "occupancy_frac": 0.06765,
+          "coarse_map_entries": 16290,
+          "coarse_vs_dense": 0.00393,
+          "fine_pairs_if_kept": 282112,
+          "fine_vs_dense": 0.0681,
+          "effective_c": 97.99
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 626,
+          "occupancy_frac": 0.15287,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 641024,
+          "fine_vs_dense": 0.15473,
+          "effective_c": 222.66
+        }
+      }
+    },
+    {
+      "pdb": "8A22",
+      "L": 534,
+      "n_contacts": 1752,
+      "blocks": {
+        "4": {
+          "n_block_rows": 134,
+          "occupied": 368,
+          "occupancy_frac": 0.04069,
+          "coarse_map_entries": 9045,
+          "coarse_vs_dense": 0.06356,
+          "fine_pairs_if_kept": 5888,
+          "fine_vs_dense": 0.04137,
+          "effective_c": 11.03
+        },
+        "8": {
+          "n_block_rows": 67,
+          "occupied": 195,
+          "occupancy_frac": 0.0856,
+          "coarse_map_entries": 2278,
+          "coarse_vs_dense": 0.01601,
+          "fine_pairs_if_kept": 12480,
+          "fine_vs_dense": 0.0877,
+          "effective_c": 23.37
+        },
+        "16": {
+          "n_block_rows": 34,
+          "occupied": 107,
+          "occupancy_frac": 0.17983,
+          "coarse_map_entries": 595,
+          "coarse_vs_dense": 0.00418,
+          "fine_pairs_if_kept": 27392,
+          "fine_vs_dense": 0.19248,
+          "effective_c": 51.3
+        },
+        "32": {
+          "n_block_rows": 17,
+          "occupied": 54,
+          "occupancy_frac": 0.35294,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.00108,
+          "fine_pairs_if_kept": 55296,
+          "fine_vs_dense": 0.38856,
+          "effective_c": 103.55
+        }
+      }
+    },
+    {
+      "pdb": "8A3W",
+      "L": 1624,
+      "n_contacts": 6961,
+      "blocks": {
+        "4": {
+          "n_block_rows": 406,
+          "occupied": 1528,
+          "occupancy_frac": 0.01849,
+          "coarse_map_entries": 82621,
+          "coarse_vs_dense": 0.06269,
+          "fine_pairs_if_kept": 24448,
+          "fine_vs_dense": 0.01855,
+          "effective_c": 15.05
+        },
+        "8": {
+          "n_block_rows": 203,
+          "occupied": 860,
+          "occupancy_frac": 0.04153,
+          "coarse_map_entries": 20706,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 55040,
+          "fine_vs_dense": 0.04176,
+          "effective_c": 33.89
+        },
+        "16": {
+          "n_block_rows": 102,
+          "occupied": 504,
+          "occupancy_frac": 0.09595,
+          "coarse_map_entries": 5253,
+          "coarse_vs_dense": 0.00399,
+          "fine_pairs_if_kept": 129024,
+          "fine_vs_dense": 0.0979,
+          "effective_c": 79.45
+        },
+        "32": {
+          "n_block_rows": 51,
+          "occupied": 274,
+          "occupancy_frac": 0.20664,
+          "coarse_map_entries": 1326,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 280576,
+          "fine_vs_dense": 0.2129,
+          "effective_c": 172.77
+        }
+      }
+    },
+    {
+      "pdb": "8A5I",
+      "L": 2908,
+      "n_contacts": 15766,
+      "blocks": {
+        "4": {
+          "n_block_rows": 727,
+          "occupied": 3359,
+          "occupancy_frac": 0.01269,
+          "coarse_map_entries": 264628,
+          "coarse_vs_dense": 0.06261,
+          "fine_pairs_if_kept": 53744,
+          "fine_vs_dense": 0.01272,
+          "effective_c": 18.48
+        },
+        "8": {
+          "n_block_rows": 364,
+          "occupied": 1895,
+          "occupancy_frac": 0.02853,
+          "coarse_map_entries": 66430,
+          "coarse_vs_dense": 0.01572,
+          "fine_pairs_if_kept": 121280,
+          "fine_vs_dense": 0.02869,
+          "effective_c": 41.71
+        },
+        "16": {
+          "n_block_rows": 182,
+          "occupied": 1112,
+          "occupancy_frac": 0.06677,
+          "coarse_map_entries": 16653,
+          "coarse_vs_dense": 0.00394,
+          "fine_pairs_if_kept": 284672,
+          "fine_vs_dense": 0.06735,
+          "effective_c": 97.89
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 646,
+          "occupancy_frac": 0.15432,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 661504,
+          "fine_vs_dense": 0.1565,
+          "effective_c": 227.48
+        }
+      }
+    },
+    {
+      "pdb": "8AUV",
+      "L": 1545,
+      "n_contacts": 6842,
+      "blocks": {
+        "4": {
+          "n_block_rows": 387,
+          "occupied": 1510,
+          "occupancy_frac": 0.02011,
+          "coarse_map_entries": 75078,
+          "coarse_vs_dense": 0.06295,
+          "fine_pairs_if_kept": 24160,
+          "fine_vs_dense": 0.02026,
+          "effective_c": 15.64
+        },
+        "8": {
+          "n_block_rows": 194,
+          "occupied": 864,
+          "occupancy_frac": 0.04568,
+          "coarse_map_entries": 18915,
+          "coarse_vs_dense": 0.01586,
+          "fine_pairs_if_kept": 55296,
+          "fine_vs_dense": 0.04636,
+          "effective_c": 35.79
+        },
+        "16": {
+          "n_block_rows": 97,
+          "occupied": 507,
+          "occupancy_frac": 0.10667,
+          "coarse_map_entries": 4753,
+          "coarse_vs_dense": 0.00398,
+          "fine_pairs_if_kept": 129792,
+          "fine_vs_dense": 0.10882,
+          "effective_c": 84.01
+        },
+        "32": {
+          "n_block_rows": 49,
+          "occupied": 263,
+          "occupancy_frac": 0.21469,
+          "coarse_map_entries": 1225,
+          "coarse_vs_dense": 0.00103,
+          "fine_pairs_if_kept": 269312,
+          "fine_vs_dense": 0.22579,
+          "effective_c": 174.31
+        }
+      }
+    },
+    {
+      "pdb": "8BF9",
+      "L": 1766,
+      "n_contacts": 8487,
+      "blocks": {
+        "4": {
+          "n_block_rows": 442,
+          "occupied": 1858,
+          "occupancy_frac": 0.01898,
+          "coarse_map_entries": 97903,
+          "coarse_vs_dense": 0.06282,
+          "fine_pairs_if_kept": 29728,
+          "fine_vs_dense": 0.01907,
+          "effective_c": 16.83
+        },
+        "8": {
+          "n_block_rows": 221,
+          "occupied": 1073,
+          "occupancy_frac": 0.04374,
+          "coarse_map_entries": 24531,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 68672,
+          "fine_vs_dense": 0.04406,
+          "effective_c": 38.89
+        },
+        "16": {
+          "n_block_rows": 111,
+          "occupied": 660,
+          "occupancy_frac": 0.10618,
+          "coarse_map_entries": 6216,
+          "coarse_vs_dense": 0.00399,
+          "fine_pairs_if_kept": 168960,
+          "fine_vs_dense": 0.10841,
+          "effective_c": 95.67
+        },
+        "32": {
+          "n_block_rows": 56,
+          "occupied": 371,
+          "occupancy_frac": 0.23246,
+          "coarse_map_entries": 1596,
+          "coarse_vs_dense": 0.00102,
+          "fine_pairs_if_kept": 379904,
+          "fine_vs_dense": 0.24376,
+          "effective_c": 215.12
+        }
+      }
+    },
+    {
+      "pdb": "8BHN",
+      "L": 2758,
+      "n_contacts": 13041,
+      "blocks": {
+        "4": {
+          "n_block_rows": 690,
+          "occupied": 2948,
+          "occupancy_frac": 0.01237,
+          "coarse_map_entries": 238395,
+          "coarse_vs_dense": 0.0627,
+          "fine_pairs_if_kept": 47168,
+          "fine_vs_dense": 0.01241,
+          "effective_c": 17.1
+        },
+        "8": {
+          "n_block_rows": 345,
+          "occupied": 1699,
+          "occupancy_frac": 0.02847,
+          "coarse_map_entries": 59685,
+          "coarse_vs_dense": 0.0157,
+          "fine_pairs_if_kept": 108736,
+          "fine_vs_dense": 0.0286,
+          "effective_c": 39.43
+        },
+        "16": {
+          "n_block_rows": 173,
+          "occupied": 1024,
+          "occupancy_frac": 0.06804,
+          "coarse_map_entries": 15051,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 262144,
+          "fine_vs_dense": 0.06895,
+          "effective_c": 95.05
+        },
+        "32": {
+          "n_block_rows": 87,
+          "occupied": 588,
+          "occupancy_frac": 0.15361,
+          "coarse_map_entries": 3828,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 602112,
+          "fine_vs_dense": 0.15837,
+          "effective_c": 218.31
+        }
+      }
+    },
+    {
+      "pdb": "8BUU",
+      "L": 2850,
+      "n_contacts": 15352,
+      "blocks": {
+        "4": {
+          "n_block_rows": 713,
+          "occupied": 3274,
+          "occupancy_frac": 0.01286,
+          "coarse_map_entries": 254541,
+          "coarse_vs_dense": 0.0627,
+          "fine_pairs_if_kept": 52384,
+          "fine_vs_dense": 0.0129,
+          "effective_c": 18.38
+        },
+        "8": {
+          "n_block_rows": 357,
+          "occupied": 1849,
+          "occupancy_frac": 0.02893,
+          "coarse_map_entries": 63903,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 118336,
+          "fine_vs_dense": 0.02915,
+          "effective_c": 41.52
+        },
+        "16": {
+          "n_block_rows": 179,
+          "occupied": 1116,
+          "occupancy_frac": 0.06927,
+          "coarse_map_entries": 16110,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 285696,
+          "fine_vs_dense": 0.07037,
+          "effective_c": 100.24
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 650,
+          "occupancy_frac": 0.15873,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 665600,
+          "fine_vs_dense": 0.16395,
+          "effective_c": 233.54
+        }
+      }
+    },
+    {
+      "pdb": "8CBK",
+      "L": 93,
+      "n_contacts": 191,
+      "blocks": {
+        "4": {
+          "n_block_rows": 24,
+          "occupied": 35,
+          "occupancy_frac": 0.11667,
+          "coarse_map_entries": 300,
+          "coarse_vs_dense": 0.07013,
+          "fine_pairs_if_kept": 560,
+          "fine_vs_dense": 0.1309,
+          "effective_c": 6.02
+        },
+        "8": {
+          "n_block_rows": 12,
+          "occupied": 20,
+          "occupancy_frac": 0.25641,
+          "coarse_map_entries": 78,
+          "coarse_vs_dense": 0.01823,
+          "fine_pairs_if_kept": 1280,
+          "fine_vs_dense": 0.29921,
+          "effective_c": 13.76
+        },
+        "16": {
+          "n_block_rows": 6,
+          "occupied": 9,
+          "occupancy_frac": 0.42857,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00491,
+          "fine_pairs_if_kept": 2304,
+          "fine_vs_dense": 0.53857,
+          "effective_c": 24.77
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.0014,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 1.19682,
+          "effective_c": 55.05
+        }
+      }
+    },
+    {
+      "pdb": "8CWO",
+      "L": 1024,
+      "n_contacts": 5100,
+      "blocks": {
+        "4": {
+          "n_block_rows": 256,
+          "occupied": 1041,
+          "occupancy_frac": 0.03165,
+          "coarse_map_entries": 32896,
+          "coarse_vs_dense": 0.06281,
+          "fine_pairs_if_kept": 16656,
+          "fine_vs_dense": 0.0318,
+          "effective_c": 16.27
+        },
+        "8": {
+          "n_block_rows": 128,
+          "occupied": 577,
+          "occupancy_frac": 0.06989,
+          "coarse_map_entries": 8256,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 36928,
+          "fine_vs_dense": 0.0705,
+          "effective_c": 36.06
+        },
+        "16": {
+          "n_block_rows": 64,
+          "occupied": 341,
+          "occupancy_frac": 0.16394,
+          "coarse_map_entries": 2080,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 87296,
+          "fine_vs_dense": 0.16667,
+          "effective_c": 85.25
+        },
+        "32": {
+          "n_block_rows": 32,
+          "occupied": 182,
+          "occupancy_frac": 0.3447,
+          "coarse_map_entries": 528,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 186368,
+          "fine_vs_dense": 0.35582,
+          "effective_c": 182.0
+        }
+      }
+    },
+    {
+      "pdb": "8DZJ",
+      "L": 153,
+      "n_contacts": 433,
+      "blocks": {
+        "4": {
+          "n_block_rows": 39,
+          "occupied": 80,
+          "occupancy_frac": 0.10256,
+          "coarse_map_entries": 780,
+          "coarse_vs_dense": 0.06708,
+          "fine_pairs_if_kept": 1280,
+          "fine_vs_dense": 0.11008,
+          "effective_c": 8.37
+        },
+        "8": {
+          "n_block_rows": 20,
+          "occupied": 44,
+          "occupancy_frac": 0.20952,
+          "coarse_map_entries": 210,
+          "coarse_vs_dense": 0.01806,
+          "fine_pairs_if_kept": 2816,
+          "fine_vs_dense": 0.24217,
+          "effective_c": 18.41
+        },
+        "16": {
+          "n_block_rows": 10,
+          "occupied": 23,
+          "occupancy_frac": 0.41818,
+          "coarse_map_entries": 55,
+          "coarse_vs_dense": 0.00473,
+          "fine_pairs_if_kept": 5888,
+          "fine_vs_dense": 0.50636,
+          "effective_c": 38.48
+        },
+        "32": {
+          "n_block_rows": 5,
+          "occupied": 13,
+          "occupancy_frac": 0.86667,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00129,
+          "fine_pairs_if_kept": 13312,
+          "fine_vs_dense": 1.14482,
+          "effective_c": 87.01
+        }
+      }
+    },
+    {
+      "pdb": "8ESQ",
+      "L": 2230,
+      "n_contacts": 9088,
+      "blocks": {
+        "4": {
+          "n_block_rows": 558,
+          "occupied": 1931,
+          "occupancy_frac": 0.01238,
+          "coarse_map_entries": 155961,
+          "coarse_vs_dense": 0.06275,
+          "fine_pairs_if_kept": 30896,
+          "fine_vs_dense": 0.01243,
+          "effective_c": 13.85
+        },
+        "8": {
+          "n_block_rows": 279,
+          "occupied": 1089,
+          "occupancy_frac": 0.02788,
+          "coarse_map_entries": 39060,
+          "coarse_vs_dense": 0.01572,
+          "fine_pairs_if_kept": 69696,
+          "fine_vs_dense": 0.02804,
+          "effective_c": 31.25
+        },
+        "16": {
+          "n_block_rows": 140,
+          "occupied": 658,
+          "occupancy_frac": 0.06667,
+          "coarse_map_entries": 9870,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 168448,
+          "fine_vs_dense": 0.06778,
+          "effective_c": 75.54
+        },
+        "32": {
+          "n_block_rows": 70,
+          "occupied": 371,
+          "occupancy_frac": 0.1493,
+          "coarse_map_entries": 2485,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 379904,
+          "fine_vs_dense": 0.15286,
+          "effective_c": 170.36
+        }
+      }
+    },
+    {
+      "pdb": "8EUG",
+      "L": 2869,
+      "n_contacts": 14438,
+      "blocks": {
+        "4": {
+          "n_block_rows": 718,
+          "occupied": 3119,
+          "occupancy_frac": 0.01208,
+          "coarse_map_entries": 258121,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 49904,
+          "fine_vs_dense": 0.01213,
+          "effective_c": 17.39
+        },
+        "8": {
+          "n_block_rows": 359,
+          "occupied": 1804,
+          "occupancy_frac": 0.02792,
+          "coarse_map_entries": 64620,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 115456,
+          "fine_vs_dense": 0.02806,
+          "effective_c": 40.24
+        },
+        "16": {
+          "n_block_rows": 180,
+          "occupied": 1088,
+          "occupancy_frac": 0.06679,
+          "coarse_map_entries": 16290,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 278528,
+          "fine_vs_dense": 0.0677,
+          "effective_c": 97.08
+        },
+        "32": {
+          "n_block_rows": 90,
+          "occupied": 622,
+          "occupancy_frac": 0.15189,
+          "coarse_map_entries": 4095,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 636928,
+          "fine_vs_dense": 0.15481,
+          "effective_c": 222.0
+        }
+      }
+    },
+    {
+      "pdb": "8EX9",
+      "L": 102,
+      "n_contacts": 302,
+      "blocks": {
+        "4": {
+          "n_block_rows": 26,
+          "occupied": 61,
+          "occupancy_frac": 0.17379,
+          "coarse_map_entries": 351,
+          "coarse_vs_dense": 0.06814,
+          "fine_pairs_if_kept": 976,
+          "fine_vs_dense": 0.18948,
+          "effective_c": 9.57
+        },
+        "8": {
+          "n_block_rows": 13,
+          "occupied": 35,
+          "occupancy_frac": 0.38462,
+          "coarse_map_entries": 91,
+          "coarse_vs_dense": 0.01767,
+          "fine_pairs_if_kept": 2240,
+          "fine_vs_dense": 0.43487,
+          "effective_c": 21.96
+        },
+        "16": {
+          "n_block_rows": 7,
+          "occupied": 20,
+          "occupancy_frac": 0.71429,
+          "coarse_map_entries": 28,
+          "coarse_vs_dense": 0.00544,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 0.99398,
+          "effective_c": 50.2
+        },
+        "32": {
+          "n_block_rows": 4,
+          "occupied": 7,
+          "occupancy_frac": 0.7,
+          "coarse_map_entries": 10,
+          "coarse_vs_dense": 0.00194,
+          "fine_pairs_if_kept": 7168,
+          "fine_vs_dense": 1.39157,
+          "effective_c": 70.27
+        }
+      }
+    },
+    {
+      "pdb": "8FKW",
+      "L": 2277,
+      "n_contacts": 7997,
+      "blocks": {
+        "4": {
+          "n_block_rows": 570,
+          "occupied": 1692,
+          "occupancy_frac": 0.0104,
+          "coarse_map_entries": 162735,
+          "coarse_vs_dense": 0.0628,
+          "fine_pairs_if_kept": 27072,
+          "fine_vs_dense": 0.01045,
+          "effective_c": 11.89
+        },
+        "8": {
+          "n_block_rows": 285,
+          "occupied": 947,
+          "occupancy_frac": 0.02324,
+          "coarse_map_entries": 40755,
+          "coarse_vs_dense": 0.01573,
+          "fine_pairs_if_kept": 60608,
+          "fine_vs_dense": 0.02339,
+          "effective_c": 26.62
+        },
+        "16": {
+          "n_block_rows": 143,
+          "occupied": 567,
+          "occupancy_frac": 0.05507,
+          "coarse_map_entries": 10296,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 145152,
+          "fine_vs_dense": 0.05602,
+          "effective_c": 63.75
+        },
+        "32": {
+          "n_block_rows": 72,
+          "occupied": 333,
+          "occupancy_frac": 0.12671,
+          "coarse_map_entries": 2628,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 340992,
+          "fine_vs_dense": 0.13159,
+          "effective_c": 149.75
+        }
+      }
+    },
+    {
+      "pdb": "8FMW",
+      "L": 2929,
+      "n_contacts": 15557,
+      "blocks": {
+        "4": {
+          "n_block_rows": 733,
+          "occupied": 3351,
+          "occupancy_frac": 0.01246,
+          "coarse_map_entries": 269011,
+          "coarse_vs_dense": 0.06273,
+          "fine_pairs_if_kept": 53616,
+          "fine_vs_dense": 0.0125,
+          "effective_c": 18.31
+        },
+        "8": {
+          "n_block_rows": 367,
+          "occupied": 1903,
+          "occupancy_frac": 0.02818,
+          "coarse_map_entries": 67528,
+          "coarse_vs_dense": 0.01575,
+          "fine_pairs_if_kept": 121792,
+          "fine_vs_dense": 0.0284,
+          "effective_c": 41.58
+        },
+        "16": {
+          "n_block_rows": 184,
+          "occupied": 1149,
+          "occupancy_frac": 0.06751,
+          "coarse_map_entries": 17020,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 294144,
+          "fine_vs_dense": 0.0686,
+          "effective_c": 100.42
+        },
+        "32": {
+          "n_block_rows": 92,
+          "occupied": 647,
+          "occupancy_frac": 0.15124,
+          "coarse_map_entries": 4278,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 662528,
+          "fine_vs_dense": 0.15451,
+          "effective_c": 226.2
+        }
+      }
+    },
+    {
+      "pdb": "8FRU",
+      "L": 2551,
+      "n_contacts": 12022,
+      "blocks": {
+        "4": {
+          "n_block_rows": 638,
+          "occupied": 2681,
+          "occupancy_frac": 0.01315,
+          "coarse_map_entries": 203841,
+          "coarse_vs_dense": 0.06267,
+          "fine_pairs_if_kept": 42896,
+          "fine_vs_dense": 0.01319,
+          "effective_c": 16.82
+        },
+        "8": {
+          "n_block_rows": 319,
+          "occupied": 1542,
+          "occupancy_frac": 0.03021,
+          "coarse_map_entries": 51040,
+          "coarse_vs_dense": 0.01569,
+          "fine_pairs_if_kept": 98688,
+          "fine_vs_dense": 0.03034,
+          "effective_c": 38.69
+        },
+        "16": {
+          "n_block_rows": 160,
+          "occupied": 942,
+          "occupancy_frac": 0.07314,
+          "coarse_map_entries": 12880,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 241152,
+          "fine_vs_dense": 0.07414,
+          "effective_c": 94.53
+        },
+        "32": {
+          "n_block_rows": 80,
+          "occupied": 551,
+          "occupancy_frac": 0.17006,
+          "coarse_map_entries": 3240,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 564224,
+          "fine_vs_dense": 0.17347,
+          "effective_c": 221.18
+        }
+      }
+    },
+    {
+      "pdb": "8FVY",
+      "L": 1441,
+      "n_contacts": 6567,
+      "blocks": {
+        "4": {
+          "n_block_rows": 361,
+          "occupied": 1396,
+          "occupancy_frac": 0.02136,
+          "coarse_map_entries": 65341,
+          "coarse_vs_dense": 0.06298,
+          "fine_pairs_if_kept": 22336,
+          "fine_vs_dense": 0.02153,
+          "effective_c": 15.5
+        },
+        "8": {
+          "n_block_rows": 181,
+          "occupied": 782,
+          "occupancy_frac": 0.04748,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.01588,
+          "fine_pairs_if_kept": 50048,
+          "fine_vs_dense": 0.04824,
+          "effective_c": 34.73
+        },
+        "16": {
+          "n_block_rows": 91,
+          "occupied": 455,
+          "occupancy_frac": 0.1087,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00403,
+          "fine_pairs_if_kept": 116480,
+          "fine_vs_dense": 0.11227,
+          "effective_c": 80.83
+        },
+        "32": {
+          "n_block_rows": 46,
+          "occupied": 240,
+          "occupancy_frac": 0.22202,
+          "coarse_map_entries": 1081,
+          "coarse_vs_dense": 0.00104,
+          "fine_pairs_if_kept": 245760,
+          "fine_vs_dense": 0.23687,
+          "effective_c": 170.55
+        }
+      }
+    },
+    {
+      "pdb": "8GKH",
+      "L": 76,
+      "n_contacts": 126,
+      "blocks": {
+        "4": {
+          "n_block_rows": 19,
+          "occupied": 29,
+          "occupancy_frac": 0.15263,
+          "coarse_map_entries": 190,
+          "coarse_vs_dense": 0.06667,
+          "fine_pairs_if_kept": 464,
+          "fine_vs_dense": 0.16281,
+          "effective_c": 6.11
+        },
+        "8": {
+          "n_block_rows": 10,
+          "occupied": 14,
+          "occupancy_frac": 0.25455,
+          "coarse_map_entries": 55,
+          "coarse_vs_dense": 0.0193,
+          "fine_pairs_if_kept": 896,
+          "fine_vs_dense": 0.31439,
+          "effective_c": 11.79
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 7,
+          "occupancy_frac": 0.46667,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00526,
+          "fine_pairs_if_kept": 1792,
+          "fine_vs_dense": 0.62877,
+          "effective_c": 23.58
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 4,
+          "occupancy_frac": 0.66667,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00211,
+          "fine_pairs_if_kept": 4096,
+          "fine_vs_dense": 1.43719,
+          "effective_c": 53.89
+        }
+      }
+    },
+    {
+      "pdb": "8HKU",
+      "L": 2995,
+      "n_contacts": 15210,
+      "blocks": {
+        "4": {
+          "n_block_rows": 749,
+          "occupied": 3352,
+          "occupancy_frac": 0.01193,
+          "coarse_map_entries": 280875,
+          "coarse_vs_dense": 0.06265,
+          "fine_pairs_if_kept": 53632,
+          "fine_vs_dense": 0.01196,
+          "effective_c": 17.91
+        },
+        "8": {
+          "n_block_rows": 375,
+          "occupied": 1917,
+          "occupancy_frac": 0.02719,
+          "coarse_map_entries": 70500,
+          "coarse_vs_dense": 0.01572,
+          "fine_pairs_if_kept": 122688,
+          "fine_vs_dense": 0.02736,
+          "effective_c": 40.96
+        },
+        "16": {
+          "n_block_rows": 188,
+          "occupied": 1142,
+          "occupancy_frac": 0.06428,
+          "coarse_map_entries": 17766,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 292352,
+          "fine_vs_dense": 0.06521,
+          "effective_c": 97.61
+        },
+        "32": {
+          "n_block_rows": 94,
+          "occupied": 646,
+          "occupancy_frac": 0.14468,
+          "coarse_map_entries": 4465,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 661504,
+          "fine_vs_dense": 0.14754,
+          "effective_c": 220.87
+        }
+      }
+    },
+    {
+      "pdb": "8HMY",
+      "L": 90,
+      "n_contacts": 279,
+      "blocks": {
+        "4": {
+          "n_block_rows": 23,
+          "occupied": 50,
+          "occupancy_frac": 0.18116,
+          "coarse_map_entries": 276,
+          "coarse_vs_dense": 0.06891,
+          "fine_pairs_if_kept": 800,
+          "fine_vs_dense": 0.19975,
+          "effective_c": 8.89
+        },
+        "8": {
+          "n_block_rows": 12,
+          "occupied": 27,
+          "occupancy_frac": 0.34615,
+          "coarse_map_entries": 78,
+          "coarse_vs_dense": 0.01948,
+          "fine_pairs_if_kept": 1728,
+          "fine_vs_dense": 0.43146,
+          "effective_c": 19.2
+        },
+        "16": {
+          "n_block_rows": 6,
+          "occupied": 14,
+          "occupancy_frac": 0.66667,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00524,
+          "fine_pairs_if_kept": 3584,
+          "fine_vs_dense": 0.89488,
+          "effective_c": 39.82
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 6,
+          "occupancy_frac": 1.0,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.0015,
+          "fine_pairs_if_kept": 6144,
+          "fine_vs_dense": 1.53408,
+          "effective_c": 68.27
+        }
+      }
+    },
+    {
+      "pdb": "8IAZ",
+      "L": 163,
+      "n_contacts": 468,
+      "blocks": {
+        "4": {
+          "n_block_rows": 41,
+          "occupied": 106,
+          "occupancy_frac": 0.12311,
+          "coarse_map_entries": 861,
+          "coarse_vs_dense": 0.06521,
+          "fine_pairs_if_kept": 1696,
+          "fine_vs_dense": 0.12846,
+          "effective_c": 10.4
+        },
+        "8": {
+          "n_block_rows": 21,
+          "occupied": 60,
+          "occupancy_frac": 0.25974,
+          "coarse_map_entries": 231,
+          "coarse_vs_dense": 0.0175,
+          "fine_pairs_if_kept": 3840,
+          "fine_vs_dense": 0.29084,
+          "effective_c": 23.56
+        },
+        "16": {
+          "n_block_rows": 11,
+          "occupied": 32,
+          "occupancy_frac": 0.48485,
+          "coarse_map_entries": 66,
+          "coarse_vs_dense": 0.005,
+          "fine_pairs_if_kept": 8192,
+          "fine_vs_dense": 0.62047,
+          "effective_c": 50.26
+        },
+        "32": {
+          "n_block_rows": 6,
+          "occupied": 16,
+          "occupancy_frac": 0.7619,
+          "coarse_map_entries": 21,
+          "coarse_vs_dense": 0.00159,
+          "fine_pairs_if_kept": 16384,
+          "fine_vs_dense": 1.24093,
+          "effective_c": 100.52
+        }
+      }
+    },
+    {
+      "pdb": "8IYQ",
+      "L": 109,
+      "n_contacts": 200,
+      "blocks": {
+        "4": {
+          "n_block_rows": 28,
+          "occupied": 35,
+          "occupancy_frac": 0.08621,
+          "coarse_map_entries": 406,
+          "coarse_vs_dense": 0.06898,
+          "fine_pairs_if_kept": 560,
+          "fine_vs_dense": 0.09514,
+          "effective_c": 5.14
+        },
+        "8": {
+          "n_block_rows": 14,
+          "occupied": 21,
+          "occupancy_frac": 0.2,
+          "coarse_map_entries": 105,
+          "coarse_vs_dense": 0.01784,
+          "fine_pairs_if_kept": 1344,
+          "fine_vs_dense": 0.22834,
+          "effective_c": 12.33
+        },
+        "16": {
+          "n_block_rows": 7,
+          "occupied": 13,
+          "occupancy_frac": 0.46429,
+          "coarse_map_entries": 28,
+          "coarse_vs_dense": 0.00476,
+          "fine_pairs_if_kept": 3328,
+          "fine_vs_dense": 0.56541,
+          "effective_c": 30.53
+        },
+        "32": {
+          "n_block_rows": 4,
+          "occupied": 7,
+          "occupancy_frac": 0.7,
+          "coarse_map_entries": 10,
+          "coarse_vs_dense": 0.0017,
+          "fine_pairs_if_kept": 7168,
+          "fine_vs_dense": 1.2178,
+          "effective_c": 65.76
+        }
+      }
+    },
+    {
+      "pdb": "8JOZ",
+      "L": 79,
+      "n_contacts": 242,
+      "blocks": {
+        "4": {
+          "n_block_rows": 20,
+          "occupied": 45,
+          "occupancy_frac": 0.21429,
+          "coarse_map_entries": 210,
+          "coarse_vs_dense": 0.06816,
+          "fine_pairs_if_kept": 720,
+          "fine_vs_dense": 0.23369,
+          "effective_c": 9.11
+        },
+        "8": {
+          "n_block_rows": 10,
+          "occupied": 24,
+          "occupancy_frac": 0.43636,
+          "coarse_map_entries": 55,
+          "coarse_vs_dense": 0.01785,
+          "fine_pairs_if_kept": 1536,
+          "fine_vs_dense": 0.49854,
+          "effective_c": 19.44
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 12,
+          "occupancy_frac": 0.8,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00487,
+          "fine_pairs_if_kept": 3072,
+          "fine_vs_dense": 0.99708,
+          "effective_c": 38.89
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00195,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 1.6618,
+          "effective_c": 64.81
+        }
+      }
+    },
+    {
+      "pdb": "8JY0",
+      "L": 64,
+      "n_contacts": 163,
+      "blocks": {
+        "4": {
+          "n_block_rows": 16,
+          "occupied": 36,
+          "occupancy_frac": 0.26471,
+          "coarse_map_entries": 136,
+          "coarse_vs_dense": 0.06746,
+          "fine_pairs_if_kept": 576,
+          "fine_vs_dense": 0.28571,
+          "effective_c": 9.0
+        },
+        "8": {
+          "n_block_rows": 8,
+          "occupied": 18,
+          "occupancy_frac": 0.5,
+          "coarse_map_entries": 36,
+          "coarse_vs_dense": 0.01786,
+          "fine_pairs_if_kept": 1152,
+          "fine_vs_dense": 0.57143,
+          "effective_c": 18.0
+        },
+        "16": {
+          "n_block_rows": 4,
+          "occupied": 8,
+          "occupancy_frac": 0.8,
+          "coarse_map_entries": 10,
+          "coarse_vs_dense": 0.00496,
+          "fine_pairs_if_kept": 2048,
+          "fine_vs_dense": 1.01587,
+          "effective_c": 32.0
+        },
+        "32": {
+          "n_block_rows": 2,
+          "occupied": 3,
+          "occupancy_frac": 1.0,
+          "coarse_map_entries": 3,
+          "coarse_vs_dense": 0.00149,
+          "fine_pairs_if_kept": 3072,
+          "fine_vs_dense": 1.52381,
+          "effective_c": 48.0
+        }
+      }
+    },
+    {
+      "pdb": "8K0P",
+      "L": 542,
+      "n_contacts": 2263,
+      "blocks": {
+        "4": {
+          "n_block_rows": 136,
+          "occupied": 473,
+          "occupancy_frac": 0.05077,
+          "coarse_map_entries": 9316,
+          "coarse_vs_dense": 0.06354,
+          "fine_pairs_if_kept": 7568,
+          "fine_vs_dense": 0.05162,
+          "effective_c": 13.96
+        },
+        "8": {
+          "n_block_rows": 68,
+          "occupied": 262,
+          "occupancy_frac": 0.11168,
+          "coarse_map_entries": 2346,
+          "coarse_vs_dense": 0.016,
+          "fine_pairs_if_kept": 16768,
+          "fine_vs_dense": 0.11437,
+          "effective_c": 30.94
+        },
+        "16": {
+          "n_block_rows": 34,
+          "occupied": 148,
+          "occupancy_frac": 0.24874,
+          "coarse_map_entries": 595,
+          "coarse_vs_dense": 0.00406,
+          "fine_pairs_if_kept": 37888,
+          "fine_vs_dense": 0.25843,
+          "effective_c": 69.9
+        },
+        "32": {
+          "n_block_rows": 17,
+          "occupied": 78,
+          "occupancy_frac": 0.5098,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.00104,
+          "fine_pairs_if_kept": 79872,
+          "fine_vs_dense": 0.54479,
+          "effective_c": 147.37
+        }
+      }
+    },
+    {
+      "pdb": "8KD9",
+      "L": 73,
+      "n_contacts": 260,
+      "blocks": {
+        "4": {
+          "n_block_rows": 19,
+          "occupied": 49,
+          "occupancy_frac": 0.25789,
+          "coarse_map_entries": 190,
+          "coarse_vs_dense": 0.0723,
+          "fine_pairs_if_kept": 784,
+          "fine_vs_dense": 0.29833,
+          "effective_c": 10.74
+        },
+        "8": {
+          "n_block_rows": 10,
+          "occupied": 25,
+          "occupancy_frac": 0.45455,
+          "coarse_map_entries": 55,
+          "coarse_vs_dense": 0.02093,
+          "fine_pairs_if_kept": 1600,
+          "fine_vs_dense": 0.60883,
+          "effective_c": 21.92
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 12,
+          "occupancy_frac": 0.8,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00571,
+          "fine_pairs_if_kept": 3072,
+          "fine_vs_dense": 1.16895,
+          "effective_c": 42.08
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00228,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 1.94825,
+          "effective_c": 70.14
+        }
+      }
+    },
+    {
+      "pdb": "8P8B",
+      "L": 2890,
+      "n_contacts": 14989,
+      "blocks": {
+        "4": {
+          "n_block_rows": 723,
+          "occupied": 3244,
+          "occupancy_frac": 0.01239,
+          "coarse_map_entries": 261726,
+          "coarse_vs_dense": 0.06269,
+          "fine_pairs_if_kept": 51904,
+          "fine_vs_dense": 0.01243,
+          "effective_c": 17.96
+        },
+        "8": {
+          "n_block_rows": 362,
+          "occupied": 1832,
+          "occupancy_frac": 0.02788,
+          "coarse_map_entries": 65703,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 117248,
+          "fine_vs_dense": 0.02809,
+          "effective_c": 40.57
+        },
+        "16": {
+          "n_block_rows": 181,
+          "occupied": 1090,
+          "occupancy_frac": 0.06618,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 279040,
+          "fine_vs_dense": 0.06684,
+          "effective_c": 96.55
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 629,
+          "occupancy_frac": 0.15026,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 644096,
+          "fine_vs_dense": 0.15429,
+          "effective_c": 222.87
+        }
+      }
+    },
+    {
+      "pdb": "8R6C",
+      "L": 2729,
+      "n_contacts": 14801,
+      "blocks": {
+        "4": {
+          "n_block_rows": 683,
+          "occupied": 3203,
+          "occupancy_frac": 0.01371,
+          "coarse_map_entries": 233586,
+          "coarse_vs_dense": 0.06275,
+          "fine_pairs_if_kept": 51248,
+          "fine_vs_dense": 0.01377,
+          "effective_c": 18.78
+        },
+        "8": {
+          "n_block_rows": 342,
+          "occupied": 1812,
+          "occupancy_frac": 0.03089,
+          "coarse_map_entries": 58653,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 115968,
+          "fine_vs_dense": 0.03115,
+          "effective_c": 42.49
+        },
+        "16": {
+          "n_block_rows": 171,
+          "occupied": 1080,
+          "occupancy_frac": 0.07344,
+          "coarse_map_entries": 14706,
+          "coarse_vs_dense": 0.00395,
+          "fine_pairs_if_kept": 276480,
+          "fine_vs_dense": 0.07428,
+          "effective_c": 101.31
+        },
+        "32": {
+          "n_block_rows": 86,
+          "occupied": 621,
+          "occupancy_frac": 0.166,
+          "coarse_map_entries": 3741,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 635904,
+          "fine_vs_dense": 0.17083,
+          "effective_c": 233.02
+        }
+      }
+    },
+    {
+      "pdb": "9EY2",
+      "L": 68,
+      "n_contacts": 163,
+      "blocks": {
+        "4": {
+          "n_block_rows": 17,
+          "occupied": 33,
+          "occupancy_frac": 0.21569,
+          "coarse_map_entries": 153,
+          "coarse_vs_dense": 0.06716,
+          "fine_pairs_if_kept": 528,
+          "fine_vs_dense": 0.23178,
+          "effective_c": 7.76
+        },
+        "8": {
+          "n_block_rows": 9,
+          "occupied": 18,
+          "occupancy_frac": 0.4,
+          "coarse_map_entries": 45,
+          "coarse_vs_dense": 0.01975,
+          "fine_pairs_if_kept": 1152,
+          "fine_vs_dense": 0.50571,
+          "effective_c": 16.94
+        },
+        "16": {
+          "n_block_rows": 5,
+          "occupied": 10,
+          "occupancy_frac": 0.66667,
+          "coarse_map_entries": 15,
+          "coarse_vs_dense": 0.00658,
+          "fine_pairs_if_kept": 2560,
+          "fine_vs_dense": 1.12379,
+          "effective_c": 37.65
+        },
+        "32": {
+          "n_block_rows": 3,
+          "occupied": 5,
+          "occupancy_frac": 0.83333,
+          "coarse_map_entries": 6,
+          "coarse_vs_dense": 0.00263,
+          "fine_pairs_if_kept": 5120,
+          "fine_vs_dense": 2.24759,
+          "effective_c": 75.29
+        }
+      }
+    },
+    {
+      "pdb": "9FCO",
+      "L": 1038,
+      "n_contacts": 5290,
+      "blocks": {
+        "4": {
+          "n_block_rows": 260,
+          "occupied": 1092,
+          "occupancy_frac": 0.03218,
+          "coarse_map_entries": 33930,
+          "coarse_vs_dense": 0.06304,
+          "fine_pairs_if_kept": 17472,
+          "fine_vs_dense": 0.03246,
+          "effective_c": 16.83
+        },
+        "8": {
+          "n_block_rows": 130,
+          "occupied": 601,
+          "occupancy_frac": 0.07058,
+          "coarse_map_entries": 8515,
+          "coarse_vs_dense": 0.01582,
+          "fine_pairs_if_kept": 38464,
+          "fine_vs_dense": 0.07147,
+          "effective_c": 37.06
+        },
+        "16": {
+          "n_block_rows": 65,
+          "occupied": 343,
+          "occupancy_frac": 0.15991,
+          "coarse_map_entries": 2145,
+          "coarse_vs_dense": 0.00399,
+          "fine_pairs_if_kept": 87808,
+          "fine_vs_dense": 0.16315,
+          "effective_c": 84.59
+        },
+        "32": {
+          "n_block_rows": 33,
+          "occupied": 182,
+          "occupancy_frac": 0.32442,
+          "coarse_map_entries": 561,
+          "coarse_vs_dense": 0.00104,
+          "fine_pairs_if_kept": 186368,
+          "fine_vs_dense": 0.34628,
+          "effective_c": 179.55
+        }
+      }
+    },
+    {
+      "pdb": "9FHL",
+      "L": 1397,
+      "n_contacts": 6898,
+      "blocks": {
+        "4": {
+          "n_block_rows": 350,
+          "occupied": 1458,
+          "occupancy_frac": 0.02374,
+          "coarse_map_entries": 61425,
+          "coarse_vs_dense": 0.06299,
+          "fine_pairs_if_kept": 23328,
+          "fine_vs_dense": 0.02392,
+          "effective_c": 16.7
+        },
+        "8": {
+          "n_block_rows": 175,
+          "occupied": 810,
+          "occupancy_frac": 0.0526,
+          "coarse_map_entries": 15400,
+          "coarse_vs_dense": 0.01579,
+          "fine_pairs_if_kept": 51840,
+          "fine_vs_dense": 0.05316,
+          "effective_c": 37.11
+        },
+        "16": {
+          "n_block_rows": 88,
+          "occupied": 469,
+          "occupancy_frac": 0.11977,
+          "coarse_map_entries": 3916,
+          "coarse_vs_dense": 0.00402,
+          "fine_pairs_if_kept": 120064,
+          "fine_vs_dense": 0.12313,
+          "effective_c": 85.94
+        },
+        "32": {
+          "n_block_rows": 44,
+          "occupied": 238,
+          "occupancy_frac": 0.2404,
+          "coarse_map_entries": 990,
+          "coarse_vs_dense": 0.00102,
+          "fine_pairs_if_kept": 243712,
+          "fine_vs_dense": 0.24993,
+          "effective_c": 174.45
+        }
+      }
+    },
+    {
+      "pdb": "9FXO",
+      "L": 1798,
+      "n_contacts": 7851,
+      "blocks": {
+        "4": {
+          "n_block_rows": 450,
+          "occupied": 1711,
+          "occupancy_frac": 0.01686,
+          "coarse_map_entries": 101475,
+          "coarse_vs_dense": 0.06281,
+          "fine_pairs_if_kept": 27376,
+          "fine_vs_dense": 0.01695,
+          "effective_c": 15.23
+        },
+        "8": {
+          "n_block_rows": 225,
+          "occupied": 966,
+          "occupancy_frac": 0.03799,
+          "coarse_map_entries": 25425,
+          "coarse_vs_dense": 0.01574,
+          "fine_pairs_if_kept": 61824,
+          "fine_vs_dense": 0.03827,
+          "effective_c": 34.38
+        },
+        "16": {
+          "n_block_rows": 113,
+          "occupied": 568,
+          "occupancy_frac": 0.08819,
+          "coarse_map_entries": 6441,
+          "coarse_vs_dense": 0.00399,
+          "fine_pairs_if_kept": 145408,
+          "fine_vs_dense": 0.09001,
+          "effective_c": 80.87
+        },
+        "32": {
+          "n_block_rows": 57,
+          "occupied": 313,
+          "occupancy_frac": 0.18935,
+          "coarse_map_entries": 1653,
+          "coarse_vs_dense": 0.00102,
+          "fine_pairs_if_kept": 320512,
+          "fine_vs_dense": 0.1984,
+          "effective_c": 178.26
+        }
+      }
+    },
+    {
+      "pdb": "9GHE",
+      "L": 2758,
+      "n_contacts": 14845,
+      "blocks": {
+        "4": {
+          "n_block_rows": 690,
+          "occupied": 3197,
+          "occupancy_frac": 0.01341,
+          "coarse_map_entries": 238395,
+          "coarse_vs_dense": 0.0627,
+          "fine_pairs_if_kept": 51152,
+          "fine_vs_dense": 0.01345,
+          "effective_c": 18.55
+        },
+        "8": {
+          "n_block_rows": 345,
+          "occupied": 1820,
+          "occupancy_frac": 0.03049,
+          "coarse_map_entries": 59685,
+          "coarse_vs_dense": 0.0157,
+          "fine_pairs_if_kept": 116480,
+          "fine_vs_dense": 0.03064,
+          "effective_c": 42.23
+        },
+        "16": {
+          "n_block_rows": 173,
+          "occupied": 1087,
+          "occupancy_frac": 0.07222,
+          "coarse_map_entries": 15051,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 278272,
+          "fine_vs_dense": 0.07319,
+          "effective_c": 100.9
+        },
+        "32": {
+          "n_block_rows": 87,
+          "occupied": 623,
+          "occupancy_frac": 0.16275,
+          "coarse_map_entries": 3828,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 637952,
+          "fine_vs_dense": 0.1678,
+          "effective_c": 231.31
+        }
+      }
+    },
+    {
+      "pdb": "9GYT",
+      "L": 2910,
+      "n_contacts": 13791,
+      "blocks": {
+        "4": {
+          "n_block_rows": 728,
+          "occupied": 2954,
+          "occupancy_frac": 0.01113,
+          "coarse_map_entries": 265356,
+          "coarse_vs_dense": 0.06269,
+          "fine_pairs_if_kept": 47264,
+          "fine_vs_dense": 0.01117,
+          "effective_c": 16.24
+        },
+        "8": {
+          "n_block_rows": 364,
+          "occupied": 1698,
+          "occupancy_frac": 0.02556,
+          "coarse_map_entries": 66430,
+          "coarse_vs_dense": 0.01569,
+          "fine_pairs_if_kept": 108672,
+          "fine_vs_dense": 0.02568,
+          "effective_c": 37.34
+        },
+        "16": {
+          "n_block_rows": 182,
+          "occupied": 1005,
+          "occupancy_frac": 0.06035,
+          "coarse_map_entries": 16653,
+          "coarse_vs_dense": 0.00393,
+          "fine_pairs_if_kept": 257280,
+          "fine_vs_dense": 0.06079,
+          "effective_c": 88.41
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 574,
+          "occupancy_frac": 0.13712,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00099,
+          "fine_pairs_if_kept": 587776,
+          "fine_vs_dense": 0.13887,
+          "effective_c": 201.98
+        }
+      }
+    },
+    {
+      "pdb": "9JPP",
+      "L": 2737,
+      "n_contacts": 14202,
+      "blocks": {
+        "4": {
+          "n_block_rows": 685,
+          "occupied": 3093,
+          "occupancy_frac": 0.01316,
+          "coarse_map_entries": 234955,
+          "coarse_vs_dense": 0.06275,
+          "fine_pairs_if_kept": 49488,
+          "fine_vs_dense": 0.01322,
+          "effective_c": 18.08
+        },
+        "8": {
+          "n_block_rows": 343,
+          "occupied": 1760,
+          "occupancy_frac": 0.02983,
+          "coarse_map_entries": 58996,
+          "coarse_vs_dense": 0.01576,
+          "fine_pairs_if_kept": 112640,
+          "fine_vs_dense": 0.03008,
+          "effective_c": 41.15
+        },
+        "16": {
+          "n_block_rows": 172,
+          "occupied": 1058,
+          "occupancy_frac": 0.07111,
+          "coarse_map_entries": 14878,
+          "coarse_vs_dense": 0.00397,
+          "fine_pairs_if_kept": 270848,
+          "fine_vs_dense": 0.07234,
+          "effective_c": 98.96
+        },
+        "32": {
+          "n_block_rows": 86,
+          "occupied": 619,
+          "occupancy_frac": 0.16546,
+          "coarse_map_entries": 3741,
+          "coarse_vs_dense": 0.001,
+          "fine_pairs_if_kept": 633856,
+          "fine_vs_dense": 0.16929,
+          "effective_c": 231.59
+        }
+      }
+    },
+    {
+      "pdb": "9PJ7",
+      "L": 2885,
+      "n_contacts": 15006,
+      "blocks": {
+        "4": {
+          "n_block_rows": 722,
+          "occupied": 3282,
+          "occupancy_frac": 0.01257,
+          "coarse_map_entries": 261003,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 52512,
+          "fine_vs_dense": 0.01262,
+          "effective_c": 18.2
+        },
+        "8": {
+          "n_block_rows": 361,
+          "occupied": 1876,
+          "occupancy_frac": 0.02871,
+          "coarse_map_entries": 65341,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 120064,
+          "fine_vs_dense": 0.02886,
+          "effective_c": 41.62
+        },
+        "16": {
+          "n_block_rows": 181,
+          "occupied": 1115,
+          "occupancy_frac": 0.06769,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 285440,
+          "fine_vs_dense": 0.06861,
+          "effective_c": 98.94
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 656,
+          "occupancy_frac": 0.15671,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 671744,
+          "fine_vs_dense": 0.16147,
+          "effective_c": 232.84
+        }
+      }
+    },
+    {
+      "pdb": "9PJ9",
+      "L": 2885,
+      "n_contacts": 15051,
+      "blocks": {
+        "4": {
+          "n_block_rows": 722,
+          "occupied": 3283,
+          "occupancy_frac": 0.01258,
+          "coarse_map_entries": 261003,
+          "coarse_vs_dense": 0.06274,
+          "fine_pairs_if_kept": 52528,
+          "fine_vs_dense": 0.01263,
+          "effective_c": 18.21
+        },
+        "8": {
+          "n_block_rows": 361,
+          "occupied": 1880,
+          "occupancy_frac": 0.02877,
+          "coarse_map_entries": 65341,
+          "coarse_vs_dense": 0.01571,
+          "fine_pairs_if_kept": 120320,
+          "fine_vs_dense": 0.02892,
+          "effective_c": 41.71
+        },
+        "16": {
+          "n_block_rows": 181,
+          "occupied": 1112,
+          "occupancy_frac": 0.06751,
+          "coarse_map_entries": 16471,
+          "coarse_vs_dense": 0.00396,
+          "fine_pairs_if_kept": 284672,
+          "fine_vs_dense": 0.06843,
+          "effective_c": 98.67
+        },
+        "32": {
+          "n_block_rows": 91,
+          "occupied": 655,
+          "occupancy_frac": 0.15647,
+          "coarse_map_entries": 4186,
+          "coarse_vs_dense": 0.00101,
+          "fine_pairs_if_kept": 670720,
+          "fine_vs_dense": 0.16122,
+          "effective_c": 232.49
+        }
+      }
+    }
+  ]
+}

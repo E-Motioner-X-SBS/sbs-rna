@@ -64,9 +64,11 @@ features but two readouts of one phenomenon.
 PHAROS accordingly (i) accepts \textbf{ionic conditions as a model input},
 which no existing RNA structure predictor does, propagating them to attention
 logits through a Manning-renormalised screened-Coulomb bias; (ii) replaces the
-dense pair track with an \textbf{adaptive sparse pair track} retaining
-$K = 32L$ candidate edges, giving sixfold headroom over the measured contact
-requirement at $1.56\%$ of dense cost; (iii) routes a \textbf{sparse
+dense pair track with a \textbf{hierarchical coarse-to-fine pair track} that
+selects contact-bearing \emph{blocks} rather than pairs, at $2.2\%$ of dense
+cost---adopted after we measured a flat top-$K$ design recovering only
+\emph{one contact in five} on long chains, and measured block occupancy falling
+to $1.34\%$ as chains lengthen; (iii) routes a \textbf{sparse
 mixture-of-experts} on local structural regime rather than sequence context,
 supported by our negative result that GNRA $k$-mer context predicts rigidity at
 only $0.073\sigma$; and (iv) supplies motif geometry through a \textbf{frozen
@@ -232,10 +234,9 @@ L=1024 \rightarrow 77.3~\text{GB}, \qquad
 L=2048 \rightarrow 309.2~\text{GB}.
 \]
 A dense pair track is not merely wasteful at RNA lengths; it is infeasible.
-Retaining $K = cL$ candidate edges with $c=32$ costs $1.56\%$ of dense at
-$L=2048$ ($65{,}536$ edges, $16.8$~MB per tensor) while providing roughly
-sixfold headroom over the measured p95 requirement of $5.42$ contacts per
-nucleotide.
+How that sparsity is exploited turns out to matter as much as exploiting it at
+all: a flat top-$K$ selection fails on long chains, and contacts must be
+selected as \emph{blocks}. Section~\ref{sec:hpt} reports both measurements.
 
 \subsection{Ion coordination and local rigidity are one phenomenon}
 
@@ -514,28 +515,118 @@ NucleicBERT (dense)                  & 404M & 404M \\
 PHAROS-Base carries $2.3\times$ the capacity of NucleicBERT at slightly lower
 active compute, with an attention term roughly $8\times$ cheaper at long context.
 
-\subsection{Adaptive sparse pair track}
+\subsection{Hierarchical pair track}
+\label{sec:hpt}
 
-\begin{figure}[h]
+\begin{figure}[p]
 \centering
-\includegraphics[width=0.86\textwidth,keepaspectratio]{../architecture/diagrams/rendered/04-sparse-pair-track.png}
-\caption{The sparse pair track and its measured justification.}
+\includegraphics[width=\textwidth,keepaspectratio]{../architecture/diagrams/rendered/04-hierarchical-pair-track.png}
+\caption{The pair track, after the flat design was measured and replaced.}
 \end{figure}
 
-The track proceeds in four steps. A proposal stage computes candidate pair
-scores in $O(Lw)$ from a low-rank outer product plus a Turner nearest-neighbour
-prior, never materialising an $L \times L$ tensor. A selection stage retains
-$K = 32L$ candidates. Sparse triangle updates then enforce the triangle
-inequality on the induced subgraph. Finally candidates are re-scored after every
-recycle, making the top-$K$ a soft, revisable commitment rather than a hard
-early prune.
+\subsubsection{A flat top-$K$ proposal was specified, measured, and discarded}
 
-\paragraph{Failure mode.} A contact never proposed can never be predicted. The
-mitigations are the sixfold headroom of Table~\ref{tab:sparsity}, per-recycle
-re-selection, and a recall-oriented auxiliary loss on the proposal stage.
-\textcolor{risk}{\textbf{Proposal recall must be reported per length bin.}} A
-sparse track that silently drops five percent of true contacts would impose an
-invisible accuracy ceiling, and must be measured rather than assumed.
+Version 0.1 of this design specified a flat proposal retaining $K = 32L$
+candidate edges. We tested it. Scoring every pair with a sequence-only proposer
+(the ERNIE-RNA pair prior, stacking context, and an exponential
+sequence-distance decay) and measuring recall of true 3D contacts within the top
+$K$ gives Table~\ref{tab:recall}.
+
+\begin{table}[h]
+\centering
+\caption{Recall of true 3D contacts under a flat top-$K$ proposal at $c=32$. \meas}
+\label{tab:recall}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Chain length} & \textbf{$n$} & \textbf{mean recall} & \textbf{$K$ as \% of dense} \\
+\midrule
+32--100   & 29 & $0.980$ & $59.4\%$ \\
+100--200  & 6  & $0.642$ & $25.5\%$ \\
+200--500  & 3  & $0.307$ & $9.0\%$ \\
+500--1200 & 5  & $\mathbf{0.200}$ & $4.7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A \emph{random} scorer achieves mean recall $0.746$ at $c=32$ over the same
+chains, because on short chains $32L$ already covers most of the map. The flat
+proposer's headline mean of $0.795$ is therefore very nearly an artefact of
+short chains. \textcolor{risk}{\textbf{On long chains, where sparsity actually
+matters, it recovers one contact in five}}---a silent and fatal accuracy
+ceiling.
+
+A banded fallback does not rescue it, because RNA contacts are not sufficiently
+local. The fraction of contacts within $|i-j| \leq$ band is $0.350$ at band 32,
+$0.479$ at 64, $0.597$ at 128, $0.706$ at 256 and $0.812$ at 512 for chains of
+1500--3000~nt; median contact separation is $78$~nt with a long tail. Even a
+$\pm512$ band, which would cost vastly more than the whole budget, misses $19\%$.
+
+\subsubsection{Contacts are clustered, so select blocks rather than pairs}
+
+Helical stems are contiguous anti-diagonal runs in the contact map. Contacts are
+therefore spread along the sequence but concentrated in very few
+\emph{blocks}. Table~\ref{tab:blocks} measures this.
+
+\begin{table}[h]
+\centering
+\caption{Block occupancy at block size $b=4$: the fraction of blocks containing
+at least one contact, and the effective $c$ of keeping every occupied block. \meas}
+\label{tab:blocks}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Chain length} & \textbf{median $L$} & \textbf{occupancy at $b=4$} & \textbf{effective $c$} \\
+\midrule
+64--200    & 88   & $16.34\%$ & $7.9$ \\
+200--500   & 393  & $6.87\%$  & $12.6$ \\
+500--1500  & 1038 & $3.17\%$  & $14.8$ \\
+1500--3000 & 2861 & $\mathbf{1.34\%}$ & $\mathbf{17.2}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Occupancy \emph{falls} as chains lengthen, so the mechanism becomes more
+effective at exactly the lengths where the flat design failed. Retaining every
+occupied $4\times4$ block costs an effective $c$ of roughly $17$---below the
+discarded flat budget of $32$---while capturing every contact by construction.
+
+\subsubsection{Three-level coarse-to-fine track}
+
+\begin{table}[h]
+\centering
+\caption{Cost of the hierarchical track at $L = 2861$, as a fraction of a dense
+pair map. \meas}
+\begin{tabular}{llc}
+\toprule
+\textbf{Level} & \textbf{Operation} & \textbf{Cost} \\
+\midrule
+L1 & \textbf{dense} pair map at block size $b=16$ & $0.396\%$ \\
+L2 & refine occupied $b=16$ blocks to $b=4$ & $0.460\%$ \\
+L3 & refine occupied $b=4$ blocks to individual pairs & $1.346\%$ \\
+\midrule
+& \textbf{Total} & $\mathbf{2.202\%}$ \\
+& flat top-$K$ at $c=32$, for comparison & $1.118\%$ (at $\sim$20\% recall) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For roughly twice the cost of the flat design, the track moves from a hard
+$20\%$ recall ceiling to a ceiling of $100\%$. Two properties make this work.
+First, the L1 map is \emph{genuinely dense}, so it loses no recall at the coarse
+level at all---at $L=4096$ with $b=16$ it is only $65$k entries. Recall can only
+be lost at the selection thresholds, which are tunable and can be set
+recall-first. Second, deciding whether a $16\times16$ block contains any contact
+aggregates $256$ pair-decisions into one, so coarse-level signal-to-noise is far
+higher than for individual pair ranking. The model ranks $32$k blocks and then
+$16$ sub-blocks inside each survivor, never $4.1$M individual pairs.
+
+\paragraph{What remains unproven.} These measurements establish that the
+information is present and the cost affordable. They do \emph{not} establish
+that a trained model will identify occupied blocks accurately; that requires
+training. The relevant external evidence is ERNIE-RNA's zero-shot Top-$L$/1
+contact precision of $0.68$ from attention maps alone, which indicates that
+learned representations rank contacts far better than the sequence-only
+heuristic tested above. \textcolor{risk}{\textbf{Block-detection recall must be
+reported per length bin and per level.}}
 
 \subsection{Motif retrieval bank}
 
@@ -660,8 +751,10 @@ Manning-screened Coulomb bias & No existing RNA structure predictor accepts
 ionic conditions. \\
 First sparse-MoE architecture for RNA structure & AIDO.Protein is MoE for
 protein; no RNA equivalent exists. \\
-$O(L)$ sparse pair track justified by measured contact scaling &
-AlphaFold3 and Rhoformer are dense $O(L^2)$. \\
+Hierarchical coarse-to-fine pair track selecting blocks rather than pairs,
+justified by measured $1.34\%$ block occupancy & AlphaFold3 and Rhoformer are
+dense $O(L^2)$; flat top-$K$ sparsification is measured here to fail at
+$\sim$20\% recall on long chains. \\
 Frozen motif KV bank as a retrieval-based geometry prior & The Motif Atlas is
 published but wired into no large model. \\
 $\mathrm{Mg}^{2+}$ sites and B-factor rigidity as free auxiliary supervision &
@@ -676,8 +769,11 @@ Treated separately or not at all elsewhere. \\
 \section{Risks and open questions}
 
 \begin{enumerate}[leftmargin=1.4em,itemsep=0.25em]
-\item \textbf{Proposal recall ceiling.} If the sparse proposal stage misses true
-contacts, nothing downstream recovers them. Must be measured per length bin.
+\item \textbf{Block-detection recall.} Superseded but not eliminated. The flat
+top-$K$ design was measured at $\sim$20\% recall on long chains and replaced
+(Section~\ref{sec:hpt}). The hierarchical track has a $100\%$ recall
+\emph{ceiling} by construction, but whether a trained model attains it is
+unproven. Recall must be reported per length bin and per level.
 \item \textbf{Ionic metadata sparsity.} mmCIF records crystallisation conditions
 inconsistently. Stage 5 may have far fewer usable ionic labels than hoped. This
 requires an audit before committing to that stage, and is currently
@@ -721,6 +817,9 @@ large-scale training is attempted.
 \texttt{scripts/sampling/analyze\_ions\_motifs.py} & \texttt{ion\_summary.json} \\
 \texttt{scripts/sampling/analyze\_rigidity.py} & \texttt{rigidity\_summary.json} \\
 \texttt{scripts/sampling/analyze\_contact\_sparsity.py} & \texttt{contact\_sparsity.json} \\
+\texttt{scripts/sampling/validate\_proposal\_recall.py} & \texttt{proposal\_recall.json} \\
+\texttt{scripts/sampling/analyze\_contact\_separation.py} & \texttt{contact\_separation.json} \\
+\texttt{scripts/sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -1,0 +1,595 @@
+<title>PHAROS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F1F4F8; --panel:#FFFFFF; --sunk:#E5EAF1;
+  --ink:#0C131C; --ink-2:#3D4A5C; --ink-3:#6B7A8C;
+  --rule:#CBD5E1; --rule-soft:#E2E8F0;
+  --teal:#15697F; --teal-soft:#D6EAF0;
+  --burnt:#C2410C; --burnt-soft:#FBE3D6;
+  --mg:#3D8B4A; --mg-soft:#DCEEDF;
+  --warn:#A13434; --warn-soft:#F7DEDE;
+  --display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0C131C; --panel:#121C28; --sunk:#0A1119;
+  --ink:#E8EEF5; --ink-2:#AEBDCD; --ink-3:#7E8FA3;
+  --rule:#28374A; --rule-soft:#1C2938;
+  --teal:#4FB6CE; --teal-soft:#12313C;
+  --burnt:#F0803F; --burnt-soft:#3A1B0C;
+  --mg:#6FC47E; --mg-soft:#16321C;
+  --warn:#E87B7B; --warn-soft:#38181A;
+}}
+:root[data-theme="dark"]{
+  --paper:#0C131C; --panel:#121C28; --sunk:#0A1119;
+  --ink:#E8EEF5; --ink-2:#AEBDCD; --ink-3:#7E8FA3;
+  --rule:#28374A; --rule-soft:#1C2938;
+  --teal:#4FB6CE; --teal-soft:#12313C;
+  --burnt:#F0803F; --burnt-soft:#3A1B0C;
+  --mg:#6FC47E; --mg-soft:#16321C;
+  --warn:#E87B7B; --warn-soft:#38181A;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:0 72px}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- masthead ---------- */
+header{border-bottom:2px solid var(--ink);padding-block:36px 20px;margin-bottom:8px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 18px;margin-bottom:18px}
+h1{font-size:clamp(40px,9vw,76px);line-height:.94;letter-spacing:-.02em}
+.expand{font-family:var(--mono);font-size:clamp(11px,2.4vw,13px);color:var(--teal);
+  letter-spacing:.04em;margin-top:10px}
+.expand b{color:var(--ink);font-weight:600}
+.sub{margin-top:18px;font-size:17px;color:var(--ink-2);max-width:62ch}
+.statusbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  padding:5px 10px;border:1px solid var(--rule);border-radius:2px;color:var(--ink-2);background:var(--panel)}
+.chip.alert{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.chip.ok{border-color:var(--mg);color:var(--mg);background:var(--mg-soft)}
+
+/* ---------- section scaffolding ---------- */
+section{margin-top:56px}
+.sechead{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--rule);
+  padding-bottom:10px;margin-bottom:26px}
+.secnum{font-family:var(--mono);font-size:12px;color:var(--burnt);letter-spacing:.1em}
+.sechead h2{font-size:clamp(22px,4vw,30px);letter-spacing:-.01em}
+.lede{color:var(--ink-2);max-width:68ch;margin-bottom:26px}
+
+/* ---------- evidence panels ---------- */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:20px}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:20px}
+.panel h3{font-size:16px;margin-bottom:4px}
+.panel .note{font-size:13px;color:var(--ink-3);margin-bottom:14px}
+.finding{border-left:3px solid var(--mg);background:var(--panel);border:1px solid var(--rule);
+  border-left:3px solid var(--mg);padding:18px 20px;border-radius:0 3px 3px 0}
+.finding .tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--mg);display:block;margin-bottom:6px}
+.finding p{margin:0;color:var(--ink-2)}
+.finding b{color:var(--ink)}
+svg{display:block;width:100%;height:auto;max-width:100%;overflow:visible}
+figcaption{font-size:12px;color:var(--ink-3);margin-top:10px;font-family:var(--mono)}
+
+/* ---------- pipeline blueprint ---------- */
+.pipe{display:flex;flex-direction:column;gap:0}
+.stage{display:grid;grid-template-columns:52px 1fr 168px;gap:18px;align-items:start;
+  background:var(--panel);border:1px solid var(--rule);padding:16px 18px;position:relative}
+.stage + .stage{border-top:none}
+.stage.novel{border-left:3px solid var(--burnt)}
+.stage.frozen{border-left:3px solid var(--mg)}
+.stage.plain{border-left:3px solid var(--teal)}
+.badge{font-family:var(--display);font-size:26px;line-height:1;color:var(--ink);
+  border:1px solid var(--rule);border-radius:2px;display:grid;place-items:center;
+  width:44px;height:44px;background:var(--sunk)}
+.stage h4{font-size:16px;margin-bottom:3px}
+.stage p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.cost{font-family:var(--mono);font-size:11px;text-align:right;color:var(--ink-3);line-height:1.7}
+.cost b{display:block;font-size:13px;color:var(--teal);font-weight:600}
+.cost.q b{color:var(--burnt)}
+.connector{height:16px;border-left:2px dotted var(--rule);margin-left:44px}
+.recycle{font-family:var(--mono);font-size:11.5px;color:var(--burnt);background:var(--burnt-soft);
+  border:1px dashed var(--burnt);padding:10px 14px;border-radius:2px;margin-top:10px}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--rule-soft)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);background:var(--sunk);border-bottom:1px solid var(--rule)}
+tbody tr:last-child td{border-bottom:none}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+tr.total td{font-weight:600;background:var(--sunk)}
+.delta{font-family:var(--mono);font-size:12px;color:var(--mg)}
+
+/* ---------- claims + risks ---------- */
+.claims{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.claim{background:var(--panel);padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.claim .what{font-weight:600}
+.claim .status{font-size:13px;color:var(--ink-2)}
+.risks{display:grid;gap:10px}
+.risk{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;
+  border:1px solid var(--rule);border-left:3px solid var(--warn);background:var(--panel);padding:14px 16px;border-radius:0 3px 3px 0}
+.risk .n{font-family:var(--mono);font-size:11px;color:var(--warn);padding-top:2px}
+.risk p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.risk b{color:var(--ink)}
+
+footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 24px}
+
+@media(max-width:620px){
+  .stage{grid-template-columns:40px 1fr;gap:12px}
+  .cost{grid-column:2;text-align:left;margin-top:6px}
+  .badge{width:36px;height:36px;font-size:20px}
+  .connector{margin-left:36px}
+  .claim{grid-template-columns:1fr;gap:6px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">
+    <span>Architecture Design Report</span><span>Version 0.1</span>
+    <span>12 September 2026</span><span>SBS-RNA</span>
+  </div>
+  <h1>PHAROS</h1>
+  <div class="expand">
+    <b>P</b>hysics-<b>H</b>ybrid <b>A</b>ttention-<b>R</b>outed mixture-<b>O</b>f-experts for RNA <b>S</b>tructure
+  </div>
+  <p class="sub">An architecture for RNA structure and contact-map prediction, built on the
+  claim that inductive bias — not scale — is what RNA prediction is short of. Every number
+  below is either measured on 180 non-redundant structures or cited.</p>
+  <div class="statusbar">
+    <span class="chip alert">Design only — no model trained</span>
+    <span class="chip ok">180 structures analysed</span>
+    <span class="chip">~911M total / ~382M active params</span>
+    <span class="chip">Field ceiling: TM ≈ 0.55</span>
+  </div>
+</header>
+
+<!-- ================= 1. THE ARGUMENT ================= -->
+<section>
+  <div class="sechead"><span class="secnum">01</span><h2>The argument</h2></div>
+  <p class="lede">RNA 3D prediction sits near TM-score 0.55 — the threshold for recovering
+  roughly the right fold — while protein prediction routinely exceeds 0.9. The most
+  informative result in the recent literature says the gap is not a scale problem.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>86M beats 650M</h3>
+      <p class="note">Secondary structure F₁, and cross-family generalisation</p>
+      <div class="tablewrap" style="border:none">
+      <table style="min-width:0">
+        <thead><tr><th>Model</th><th class="num">Params</th><th class="num">bpRNA-1m</th><th class="num">bpRNA-new</th></tr></thead>
+        <tbody>
+          <tr><td><b>ERNIE-RNA</b></td><td class="num">86M</td><td class="num"><b>0.873</b></td><td class="num"><b>0.646</b></td></tr>
+          <tr><td>RiNALMo</td><td class="num">650M</td><td class="num">0.850</td><td class="num">0.355</td></tr>
+          <tr><td>UNI-RNA</td><td class="num">400M</td><td class="num">0.821</td><td class="num">—</td></tr>
+          <tr><td>RNA-FM</td><td class="num">100M</td><td class="num">0.808</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>What ERNIE-RNA actually does</h3>
+      <p class="note">One additive bias on attention logits</p>
+      <p style="font-family:var(--mono);font-size:13px;background:var(--sunk);padding:12px;border-radius:2px;margin:0 0 12px">
+        A<sub>ij</sub> = Q<sub>i</sub>K<sub>j</sub>ᵀ/√d + B<sub>pair</sub>(i,j)
+      </p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">B<sub>pair</sub> is set by hand:
+      <span class="mono">3</span> for C–G, <span class="mono">2</span> for A–U,
+      <span class="mono">0.8</span> for G–U, <span class="mono">0</span> on the diagonal.
+      That is the whole advantage — and it nearly doubles cross-family F₁ against a model
+      7.5× its size, because a physical prior holds across families where learned
+      statistics do not.</p>
+    </div>
+  </div>
+
+  <div class="finding" style="margin-top:20px">
+    <span class="tag">Thesis</span>
+    <p>If a crude three-valued prior outperforms 7.5× the parameters, then the marginal
+    return on <b>better physics</b> exceeds the marginal return on <b>more scale</b>.
+    PHAROS replaces that hand-set prior with a learned, ion-aware, motif-aware one.</p>
+  </div>
+</section>
+
+<!-- ================= 2. MEASURED EVIDENCE ================= -->
+<section>
+  <div class="sechead"><span class="secnum">02</span><h2>Measured evidence</h2></div>
+  <p class="lede">Three findings measured for this report on 180 BGSU non-redundant
+  representative structures at ≤3.0 Å. Each one forces a specific architectural decision.</p>
+
+  <!-- Finding 1 -->
+  <div class="panel" style="margin-bottom:20px">
+    <h3>Finding 1 — RNA contact maps scale O(L), not O(L²)</h3>
+    <p class="note">117 chains · contact = any heavy-atom pair ≤ 8 Å, |i−j| ≥ 4</p>
+    <div class="grid2">
+      <figure style="margin:0">
+        <svg viewBox="0 0 420 236" role="img" aria-label="Contacts per nucleotide saturates near 4.9 as chain length grows">
+          <line x1="60" y1="200" x2="392" y2="200" stroke="var(--rule)" stroke-width="1"/>
+          <line x1="60" y1="30" x2="60" y2="200" stroke="var(--rule)" stroke-width="1"/>
+          <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
+            <text x="54" y="204" text-anchor="end">0</text>
+            <text x="54" y="147" text-anchor="end">2</text>
+            <text x="54" y="90" text-anchor="end">4</text>
+            <text x="54" y="34" text-anchor="end">6</text>
+            <text x="84" y="216" text-anchor="middle">56</text>
+            <text x="139" y="216" text-anchor="middle">124</text>
+            <text x="219" y="216" text-anchor="middle">393</text>
+            <text x="287" y="216" text-anchor="middle">1038</text>
+            <text x="358" y="216" text-anchor="middle">2901</text>
+            <text x="226" y="232" text-anchor="middle" fill="var(--ink-3)">chain length L (log scale)</text>
+          </g>
+          <line x1="60" y1="62.5" x2="392" y2="62.5" stroke="var(--mg)" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>
+          <text x="64" y="57" text-anchor="start" font-family="var(--mono)" font-size="9" fill="var(--mg)">saturation ≈ 4.9</text>
+          <polyline points="84,149.5 139,119.2 219,80.6 287,71.6 358,62.5"
+            fill="none" stroke="var(--teal)" stroke-width="2.5"/>
+          <g fill="var(--teal)">
+            <circle cx="84" cy="149.5" r="4"/><circle cx="139" cy="119.2" r="4"/>
+            <circle cx="219" cy="80.6" r="4"/><circle cx="287" cy="71.6" r="4"/>
+            <circle cx="358" cy="62.5" r="4"/>
+          </g>
+          <g font-family="var(--mono)" font-size="9.5" fill="var(--ink)">
+            <text x="84" y="141" text-anchor="middle">1.78</text>
+            <text x="139" y="111" text-anchor="middle">2.85</text>
+            <text x="219" y="72" text-anchor="middle">4.22</text>
+            <text x="287" y="63" text-anchor="middle">4.53</text>
+            <text x="358" y="54" text-anchor="middle">4.85</text>
+          </g>
+        </svg>
+        <figcaption>contacts per nucleotide — saturates</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <svg viewBox="0 0 420 236" role="img" aria-label="Contact map density falls from 6.5 percent to 0.35 percent as chain length grows">
+          <line x1="60" y1="200" x2="392" y2="200" stroke="var(--rule)" stroke-width="1"/>
+          <line x1="60" y1="30" x2="60" y2="200" stroke="var(--rule)" stroke-width="1"/>
+          <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
+            <text x="54" y="204" text-anchor="end">0%</text>
+            <text x="54" y="152" text-anchor="end">2%</text>
+            <text x="54" y="103" text-anchor="end">4%</text>
+            <text x="54" y="55" text-anchor="end">6%</text>
+            <text x="84" y="216" text-anchor="middle">56</text>
+            <text x="139" y="216" text-anchor="middle">124</text>
+            <text x="219" y="216" text-anchor="middle">393</text>
+            <text x="287" y="216" text-anchor="middle">1038</text>
+            <text x="358" y="216" text-anchor="middle">2901</text>
+            <text x="226" y="232" text-anchor="middle" fill="var(--ink-3)">chain length L (log scale)</text>
+          </g>
+          <polyline points="84,41.6 139,101.8 219,147.7 287,176.3 358,191.4"
+            fill="none" stroke="var(--burnt)" stroke-width="2.5"/>
+          <g fill="var(--burnt)">
+            <circle cx="84" cy="41.6" r="4"/><circle cx="139" cy="101.8" r="4"/>
+            <circle cx="219" cy="147.7" r="4"/><circle cx="287" cy="176.3" r="4"/>
+            <circle cx="358" cy="191.4" r="4"/>
+          </g>
+          <g font-family="var(--mono)" font-size="9.5" fill="var(--ink)">
+            <text x="92" y="36" text-anchor="middle">6.52%</text>
+            <text x="145" y="95" text-anchor="middle">4.04%</text>
+            <text x="222" y="140" text-anchor="middle">2.15%</text>
+            <text x="289" y="169" text-anchor="middle">0.97%</text>
+            <text x="356" y="184" text-anchor="middle">0.35%</text>
+          </g>
+        </svg>
+        <figcaption>contact-map density — collapses as 1/L</figcaption>
+      </figure>
+    </div>
+    <div class="finding" style="margin-top:16px">
+      <span class="tag">Forces</span>
+      <p>A dense L×L pair track would need <b>309 GB</b> of activations at L=2048 and would
+      spend over 99% of its compute on empty space. Sparsity is the ground truth, not an
+      approximation — so PHAROS keeps <b>K = 32L</b> candidate edges, giving ~6× headroom
+      over the measured p95 of 5.42 contacts/nt at <b>1.56%</b> of dense cost.</p>
+    </div>
+  </div>
+
+  <!-- Finding 2 -->
+  <div class="panel" style="margin-bottom:20px">
+    <h3>Finding 2 — Ion coordination and rigidity are one phenomenon</h3>
+    <p class="note">24,623 nucleotides · 31 X-ray structures · B-factor z-normalised within each structure</p>
+    <figure style="margin:0">
+      <svg viewBox="0 0 560 262" role="img" aria-label="Normalised B-factor rises monotonically with distance from the nearest magnesium ion, spanning 1.76 sigma">
+        <line x1="310" y1="24" x2="310" y2="232" stroke="var(--rule)" stroke-width="1.5"/>
+        <rect x="142.2" y="34" width="167.8" height="24" fill="var(--mg)" opacity=".9"/>
+        <rect x="182.1" y="68" width="127.9" height="24" fill="var(--mg)" opacity=".76"/>
+        <rect x="231.2" y="102" width="78.8"  height="24" fill="var(--mg)" opacity=".62"/>
+        <rect x="310"   y="136" width="1.5"   height="24" fill="var(--ink-3)"/>
+        <rect x="310"   y="170" width="143.6" height="24" fill="var(--burnt)" opacity=".76"/>
+        <rect x="310"   y="204" width="166.6" height="24" fill="var(--burnt)" opacity=".9"/>
+        <g font-family="var(--mono)" font-size="10.5" fill="var(--ink-2)" text-anchor="end">
+          <text x="134" y="51">0–4 Å</text><text x="134" y="85">4–6 Å</text>
+          <text x="134" y="119">6–8 Å</text><text x="134" y="153">8–12 Å</text>
+          <text x="134" y="187">12–20 Å</text><text x="134" y="221">&gt; 20 Å</text>
+        </g>
+        <g font-family="var(--mono)" font-size="10.5" fill="var(--ink)" font-weight="500">
+          <text x="150" y="51">−0.883</text><text x="190" y="85">−0.673</text>
+          <text x="239" y="119">−0.415</text><text x="318" y="153">+0.004</text>
+          <text x="461" y="187">+0.756</text><text x="484" y="221">+0.877</text>
+        </g>
+        <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
+          <text x="150" y="20">more rigid ←</text>
+          <text x="470" y="20" text-anchor="end">→ more mobile</text>
+          <text x="310" y="248" text-anchor="middle">normalised B-factor (z)</text>
+          <text x="60" y="248">n = 319 … 8,115 per bin</text>
+        </g>
+      </svg>
+      <figcaption>distance to nearest Mg²⁺ vs. local order — monotonic across 1.76 σ</figcaption>
+    </figure>
+    <div class="finding" style="margin-top:16px">
+      <span class="tag">Forces</span>
+      <p>Ion effects and motif rigidity are <b>not independent features</b>. Predicting Mg²⁺
+      sites yields a rigidity map nearly for free and vice versa, so they share one physics
+      expert rather than two disconnected heads. <span style="color:var(--ink-3)">Caveat: Mg²⁺
+      proximity and packing density both track folded cores — this is association, not
+      isolated causation, and the closest bin holds only 319 nucleotides.</span></p>
+    </div>
+  </div>
+
+  <!-- Finding 3 + ion inventory -->
+  <div class="grid2">
+    <div class="panel">
+      <h3>Which ion to model</h3>
+      <p class="note">Cation inventory across 179 parsed structures</p>
+      <figure style="margin:0">
+        <svg viewBox="0 0 420 200" role="img" aria-label="Magnesium outnumbers all other cations about nine to one">
+          <g font-family="var(--mono)" font-size="10.5">
+            <text x="52" y="24" text-anchor="end" fill="var(--ink)">Mg²⁺</text>
+            <rect x="58" y="14" width="296" height="14" fill="var(--mg)"/>
+            <text x="360" y="24" fill="var(--ink)">17,428</text>
+
+            <text x="52" y="49" text-anchor="end" fill="var(--ink-2)">K⁺</text>
+            <rect x="58" y="39" width="228" height="14" fill="var(--teal)" opacity=".75"/>
+            <text x="292" y="49" fill="var(--ink-2)">1,868</text>
+
+            <text x="52" y="74" text-anchor="end" fill="var(--ink-2)">Zn²⁺</text>
+            <rect x="58" y="64" width="178" height="14" fill="var(--teal)" opacity=".55"/>
+            <text x="242" y="74" fill="var(--ink-2)">359</text>
+
+            <text x="52" y="99" text-anchor="end" fill="var(--ink-2)">Na⁺</text>
+            <rect x="58" y="89" width="154" height="14" fill="var(--teal)" opacity=".45"/>
+            <text x="218" y="99" fill="var(--ink-2)">161</text>
+
+            <text x="52" y="124" text-anchor="end" fill="var(--ink-2)">Ca²⁺</text>
+            <rect x="58" y="114" width="102" height="14" fill="var(--teal)" opacity=".35"/>
+            <text x="166" y="124" fill="var(--ink-2)">29</text>
+
+            <text x="52" y="149" text-anchor="end" fill="var(--ink-2)">Mn²⁺</text>
+            <rect x="58" y="139" width="75" height="14" fill="var(--teal)" opacity=".3"/>
+            <text x="139" y="149" fill="var(--ink-2)">12</text>
+
+            <text x="52" y="174" text-anchor="end" fill="var(--ink-2)">Ba²⁺</text>
+            <rect x="58" y="164" width="33" height="14" fill="var(--teal)" opacity=".25"/>
+            <text x="97" y="174" fill="var(--ink-2)">3</text>
+
+            <text x="58" y="194" fill="var(--ink-3)" font-size="9">bar length ∝ log₁₀(count)</text>
+          </g>
+        </svg>
+      </figure>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:12px 0 0">
+      <b>83%</b> of direct Mg²⁺ coordination is to the non-bridging phosphate oxygens
+      OP1/OP2; the next class is the major-groove guanine site G(O6)/G(N7). Coordination is
+      mostly water-mediated: <span class="mono">0.77</span> inner-sphere vs
+      <span class="mono">7.00</span> outer-sphere contacts per ion.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Finding 3 — a negative result</h3>
+      <p class="note">Does GNRA sequence context alone predict rigidity?</p>
+      <div class="tablewrap" style="border:none">
+      <table style="min-width:0">
+        <thead><tr><th>Context</th><th class="num">n nt</th><th class="num">mean z<sub>B</sub></th></tr></thead>
+        <tbody>
+          <tr><td>GNRA-like 4-mer</td><td class="num">4,944</td><td class="num">−0.082</td></tr>
+          <tr><td>all other</td><td class="num">95,768</td><td class="num">−0.009</td></tr>
+          <tr class="total"><td>effect size</td><td class="num">—</td><td class="num">0.073 σ</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="finding" style="margin-top:16px;border-left-color:var(--warn)">
+        <span class="tag" style="color:var(--warn)">Rules out</span>
+        <p>Negligible. A GNRA <i>sequence</i> is a GNRA <i>tetraloop</i> only when it caps a
+        hairpin, so linear k-mer matching mostly counts helical positions. <b>Motif identity
+        requires the interaction graph.</b> This rules out learning motifs from sequence
+        n-grams, and is why routing happens in the pair track — never on raw k-mers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3. PIPELINE ================= -->
+<section>
+  <div class="sechead"><span class="secnum">03</span><h2>The pipeline</h2></div>
+  <p class="lede">Seven stages. Left edge colour marks the kind of component:
+  <span style="color:var(--burnt);font-weight:600">novel</span>,
+  <span style="color:var(--mg);font-weight:600">frozen retrieval</span>,
+  <span style="color:var(--teal);font-weight:600">adapted standard</span>.
+  The right column is the cost that stage pays.</p>
+
+  <div class="pipe">
+    <div class="stage novel">
+      <div class="badge">IN</div>
+      <div>
+        <h4>Sequence + ionic condition</h4>
+        <p>L nucleotides, vocab 5 (A C G U N), L ≤ 4096 — plus
+        <b>c<sub>ion</sub> = ([Mg²⁺], [K⁺], [Na⁺], T, pH)</b> as a FiLM-style conditioning
+        vector. The same sequence at 0 mM and 10 mM Mg²⁺ must predict differently.
+        No existing RNA predictor accepts this input.</p>
+      </div>
+      <div class="cost"><b>novel input</b>MSA optional<br>probing optional</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage plain">
+      <div class="badge">A</div>
+      <div>
+        <h4>Token trunk — hybrid mixers + MoE</h4>
+        <p>32 blocks at d=768, repeating period-8:
+        <span class="mono">[GDN GDN SWA GDN GDN SWA GDN FULL]</span>.
+        Gated DeltaNet carries 20 blocks, sliding-window 8, full attention only 4 — because
+        A-form helix is locally periodic and low-information, while junctions and pseudoknots
+        are rare but need global mixing.</p>
+      </div>
+      <div class="cost q"><b>8× cheaper</b>67M vs 537M<br>pair evals @ L=4096</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage novel">
+      <div class="badge">A′</div>
+      <div>
+        <h4>Physics-biased attention</h4>
+        <p class="mono" style="font-size:12.5px;background:var(--sunk);padding:10px;border-radius:2px;margin-bottom:8px">
+        A<sub>ij</sub> = Q<sub>i</sub>K<sub>j</sub>ᵀ/√d + B<sub>wc</sub> + B<sub>elec</sub>(c<sub>ion</sub>) + B<sub>motif</sub> + A<sup>(l−1)</sup></p>
+        <p>B<sub>elec</sub> = −λ q²<sub>eff</sub> ℓ<sub>B</sub> exp(−κd<sub>ij</sub>)/d<sub>ij</sub>, with Manning
+        condensed fraction θ = 1 − 1/(zξ) ≈ 0.76 and Debye κ from ionic strength. Only λ is
+        learned. <b>This is how salt reaches the logits.</b></p>
+      </div>
+      <div class="cost"><b>closed form</b>ℓ<sub>B</sub> ≈ 7.1 Å @ 298 K<br>θ ≈ 0.76 monovalent</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage plain">
+      <div class="badge">A″</div>
+      <div>
+        <h4>Mixture-of-experts feed-forward</h4>
+        <p>32 fine-grained routed experts (d<sub>ff</sub>=512) + 2 always-on shared, top-4 →
+        6 active of 34. Watson–Crick helix lives in a <i>shared</i> expert so the routed 32
+        never relearn it. Balancing is auxiliary-loss-free — 5S rRNA alone is 5,976 BGSU
+        clusters, so a balance loss would fight the biology. <b>The router reads structural
+        regime, not sequence.</b></p>
+      </div>
+      <div class="cost"><b>6 / 34 active</b>every 2nd block<br>bias-based balancing</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage novel">
+      <div class="badge">B</div>
+      <div>
+        <h4>Adaptive sparse pair track</h4>
+        <p>Propose candidates in O(Lw) without materialising L×L → keep K = 32L → sparse
+        triangle updates on the induced subgraph → re-select every recycle, so top-K is a
+        revisable commitment rather than a hard prune.</p>
+      </div>
+      <div class="cost q"><b>1.56% of dense</b>16.8 MB not 1.07 GB<br>@ L=2048</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage frozen">
+      <div class="badge">C</div>
+      <div>
+        <h4>Motif KV bank — frozen</h4>
+        <p>667 RNA 3D Motif Atlas classes distilled from 4,992 instances (7.5:1). Keys encode
+        the non-canonical interaction graph; values encode internal geometry. With only 6,661
+        structurally-resolved sequences, the model cannot reliably <i>learn</i> motif
+        geometry — so it is handed the geometry and learns only <b>where</b> motifs go.</p>
+      </div>
+      <div class="cost"><b>~10³ entries</b>fixed, batch-shared<br>cost negligible</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage novel">
+      <div class="badge">D</div>
+      <div>
+        <h4>Physics module — the Hamiltonian</h4>
+        <p class="mono" style="font-size:12.5px;background:var(--sunk);padding:10px;border-radius:2px;margin-bottom:8px">
+        E = E<sub>stack</sub> + E<sub>pair</sub> + E<sub>elec</sub><sup>implicit</sup> + E<sub>Mg</sub><sup>explicit</sup> + E<sub>excl</sub> + E<sub>rigid</sub></p>
+        <p>Implicit Manning screening for monovalent K⁺; explicit Mg²⁺ with an
+        <b>inner/outer-sphere classifier</b>, because the coordination <i>mode</i> — not the
+        ion's presence — drives folding transitions. E<sub>rigid</sub> is where Finding 2
+        enters the geometry.</p>
+      </div>
+      <div class="cost"><b>hybrid split</b>implicit K⁺<br>explicit Mg²⁺</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage plain">
+      <div class="badge">E</div>
+      <div>
+        <h4>Heads</h4>
+        <p>Secondary structure · contact &amp; distance maps · <b>Mg²⁺ sites with
+        inner/outer class</b> · <b>per-nucleotide rigidity</b> · SHAPE/DMS reactivity · 3D
+        coordinates. The two bold heads are supervised by labels sitting inside every mmCIF
+        the field already downloads, and used by no current predictor.</p>
+      </div>
+      <div class="cost"><b>2 free channels</b>17,428 Mg²⁺ sites<br>from 180 structures</div>
+    </div>
+    <div class="connector"></div>
+
+    <div class="stage plain">
+      <div class="badge">F</div>
+      <div>
+        <h4>Structure decoder</h4>
+        <p>Frame-based diffusion to all-atom coordinates. An explicit geometric and energetic
+        stage is retained rather than going fully generative — trRosettaRNA's
+        restraint-then-fold approach (0.548) still outscores AlphaFold3's raw-atom
+        diffusion (0.510), and CASP16 was won by physics-plus-ML hybrids.</p>
+      </div>
+      <div class="cost"><b>TM ≈ 0.55</b>is the field ceiling<br>to beat</div>
+    </div>
+  </div>
+
+  <div class="recycle">↻ RECYCLE ×3 — B<sub>elec</sub> needs a distance estimate to evaluate, so it is
+  disabled at recycle 0 and enabled from recycle 1 using the current predicted distance map.
+  Recycling is structural to the design, not an optimisation.</div>
+</section>
+
+<!-- ================= 4. BUDGET ================= -->
+<section>
+  <div class="sechead"><span class="secnum">04</span><h2>Parameter budget</h2></div>
+  <p class="lede">PHAROS-Base against NucleicBERT, the dense 404M model this is meant to
+  supersede. More capacity, slightly less active compute.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Component</th><th class="num">Total</th><th class="num">Active</th></tr></thead>
+      <tbody>
+        <tr><td>Embeddings (vocab 5)</td><td class="num">0.01M</td><td class="num">0.01M</td></tr>
+        <tr><td>Attention — 32 blocks, d=768</td><td class="num">75.5M</td><td class="num">75.5M</td></tr>
+        <tr><td>MoE FFN — 16 blocks × 34 experts</td><td class="num">642M</td><td class="num">113M</td></tr>
+        <tr><td>Dense FFN — 16 non-MoE blocks</td><td class="num">113M</td><td class="num">113M</td></tr>
+        <tr><td>Sparse pair track + triangle updates</td><td class="num">45M</td><td class="num">45M</td></tr>
+        <tr><td>Motif bank, heads, decoder</td><td class="num">35M</td><td class="num">35M</td></tr>
+        <tr class="total"><td>PHAROS-Base</td><td class="num">~911M</td><td class="num">~382M</td></tr>
+        <tr><td>NucleicBERT (dense, all active)</td><td class="num">404M</td><td class="num">404M</td></tr>
+        <tr class="total"><td>Difference</td><td class="num"><span class="delta">2.3× capacity</span></td><td class="num"><span class="delta">0.95× compute</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 5. CLAIMS ================= -->
+<section>
+  <div class="sechead"><span class="secnum">05</span><h2>Novelty claims</h2></div>
+  <div class="claims">
+    <div class="claim"><div class="what">Ionic conditions as a model input, reaching attention logits via a Manning-screened Coulomb bias</div><div class="status">No existing RNA structure predictor accepts ionic conditions.</div></div>
+    <div class="claim"><div class="what">First sparse-MoE architecture for RNA structure</div><div class="status">AIDO.Protein is MoE for protein; no RNA equivalent exists.</div></div>
+    <div class="claim"><div class="what">O(L) sparse pair track justified by measured contact scaling</div><div class="status">AlphaFold3 and Rhoformer are dense O(L²).</div></div>
+    <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
+    <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
+    <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere.</div></div>
+  </div>
+</section>
+
+<!-- ================= 6. RISKS ================= -->
+<section>
+  <div class="sechead"><span class="secnum">06</span><h2>What could sink it</h2></div>
+  <div class="risks">
+    <div class="risk"><span class="n">R1</span><p><b>Proposal recall ceiling.</b> A contact never proposed can never be predicted. Recall must be reported per length bin — silently dropping 5% of contacts would be an invisible accuracy ceiling.</p></div>
+    <div class="risk"><span class="n">R2</span><p><b>Ionic metadata is sparse and inconsistent.</b> mmCIF records crystallisation conditions unevenly. The ion-conditioned training stage may have far fewer usable labels than hoped. <b>This needs an audit before the stage is committed to — currently open.</b></p></div>
+    <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~76% of backbone charge is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
+    <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs left only 31 of 137 parsed structures usable.</p></div>
+    <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
+    <div class="risk"><span class="n">R6</span><p><b>Evaluation honesty.</b> Any improvement claim must be made on blind sets (CASP15/16, RNA-Puzzles), never on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.</p></div>
+  </div>
+</section>
+
+<footer>
+  <span>PHAROS v0.1 · design specification</span>
+  <span>Measurements: 180 BGSU NR structures ≤3.0 Å</span>
+  <span>No model trained · no performance claimed</span>
+</footer>
+</div>

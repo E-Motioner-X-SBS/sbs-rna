@@ -34,7 +34,9 @@ Across 117 chains, contacts per nucleotide *saturates* while density collapses:
 Median 4.40 contacts/nt, p95 5.42, max 5.50 — bounded by RNA's coordination
 geometry, independent of length. A dense L×L pair track spends >99% of its
 compute on empty space, and at L=2048 would need **309 GB** of activations.
-=> *Sparsity is the ground truth, not an approximation.*
+=> *Sparsity is the ground truth, not an approximation.* But **how** you exploit
+it matters: a flat top-K proposal was measured and fails on long chains (§5.1);
+contacts must be selected as **blocks**, not pairs (§5.2).
 
 **Fact 3 — Ion coordination and local rigidity are the same phenomenon.** **[measured]**
 Normalised B-factor vs distance to nearest Mg²⁺, 24,623 nt in 31 X-ray structures:
@@ -73,9 +75,10 @@ sequence + ionic condition
         |
  [A] Token Trunk  - 32 hybrid blocks, MoE FFN, physics-biased attention   O(L)
         |
- [B] Pair Proposal - cheap O(L w) pairing -> select K = 32L candidates
+ [B] Coarse block map - DENSE at b=16, only 0.4% of dense pair cost
         |
- [C] Sparse Pair Track - sparse triangle updates on K edges               O(K)
+ [C] Hierarchical Pair Track - refine occupied blocks b=16 -> b=4 -> pairs
+        |     effective c ~ 17 on long chains, 2.2% of dense total
         |         ^
         |         +-- [D] Motif KV Bank (frozen retrieval, 667 classes)
         |
@@ -203,37 +206,103 @@ context.
 
 ---
 
-## 5. [B]+[C] Adaptive Sparse Pair Track (ASPT)
+## 5. [B]+[C] Hierarchical Pair Track (HPT)
 
-The main efficiency contribution, justified by Fact 2.
+> **Revised in session 1 after the flat design was measured and failed.**
+> The original specification used a flat top-K proposal keeping K = 32L edges.
+> That design is **retained only as a fallback for short chains**; see §5.1.
 
-**Step 1 — cheap pairing proposal.** From the trunk output, compute a low-rank
-outer product plus a Turner nearest-neighbour prior to score candidate pairs in
-O(L·w) for local pairs plus a global top-k scan. No L×L tensor is ever
-materialised.
+### 5.1 The flat top-K design was tested and does not scale [measured]
 
-**Step 2 — select K = c·L candidates**, c = 32 by default.
-Observed requirement is 4.40 contacts/nt (p95 5.42, max 5.50) **[measured]**, so
-c=32 gives **~6x headroom** over the worst chain we measured. At L=2048 this is
-65,536 edges = **1.56% of dense**, 16.8 MB per tensor instead of 1.07 GB.
+`scripts/sampling/validate_proposal_recall.py` scored every pair with a
+sequence-only proposer (ERNIE-RNA pair prior + stacking context + exponential
+sequence-distance decay) and measured recall of true 3D contacts in the top
+K = 32L:
 
-**Step 3 — sparse triangle updates.** AF3's triangle attention enforces the
-triangle inequality on the pair graph. We run the same updates but restricted to
-the induced subgraph on K edges. Triangles are formed only among retained
-candidates, which is where the structural signal lives anyway.
+| Chain length | n | mean recall @ c=32 | K as % of dense |
+|---|---|---|---|
+| 32-100 | 29 | 0.980 | 59.4% |
+| 100-200 | 6 | 0.642 | 25.5% |
+| 200-500 | 3 | 0.307 | 9.0% |
+| 500-1200 | 5 | **0.200** | 4.7% |
 
-**Step 4 — re-selection each recycle.** Candidates are re-scored after every
-recycle, so a contact missed initially can be recovered. This makes the top-K a
-soft, revisable commitment rather than a hard early prune.
+A **random** scorer reaches mean recall 0.746 at c=32 across the same set,
+because on short chains 32L already covers most of the map. The flat proposer's
+apparent 0.795 mean is therefore almost entirely an artefact of short chains.
+**On long chains, where sparsity actually matters, it recovers one contact in
+five.** That is a fatal, silent accuracy ceiling.
 
-**Failure mode and mitigation**: if the true contact is never proposed, it can
-never be predicted. Mitigation is (a) the 6x headroom, (b) re-selection each
-recycle, (c) a recall-oriented auxiliary loss on the proposal stage specifically
-penalising missed true contacts. **Proposal recall is an explicit metric to
-report** — a sparse track that quietly drops 5% of true contacts would be a
-silent accuracy ceiling, and must be measured, not assumed.
+A banded fallback does not rescue it. Contacts are not local enough
+(`analyze_contact_separation.py`, fraction of contacts within |i-j| <= band):
 
----
+| Band | L 500-1500 | L 1500-3000 |
+|---|---|---|
+| 32 | 0.413 | 0.350 |
+| 64 | 0.562 | 0.479 |
+| 128 | 0.694 | 0.597 |
+| 256 | 0.832 | 0.706 |
+| 512 | 0.956 | **0.812** |
+
+Median contact separation on long chains is 78 nt with a long tail; even a
++/-512 band misses 19%.
+
+### 5.2 The fix: contacts are strongly *clustered*, so select blocks not pairs
+
+Helical stems are contiguous anti-diagonal runs, so contacts occupy very few
+*blocks* even though they are spread along the sequence. Measured block
+occupancy (`analyze_block_sparsity.py`, 69 chains):
+
+| Chain length | median L | b=4 occupancy | effective c at b=4 |
+|---|---|---|---|
+| 64-200 | 88 | 16.34% | 7.9 |
+| 200-500 | 393 | 6.87% | 12.6 |
+| 500-1500 | 1038 | 3.17% | 14.8 |
+| 1500-3000 | 2861 | **1.34%** | **17.2** |
+
+**Occupancy falls as chains get longer** — the mechanism gets *more* effective
+at exactly the lengths where the flat design failed. Keeping every occupied
+4x4 block costs an effective c of only ~17, *below* the flat budget of 32,
+while capturing 100% of contacts by construction.
+
+### 5.3 Three-level coarse-to-fine track
+
+| Level | Operation | Cost (L=2861) |
+|---|---|---|
+| L1 | **dense** pair map at block size b=16 | 0.396% of dense |
+| L2 | refine occupied b=16 blocks to b=4 | 0.460% of dense |
+| L3 | refine occupied b=4 blocks to pairs | 1.346% of dense |
+| | **total** | **2.202% of dense** |
+
+Compare the flat design: 1.118% of dense at c=32, but ~20% recall. **For roughly
+2x the cost we move from a hard 20% ceiling to a recall limited only by
+block-level detection.**
+
+Why this is easier to learn: identifying whether a 16x16 block contains *any*
+contact aggregates 256 pair-decisions into one, so the signal-to-noise ratio at
+the coarse level is far higher than for individual pair ranking. The model never
+has to rank 4.1M individual pairs; it ranks 32k blocks, then 16 sub-blocks
+inside each survivor.
+
+The L1 map is genuinely dense and therefore has **no recall loss at all** at the
+coarse level — at L=4096 and b=16 it is only 65k entries. Recall loss can only
+enter at the *selection thresholds*, which are tunable and can be set
+recall-first (keep any block above a low probability), trading a little compute
+for coverage.
+
+### 5.4 What is still unproven
+
+The measurements establish that the *information* is there: contacts are
+clustered enough that block selection is viable, and the cost is affordable.
+They do **not** establish that a trained model will identify occupied blocks
+accurately — that requires training. The relevant external evidence is
+ERNIE-RNA's zero-shot Top-L/1 contact precision of 0.68 from attention maps
+alone, which suggests learned representations rank contacts far better than the
+sequence-only heuristic tested in §5.1.
+
+**Block-detection recall must be reported per length bin and per level.** This
+remains risk R1, but it is now a *measurable, bounded* risk attached to a
+mechanism with a 100% ceiling, rather than an unbounded one attached to a
+mechanism with a measured 20% ceiling.
 
 ## 6. [D] Motif KV bank — retrieval instead of memorisation
 
@@ -376,15 +445,18 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 |---|---|---|
 | 1 | **Ionic condition as a model input**, reaching attention logits via a Manning-screened Coulomb bias | **No existing RNA structure predictor accepts ionic conditions.** |
 | 2 | First **sparse-MoE** architecture for RNA structure | AIDO.Protein is MoE for protein; no RNA equivalent |
-| 3 | **O(L) sparse pair track** justified by measured contact scaling | AF3/Rhoformer are dense O(L²) |
+| 3 | **Hierarchical coarse-to-fine pair track** selecting blocks not pairs, justified by measured 1.34% block occupancy | AF3/Rhoformer are dense O(L²); flat top-K sparsification measured here to fail at ~20% recall on long chains |
 | 4 | **Frozen motif KV bank** as retrieval-based geometry prior | Motif Atlas is published but wired into no large model |
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
 
 ## 12. Risks and open questions
 
-1. **Proposal recall ceiling.** If ASPT's proposal stage misses true contacts,
-   nothing downstream recovers them. Must be measured explicitly per length bin.
+1. **Block-detection recall.** Superseded but not eliminated. The flat top-K
+   design was measured at ~20% recall on long chains and replaced (§5.1-5.3).
+   The hierarchical track has a 100% recall *ceiling* by construction, but
+   whether a trained model hits it is unproven. Block-detection recall must be
+   reported per length bin and per level.
 2. **Ionic metadata sparsity.** mmCIF records crystallisation conditions
    inconsistently. Stage 5 may have far fewer usable ionic labels than hoped —
    needs an audit before committing to that stage. **Open.**
