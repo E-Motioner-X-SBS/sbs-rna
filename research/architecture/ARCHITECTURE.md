@@ -537,6 +537,68 @@ structures stratified by ionic condition) is not viable on PDB data alone** and
 is rewritten accordingly: it becomes conditioning on *probing titrations*, with
 deposited structures supplying only site-level supervision.
 
+## 7c. Stiffness Encoder — learned, not tabulated [measured]
+
+The physics module's `E_rigid` term needs local force constants. Two ways to
+supply them, and the measurement settles it.
+
+### The data
+`_ndb_struct_na_base_pair_step` gives the 6 deformation coordinates (shift,
+slide, rise, tilt, roll, twist) for every annotated step. We extracted
+**103,964 steps across 155 structures** and derived covariance-based stiffness
+matrices `F = kT C^-1` for 76 dinucleotide contexts (n >= 200).
+
+Validation: Watson-Crick means reproduce canonical A-form RNA (GG/CC rise 3.14 A
+twist 29.98; AU/AU rise 2.81 twist 33.94; reference ~2.8-3.1 A, ~32 deg).
+**Stiffness spans 134x** between the stiffest (UG/UG, twist sd 11.5 deg) and
+floppiest (AA/UA, 102 deg) contexts, and GC content predicts rigidity
+(Pearson -0.314 with twist sd).
+
+### Why a lookup table is the wrong design
+
+| Model | conditioning | NLL (nats/step) |
+|---|---|---|
+| M0 | none | 19.724 |
+| M1 | sequence context = **a lookup table** | 17.579 |
+| M2 | sequence x structural context | **14.551** |
+| — | structural context alone | 17.847 |
+
+**Structural context contributes more than sequence context** (+3.028 vs +2.144
+nats), using only a 2-bit structural descriptor. A dinucleotide table captures
+under half the available signal, and covers only 86.7% of steps — the 13,866
+uncovered steps being the structurally unusual ones that matter most.
+
+This is the same lesson as the GNRA negative result (§1, Fact 3-adjacent):
+**sequence context alone does not determine local structural behaviour.**
+
+### The design
+
+A **stiffness encoder** head consumes the trunk representation and the pair
+representation at each step and emits:
+- `mu_i` in R^6 — the expected deformation
+- `F_i`, a 6x6 **positive-definite precision matrix**, parameterised via a
+  Cholesky factor `L_i` with `F_i = L_i L_i^T` so positive-definiteness is
+  structural rather than penalised.
+
+Trained by Gaussian negative log-likelihood of the observed deformation:
+
+```
+L_stiff = sum_i [ 0.5 (x_i - mu_i)^T F_i (x_i - mu_i) - 0.5 log det F_i ]
+```
+
+The `log det F` term is load-bearing: without it the degenerate optimum is
+`F -> 0` — declare everything floppy and pay nothing. With it, confidence must
+be earned.
+
+**Acceptance criterion**: the encoder must reach below **14.551 nats/step** on
+held-out structures. Above **17.579** it is worse than a lookup table and the
+component should be cut.
+
+`F_i` then *is* the local force-constant field for `E_rigid`, conditioned on
+structure rather than retrieved by sequence — and it composes with the measured
+Mg²⁺/rigidity coupling (§1, Fact 3), since ion proximity is part of the
+structural context the encoder sees.
+
 ## 8. [F]+[G] Heads and decoder
 
 | Head | Output | Supervision | Labels available |
@@ -607,6 +669,87 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 
 ---
 
+## 10b. Training: making it affordable without compromising the model
+
+NucleicBERT used **192 A100s** densely. That is the bar to get under, and the
+efficiency literature offers enough to do it.
+
+### 10b.1 Optimiser — Muon
+
+**Muon** orthogonalises gradient momentum via Newton-Schulz iterations before
+applying it. Reported: **~2x compute efficiency vs AdamW**, matching quality at
+**~52% of training FLOPs**, with ~33% memory saving. Critically for us it is
+already validated on an **MoE** model at scale (Moonlight, 3B/16B, 5.7T tokens)
+and is in production use (Kimi K2).
+
+- Applies to 2D matrix parameters — for PHAROS that is the expert FFNs and
+  attention projections, i.e. the overwhelming majority of parameters.
+- Embeddings, norms, biases and scalars stay on AdamW.
+- **Honest caveat**: Muon needs *fewer steps* but each step costs more
+  (Newton-Schulz is cubic). The net win favours large hidden dimensions; it must
+  be benchmarked on our actual shapes before being assumed.
+
+### 10b.2 The DeepSeek-V3 stack, filtered for what actually transfers
+
+| Technique | Verdict for PHAROS |
+|---|---|
+| **FP8 mixed precision** | **Adopt.** <0.25% loss error vs BF16 at 671B scale; block/tile quantisation with selective high-precision accumulation. Largest single memory/throughput win. |
+| **Auxiliary-loss-free load balancing** | **Already in the design** (§4.3). Essential here because 5S rRNA is 5,976 of the 3D clusters, so a balance *loss* would fight the biology. |
+| **DualPipe** | **Defer.** Only pays once the model spans nodes. |
+| **Multi-head Latent Attention** | **Skip.** Largely redundant — 20 of our 32 blocks are already linear attention, so the KV cache is small by construction. |
+| **Multi-token prediction** | **Adapt, don't copy.** MTP is defined for causal LMs; our objective is span-masked. The analogue is predicting a whole masked *span* jointly rather than independently per position. Worth an ablation, not a commitment. |
+
+### 10b.3 Looped refinement is structural, not an add-on
+
+AlphaFold2 recycles 3x by default (swept 0-10 in the literature; some pipelines
+iterate to convergence). For PHAROS recycling is **required by the physics**:
+`B_elec` needs a distance estimate `d_ij`, which does not exist on the first
+pass. It is disabled at recycle 0 and enabled from recycle 1 onward.
+
+Two consequences worth stating:
+1. **Weight sharing across cycles buys accuracy at zero parameter cost** —
+   valuable given 6,661 unique 3D sequences.
+2. Gradients need flow only through the final cycle (AF2's approach), so
+   recycling costs one cycle of activation memory, not N.
+
+### 10b.4 The full physics-guided objective
+
+```
+L = L_MLM + L_2D + L_contact + L_dist
+  + lambda_1 * L_stiff        (Gaussian NLL, learned precision F_i -- §7c)
+  + lambda_2 * L_Mg           (site + inner/outer class; 44,708 curated labels)
+  + lambda_3 * L_elec         (Manning-screened Coulomb consistency)
+  + lambda_4 * L_violation    (steric clash, bond geometry)
+  + lambda_5 * L_flex         (B-factor / RMSF, and unmodelled-residue labels)
+```
+
+Precedent that this helps rather than hurts: **OpenMM-Loss** implements MD
+potential energy as a differentiable loss for AlphaFold2 and reports *comparable
+accuracy with lower potential energy and better MolProbity scores*. Physics terms
+improve structural quality without costing accuracy.
+
+**Where each label comes from — all of it already in the mmCIF files:**
+
+| Term | Source | Volume (180 structures) |
+|---|---|---|
+| `L_stiff` | `_ndb_struct_na_base_pair_step` | **103,964 annotated steps** |
+| `L_Mg` | `_struct_conn` `metalc` | **44,708 Mg²⁺ coordination records** |
+| `L_flex` | B-factors + `_pdbx_unobs_or_zero_occ_residues` | **143,871 unobserved-residue records** |
+| motif vocabulary | Saenger `hbond_type_28` / LW `hbond_type_12` | **29 Saenger classes** |
+| `L_elec` | closed form from `c_ion` | no labels needed |
+
+None of this required new data acquisition. It was sitting unused in files the
+field already downloads.
+
+### 10b.5 Force-field grounding
+
+For `L_violation` and any MD-based refinement, the current best RNA parameter
+sets are **AMBER χOL3** (standard; revised dihedrals improved agreement with PDB
+conformer populations) and **HB-CUFIX** (2025), which outperforms χOL3 and ROC
+against NMR and SAXS on single-stranded oligonucleotides. Turner
+nearest-neighbour free energies remain the reference for 2D thermodynamics and
+already initialise `B_wc` (§4.2).
+
 ## 11. Novelty claims, stated precisely
 
 | # | Claim | Prior art status |
@@ -617,6 +760,8 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 | 4 | **Frozen motif KV bank** as retrieval-based geometry prior | Motif Atlas is published but wired into no large model |
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
+| 8 | **Learned stiffness encoder** emitting a per-step 6x6 precision matrix trained by Gaussian NLL, replacing a tabulated force field | Nucleic-acid elasticity uses fixed per-context stiffness tables; measured here to capture <half the signal (14.551 vs 17.579 nats/step) |
+| 9 | **Physics labels mined from unused mmCIF categories** — 103,964 step geometries, 44,708 curated Mg²⁺ coordinations, 143,871 disorder records | These categories ship with every RNA structure and are used by no structure predictor |
 | 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature) | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth. *Motivated by the literature and by measured between-family variance (0.333-1.000); our own depth split is weak evidence (Spearman +0.224, n=12)* |
 
 ## 12. Risks and open questions

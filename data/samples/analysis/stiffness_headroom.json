@@ -1,0 +1,14 @@
+{
+  "total_steps": 103964,
+  "M0_global_nll": 19.7235,
+  "M1_sequence_context_nll": 17.5792,
+  "M1_groups": 76,
+  "M1_steps": 90098,
+  "M2_sequence_x_structure_nll": 14.551,
+  "M2_groups": 82,
+  "M2_steps": 78076,
+  "Mstruct_only_nll": 17.847,
+  "gain_sequence_over_global": 2.1443,
+  "gain_structure_over_sequence": 3.0282,
+  "gain_structure_only_over_global": 1.8765
+}

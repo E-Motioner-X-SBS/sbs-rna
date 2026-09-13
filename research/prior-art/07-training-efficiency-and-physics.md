@@ -1,0 +1,189 @@
+# Prior Art 7 — Efficient Training, and Physics That Can Guide It
+
+The architecture is only useful if it can actually be trained. NucleicBERT used
+**192 A100s** densely; that is not reproducible for this project. This surveys
+what the efficiency literature offers, and what physics can be folded into the
+training objective.
+
+## 7.1 Muon — the single biggest optimiser win available
+
+**Muon** (MomentUm Orthogonalized by Newton-Schulz) maintains SGD-style momentum
+on 2D weight matrices, then applies Newton-Schulz iterations to approximate the
+polar decomposition — i.e. it *orthogonalises the gradient momentum* before
+applying it.
+
+| Property | Value |
+|---|---|
+| Compute efficiency vs AdamW | **~2x** at compute-optimal training |
+| FLOPs to match AdamW quality | **~52%** |
+| Memory saving | ~33% |
+| Demonstrated at scale | **Moonlight**, a 3B/16B **MoE** model, 5.7T tokens |
+| Production use | Kimi K2 |
+
+**Why it matters here specifically**: Moonlight is a *Mixture-of-Experts* model,
+so Muon is already validated on the exact architecture class PHAROS uses. A ~2x
+FLOP reduction is the difference between "needs a national facility" and "needs a
+modest cluster".
+
+**The catch, stated honestly**: Muon needs *fewer optimizer steps* to reach a
+given loss, but **each step is more expensive** — Newton-Schulz is a cubic matrix
+operation. The net win depends on the ratio of optimiser overhead to forward/
+backward cost, which is favourable for large hidden dimensions and less so for
+small ones. The quintic Newton-Schulz iteration runs in bfloat16 on GPU.
+
+**Scope**: Muon applies to 2D matrix parameters. Embeddings, biases, norms and
+scalar parameters stay on AdamW. For PHAROS the expert FFN matrices and attention
+projections — the overwhelming majority of parameters — are Muon-eligible.
+
+## 7.2 The DeepSeek-V3 efficiency stack
+
+DeepSeek-V3 trained a 671B-parameter MoE on **14.8T tokens for 2.788M H800
+GPU-hours** (~$5-6M). The techniques are individually adoptable:
+
+| Technique | What it does | Applicability to PHAROS |
+|---|---|---|
+| **FP8 mixed precision** | all major GEMMs in FP8, with block/tile quantisation and selective high-precision accumulation. **<0.25% loss error vs BF16** | directly applicable; the single largest memory/throughput win |
+| **DualPipe** | pipeline parallelism with near-total computation-communication overlap, few bubbles | applicable once the model spans nodes |
+| **Auxiliary-loss-free load balancing** | per-expert bias adjusted each step instead of a competing loss term | **already in the PHAROS design** (§4.3) |
+| **Multi-head Latent Attention (MLA)** | compresses the KV cache | partially redundant — PHAROS already uses linear attention for 20/32 blocks |
+| **Multi-token prediction (MTP)** | predicts several tokens ahead; improves quality *and* enables speculative decoding | adaptable: predict masked *spans*, matching the span-masking objective |
+
+**The honest read**: FP8 and aux-loss-free balancing transfer cleanly. MLA is
+largely redundant against our hybrid attention. DualPipe only matters at
+multi-node scale. MTP is interesting but needs reinterpretation for a masked
+rather than causal objective.
+
+## 7.3 Looped / recycled refinement
+
+AlphaFold2's **recycling** feeds the pair representation, single representation
+and predicted structure back into the network, by default **3 times**; studies
+have swept 0-10 cycles and some pipelines iterate "until no further improvement
+is detectable". It is a genuine accuracy mechanism, not just an inference trick.
+
+**For PHAROS recycling is structural, not optional.** The electrostatic attention
+bias `B_elec` requires a distance estimate `d_ij` to evaluate. It cannot be
+computed on the first pass, so it is disabled at recycle 0 and enabled from
+recycle 1 using the current predicted distance map. Each cycle sharpens the
+geometry, which sharpens the physics term, which sharpens the geometry.
+
+Two consequences:
+1. **Weight sharing across cycles** means recycling buys accuracy at *zero*
+   parameter cost — attractive given our data scarcity.
+2. Gradients need only flow through the final cycle (AF2's approach), so the
+   memory cost of recycling is one cycle, not N.
+
+## 7.4 Physics that can guide training
+
+### (a) Energy as a differentiable loss — the established route
+**OpenMM-Loss** implements the potential energy of a predicted structure as a
+PyTorch loss, feeding molecular-dynamics forces in as gradients for AlphaFold2.
+Result: **comparable accuracy with lower potential energy and better MolProbity
+scores**. This is the key precedent — physics terms improve *structural quality*
+without costing accuracy.
+
+### (b) RNA force fields
+- **AMBER χOL3** (ff99bsc0χOL3) is the standard RNA parameter set; the revised
+  dihedral parameters improved agreement with PDB conformer populations.
+- **HB-CUFIX** (2025) compares against NMR and SAXS on single-stranded
+  oligonucleotides and **outperforms χOL3 and ROC**, giving near-experimental
+  accuracy for sequence-dependent structural preferences.
+- **Turner nearest-neighbour** free energies remain the reference for secondary
+  structure thermodynamics.
+
+### (c) **Measured base-pair-step stiffness — our own contribution**
+This is the term the literature does *not* already provide in usable form.
+From `_ndb_struct_na_base_pair_step` across 155 structures we extracted
+**103,964 annotated steps** and derived covariance-based stiffness matrices
+`F = kT C^-1` for **76 dinucleotide contexts** with n >= 200.
+
+Validation — the Watson-Crick means reproduce canonical A-form RNA:
+
+| Context | n | rise (A) | twist (deg) | slide (A) |
+|---|---|---|---|---|
+| GG/CC | 7,558 | 3.14 | 29.98 | -1.69 |
+| GC/GC | 5,902 | 3.11 | 33.41 | -1.51 |
+| AA/UU | 1,811 | 3.01 | 30.59 | -1.48 |
+| AU/AU | 1,506 | 2.81 | 33.94 | -1.58 |
+
+(reference A-form RNA: rise ~2.8-3.1 A, twist ~32 deg, slide ~-1.5 A)
+
+Findings:
+- **Stiffness spans 134x** across contexts. Stiffest UG/UG (twist sd 11.5 deg);
+  floppiest AA/UA (102 deg) — the floppy end is dominated by non-canonical
+  contexts, exactly as expected.
+- **GC content predicts rigidity**: Pearson(GC fraction, twist sd) = **-0.314**,
+  roll sd -0.298, over 76 contexts. More hydrogen bonds and better stacking give
+  a stiffer step.
+
+### (c2) Do NOT hard-code this as a lookup table — learn it [measured]
+
+The obvious implementation is a 76-entry table keyed on dinucleotide context.
+**That is the same mistake the GNRA result already disproved**: sequence context
+alone is a weak predictor of rigidity. We measured the headroom directly by
+fitting Gaussians over the 6 step coordinates and comparing mean negative
+log-likelihood per step (`measure_stiffness_headroom.py`, 103,964 steps):
+
+| Model | conditioning | NLL (nats/step) | gain |
+|---|---|---|---|
+| M0 | none (one global Gaussian) | 19.724 | — |
+| M1 | **sequence context** (what a lookup table achieves) | 17.579 | 2.144 |
+| M2 | **sequence x structural context** | **14.551** | **+3.028 further** |
+| — | structural context *alone*, ignoring sequence | 17.847 | 1.877 |
+
+**Structural context buys more than sequence context does** (3.028 vs 2.144
+nats), and structure alone is nearly as informative as sequence alone. A
+dinucleotide lookup table therefore captures **less than half** the available
+signal — and this is with only a crude 2-bit structural descriptor (is the pair
+canonical? is it inside a helical run of >= 4?). A learned encoder with the full
+representation should do better still.
+
+The table also has a coverage hole: only 76 contexts reach n >= 200, covering
+90,098 of 103,964 steps (**86.7%**). The remaining 13,866 steps — the unusual,
+most structurally interesting ones — get no entry at all. An encoder generalises
+to them; a table cannot.
+
+### (c3) The resulting objective
+
+Replace the table with a **stiffness encoder** that emits, per step, a mean
+`mu_i` and a positive-definite precision `F_i` (parameterised through a Cholesky
+factor so positive-definiteness is structural). Train it by the Gaussian negative
+log-likelihood of the observed deformation:
+
+```
+L_stiff = sum_i [ 0.5 (x_i - mu_i)^T F_i (x_i - mu_i) - 0.5 log det F_i ]
+```
+
+The `log det F` term is essential: without it the trivial solution is `F -> 0`
+(declare everything floppy, pay no penalty). With it, the model is rewarded for
+*confident* predictions only where the data actually supports them.
+
+At inference `F_i` is exactly the local harmonic force-constant field that
+`E_rigid` needs, now conditioned on structure rather than looked up by sequence.
+
+**Benchmarks the encoder must beat**: 17.579 nats/step (sequence table) and
+14.551 nats/step (sequence x crude structure). Anything above the first is worse
+than a lookup table and the design should be abandoned.
+
+### (d) Other free supervision found in the same files
+- **`_struct_conn` `metalc`**: **44,708 curated Mg²⁺ coordination records**
+  (plus 7,009 K⁺, 1,367 Zn²⁺), with coordinating atoms ranked
+  OP2 > OP1 > O6 > O4 > O2' > N7 — independently reproducing our
+  distance-based finding that phosphate oxygens dominate.
+- **Saenger 28-class / Leontis-Westhof 12-class** base-pair annotations:
+  **29 Saenger classes present**, giving a ready-made non-canonical interaction
+  vocabulary for the motif machinery.
+- **`_pdbx_unobs_or_zero_occ_residues`**: **143,871 records** of unmodelled
+  residues — regions too disordered to resolve, i.e. a free maximal-flexibility
+  label complementary to B-factors.
+
+## Sources
+- Muon is Scalable for LLM Training (Moonlight) https://arxiv.org/pdf/2502.16982
+- Muon repo https://github.com/MoonshotAI/Moonlight
+- Muon original note (Keller Jordan) https://kellerjordan.github.io/posts/muon/
+- DeepSeek-V3 Technical Report https://arxiv.org/pdf/2412.19437
+- DeepSeek-V2 (MLA) https://arxiv.org/pdf/2405.04434
+- AlphaFold2 recycling / ReFOLD https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10290552/
+- OpenMM-Loss: MD forces as deep learning gradients https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11393680/
+- HB-CUFIX RNA force field (J Chem Phys 2025) https://pubs.aip.org/aip/jcp/article/162/20/200901/3347562/HB-CUFIX-Force-field-for-accurate-RNA-simulations
+- Revised RNA dihedral parameters (χOL3) https://pubs.acs.org/doi/10.1021/acs.jctc.6b00870
+- **Own measurement**: `data/samples/analysis/basepair_geometry.json`
