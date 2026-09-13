@@ -121,13 +121,18 @@ At the **revised 25B-token budget**, PHAROS-Small:
 
 | Hardware + format | GPU-hours (with Muon + read down-weighting, 2.38×) |
 |---|---|
-| A100 bf16 | **~10** |
-| H100 fp8 | **~1.6** |
+| A100 bf16 | **~78** |
+| H100 fp8 | **~12** |
 
-(323B-token figures, for reference: 126 h A100 bf16, 20 h H100 fp8.)
+> **Corrected in cycle 4 (defect #17).** These were ~10 h and ~1.6 h before the
+> refinement loops were counted. PHAROS-Small runs **8** loops with deep
+> supervision at every segment, so compute scales 8×. Two independently written
+> cost paths now agree at 78 h.
 
-**The token-budget cut is a far larger saving than any precision lever** — 12.9×
-against FP8's 1.6× — and it costs no accuracy, because the tokens being dropped
+(323B-token figures, for reference: ~1,011 h A100 bf16.)
+
+**The token-budget cut remains the largest single lever** — 12.9× against FP8's
+1.6×, and larger than the whole right-sizing step (1.65× by effective compute) — and it costs no accuracy, because the tokens being dropped
 are redundant rather than informative.
 
 ---

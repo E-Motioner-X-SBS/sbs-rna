@@ -130,6 +130,16 @@
 - DISC-20 [VERIFIED]: at 3.10 A median resolution, fp16 coordinates are 3,100x
   finer than the experimental noise floor.
 
+## Cycle 4 discoveries
+- DISC-21 [DEFECT #16]: the ladder's "loops" column mixed train-time (Small: 8)
+  with serve-time (Base-v2: 3). At matched serve-3, Small is 48 effective layers
+  vs Base-v2's 96 -- the depth claim reverses at inference.
+- DISC-22 [DEFECT #17, LARGEST]: refinement loops were never in the FLOP budget.
+  Every cost understated by its loop count (Small 8x). "4.4x smaller" is really
+  1.65x by effective compute; the lever chain is 5.6x not 24x; the corrected
+  cost at 25B is 78 A100-h bf16 / 12 H100-h fp8. The activation-memory half of
+  the claim survives -- only the compute half was wrong.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

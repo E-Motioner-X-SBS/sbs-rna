@@ -46,8 +46,17 @@ def attn_flops_per_token(L: int) -> float:
     gdn  = n_gdn  * 2 * 2 * 16 * d         # linear attention: O(1) state per token
     return full + swa + gdn
 
-def train_flops(tokens: float, L: int, n_active: float) -> float:
-    return 6 * n_active * tokens + 3 * attn_flops_per_token(L) * tokens
+def train_flops(tokens: float, L: int, n_active: float, loops: int = 1) -> float:
+    """Training FLOPs INCLUDING refinement loops.
+
+    Defect #17: this previously omitted `loops` entirely. Section 10b.3 specifies
+    deep supervision at EVERY segment with a one-step (detached) gradient, so each
+    of the `loops` segments is its own forward+backward. Cost therefore scales
+    linearly with the loop count. Activation MEMORY does not -- that is what the
+    detach buys -- but compute does.
+    """
+    per_pass = 6 * n_active * tokens + 3 * attn_flops_per_token(L) * tokens
+    return loops * per_pass
 
 # ---- realistic hardware ----
 HW = {"A100-80G bf16": 312e12, "H100-80G bf16": 989e12, "H100-80G fp8": 1979e12}
@@ -57,7 +66,8 @@ print("=== Stage 1 (MLM pretraining) cost, as specified ===")
 print("  corpus: elDORS 1.32B seqs; median ~245 nt cross-chunk => ~336B tokens for 1 epoch")
 TOK_FULL = 1.32e9 * 245
 for L in (2048,):
-    F = train_flops(TOK_FULL, L, P["active"])
+    LOOPS = 3   # PHAROS-Base as first specified
+    F = train_flops(TOK_FULL, L, P["active"], loops=LOOPS)
     print(f"  tokens {TOK_FULL/1e9:.0f}B, L={L}: {F/1e21:.2f} ZFLOPs")
     for name, peak in HW.items():
         hours = F / (peak * MFU) / 3600

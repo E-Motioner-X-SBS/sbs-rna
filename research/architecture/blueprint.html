@@ -157,6 +157,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <span class="chip ok">~79 A100-h to train</span>
     <span class="chip">149M total / 61M active</span>
     <span class="chip ok">BF16 · 25B tokens · no 4-bit</span>
+    <span class="chip">78 A100-h (loops counted)</span>
   </div>
 </header>
 
@@ -1568,6 +1569,52 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       The rest — B-factor, Mg distance, Saenger class, disorder — are <b>supervision targets,
       not inputs</b>. Feeding them in would leak the answer.</p>
     </div>
+  </div>
+</section>
+
+<!-- ================= 16. DEFECT 17 ================= -->
+<section>
+  <div class="sechead"><span class="secnum">16</span><h2>The loops were never costed</h2></div>
+  <p class="lede">The cost model computed 6·N<sub>active</sub>·T — the cost of <b>one pass</b>
+  through the blocks. PHAROS-Small runs <b>8 refinement loops</b> with deep supervision at every
+  segment, so each is its own forward and backward. Compute scales with the loop count; the
+  design said loops "cost compute but no additional activation memory", then omitted the compute.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th class="num">blocks</th><th class="num">train loops</th><th class="num">train depth</th><th class="num">serve@3</th><th class="num">active</th><th class="num">eff. compute</th><th class="num">A100-h @25B</th></tr></thead>
+      <tbody>
+        <tr class="total"><td><b>Small</b></td><td class="num">16</td><td class="num">8</td><td class="num">128</td><td class="num" style="color:var(--warn)"><b>48</b></td><td class="num">61M</td><td class="num"><b>488M</b></td><td class="num"><b>78</b></td></tr>
+        <tr><td>Base-v2</td><td class="num">32</td><td class="num">3</td><td class="num">96</td><td class="num">96</td><td class="num">269M</td><td class="num">807M</td><td class="num">129</td></tr>
+        <tr><td>Mini</td><td class="num">12</td><td class="num">12</td><td class="num">144</td><td class="num">36</td><td class="num">30M</td><td class="num">360M</td><td class="num">58</td></tr>
+        <tr><td>Micro</td><td class="num">8</td><td class="num">16</td><td class="num">128</td><td class="num">24</td><td class="num">12M</td><td class="num">192M</td><td class="num">31</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="panel" style="border-left:3px solid var(--warn)">
+      <h3>"4.4× smaller" collapses to 1.65×</h3>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">By <b>active parameters</b>, 61M vs
+      269M is 4.4×. By <b>effective compute</b> (active × loops) it is <b>488M vs 807M — only
+      1.65×</b>. Eight loops against three consume most of the saving.</p>
+    </div>
+    <div class="panel" style="border-left:3px solid var(--warn)">
+      <h3>The depth claim reverses at inference</h3>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">Small's 8 is a <i>training</i> loop
+      count ("train 8–16, serve 3"); Base-v2's 3 reads as a <i>serving</i> count — two different
+      quantities in one column. At a matched serve-3 setting Small is <b>48</b> effective layers
+      against Base-v2's <b>96</b>. <b>The claim reverses.</b></p>
+    </div>
+  </div>
+
+  <div class="finding" style="margin-top:20px">
+    <span class="tag">Corrected</span>
+    <p>The lever chain falls from a claimed <b>24×</b> to <b>5.6×</b>, because right-sizing is
+    1.65× rather than 4.43× once loops are counted. At the decided 25B budget PHAROS-Small costs
+    <b>78 A100-hours</b> in bf16, or <b>12</b> on H100 fp8 — two independently written cost paths
+    agree on both. <b>The token cut (12.9×) is therefore the largest single lever in the design</b>
+    — larger than right-sizing and larger than any precision choice.</p>
   </div>
 </section>
 

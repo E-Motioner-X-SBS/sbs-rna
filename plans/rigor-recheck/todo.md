@@ -29,3 +29,9 @@ Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 - [x] Repo layout created: src/pharos/, configs/, with a tested physics module
 - [DEFERRED: needs hardware] Benchmark Muon 2.00x on our actual shapes
 - [DEFERRED: needs training] Validate the 25B stopping point empirically
+
+## Cycle 4 — internal coherence
+- [x] C1 recycle x3 vs 8 loops -> DEFECT #16, ladder now separates train/serve depth
+- [x] C2 loops in the FLOP budget -> DEFECT #17, all costs corrected, guard extended
+- [ ] C3 attention head count is never specified anywhere (d=512, heads=?)
+- [ ] C4 head parameter budget: 3 heads added since "motif bank, heads, decoder 10M"

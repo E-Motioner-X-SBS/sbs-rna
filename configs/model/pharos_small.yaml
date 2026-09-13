@@ -2,7 +2,11 @@
 name: pharos-small
 d_model: 512
 n_blocks: 16
-n_refine_loops: 8          # effective depth 16*8 = 128 layers
+n_refine_loops_train: 8    # train depth 16*8 = 128 effective layers
+n_refine_loops_serve: 3    # 10b.3: train 8-16, serve 3 -> SERVE depth is 16*3 = 48
+# defect #17: compute scales with the loop count. Effective compute is
+# active x loops = 61M x 8 = 488M, not 61M. Against Base-v2's 269M x 3 = 807M
+# that is 1.65x cheaper, NOT the 4.4x implied by active params alone.
 # mixer schedule, period-8 repeated twice: 10 GDN, 4 SWA, 2 FULL
 mixer_pattern: [GDN, GDN, SWA, GDN, GDN, SWA, GDN, FULL]
 swa_window: 128
@@ -36,4 +40,5 @@ vocab:
 
 params:                    # re-derived independently, cycle 2 S3
   total_M: 148.73
-  active_M: 60.65
+  active_M: 60.65          # ONE pass; multiply by n_refine_loops_train for compute
+  effective_compute_M: 488 # 60.65 x 8

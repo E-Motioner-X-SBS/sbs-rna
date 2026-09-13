@@ -1,0 +1,60 @@
+{
+  "defect_17": "refinement loops omitted from the FLOP budget",
+  "ladder_with_loops": [
+    {
+      "model": "PHAROS-Micro",
+      "active_M": 12,
+      "loops": 16,
+      "effective_compute_M": 192,
+      "published_h": 61,
+      "real_h": 976
+    },
+    {
+      "model": "PHAROS-Mini",
+      "active_M": 30,
+      "loops": 12,
+      "effective_compute_M": 360,
+      "published_h": 148,
+      "real_h": 1776
+    },
+    {
+      "model": "PHAROS-Small",
+      "active_M": 61,
+      "loops": 8,
+      "effective_compute_M": 488,
+      "published_h": 299,
+      "real_h": 2392
+    },
+    {
+      "model": "PHAROS-Base-v2",
+      "active_M": 269,
+      "loops": 3,
+      "effective_compute_M": 807,
+      "published_h": 1325,
+      "real_h": 3975
+    }
+  ],
+  "small_vs_base_by_active": 4.41,
+  "small_vs_base_by_effective_compute": 1.65,
+  "depth_train": {
+    "PHAROS-Micro": {
+      "train": 128,
+      "serve_at_3": 24
+    },
+    "PHAROS-Mini": {
+      "train": 144,
+      "serve_at_3": 36
+    },
+    "PHAROS-Small": {
+      "train": 128,
+      "serve_at_3": 48
+    },
+    "PHAROS-Base-v2": {
+      "train": 96,
+      "serve_at_3": 96
+    }
+  },
+  "corrected_total_factor": 5.6,
+  "corrected_a100h_323B": 1011,
+  "corrected_a100h_25B": 78
+}

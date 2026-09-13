@@ -7,10 +7,10 @@ subfolder to avoid collision.
 | Field | Value |
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
-| Cycle | **3** — core architecture + dataset + precision |
-| Phase | 6 AUDIT (cycle 3) |
+| Cycle | **4** — core architecture + dataset + precision |
+| Phase | 4 IMPLEMENT (cycle 4) |
 | Started | 2026-09-13 (cycle 1), cycle 2 same day |
-| Open TODO | 0 open, 3 DEFERRED (need hardware/training) |
+| Open TODO | 2 open (C3, C4), 3 DEFERRED |
 
 ## Why cycle 2 exists
 

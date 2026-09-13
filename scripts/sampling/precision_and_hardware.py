@@ -26,7 +26,8 @@ MFU = 0.35
 
 # PHAROS-Small
 N_ACTIVE, N_TOTAL = 60.65e6, 148.73e6
-TOKENS = 323e9
+LOOPS = 8          # defect #17: refinement loops DO cost compute
+TOKENS = 25e9      # cycle-3 decision D2 (was 323e9)
 
 
 def hours(flops, peak):
@@ -34,9 +35,9 @@ def hours(flops, peak):
 
 
 def main():
-    F = 6 * N_ACTIVE * TOKENS
-    print(f"PHAROS-Small: {N_ACTIVE/1e6:.1f}M active, {TOKENS/1e9:.0f}B tokens")
-    print(f"  training FLOPs (6*N*T) = {F/1e21:.2f} ZFLOPs\n")
+    F = LOOPS * 6 * N_ACTIVE * TOKENS
+    print(f"PHAROS-Small: {N_ACTIVE/1e6:.1f}M active x {LOOPS} refinement loops, {TOKENS/1e9:.0f}B tokens")
+    print(f"  training FLOPs (loops*6*N*T) = {F/1e21:.2f} ZFLOPs\n")
 
     print(f"{'hardware':24s}{'bf16':>12s}{'fp8':>12s}{'fp4':>12s}   (GPU-hours)")
     rows = {}
@@ -103,9 +104,12 @@ def main():
                            "raw_hours": round(raw, 1), "with_levers_hours": round(net, 1),
                            "note": note})
     print()
-    print("  The published '~79 A100-hours' is between A100 bf16 (299) and H100 fp8 (47)")
-    print("  because it mixed an Ampere baseline with a Hopper-only lever.")
-    print("  Honest headline: 126 h on A100 bf16, 20 h on H100 fp8, 4 h on B200 NVFP4.")
+    g = {f"{r['hw']}_{r['format']}": r['with_levers_hours'] for r in ladder}
+    print(f"  Honest headline at {TOKENS/1e9:.0f}B tokens x {LOOPS} loops:")
+    print(f"    A100 bf16 {g['A100-80G_bf16']:.0f} h  |  H100 fp8 {g['H100-80G_fp8']:.0f} h"
+          f"  |  B200 NVFP4 {g['B200_fp4']:.0f} h (not adopted -- see D3)")
+    print("  Two corrections are baked in: defect #15 (A100 cannot run FP8) and")
+    print("  defect #17 (refinement loops were omitted from the FLOP count entirely).")
 
     res = {"corrected_ladder": ladder,
            "hw_independent_factor": round(f_indep, 3),

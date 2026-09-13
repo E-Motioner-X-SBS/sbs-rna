@@ -1825,6 +1825,59 @@ and widening $d$ is quadratic in the FFN. Only $26.0$ of those bits are
 available at inference; the remainder are supervision targets, and feeding them
 in would leak the answer.
 
+\section{Defect \#17: refinement loops were never costed}
+\label{sec:loops}
+
+The cost model computed $6 N_{\text{active}} T$ --- the cost of \emph{one} pass
+through the blocks. PHAROS-Small runs \textbf{8 refinement loops}, and the
+training design specifies deep supervision at \emph{every} segment with a
+one-step (detached) gradient, so each segment is its own forward and backward
+pass. Compute therefore scales linearly with the loop count. The design even
+states that loops ``cost compute but no additional activation memory'', and then
+omits the compute. Activation memory indeed does not scale---that is what the
+detach buys---but FLOPs do.
+
+\begin{table}[h]
+\centering
+\caption{The ladder with the loop factor restored. Every published cost was
+understated by exactly its loop count. \meas}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{blk} & \textbf{loops} & \textbf{train d.} & \textbf{serve@3} & \textbf{active} & \textbf{eff.\ comp.} & \textbf{A100-h} \\
+\midrule
+\textbf{Small} & 16 & 8 & 128 & \textbf{48} & 61M & \textbf{488M} & \textbf{78} \\
+Base-v2 & 32 & 3 & 96 & 96 & 269M & 807M & 129 \\
+Mini & 12 & 12 & 144 & 36 & 30M & 360M & 58 \\
+Micro & 8 & 16 & 128 & 24 & 12M & 192M & 31 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two headline claims do not survive.
+
+\paragraph{``4.4$\times$ smaller than Base-v2'' collapses to 1.65$\times$.} By
+active parameters, 61M against 269M is $4.4\times$. By \emph{effective compute}
+(active $\times$ loops) it is 488M against 807M --- only $\mathbf{1.65\times}$.
+Eight loops against three consume most of the saving.
+
+\paragraph{The depth comparison mixed training with serving.} Small's 8 is a
+\emph{training} loop count (the design says ``train 8--16, serve 3''), while
+Base-v2's 3 reads as a serving count---two different quantities in one column.
+At a matched serve-3 setting, Small is \textbf{48} effective layers against
+Base-v2's \textbf{96}: \textcolor{risk}{\textbf{the claim reverses at
+inference}}.
+
+\paragraph{Corrected cost.} The lever chain falls from a claimed $24\times$ to
+$\mathbf{5.6\times}$, because the right-sizing step is $1.65\times$ rather than
+$4.43\times$ once loops are counted. At the decided 25B-token budget,
+PHAROS-Small costs $\mathbf{78}$ A100-hours in bf16 or $\mathbf{12}$ on H100
+fp8. Two independently written cost paths agree on both figures.
+
+The token-budget cut ($12.9\times$) therefore remains the largest single lever
+in the design---larger than right-sizing and larger than any precision choice.
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1935,6 +1988,7 @@ large-scale training is attempted.
 \texttt{.../sampling/precision\_and\_hardware.py} & \texttt{precision\_hardware.json} \\
 \texttt{.../sampling/audit\_token\_attributes.py} & \texttt{token\_attributes.json} \\
 \texttt{.../sampling/decide\_precision\_and\_size.py} & \texttt{precision\_size\_decision.json} \\
+\texttt{.../sampling/recompute\_cost\_with\_loops.py} & \texttt{cost\_with\_loops.json} \\
 \texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
 \texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\

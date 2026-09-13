@@ -364,3 +364,40 @@ salt rises, |B_elec| falling with it). `test_manning.py` ALL TESTS PASS.
 QiD scaling law scored across the ladder; PHAROS-Small at 265x Chinchilla is the
 worst case. Token budget cut 323B -> 25B (12.9x saving, no accuracy cost)
 dominates any precision lever (FP8 1.6x).
+
+## Cycle 4 — internal coherence after ~20 corrections
+
+### C1 — recycle count: pipeline says x3, config says 8 loops — **DEFECT #16**
+Two different quantities in one column. Section 10b.3 says "train 8-16, serve 3",
+so Small's 8 is a TRAIN count while Base-v2's 3 reads as a SERVE count. At a
+matched serve-3 setting Small is 16x3 = **48** effective layers against
+Base-v2's 32x3 = **96**. The headline "more effective depth than Base-v2
+(128 vs 96)" holds only at training and **reverses at inference**.
+Fixed: the ladder now carries separate `train depth` and `serve@3 depth` columns.
+
+### C2 — were the loops ever costed? — **DEFECT #17, the largest yet**
+`train_flops()` computed `6 * n_active * tokens` with **no loop factor**.
+Deep supervision at every segment with a one-step (detached) gradient means each
+segment is its own forward+backward, so compute scales linearly with loops.
+The design even states loops "cost compute but no additional activation memory"
+and then omits the compute.
+
+| Model | loops | published h | REAL h | understated |
+|---|---|---|---|---|
+| Micro | 16 | 61 | 976 | 16x |
+| Mini | 12 | 148 | 1,776 | 12x |
+| **Small** | **8** | **299** | **2,392** | **8x** |
+| Base-v2 | 3 | 1,325 | 3,975 | 3x |
+
+Consequences:
+- **"4.4x smaller than Base-v2" collapses to 1.65x.** By active params 61M vs
+  269M is 4.4x; by effective compute (active x loops) 488M vs 807M is 1.65x.
+- **Lever chain 24x -> 5.6x**, because right-sizing is 1.65x not 4.43x.
+- Corrected cost at the decided 25B budget: **78 A100-h bf16**, **12 H100-h fp8**.
+
+Verified by **two independently written cost paths** (`precision_and_hardware.py`
+patched to include loops, and a fresh `recompute_cost_with_loops.py`) which agree
+at 78 h. Guard now re-derives effective compute, the 1.65x ratio and the 78 h.
+
+> Activation *memory* genuinely does not scale with loops -- the detach buys
+> that -- so that half of the claim survives. Only the compute half was wrong.

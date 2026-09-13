@@ -292,12 +292,32 @@ corpus than families are.
 
 Sizes, with depth supplied by refinement loops rather than block count:
 
-| Model | d | blocks | loops | effective layers | total | active | A100-h |
-|---|---|---|---|---|---|---|---|
-| **PHAROS-Small (default)** | **512** | **16** | **8** | **128** | **149M** | **61M** | **299** |
-| Base-v2 (scale-up path) | 768 | 32 | 3 | 96 | 1,401M | 269M | 1,325 |
-| Mini | 384 | 12 | 12 | 144 | 67M | 30M | 148 |
-| Micro | 256 | 8 | 16 | 128 | 23M | 12M | 61 |
+| Model | d | blocks | train loops | train depth | serve@3 depth | total | active | **eff. compute** | **A100-h @25B** |
+|---|---|---|---|---|---|---|---|---|---|
+| **PHAROS-Small (default)** | **512** | **16** | **8** | **128** | **48** | **149M** | **61M** | **488M** | **78** |
+| Base-v2 (scale-up path) | 768 | 32 | 3 | 96 | 96 | 1,401M | 269M | 807M | 129 |
+| Mini | 384 | 12 | 12 | 144 | 36 | 67M | 30M | 360M | 58 |
+| Micro | 256 | 8 | 16 | 128 | 24 | 23M | 12M | 192M | 31 |
+
+> **Defect #17, corrected in cycle 4.** The A100-h column previously counted
+> **one pass** through the blocks. §10b.3 specifies deep supervision at *every*
+> segment with a one-step (detached) gradient, so each of the `loops` segments is
+> its own forward+backward and **compute scales linearly with the loop count**.
+> Every published cost was understated by exactly that factor — Small 8x,
+> Base-v2 3x, Mini 12x, Micro 16x. (Activation *memory* does not scale; that is
+> what the detach buys. The design said loops "cost compute but no additional
+> activation memory", then omitted the compute.)
+>
+> Two consequences for headline claims:
+>
+> 1. **"4.4x smaller than Base-v2" does not survive.** By active parameters
+>    61M vs 269M is 4.4x. By **effective compute** (active x loops) it is
+>    488M vs 807M — only **1.65x**. Eight loops against three eat most of it.
+> 2. **The depth comparison mixed train-time with serve-time.** Small's 8 is a
+>    *training* loop count (§10b.3: "train 8-16, serve 3"); Base-v2's 3 reads as
+>    a serving count. At a matched serve-3 setting Small is **48** effective
+>    layers against Base-v2's **96** — the claim **reverses at inference**.
+>    The table now separates the two columns.
 
 Versus **NucleicBERT: 404M, all active.** PHAROS-Small uses **6.6x fewer active
 parameters** while reaching 128 effective layers, and its attention term is ~8x
@@ -1152,8 +1172,9 @@ no model in the table below is capacity-limited for it.
 | PHAROS-Mini | 384 | 12 | 12 | 144 | 67M | 30M | 148 |
 | PHAROS-Micro | 256 | 8 | 16 | 128 | 23M | 12M | 61 |
 
-**PHAROS-Small reaches *more* effective depth than Base-v2 (128 layers vs 96) at
-9.4x fewer total parameters**, because depth now comes from refinement loops
+**PHAROS-Small reaches more *training-time* depth than Base-v2 (128 vs 96) at
+9.4x fewer total parameters — but only 1.65x less effective compute, and at a
+matched serve-3 setting it is shallower (48 vs 96)**, because depth now comes from refinement loops
 rather than stacked blocks — and with the one-step gradient (§10b.3) those loops
 cost compute but **no additional activation memory**.
 
@@ -1168,7 +1189,7 @@ cost compute but **no additional activation memory**.
 | FP8 (H100-class) | 1.60x | 94 |
 | down-weight 151-nt read chunks | 1.19x | **79** |
 
-**24x total: 1,883 -> ~79 A100-hours — 3.3 days on a *single* A100**, or ten
+**5.6x total: 5,649 -> ~1,011 A100-hours at 323B, or ~78 at the decided 25B — about 3 days on a single A100 at the 25B budget**, or ten
 hours on eight. Against NucleicBERT's 192 A100s.
 
 ### The honest risk
@@ -1338,7 +1359,7 @@ token, so the corpus is more redundant than the token count implies.
 
 A100 (Ampere) has **no FP8 tensor cores**; FP8 arrived with Hopper. The cost was
 quoted in **A100-hours** while applying a **1.60x FP8** lever, so "~79
-A100-hours" existed on no single machine, and "3.3 days on a single A100" was
+A100-hours" existed on no single machine, and "about 3 days on a single A100 at the 25B budget" was
 unreachable. Corrected, with levers split by what they depend on
 (hardware-independent: Muon 2.00x, read down-weighting 1.19x -> 2.38x):
 

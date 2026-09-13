@@ -41,11 +41,12 @@ corpus_weighting:
   long_context_sources: [chunk_006, chunk_009]   # median 2,193-2,389 nt
 
 cost_estimate_gpu_hours:   # hardware-explicit (defect #15); at the REVISED 25B budget
+  # cycle 4 defect #17: includes the 8 refinement loops (deep supervision at
+  # every segment => compute scales with loop count; activation memory does not)
   at_25B_tokens:
-    a100_bf16: 10
-    h100_fp8: 1.6
+    a100_bf16: 78
+    h100_fp8: 12
   at_323B_tokens_for_reference:
-    a100_bf16: 126
-    h100_fp8: 20
+    a100_bf16: 1011
   # The token-budget cut (12.9x) dominates any precision lever (FP8 1.6x),
   # and costs no accuracy because the dropped tokens are redundant.
