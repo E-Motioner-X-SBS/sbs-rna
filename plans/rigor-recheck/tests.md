@@ -105,3 +105,26 @@ phosphate" [VERIFIED]. Derived values match both.
 Consequence: theta~0.76 quoted in the deliverables is the **B-DNA** figure. For
 A-form RNA the correct value is **~0.80**, giving q_eff = -0.196 rather than
 -0.238. CORRECTION REQUIRED in all three deliverables.
+
+### T24 [ADDED-CYCLE-1] — residue-guard bias on the Mg gradient — **PASS (no bias)**
+`test_residue_guard_bias.py`. Recomputes the gradient at guard in {30,20,15,10,5,1}.
+
+| guard | structures | nt | span (sigma) | monotonic |
+|---|---|---|---|---|
+| 30 (baseline) | 15 | 24,623 | **1.760** | yes |
+| 20 | 16 | 24,646 | 1.757 | yes |
+| 15 | 16 | 24,646 | 1.757 | yes |
+| 10 | 17 | 24,660 | 1.757 | yes |
+| 5  | 17 | 24,660 | 1.757 | yes |
+| 1 (no guard) | 19 | 24,666 | 1.757 | yes |
+
+max |change| = **0.003 sigma**. Removing the guard entirely adds 4 structures and
+43 nucleotides (+0.17%) because the excluded structures hold 2-28 residues each.
+OQ-1 is answered: the guard is a variance control, not a source of bias.
+
+> Parser defect found while writing this test: column names were taken with
+> `line.rstrip("\n")` instead of `.strip()`, leaving a trailing space
+> (`'label_comp_id '`), so every lookup missed and the script reported
+> **0 X-ray structures**. Same class as defect #2 in cycle 1. The script now
+> raises if `label_comp_id` is absent and refuses to report on an empty set,
+> rather than printing a confident zero.

@@ -1,0 +1,248 @@
+{
+  "question": "Does the >=30-RNA-residue guard bias the Mg2+/rigidity gradient?",
+  "baseline_guard_30_span_sigma": 1.76,
+  "max_abs_change_vs_baseline": 0.003,
+  "all_monotonic": true,
+  "results": [
+    {
+      "guard": 30,
+      "structures": 15,
+      "added_small": 0,
+      "nt": 24623,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2441,
+          "mean_zB": -0.673
+        },
+        {
+          "range": "6-8",
+          "n": 7590,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8115,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 2984,
+          "mean_zB": 0.756
+        },
+        {
+          "range": "20-+",
+          "n": 3174,
+          "mean_zB": 0.877
+        }
+      ],
+      "span_sigma": 1.76,
+      "monotonic": true
+    },
+    {
+      "guard": 20,
+      "structures": 16,
+      "added_small": 1,
+      "nt": 24646,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2441,
+          "mean_zB": -0.673
+        },
+        {
+          "range": "6-8",
+          "n": 7590,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8116,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 2993,
+          "mean_zB": 0.753
+        },
+        {
+          "range": "20-+",
+          "n": 3187,
+          "mean_zB": 0.874
+        }
+      ],
+      "span_sigma": 1.757,
+      "monotonic": true
+    },
+    {
+      "guard": 15,
+      "structures": 16,
+      "added_small": 1,
+      "nt": 24646,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2441,
+          "mean_zB": -0.673
+        },
+        {
+          "range": "6-8",
+          "n": 7590,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8116,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 2993,
+          "mean_zB": 0.753
+        },
+        {
+          "range": "20-+",
+          "n": 3187,
+          "mean_zB": 0.874
+        }
+      ],
+      "span_sigma": 1.757,
+      "monotonic": true
+    },
+    {
+      "guard": 10,
+      "structures": 17,
+      "added_small": 2,
+      "nt": 24660,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2442,
+          "mean_zB": -0.674
+        },
+        {
+          "range": "6-8",
+          "n": 7591,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8117,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 2999,
+          "mean_zB": 0.751
+        },
+        {
+          "range": "20-+",
+          "n": 3192,
+          "mean_zB": 0.874
+        }
+      ],
+      "span_sigma": 1.757,
+      "monotonic": true
+    },
+    {
+      "guard": 5,
+      "structures": 17,
+      "added_small": 2,
+      "nt": 24660,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2442,
+          "mean_zB": -0.674
+        },
+        {
+          "range": "6-8",
+          "n": 7591,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8117,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 2999,
+          "mean_zB": 0.751
+        },
+        {
+          "range": "20-+",
+          "n": 3192,
+          "mean_zB": 0.874
+        }
+      ],
+      "span_sigma": 1.757,
+      "monotonic": true
+    },
+    {
+      "guard": 1,
+      "structures": 19,
+      "added_small": 4,
+      "nt": 24666,
+      "bins": [
+        {
+          "range": "0-4",
+          "n": 319,
+          "mean_zB": -0.883
+        },
+        {
+          "range": "4-6",
+          "n": 2443,
+          "mean_zB": -0.673
+        },
+        {
+          "range": "6-8",
+          "n": 7591,
+          "mean_zB": -0.415
+        },
+        {
+          "range": "8-12",
+          "n": 8120,
+          "mean_zB": 0.004
+        },
+        {
+          "range": "12-20",
+          "n": 3001,
+          "mean_zB": 0.75
+        },
+        {
+          "range": "20-+",
+          "n": 3192,
+          "mean_zB": 0.874
+        }
+      ],
+      "span_sigma": 1.757,
+      "monotonic": true
+    }
+  ]
+}

@@ -59,9 +59,14 @@
   Mg-containing subset. The nucleotide count 24,623 is correct for the 15.
 
 ## Open Questions
-- OQ-1 [PARTIALLY ANSWERED]: confound controlled (partial corr survives). The
-  <30-residue exclusion question remains: small RNAs are excluded, and they are
-  where inner-sphere Mg fraction was lowest. Effect direction unknown. [UNKNOWN]
+- OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
+  the <30-residue exclusion is now tested directly
+  (`scripts/sampling/test_residue_guard_bias.py`). Recomputing the gradient at
+  guards 30/20/15/10/5/1: the span moves from **1.760 to 1.757 sigma**, a change of
+  **0.003 sigma**, and stays monotonic at every threshold. Dropping the guard
+  entirely adds only 4 structures and 43 nucleotides (24,623 -> 24,666, +0.17%),
+  because the excluded structures hold 2-28 residues each. The guard is a
+  variance control, not a source of bias. Headline 1.76 sigma stands.
 - OQ-1-orig: Does the <30-residue exclusion bias the rigidity result? Small RNAs are
   exactly where Mg2+ inner-sphere fraction was measured lowest (0.296). Excluding
   them could inflate the Mg-rigidity gradient. MUST TEST (-> T11).
