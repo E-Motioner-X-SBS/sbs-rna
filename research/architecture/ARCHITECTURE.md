@@ -53,9 +53,13 @@ Controlling for local density reduces the association only from **+0.420** to
 packing. A within-structure estimate — comparing nucleotides within 4 A against
 those beyond 12 A *inside the same structure*, removing all between-structure
 heterogeneity — gives **+1.514 sigma**, positive in **4/4** structures holding
-both groups, bootstrap 95% CI [+1.256, +1.661]. Caveats remain: B-factor absorbs
-resolution and refinement choices, the closest bin holds 319 nucleotides, and the
-within-structure estimate rests on 4 structures.
+both groups, bootstrap 95% CI [+1.256, +1.661]. The selection objection is also
+closed: recomputing the gradient with the >=30-RNA-residue guard lowered to
+20/15/10/5 and removed entirely moves the span only from **1.760 to 1.757 sigma**
+(change 0.003), monotonic at every threshold — the guard is a variance control,
+not a source of bias (`test_residue_guard_bias.py`). Caveats remain: B-factor
+absorbs resolution and refinement choices, the closest bin holds 319 nucleotides,
+and the within-structure estimate rests on 4 structures.
 => *Ions and rigidity must share one expert, and ionic condition must be a
 model **input**, which no current predictor accepts.*
 

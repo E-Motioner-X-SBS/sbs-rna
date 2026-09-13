@@ -336,6 +336,12 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       correlation) — the signal is largely <i>independent</i> of packing. A within-structure
       estimate gives <span class="mono">+1.514 σ</span>, positive in 4/4 structures holding
       both groups, bootstrap 95% CI [+1.256, +1.661].
+      <b>The selection objection is closed too</b>: the gradient uses a ≥30-residue
+      guard, and small RNAs are where the inner-sphere Mg²⁺ fraction is lowest
+      (0.296 vs 0.511), so the exclusion could have inflated it. Recomputing at guards
+      20/15/10/5 and with no guard at all moves the span only from
+      <span class="mono">1.760</span> to <span class="mono">1.757 σ</span> and it stays
+      monotonic throughout — a variance control, not a bias.
       <span style="color:var(--ink-3)">Remaining caveats: B-factor absorbs resolution and
       refinement choices; the closest bin holds 319 nucleotides; the within-structure
       estimate rests on 4 structures. Association, not demonstrated causation.</span></p>

@@ -313,6 +313,16 @@ free and vice versa. That mutual information justifies routing them into a
 \emph{shared} physics expert rather than two disconnected heads.
 \end{quote}
 
+\paragraph{The selection objection, closed.} The gradient is measured after a
+$\geq 30$-RNA-residue guard, and small RNAs are precisely where the inner-sphere
+Mg\textsuperscript{2+} fraction is lowest ($0.296$ against $0.511$ overall), so
+the exclusion could in principle have inflated the result. Recomputing at guards
+of $20$, $15$, $10$, $5$ and with the guard removed entirely moves the span only
+from $1.760$ to $1.757\sigma$---a change of $0.003$---and it remains monotonic at
+every threshold. Removing the guard adds 4 structures and 43 nucleotides
+($+0.17\%$), because the excluded structures hold 2--28 residues each. The guard
+is a variance control, not a source of bias.
+
 \paragraph{Caveats.} B-factor also absorbs resolution, occupancy and refinement
 choices. The closest distance bin contains only $319$ nucleotides, and the
 within-structure estimate rests on 4 structures. The partial correlation above
@@ -1123,6 +1133,7 @@ large-scale training is attempted.
 \texttt{.../sampling/analyze\_block\_sparsity.py} & \texttt{block\_sparsity.json} \\
 \texttt{.../sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
 \texttt{.../sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
+\texttt{.../sampling/test\_residue\_guard\_bias.py} & \texttt{residue\_guard\_bias.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
 \texttt{.../reference/benchmark\_pair\_track.py} & \texttt{pair\_track\_benchmark.json} \\
 \bottomrule
