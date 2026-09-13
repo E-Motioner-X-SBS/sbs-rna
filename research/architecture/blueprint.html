@@ -1089,7 +1089,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <table style="min-width:0">
           <thead><tr><th>Technique</th><th>Verdict</th></tr></thead>
           <tbody>
-            <tr class="total"><td>FP8 mixed precision</td><td style="color:var(--mg);font-weight:600">ADOPT — &lt;0.25% loss error vs BF16</td></tr>
+            <tr class="total"><td>FP8 mixed precision</td><td style="color:var(--mg);font-weight:600">ADOPT — &lt;0.25% vs BF16 (validated at V2 scale, not 671B)</td></tr>
             <tr><td>Aux-loss-free balancing</td><td style="color:var(--mg)">already in the design</td></tr>
             <tr><td>DualPipe</td><td style="color:var(--ink-3)">defer until multi-node</td></tr>
             <tr><td>Multi-head Latent Attention</td><td style="color:var(--ink-3)">skip — 10 of 16 blocks already linear</td></tr>
@@ -1221,7 +1221,13 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     </div>
     <div class="risk" style="margin-top:12px">
       <span class="n">NOT ADOPTED</span>
-      <p>HRM's two-timescale H/L split — measured at ~5pp and possibly noise. <b>PHAROS already
+      <p><b>And a caveat that must travel with the citation:</b> the same independent ARC Prize
+      analysis that credits the outer loop also finds cross-task transfer is limited and that
+      <b>most of HRM's ARC-AGI performance comes from memorising solutions to the evaluation
+      tasks</b>. HRM is a zero-pretraining test-time-training approach. That weakens it as
+      evidence for a model that must <i>generalize</i> to unseen RNA — especially given §14.
+      The loop stands on its measured merits; the parameter-count argument should not lean on HRM.</p>
+      <p style="margin-top:10px">HRM's two-timescale H/L split — measured at ~5pp and possibly noise. <b>PHAROS already
       has a hierarchy</b> (coarse blocks → fine pairs) justified by <i>measured</i> block
       occupancy rather than by analogy to brain oscillations. The architectural novelty in HRM
       was oversold; the loop is what works.</p>

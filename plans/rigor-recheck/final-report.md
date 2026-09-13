@@ -1,3 +1,110 @@
+# Final Verification Report — Cycle 2
+
+> Cycle 1's report follows below, unchanged. This covers the 6,259 lines added
+> across 55 files *after* cycle 1 closed, plus the architecture-level audit the
+> user requested mid-cycle ("check if all of our architecture is efficient and
+> will be able to generalize").
+
+## Summary
+
+| Field | Value |
+|---|---|
+| Cycles used | 2 |
+| Searches run (cycle 2) | 3 (Muon, HRM ablation, DeepSeek FP8) |
+| Tests logged (cycle 2) | 8 (S1–S7 + G1/G2/G3/G7) |
+| To-do completion | 14 done, 0 open, **1 DEFERRED** (G5, needs training) |
+| Doubts | 3 logged, 3 resolved |
+| **Defects found** | **4** (#11–#14) |
+| **Major reversals** | **1** (REV-2) |
+| Macro-audit | **9/9 YES** |
+
+## Defects found in cycle 2
+
+| # | Defect | Impact |
+|---|---|---|
+| **11** | `_pdbx_unobs_or_zero_occ_residues` counted **all polymers**. 143,871 rows are 67.5% protein; RNA-only is **46,447**. | A novelty claim overstated **3.1x**. Claim survives at one third the size. |
+| **12** | Stiffness headroom fitted every group **in-sample** and scored each model on its **own covered subset** (103,964 / 90,098 / 78,076 steps). | **REV-2**: structure-over-sequence falls 3.0282 -> **1.0336** (2.9x) and **the order inverts**. |
+| **13** | The auxiliary block-occupancy loss was documented as "implemented". Only a **hook** existed — no BCE anywhere in the repo. | The R1 downgrade rested on unwritten code. Now implemented and tested. |
+| **14** | FP8 "<0.25% loss error **at 671B scale**" — the DeepSeek ablation was at **V2/V2-Lite scale (~1T tokens)**. Plus the HRM memorisation caveat existed in prior-art 07 but **never propagated** to where the argument is made. | Misattribution + a material caveat missing from the load-bearing citation. |
+
+## The reversal (REV-2)
+
+**Retracted**: "structural context contributes more than sequence context"
+(+3.028 vs +2.144 nats), used to justify the learned stiffness encoder.
+
+**Corrected**, held-out on the common 78,076-step subset:
+
+| Model | in-sample | held-out |
+|---|---|---|
+| M0 global | 19.7235 | 18.1607 |
+| M1 sequence | 17.5792 | 16.3760 (gain **1.7847**) |
+| M_struct structure only | 17.8470 | 16.4198 (gain 1.7409) |
+| M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
+
+**Survives**: structure still adds a real **+1.03 nats beyond sequence**;
+sequence-alone (+1.78) and structure-alone (+1.74) are near-equal and
+complementary (3.53 if independent vs 2.82 actual). The learned-encoder decision
+stands — a sequence-only lookup still leaves ~1.03 nats unused. The §7c
+acceptance gate moved 14.551 -> **15.3424**.
+
+## Architecture audit — the user's question
+
+**"Is it efficient?" — YES, and it is the best-verified part.** The hierarchical
+pair track runs at 0.96% of dense at L=4096 while the dense baseline cannot run
+at all on a 14 GB machine; parameter and FLOP arithmetic reproduces exactly
+(148.73M/60.65M against documented 149M/61M); the lever chain reproduces exactly
+(1,883 -> 79 A100-h, 24.0x).
+
+**"Will it generalize to any RNA?" — NOT AS SCOPED.** Four measured limits:
+
+| ID | Finding | Status |
+|---|---|---|
+| **G2** | **98.96% of RNA residues sit in protein-containing entries** (159/180 structures, median 10 protein chains). The model predicts single chains but learns partner-stabilised folds. | **Largest hazard. Not fixable by tuning.** Split reporting now mandatory. |
+| **G3** | **93.07% of RNA residues come from 61 ribosome-like entries.** Every residue-weighted statistic is primarily ribosomal. | Length-binned tables happen to stratify it; the c=20 budget is safe at both ends. Headline figures relabelled. |
+| **G7** | **8.90% of polymer residues fall outside {A,C,G,U}** — 17,767 DNA, 7,036 UNK, 2,634 inosine/other. | Vocab-5 cannot represent any. "Any RNA" unsupportable without widening it. |
+| **G1** | Every single chain fits 4096 (max 3,679), but total RNA per entry reaches **11,478**; 44/180 entries exceed the context. | Scope statement added. |
+| **G6** | The router reads structural features produced by the pair track, which runs *after* the trunk — **routing at recycle 0 is undefined**. `B_elec` got an explicit first-pass rule; the router never did. | Design gap; fix specified. |
+
+**Honest headline**: *a single-chain RNA structure model, up to 4,096 nt, trained
+predominantly on ribosomal and complex-embedded RNA, which must report
+performance split by isolated vs complexed context.*
+
+## Confidence
+
+**MEDIUM-HIGH on the measurements; MEDIUM on the design; LOW on outcomes.**
+
+- *Measurements* — every headline number is now re-derived by an independently
+  written check, and the regression guard re-derives them on demand. High.
+- *Design* — internally consistent and the efficiency case is strong, but four
+  generalization limits are now measured rather than hypothetical. Medium.
+- *Outcomes* — **no model has been trained.** Nothing here predicts that PHAROS
+  beats TM 0.55. Low, and should stay low until a checkpoint exists.
+
+## Known limitations carried forward
+
+1. **R1**: block detection is now a supervised target with a tested loss, but
+   the test is a single-example synthetic overfit. Generalization untested.
+2. **G5 [DEFERRED]**: 61M active vs ERNIE-RNA's 86M dense while doing strictly
+   more tasks. An experiment, not an argument; first checkpoint ~1 GPU-day.
+3. **G2** is unresolvable with current data — it bounds the claim permanently.
+4. Muon 2x and FP8 1.6x are *reported* figures, verified as citations but
+   **not benchmarked on our shapes**. The 24x cost reduction depends on them.
+5. Thin bins persist: contact-sparsity n=3 and n=6; coevolution deep arm n=2;
+   within-structure Mg estimate n=4.
+6. Ionic titration data (RMDB) still not acquired — prerequisite for the
+   headline ion-conditioning claim.
+
+## Defect base rate
+
+Cycle 0 (build) 5 · cycle 1 (audit) 4 · pre-cycle-2 1 · **cycle 2: 4**.
+**Fourteen defects, every one producing a plausible number rather than an
+error.** Two were caused by formatting rather than logic; two were unfair
+statistical comparisons; one was code that did not exist. The base rate has not
+fallen across cycles, which is the strongest argument for keeping
+`verify_claims.py` in the loop.
+
+---
+
 # Final Verification Report — PHAROS empirical claims
 
 **Date**: 2026-09-13 · **Cycles**: 1 (extended) · **Verdict**: claims stand after 6 corrections

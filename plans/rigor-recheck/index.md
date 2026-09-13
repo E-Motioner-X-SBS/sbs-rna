@@ -8,9 +8,9 @@ subfolder to avoid collision.
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
 | Cycle | **2** — scope: everything added AFTER cycle 1 closed |
-| Phase | 0 DECOMPOSE |
+| Phase | 6 AUDIT |
 | Started | 2026-09-13 (cycle 1), cycle 2 same day |
-| Open TODO | see todo.md |
+| Open TODO | 0 open, 1 DEFERRED (G5: needs training) |
 
 ## Why cycle 2 exists
 

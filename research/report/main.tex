@@ -1269,7 +1269,7 @@ shapes rather than assumed.
 \toprule
 \textbf{Technique} & \textbf{Verdict} \\
 \midrule
-FP8 mixed precision & \textbf{Adopt.} Under $0.25\%$ loss error against BF16 at 671B scale, with block/tile quantisation and selective high-precision accumulation. The largest single memory and throughput win. \\
+FP8 mixed precision & \textbf{Adopt.} Under $0.25\%$ loss error against BF16, validated at DeepSeek-V2-Lite/V2 scale over ${\sim}1$T tokens rather than at 671B, with block/tile quantisation and selective high-precision accumulation. The largest single memory and throughput win. \\
 Auxiliary-loss-free balancing & \textbf{Already in the design.} Essential here because 5S rRNA is 5{,}976 of the 3D clusters, so a balance \emph{loss} would fight the biology. \\
 DualPipe & \textbf{Defer} until the model spans nodes. \\
 Multi-head Latent Attention & \textbf{Skip.} Largely redundant---10 of 16 blocks are already linear attention, so the KV cache is small by construction. \\

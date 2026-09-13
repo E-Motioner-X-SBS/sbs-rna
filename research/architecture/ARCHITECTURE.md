@@ -931,7 +931,7 @@ and is in production use (Kimi K2).
 
 | Technique | Verdict for PHAROS |
 |---|---|
-| **FP8 mixed precision** | **Adopt.** <0.25% loss error vs BF16 at 671B scale; block/tile quantisation with selective high-precision accumulation. Largest single memory/throughput win. |
+| **FP8 mixed precision** | **Adopt.** <0.25% loss error vs BF16, **validated at DeepSeek-V2-Lite / V2 scale over ~1T tokens** (not at 671B — V3 is 671B but the ablation establishing the figure was smaller); block/tile quantisation with selective high-precision accumulation. Largest single memory/throughput win. |
 | **Auxiliary-loss-free load balancing** | **Already in the design** (§4.3). Essential here because 5S rRNA is 5,976 of the 3D clusters, so a balance *loss* would fight the biology. |
 | **DualPipe** | **Defer.** Only pays once the model spans nodes. |
 | **Multi-head Latent Attention** | **Skip.** Largely redundant — 10 of our 16 blocks are already linear attention, so the KV cache is small by construction. |
@@ -1073,7 +1073,7 @@ fine-grained segmentation applied consistently rather than half-way.
 | baseline | — | 1,883 | |
 | all-MoE fine-grained | 1.42x | 1,325 | measured from parameter counts |
 | Muon optimiser | 2.00x | 662 | reported ~2x — **must be benchmarked on our shapes** |
-| FP8 (H100-class) | 1.60x | 414 | realised not peak; <0.25% loss error at 671B |
+| FP8 (H100-class) | 1.60x | 414 | realised not peak; <0.25% loss error, validated at V2/V2-Lite scale not 671B |
 | down-weight 151-nt read chunks | 1.19x | **347** | 16.2% of nucleotide mass, little long-range signal |
 
 **Total 5.4x: 1,883 -> ~347 A100-hours** — under 2 days on 8 A100s, or about a
@@ -1125,6 +1125,16 @@ capacity: **127x the entire 3D information content.**
 3. **HRM.** 27M parameters, ~1,000 examples, no pretraining, beating models
    orders of magnitude larger; the independent ablation attributes the gain to
    the **refinement loop**, not to size or to the hierarchy (§10b.3).
+
+> **Caveat that must travel with this citation.** The independent ARC Prize
+> analysis that credits the outer loop *also* finds that cross-task transfer is
+> limited and that **most of HRM's ARC-AGI performance comes from memorising
+> solutions to the tasks used at evaluation time**. HRM is, in its own framing,
+> a zero-pretraining test-time-training approach. That materially weakens it as
+> evidence for a model which must *generalize* to unseen RNA — and weakens it
+> further given §10e, where the evidence base was measured to be narrow. The
+> loop is still worth adopting on its measured merits; the parameter-count
+> argument should not lean on HRM.
 
 ### The real error: one parameter budget for two very different tasks
 

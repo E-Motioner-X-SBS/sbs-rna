@@ -294,3 +294,39 @@ and added a permanent test:
 > Honest scope: a single-example overfit on a synthetic stem-plus-cluster
 > pattern. It shows the mechanism (gradient path + optimisability), **not**
 > generalization. Recall 1.000 on one memorised pattern is expected.
+
+### S6 — literature claims, verified by search this session — **PASS with 2 corrections**
+
+| Claim | Verdict |
+|---|---|
+| gRNAde multi-state 3-5%, best at 3 | **VERIFIED** this session |
+| RNAnneal: 16 experimentally-resolved riboswitch conformations, 10-state | **VERIFIED** this session |
+| Pentameric scale = minimum range of elastic couplings | **VERIFIED** this session |
+| Muon ~2x compute efficiency; Moonlight 3B/16B MoE, 5.7T tokens, ~52% FLOPs | **VERIFIED exactly** |
+| HRM 27M, ~1000 examples, 40.3% ARC-AGI; loop drives it, hierarchy ~5pp | **VERIFIED** (ARC Prize independent analysis) |
+| FP8 <0.25% loss error vs BF16 | **VERIFIED**, but **misattributed** |
+
+**Correction 1 (defect #14, misattribution).** The documents said "<0.25% loss
+error at 671B scale". The DeepSeek-V3 FP8 framework was validated at
+**V2-Lite / V2 scale over ~1T tokens**. V3 is 671B, but the ablation
+establishing the figure was smaller. Corrected in ARCHITECTURE.md (2 sites),
+main.tex and the blueprint.
+
+**Correction 2 (missing caveat).** The ARC Prize analysis that credits HRM's
+outer loop *also* reports limited cross-task transfer and that **most of HRM's
+ARC-AGI performance comes from memorising solutions to the evaluation tasks**.
+That caveat existed in prior-art 07 but **did not propagate** to ARCHITECTURE.md,
+main.tex or the blueprint, where HRM is used to justify right-sizing. Since §10e
+independently established that the evidence base is narrow, citing a
+substantially-memorisation result without the qualification is doubly risky.
+Caveat propagated to all three; the loop stands on its measured merits, but the
+parameter-count argument no longer leans on HRM.
+
+### S7 — cross-document consistency — **PASS**
+19/19 shared tokens present in ARCHITECTURE.md, main.tex and blueprint.html.
+All 7 retracted phrasings confirmed absent ("decisive pattern", "strongest
+argument for MoE", "0.76 for monovalent RNA", "contributes/adds more than
+sequence", "at 671B scale", "143,871 unobserved-residue records").
+The 4 apparent gaps were formatting, verified not drift: main.tex uses LaTeX
+thousand separators (`11{,}478`, `17{,}428`, `103{,}964`) and the blueprint
+writes `8.9%` where the others write `8.90%`.
