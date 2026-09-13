@@ -93,10 +93,49 @@ class RNADatabase:
         }
 
     def total_sequences(self) -> int:
-        row = self.con.execute(
-            "SELECT SUM(n_records) FROM files WHERE n_records IS NOT NULL"
-        ).fetchone()
+        """Total *sequences* in the pretraining corpora.
+
+        Counts only sources in the 'sequence' category. It deliberately excludes
+        'derived' sources (the Parquet packs are re-encoded copies of elDORS, so
+        including them double-counts) and every benchmark/structure source, whose
+        `n_records` are 3D chains, CSV lines or structure annotations rather than
+        sequences. Summing `n_records` across all files mixes those units and
+        overstates the corpus.
+        """
+        row = self.con.execute("""
+            SELECT SUM(f.n_records) FROM files f
+            JOIN sources s ON s.name = f.source_name
+            WHERE f.n_records IS NOT NULL AND s.category = 'sequence'
+        """).fetchone()
         return int(row[0] or 0)
+
+    def record_counts_by_category(self) -> dict:
+        """Record counts grouped by source category, with units named.
+
+        `n_records` means different things per category, so the breakdown is the
+        honest view; `total_sequences()` is only the 'sequence' row.
+        """
+        units = {
+            "sequence": "sequences",
+            "derived": "sequences (re-encoded copies of a 'sequence' source)",
+            "benchmark": "annotations / structures / measurements",
+            "structure": "chains or index entries",
+            "alignment": "families",
+        }
+        cur = self.con.execute("""
+            SELECT s.category, COUNT(f.id) n_files, SUM(f.n_records) n_records
+            FROM files f JOIN sources s ON s.name = f.source_name
+            WHERE f.n_records IS NOT NULL
+            GROUP BY s.category ORDER BY 3 DESC
+        """)
+        return {
+            r["category"]: {
+                "n_files": r["n_files"],
+                "n_records": int(r["n_records"] or 0),
+                "unit": units.get(r["category"], "records"),
+            }
+            for r in cur.fetchall()
+        }
 
     def close(self) -> None:
         self.con.close()
@@ -120,4 +159,7 @@ if __name__ == "__main__":
             f"  {sp['name']:20s} {sp['purpose']:10s} "
             f"{sp['n_files']:4d} files {sp['total_bytes'] / 1e9:7.2f} GB"
         )
-    print(f"\nTotal measured records: {db.total_sequences():,}")
+    print(f"\nPretraining sequences: {db.total_sequences():,}")
+    print("Records by category (units differ per category):")
+    for cat, d in db.record_counts_by_category().items():
+        print(f"  {cat:11s} {d['n_records']:>15,}  {d['unit']}")

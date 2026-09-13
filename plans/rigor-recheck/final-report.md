@@ -1,6 +1,6 @@
 # Final Verification Report — PHAROS empirical claims
 
-**Date**: 2026-09-13 · **Cycles**: 1 · **Verdict**: claims stand after 4 corrections
+**Date**: 2026-09-13 · **Cycles**: 1 (extended) · **Verdict**: claims stand after 6 corrections
 
 ## Scope
 Every empirical claim in `research/` re-derived independently (separately-written
@@ -79,6 +79,37 @@ cross-document scan; fixed. All subsequent edits use asserted replacements.
 - **R1 remains open**: the reference implementation proves the hierarchical
   track's cost and structure, not that a trained scorer finds occupied blocks.
 
+## Cycle 1 extension — mmCIF mining and the training design
+
+After the audit closed, the scope extended to mining the data more fully and
+designing the training. Two further defects surfaced, both in new code:
+
+**5. mmCIF ROW WRAPPING.** Long mmCIF rows wrap across physical lines (a
+43-column base-pair-step row arrives as 24 + 19 tokens). A parser requiring all
+fields on one line yields **zero rows** for every wide category — silently. Fixed
+with quote-aware token accumulation. This unlocked 103,964 annotated steps.
+
+**6. METAL/LIGAND MISCLASSIFICATION.** A length-and-case heuristic classified the
+nucleotides G, A, U and C as metals. Replaced with an explicit metal set.
+
+### New measurements (all verified)
+- **103,964 base-pair steps** across 155/180 structures; stiffness matrices
+  `F = kT C^-1` for **76 contexts**. Validated: Watson-Crick means reproduce
+  canonical A-form RNA (GG/CC rise 3.14 twist 29.98; AU/AU rise 2.81 twist 33.94).
+- Stiffness spans **134x**; GC content predicts rigidity (Pearson -0.314).
+- **44,708 curated Mg²⁺ coordination records** whose coordinating-atom ranking
+  (OP2 > OP1 > O6 > O4 > O2' > N7) **independently reproduces** the earlier
+  distance-based result. Two methods, same conclusion.
+- **Stiffness headroom**: M0 19.724 / M1 17.579 (sequence table) / M2 14.551
+  (sequence x structure). Structural context contributes **more** than sequence
+  (+3.028 vs +2.144 nats) => a learned encoder beats a lookup table. This
+  changed the design from a tabulated force field to a learned stiffness encoder
+  with a Gaussian-NLL objective and an explicit acceptance threshold.
+- **Guard sensitivity (OQ-1 CLOSED)**: sweeping the >=30-residue guard down to
+  none moves the Mg-gradient span only 1.760 -> 1.757 sigma, monotonic
+  throughout. A concurrent session's claim to this effect was verified
+  independently rather than accepted.
+
 ## Regression guard
 `scripts/sampling/verify_claims.py` re-derives every headline number, checks the
 derived arithmetic and closed-form physics, verifies all 14 shared tokens appear
@@ -92,6 +123,15 @@ not the data. Confidence is not HIGH because: the sample is 180 structures and
 12 alignments; several length bins are thin; and the central architectural
 claim (learned block detection) is still unproven by construction.
 
-Seven defects have now been found across two sessions (five implementation, two
-in the write-up). That base rate argues for keeping the regression guard in CI
-and re-running it before any future publication of these numbers.
+**Nine defects have now been found across this work** — seven in implementation
+(BGSU HTML-as-CSV, `_exptl.method_details` overwrite, MI outer-product
+broadcast, HPT L3 diagonal-only expansion, HPT L2 budget clamp, mmCIF row
+wrapping, metal/ligand misclassification) and two in the write-up (the Manning
+physics error and the coevolution overclaim), plus one silent unguarded string
+replacement. Every one of them would have produced plausible-looking but wrong
+output rather than an error.
+
+That base rate is the central lesson: **in this kind of work the failure mode is
+silence, not crashes.** Keep `verify_claims.py` in CI, re-run it before any
+publication of these numbers, and treat any weak or surprising result as a
+suspected bug until independently reproduced.

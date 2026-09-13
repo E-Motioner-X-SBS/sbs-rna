@@ -30,7 +30,7 @@ sbs-rna/
 | Sequences | 1,369,926,204 (elDORS 1,323,715,880 + RNAcentral 46,210,324) |
 | Nucleotides (elDORS est.) | ~1.25 trillion |
 | Alphabet | 5 symbols (A, C, G, T, N; ~0.1% N) |
-| Lengths | 10 to 4,096 nt; median 245 nt cross-chunk |
+| Lengths | 10 to 4,096 nt; median **245 nt** over a 1M-sequence cross-chunk sample (all 20 chunks). Chunk 001 alone gives 730 nt — the chunks are source-partitioned, so a single-chunk median is not representative. |
 | 3D chain structures | 27,452 (RNA3DB 15,441 + gRNAde 12,011) |
 | Unique sequences with 3D | 6,661 across 6,846 PDB entries |
 | 3D resolution | median 3.10 A; 13,750 chains <= 4 A; 1,991 <= 2.5 A |

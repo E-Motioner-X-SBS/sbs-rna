@@ -75,7 +75,7 @@ python3 scripts/corpus_tools.py split|sample|stats
 | Rfam families w/ 3D reps | 100 of 4,227 |
 | Rfam-mapped sequences | 10,070,931 |
 | Alphabet | A,G,C,T + N (5 symbols; T→U optional) |
-| Sequence lengths (elDORS) | 10-4096 nt, median 730 |
+| Sequence lengths (elDORS) | 10-4096 nt; median **730 nt in chunk 001**, but **245 nt** across a 1M-sequence cross-chunk sample. The chunks are source-partitioned (9 of 20 have median exactly 151 nt), so quote the cross-chunk figure unless you specifically mean one chunk. |
 
 ## Provenance and licensing
 
