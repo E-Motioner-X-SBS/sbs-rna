@@ -693,6 +693,7 @@ Hierarchical pair track and triangle updates & 45M  & 45M \\
 Motif bank, heads, decoder           & 35M   & 35M \\
 \midrule
 \textbf{PHAROS-Base total}           & $\mathbf{\sim 911M}$ & $\mathbf{\sim 382M}$ \\
+\textbf{PHAROS-Base-v2} (Sec.~\ref{sec:cost}) & $\mathbf{\sim 1{,}401M}$ & $\mathbf{\sim 269M}$ \\
 NucleicBERT (dense)                  & 404M & 404M \\
 \bottomrule
 \end{tabular}
@@ -1251,18 +1252,71 @@ Multi-token prediction & \textbf{Adapt, don't copy.} MTP is defined for causal m
 \end{tabular}
 \end{table}
 
-\subsection{Looped refinement}
-AlphaFold2 recycles three times by default, with the literature sweeping 0--10
-cycles. For PHAROS recycling is \emph{required by the physics} rather than
-optional: $B_{\mathrm{elec}}$ needs a distance estimate that does not exist on
-the first pass. Weight sharing across cycles buys accuracy at zero parameter
-cost---valuable given 6{,}661 unique 3D sequences---and gradients need flow only
-through the final cycle, so recycling costs one cycle of activation memory.
+\subsection{Looped refinement, upgraded}
+\label{sec:loop}
+
+AlphaFold2 recycles three times by default. For PHAROS recycling is
+\emph{required by the physics}: $B_{\mathrm{elec}}$ needs a distance estimate
+that does not exist on the first pass.
+
+The Hierarchical Reasoning Model literature sharpens this considerably, and the
+independent ARC Prize ablation is more informative than the paper itself.
+
+\begin{table}[h]
+\centering
+\caption{What actually drives HRM's performance, per the independent ablation.}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{9.4cm}@{}}
+\toprule
+\textbf{Component} & \textbf{Measured contribution} \\
+\midrule
+Hierarchical H/L architecture & \textbf{$\sim$5pp at most}---``a regular transformer comes within $\sim$5pp without any hyperparameter optimization''; equivalent at one outer loop \\
+\textbf{Outer refinement loop} & \textbf{$+13$pp} from none to one cycle, doubling again from 1 to 8. ``An essential driver'' \\
+Training \emph{with} refinement & Models trained with 16 loops but run with \textbf{one} at inference still gained \textbf{$>15$pp} \\
+Augmentation & 300 suffices, not the 1{,}000 claimed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The loop matters \emph{during training}, not merely at inference. Three
+changes follow.
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=0.2em]
+\item \textbf{Deep supervision at every segment.} The specification previously
+computed loss only after the final recycle. HRM's evidence says supervise each
+segment; this costs nothing and has the largest measured effect.
+\item \textbf{One-step gradient approximation}---detach hidden states between
+segments. This decouples cycle count from activation memory, so \emph{effective
+depth becomes free in memory terms}, removing the choice between AlphaFold2's
+``final cycle only'' and unaffordable full BPTT.
+\item \textbf{Train with more cycles than inference uses} (train 8--16, serve 3).
+\end{enumerate}
+
+\noindent Deferred: ACT/Q-learning halting, so easy inputs stop early---better
+motivated for RNA than for fixed-size puzzle grids, since a clean helix needs one
+pass while a four-way junction with a pseudoknot needs many.
+
+\paragraph{Not adopted.} HRM's two-timescale H/L module split, measured at
+$\sim$5pp and possibly noise. PHAROS already has a hierarchy---coarse blocks to
+fine pairs---justified by measured block occupancy rather than by analogy to
+brain oscillations.
+
+\paragraph{Why this is also a data-efficiency argument.} HRM reaches $40.3\%$ on
+ARC-AGI with 27M parameters and $\sim$1{,}000 training examples, no pretraining,
+on tasks where chain-of-thought models score $0\%$. That is our regime: 6{,}661
+unique sequences with 3D structure. It is direct evidence that a small, heavily
+recurrent model can beat far larger ones when data is scarce and the task is
+structured.
 
 \subsection{The physics-guided objective}
 \begin{align}
 \mathcal{L} =\ & \mathcal{L}_{\text{MLM}} + \mathcal{L}_{\text{2D}} + \mathcal{L}_{\text{contact}} + \mathcal{L}_{\text{dist}} \nonumber\\
  &+ \lambda_1 \mathcal{L}_{\text{stiff}} + \lambda_2 \mathcal{L}_{\mathrm{Mg}} + \lambda_3 \mathcal{L}_{\text{elec}} + \lambda_4 \mathcal{L}_{\text{violation}} + \lambda_5 \mathcal{L}_{\text{flex}} + \lambda_6 \mathcal{L}_{\text{block}}
+\end{align}
+\noindent summed over \emph{every} refinement segment (deep supervision,
+Section~\ref{sec:loop}), not only the final one, with hidden states detached
+between segments so cycle count does not increase activation memory.
+\begin{align}
 \end{align}
 
 The precedent that physics terms help rather than hurt is \textbf{OpenMM-Loss},
@@ -1274,6 +1328,104 @@ outperforming $\chi$OL3 and ROC against NMR and SAXS data.
 
 Every label above comes from data already in hand---Table in
 Section~\ref{sec:mine}---with no new acquisition required.
+
+\section{Training cost, and the configuration that follows}
+\label{sec:cost}
+
+The specification gave a parameter budget but never a training cost. Building one
+from first principles ($6 N_{\text{active}} D$ plus explicit attention terms)
+changes which parts of the architecture matter.
+
+\subsection{Where the cost actually goes}
+
+\begin{table}[h]
+\centering
+\caption{Training FLOPs per token at $L=2048$. \meas}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Term} & \textbf{GFLOPs} & \textbf{Share} \\
+\midrule
+$6 \times N_{\text{active}}$ (FFN + projections) & $2.29$ & $\mathbf{96.3\%}$ \\
+all attention terms & $0.09$ & $3.7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Active parameters are the lever}; context length and attention sparsity
+are nearly irrelevant to training cost at these lengths. Baseline Stage-1 cost
+for 323B tokens at $35\%$ MFU is \textbf{$\sim$1{,}883 A100-hours}, ten days on
+eight A100s.
+
+\paragraph{An honest correction.} Section~4.2 reports an $8\times$ reduction on
+the attention term. That is real, but since attention is only $3.7\%$ of training
+FLOPs, an $8\times$ cut there saves roughly $3\%$ of training compute. The hybrid
+attention stack earns its place on \emph{memory and inference}---a small KV cache
+at long context---not on training throughput.
+
+\subsection{The inefficiency this exposed}
+
+PHAROS-Base places MoE in every \emph{second} block and leaves 16 blocks as dense
+FFN with $d_{\text{ff}} = 3072$. Those dense blocks cost \textbf{113M active
+parameters, exactly as much as all 16 MoE blocks combined}, while carrying far
+less total capacity. It is the worst trade in the architecture.
+
+\subsection{PHAROS-Base-v2}
+
+All 32 blocks MoE with fine-grained experts: $d_{\text{ff}} = 256$, 64 routed
+plus 2 shared, top-4, giving 6 active of 66. Depth unchanged.
+
+\begin{table}[h]
+\centering
+\caption{Base versus Base-v2. \meas}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \textbf{Blocks} & \textbf{Total} & \textbf{Active} & \textbf{A100-h} \\
+\midrule
+Base (as specified) & 32 & 910M & 382M & 1{,}883 \\
+\textbf{Base-v2} & 32 & $\mathbf{1{,}401}$M & $\mathbf{269}$M & $\mathbf{1{,}325}$ \\
+change & same & $+1.54\times$ & $0.70\times$ & $0.70\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+More capacity, less compute, same depth---DeepSeekMoE's fine-grained segmentation
+applied consistently rather than half-way.
+
+\begin{table}[h]
+\centering
+\caption{Stacked cost reduction. Only the first row is certain. \meas}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.0cm}rr>{\raggedright\arraybackslash}p{5.4cm}@{}}
+\toprule
+\textbf{Lever} & \textbf{Factor} & \textbf{A100-h} & \textbf{Basis} \\
+\midrule
+baseline & --- & 1{,}883 & \\
+all-MoE fine-grained & $1.42\times$ & 1{,}325 & measured from parameter counts \\
+Muon optimiser & $2.00\times$ & 662 & reported; must be benchmarked on our shapes \\
+FP8 (H100-class) & $1.60\times$ & 414 & realised, not peak \\
+down-weight 151-nt read chunks & $1.19\times$ & $\mathbf{347}$ & $16.2\%$ of nucleotide mass \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Total $5.4\times$: 1{,}883 $\rightarrow$ $\sim$347 A100-hours}---under
+two days on eight A100s, or about a week on two. A single node for a few days,
+not a cluster.
+
+\subsection{Token budget: staged, not slashed}
+
+At 269M active parameters, Chinchilla-optimal is $\sim$5.4B tokens while we plan
+323B: about $1{,}200$ tokens per active parameter. That resembles $60\times$
+waste and is not. Deliberate over-training is standard practice for inference
+efficiency, and the MoE scaling literature reports that \emph{smaller} MoE models
+benefit from relatively \emph{more} tokens.
+
+The actionable form is a staged budget with checkpoints at 5B, 25B, 100B and 323B
+tokens, stopping when downstream metrics flatten. The first checkpoint costs
+$\sim$1.5\% of the full run, converting an unfalsifiable guess about data volume
+into an empirical decision.
 
 \section{Novelty claims}
 
@@ -1387,6 +1539,8 @@ large-scale training is attempted.
 \texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/verify\_claims.py} & regression guard (exit 0 = reproduces) \\
 \texttt{.../reference/test\_hierarchical\_pair\_track.py} & correctness tests (exit 0 = all pass) \\
+\texttt{.../sampling/training\_cost\_model.py} & \texttt{training\_cost\_base.json} \\
+\texttt{.../sampling/optimize\_architecture.py} & \texttt{architecture\_optimization.json} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1434,6 +1588,12 @@ molecular dynamics and SHAPE experiments. \emph{NAR}, 2015.
 \url{https://academic.oup.com/nar/article/43/15/7260/2414435}
 \bibitem{mgnet} Graph deep learning locates magnesium ions in RNA, 2023.
 \url{https://pubmed.ncbi.nlm.nih.gov/37292390/}
+\bibitem{hrm} Hierarchical Reasoning Model, 2025.
+\url{https://arxiv.org/pdf/2506.21734}
+\bibitem{hrmablation} The Hidden Drivers of HRM's Performance on ARC-AGI
+(independent ablation), ARC Prize. \url{https://arcprize.org/blog/hrm-analysis}
+\bibitem{muon} Muon is Scalable for LLM Training (Moonlight), 2025.
+\url{https://arxiv.org/pdf/2502.16982}
 \bibitem{bench2d} Comprehensive benchmarking of large language models for RNA
 secondary structure prediction. \emph{Briefings in Bioinformatics}, 2025.
 \url{https://academic.oup.com/bib/article/26/2/bbaf137/8109668}

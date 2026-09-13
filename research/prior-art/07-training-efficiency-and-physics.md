@@ -187,3 +187,57 @@ than a lookup table and the design should be abandoned.
 - HB-CUFIX RNA force field (J Chem Phys 2025) https://pubs.aip.org/aip/jcp/article/162/20/200901/3347562/HB-CUFIX-Force-field-for-accurate-RNA-simulations
 - Revised RNA dihedral parameters (χOL3) https://pubs.acs.org/doi/10.1021/acs.jctc.6b00870
 - **Own measurement**: `data/samples/analysis/basepair_geometry.json`
+
+---
+
+## 7.6 Hierarchical Reasoning Models — adopt the loop, not the hierarchy
+
+**HRM** (Sapient, 2025) is directly relevant because its headline is *extreme data
+efficiency*: 27M parameters, ~1,000 training examples, no pretraining and no
+chain-of-thought supervision, reaching 40.3% on ARC-AGI, 55.0% on Sudoku-Extreme
+and 74.5% on Maze-Hard — where CoT methods score 0%. **That is our regime**: we
+have 6,661 unique sequences with 3D structure, not millions.
+
+Its stated mechanisms:
+- Two interdependent recurrent modules on different timescales — a high-level
+  module for slow abstract planning, a low-level one for rapid detailed computation.
+- **Deep supervision**: multiple forward segments, loss and parameter update at
+  the end of each, hidden states detached between segments.
+- **One-step gradient approximation**: detaching hidden states before the next
+  segment avoids BPTT's memory cost while stabilising training.
+- **Adaptive Computation Time (ACT)**: a Q-head predicts halt/continue, so easy
+  instances stop early and hard ones get more compute.
+
+### The independent ablation matters more than the paper
+
+The ARC Prize team ablated HRM, and the result is not what the paper emphasises:
+
+| Component | Measured contribution |
+|---|---|
+| **Hierarchical H/L architecture** | **~5pp at most** — "a regular transformer comes within ~5pp without any hyperparameter optimization", and at one outer loop the two are equivalent |
+| **Outer refinement loop** | **+13pp** from none to one cycle; gains double again from 1 to 8 loops. "The refinement outer loop is an essential driver" |
+| Training *with* refinement | Models trained with 16 loops but run with **1** at inference still gained **>15pp** — the loop matters during *training*, not just inference |
+| Cross-task transfer | small — 31% vs 41% without the extra training sets; HRM is "fundamentally a zero-pretraining test-time training approach" |
+| Augmentation | 300 augmentations reach near-max, not the 1,000 claimed |
+
+**Conclusion: the architectural novelty was oversold; the refinement loop and
+task-specific training drove the gains.**
+
+### What PHAROS should take, and what it should not
+
+| HRM element | Verdict for PHAROS |
+|---|---|
+| Two-timescale H/L module split | **Do not adopt as a claimed win.** Independently measured at ~5pp, possibly noise. We already have a genuine hierarchy (coarse blocks -> fine pairs) justified by *measured* block occupancy, not by analogy to brain oscillations. |
+| **Outer refinement loop** | **Adopt, and train with more cycles than inference uses.** This is the one component with a large measured effect, and PHAROS already requires recycling for `B_elec` — so the mechanism is free. |
+| **Deep supervision at every segment** | **Adopt.** Our current spec computes loss only after the final recycle (AF2-style). HRM's evidence says supervising *each* segment is what pays. |
+| **One-step gradient (detach between segments)** | **Adopt.** Gives effective depth at **constant** memory — it decouples the number of refinement cycles from activation memory, which is exactly the constraint that makes deep recycling expensive. |
+| **ACT / Q-learning halting** | **Adopt (later).** RNA difficulty varies enormously — a clean helix needs one pass, a four-way junction with a pseudoknot needs many. Adaptive compute is better motivated here than on fixed-size puzzle grids. |
+
+The data-efficiency evidence also supports the overall bet: HRM shows a small,
+heavily-recurrent model can beat far larger ones when data is scarce and the task
+is structured. RNA 3D prediction is precisely that.
+
+## Sources (7.6)
+- Hierarchical Reasoning Model https://arxiv.org/pdf/2506.21734
+- HRM official release https://github.com/sapientinc/HRM
+- **The Hidden Drivers of HRM's Performance on ARC-AGI** (independent ablation) https://arcprize.org/blog/hrm-analysis

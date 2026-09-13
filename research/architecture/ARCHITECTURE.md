@@ -175,8 +175,17 @@ where global mixing is needed, and they are rare. Full attention is reserved for
 the 4 blocks that feed the pair track.
 
 **Cost at L=4096**: dense-32-block attention would be 32 x 16.8M = 537M pair
-evaluations; PHAROS pays 4 x 16.8M = 67M, a **8x reduction** on the attention
-term, before MoE savings.
+evaluations; PHAROS pays 4 x 16.8M = 67M, an **8x reduction on the attention
+term**.
+
+> **Honest scoping, added after building the cost model (§10c).** That 8x is real
+> but it is *not* a large training-cost win: at L=2048 the attention terms are
+> only **3.7%** of training FLOPs, the other 96.3% being the `6 x N_active` term.
+> An 8x cut of 3.7% saves ~3% of training compute. **The hybrid attention earns
+> its place on memory and inference, not training throughput** — a small KV cache
+> at long context (Jamba reaches 256K with 4 GB) and graceful behaviour at
+> L=4096. The lever for *training* cost is active parameters, and §10c acts on
+> that instead.
 
 ### 4.2 Physics-biased attention
 
@@ -269,7 +278,8 @@ corpus than families are.
 | Dense FFN (16 non-MoE blocks) | 113M | 113M |
 | Hierarchical pair track + triangle | ~45M | 45M |
 | Motif bank + heads + decoder | ~35M | 35M |
-| **Total** | **~911M** | **~382M** |
+| **Total (Base)** | **~911M** | **~382M** |
+| **Total (Base-v2, recommended — §10c)** | **~1,401M** | **~269M** |
 
 Versus **NucleicBERT: 404M, all active.** PHAROS-Base carries 2.3x the capacity
 at comparable active compute, and its attention term is ~8x cheaper at long
@@ -786,18 +796,46 @@ and is in production use (Kimi K2).
 | **Multi-head Latent Attention** | **Skip.** Largely redundant — 20 of our 32 blocks are already linear attention, so the KV cache is small by construction. |
 | **Multi-token prediction** | **Adapt, don't copy.** MTP is defined for causal LMs; our objective is span-masked. The analogue is predicting a whole masked *span* jointly rather than independently per position. Worth an ablation, not a commitment. |
 
-### 10b.3 Looped refinement is structural, not an add-on
+### 10b.3 Looped refinement — upgraded from AF2-style to HRM-style
 
-AlphaFold2 recycles 3x by default (swept 0-10 in the literature; some pipelines
-iterate to convergence). For PHAROS recycling is **required by the physics**:
-`B_elec` needs a distance estimate `d_ij`, which does not exist on the first
-pass. It is disabled at recycle 0 and enabled from recycle 1 onward.
+AlphaFold2 recycles 3x by default. For PHAROS recycling is **required by the
+physics**: `B_elec` needs a distance estimate `d_ij`, which does not exist on the
+first pass. It is disabled at recycle 0 and enabled from recycle 1 onward.
 
-Two consequences worth stating:
-1. **Weight sharing across cycles buys accuracy at zero parameter cost** —
-   valuable given 6,661 unique 3D sequences.
-2. Gradients need flow only through the final cycle (AF2's approach), so
-   recycling costs one cycle of activation memory, not N.
+**The Hierarchical Reasoning Model literature sharpens this considerably**, and
+the independent ARC Prize ablation is more informative than the paper. It found
+the two-timescale hierarchy contributes **~5pp at most** — "a regular transformer
+comes within ~5pp" — while the **outer refinement loop is the essential driver**:
+**+13pp** from no refinement to one cycle, doubling again from 1 to 8 loops.
+Decisively, models trained with 16 loops but run with **one** at inference still
+gained **>15pp**: *the loop matters during training, not merely at inference*.
+
+Three changes to the design follow:
+
+1. **Deep supervision at every segment.** The spec previously computed loss only
+   after the final recycle. HRM's evidence says supervise *each* segment. This
+   costs nothing and is the component with the largest measured effect.
+2. **One-step gradient approximation** — detach hidden states between segments.
+   This decouples cycle count from activation memory: **effective depth becomes
+   free in memory terms**, which is precisely the constraint that otherwise makes
+   deep recycling expensive. It also removes the need to choose between AF2's
+   "final cycle only" and unaffordable full BPTT.
+3. **Train with more cycles than inference uses** (e.g. train 8-16, serve 3),
+   since the training-time loop is what carries the gain.
+
+Deferred: **ACT / Q-learning halting**, so easy inputs stop early. RNA motivates
+this better than fixed-size puzzle grids do — a clean helix needs one pass, a
+four-way junction with a pseudoknot needs many.
+
+**Not adopted**: HRM's two-timescale H/L module split, measured at ~5pp and
+possibly noise. PHAROS already has a hierarchy — coarse blocks to fine pairs —
+justified by *measured* block occupancy (§5.2) rather than by analogy.
+
+**Why this is also a data-efficiency argument.** HRM reaches 40.3% on ARC-AGI
+with 27M parameters and ~1,000 training examples, no pretraining, where CoT
+models score 0% on its harder tasks. That is our regime: 6,661 unique sequences
+with 3D structure. It is direct evidence that a small, heavily-recurrent model
+can beat far larger ones when data is scarce and the task is structured.
 
 ### 10b.4 The full physics-guided objective
 
@@ -811,6 +849,10 @@ L = L_MLM + L_2D + L_contact + L_dist
   + lambda_6 * L_block        (block occupancy BCE at b=16 and b=4 -- §5.4b;
                                without this the pair-track selectors get no
                                usable training signal at all)
+
+  summed over EVERY refinement segment (deep supervision, §10b.3), not only the
+  final one, with hidden states detached between segments so cycle count does
+  not increase activation memory.
 ```
 
 Precedent that this helps rather than hurts: **OpenMM-Loss** implements MD
@@ -839,6 +881,77 @@ conformer populations) and **HB-CUFIX** (2025), which outperforms χOL3 and ROC
 against NMR and SAXS on single-stranded oligonucleotides. Turner
 nearest-neighbour free energies remain the reference for 2D thermodynamics and
 already initialise `B_wc` (§4.2).
+
+## 10c. Training cost, measured — and the configuration that follows
+
+The spec gave a parameter budget but never a training cost.
+`scripts/sampling/training_cost_model.py` builds one from first principles
+(`6 x N_active x D` plus explicit attention terms), and
+`optimize_architecture.py` searches the design space against it.
+
+### Where the cost actually goes [measured]
+
+At L=2048, per token:
+
+| Term | GFLOPs | Share |
+|---|---|---|
+| `6 x N_active` (FFN + projections) | 2.29 | **96.3%** |
+| all attention terms | 0.09 | 3.7% |
+
+**Active parameters are the lever.** Context length and attention sparsity are
+nearly irrelevant to training cost at these lengths.
+
+Baseline Stage-1 cost (323B tokens, one elDORS epoch, 35% MFU):
+**~1,883 A100-hours** = 10 days on 8 A100s.
+
+### The inefficiency this exposed
+
+PHAROS-Base puts MoE in every *second* block and leaves 16 blocks as dense FFN
+with `d_ff = 3072`. Those dense blocks cost **113M active parameters — exactly as
+much as all 16 MoE blocks combined** — while carrying far less total capacity.
+That is the single worst trade in the architecture.
+
+### PHAROS-Base-v2 (recommended)
+
+All 32 blocks MoE, with **fine-grained experts**: `d_ff = 256`, **64 routed + 2
+shared**, top-4 => 6 active of 66. Depth unchanged.
+
+| | blocks | total | active | A100-h |
+|---|---|---|---|---|
+| Base (as specified) | 32 | 910M | 382M | 1,883 |
+| **Base-v2** | 32 | **1,401M** | **269M** | **1,325** |
+| change | same | **+1.54x capacity** | **0.70x** | **0.70x** |
+
+**More capacity, less compute, same depth.** This is simply DeepSeekMoE's
+fine-grained segmentation applied consistently rather than half-way.
+
+### Stacked cost reduction
+
+| Lever | Factor | A100-h | Basis |
+|---|---|---|---|
+| baseline | — | 1,883 | |
+| all-MoE fine-grained | 1.42x | 1,325 | measured from parameter counts |
+| Muon optimiser | 2.00x | 662 | reported ~2x — **must be benchmarked on our shapes** |
+| FP8 (H100-class) | 1.60x | 414 | realised not peak; <0.25% loss error at 671B |
+| down-weight 151-nt read chunks | 1.19x | **347** | 16.2% of nucleotide mass, little long-range signal |
+
+**Total 5.4x: 1,883 -> ~347 A100-hours** — under 2 days on 8 A100s, or about a
+week on 2. The order of magnitude is *a single node for a few days*, not a
+cluster. Only the first row is certain; the Muon and FP8 factors are reported
+figures that must be re-measured here.
+
+### Token budget: staged, not slashed
+
+At 269M active, Chinchilla-optimal is ~5.4B tokens while we plan 323B — about
+**1,200 tokens per active parameter**. That looks like 60x of waste and is not:
+deliberate over-training is standard for inference efficiency, and the MoE
+scaling literature reports that *smaller* MoE models benefit from relatively
+**more** tokens.
+
+The actionable form is a **staged budget with checkpoints at 5B / 25B / 100B /
+323B tokens**, stopping when downstream metrics flatten. The first checkpoint
+costs ~1.5% of the full run, so the measurement is nearly free — and it converts
+an unfalsifiable guess about data volume into an empirical decision.
 
 ## 11. Novelty claims, stated precisely
 

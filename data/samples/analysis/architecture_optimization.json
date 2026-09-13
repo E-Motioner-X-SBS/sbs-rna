@@ -1,0 +1,70 @@
+{
+  "baseline_a100_hours": 1883,
+  "candidates": [
+    {
+      "name": "all-MoE, top-2+1 shared",
+      "total_M": 1401,
+      "active_M": 269,
+      "a100_hours": 1325,
+      "compute_vs_base": 0.704,
+      "capacity_vs_base": 1.54
+    },
+    {
+      "name": "all-MoE, top-2+2 shared",
+      "total_M": 1439,
+      "active_M": 306,
+      "a100_hours": 1511,
+      "compute_vs_base": 0.802,
+      "capacity_vs_base": 1.58
+    },
+    {
+      "name": "all-MoE, top-3+1 shared",
+      "total_M": 1401,
+      "active_M": 306,
+      "a100_hours": 1511,
+      "compute_vs_base": 0.802,
+      "capacity_vs_base": 1.54
+    },
+    {
+      "name": "all-MoE, top-4+2 shared",
+      "total_M": 1439,
+      "active_M": 382,
+      "a100_hours": 1883,
+      "compute_vs_base": 1.0,
+      "capacity_vs_base": 1.58
+    },
+    {
+      "name": "all-MoE finer (dff 256, top-4+2)",
+      "total_M": 1401,
+      "active_M": 269,
+      "a100_hours": 1325,
+      "compute_vs_base": 0.704,
+      "capacity_vs_base": 1.54
+    },
+    {
+      "name": "all-MoE finer (dff 256, top-6+2)",
+      "total_M": 1401,
+      "active_M": 306,
+      "a100_hours": 1511,
+      "compute_vs_base": 0.802,
+      "capacity_vs_base": 1.54
+    },
+    {
+      "name": "baseline but top-2",
+      "total_M": 910,
+      "active_M": 344,
+      "a100_hours": 1697,
+      "compute_vs_base": 0.901,
+      "capacity_vs_base": 1.0
+    },
+    {
+      "name": "24 blocks, all-MoE top-2+1",
+      "total_M": 1071,
+      "active_M": 222,
+      "a100_hours": 1092,
+      "compute_vs_base": 0.58,
+      "capacity_vs_base": 1.18
+    }
+  ],
+  "stacked_a100_hours": 341
+}

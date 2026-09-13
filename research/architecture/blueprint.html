@@ -154,6 +154,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <span class="chip alert">design revised after validation</span>
     <span class="chip ok">reference impl. benchmarked</span>
     <span class="chip ok">audited &amp; corrected</span>
+    <span class="chip ok">~347 A100-h to train</span>
   </div>
 </header>
 
@@ -1086,6 +1087,115 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     parameter sets are AMBER χOL3 and HB-CUFIX (2025), the latter outperforming χOL3 and ROC
     against NMR and SAXS. <b>Every label above came from data already in hand — no new
     acquisition.</b></p>
+  </div>
+</section>
+
+<!-- ================= 11. COST + REFINEMENT ================= -->
+<section>
+  <div class="sechead"><span class="secnum">11</span><h2>Making it affordable</h2></div>
+  <p class="lede">The spec gave a parameter budget but never a training cost. Building one from
+  first principles changed which parts of the architecture matter — and corrected one of our own
+  claims.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Where the FLOPs actually go</h3>
+      <p class="note">per token at L=2048</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Term</th><th class="num">GFLOPs</th><th class="num">share</th></tr></thead>
+          <tbody>
+            <tr class="total"><td>6 × N<sub>active</sub> (FFN + projections)</td><td class="num">2.29</td><td class="num">96.3%</td></tr>
+            <tr><td>all attention terms</td><td class="num">0.09</td><td class="num">3.7%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="risk" style="margin-top:14px">
+        <span class="n">FIX</span>
+        <p><b>This corrects our own §03 claim.</b> The hybrid attention is 8× cheaper on the
+        attention term — but attention is only 3.7% of training FLOPs, so that saves ~3% of
+        training compute. <b>The hybrid stack earns its place on memory and inference</b> (small
+        KV cache at long context), <i>not</i> on training throughput. The lever for training cost
+        is active parameters.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>The inefficiency that exposed</h3>
+      <p class="note">PHAROS-Base vs the recommended Base-v2</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px">Base puts MoE in every
+      <i>second</i> block and leaves 16 blocks as dense FFN at d<sub>ff</sub>=3072. Those dense
+      blocks cost <b>113M active — exactly as much as all 16 MoE blocks combined</b> — for far
+      less capacity. Going all-MoE with fine-grained experts (d<sub>ff</sub>=256, 64 routed + 2
+      shared, top-4) fixes it.</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th></th><th class="num">blocks</th><th class="num">total</th><th class="num">active</th><th class="num">A100-h</th></tr></thead>
+          <tbody>
+            <tr><td>Base</td><td class="num">32</td><td class="num">910M</td><td class="num">382M</td><td class="num">1,883</td></tr>
+            <tr class="total"><td>Base-v2</td><td class="num">32</td><td class="num">1,401M</td><td class="num">269M</td><td class="num">1,325</td></tr>
+            <tr><td style="color:var(--mg)">change</td><td class="num">same</td><td class="num" style="color:var(--mg)">+1.54×</td><td class="num" style="color:var(--mg)">0.70×</td><td class="num" style="color:var(--mg)">0.70×</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;color:var(--ink-3);margin-top:10px">More capacity, less compute,
+      same depth — DeepSeekMoE's fine-grained segmentation applied consistently rather than half-way.</p>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <thead><tr><th>Lever</th><th class="num">factor</th><th class="num">A100-h</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--ink-3)">baseline</td><td class="num">—</td><td class="num">1,883</td><td></td></tr>
+        <tr><td>all-MoE fine-grained</td><td class="num">1.42×</td><td class="num">1,325</td><td>measured from parameter counts</td></tr>
+        <tr><td>Muon optimiser</td><td class="num">2.00×</td><td class="num">662</td><td style="color:var(--warn)">reported — must be benchmarked on our shapes</td></tr>
+        <tr><td>FP8 (H100-class)</td><td class="num">1.60×</td><td class="num">414</td><td>realised, not peak</td></tr>
+        <tr class="total"><td>down-weight 151-nt read chunks</td><td class="num">1.19×</td><td class="num">347</td><td>16.2% of nucleotide mass</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="finding" style="margin-top:16px">
+    <span class="tag">Result</span>
+    <p><b>5.4× total: 1,883 → ~347 A100-hours.</b> Under two days on 8 A100s, or about a week on
+    2 — <b>a single node for a few days, not a cluster</b>. Only the first row is certain; the
+    Muon and FP8 factors are reported figures that must be re-measured here.
+    On the token budget: 323B tokens is ~1,200 per active parameter, which <i>looks</i> like 60×
+    of waste but is not — deliberate over-training is standard, and the MoE literature reports
+    smaller MoE models benefit from <i>more</i> tokens. The actionable form is a
+    <b>staged budget</b> with checkpoints at 5B/25B/100B/323B, stopping when metrics flatten.
+    The first checkpoint costs ~1.5% of the run.</p>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>Hierarchical Reasoning Models — adopt the loop, not the hierarchy</h3>
+    <p class="note">HRM: 27M params, ~1,000 examples, no pretraining → 40.3% ARC-AGI. That is our data regime.</p>
+    <div class="tablewrap" style="border:none">
+      <table style="min-width:0">
+        <thead><tr><th>Component</th><th>Independently measured contribution</th></tr></thead>
+        <tbody>
+          <tr><td>Hierarchical H/L architecture</td><td style="color:var(--warn)"><b>~5pp at most</b> — a plain transformer comes within ~5pp</td></tr>
+          <tr class="total"><td>Outer refinement loop</td><td style="color:var(--mg)"><b>+13pp</b> for one cycle, doubling again to 8 — "an essential driver"</td></tr>
+          <tr><td>Training <i>with</i> refinement</td><td>trained at 16 loops, run at <b>1</b> → still <b>&gt;15pp</b> gain</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="finding" style="margin-top:14px">
+      <span class="tag">Adopted</span>
+      <p><b>Deep supervision at every segment</b> (we previously computed loss only after the
+      final recycle); <b>one-step gradient</b> — detach hidden states between segments, which
+      decouples cycle count from activation memory so <b>effective depth becomes free in memory
+      terms</b>; and <b>train with more cycles than inference uses</b> (train 8–16, serve 3),
+      since the training-time loop carries the gain. ACT halting deferred — RNA motivates it
+      better than fixed puzzle grids, since a helix needs one pass and a four-way junction many.</p>
+    </div>
+    <div class="risk" style="margin-top:12px">
+      <span class="n">NOT ADOPTED</span>
+      <p>HRM's two-timescale H/L split — measured at ~5pp and possibly noise. <b>PHAROS already
+      has a hierarchy</b> (coarse blocks → fine pairs) justified by <i>measured</i> block
+      occupancy rather than by analogy to brain oscillations. The architectural novelty in HRM
+      was oversold; the loop is what works.</p>
+    </div>
   </div>
 </section>
 
