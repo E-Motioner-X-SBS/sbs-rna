@@ -1289,6 +1289,78 @@ because an undefined router is not a detail: it decides which experts fire.
 ribosomal and complex-embedded RNA, which must report performance split by
 isolated vs complexed context.*
 
+## 10f. Decided parameters and formats [cycle 3]
+
+Full record in `research/architecture/DECISIONS.md`. Three reversals.
+
+### The conflict
+
+The design wanted three incompatible things: the **smallest viable model**
+(61M active), the **full 323B-token corpus**, and **4-bit** precision.
+
+*Low-Bit Quantization Favors Undertrained LLMs* (ACL 2025, arXiv 2411.17691,
+1500+ checkpoints) finds quantization-induced degradation is **worst for small
+models trained on many tokens** — *"smaller models require higher precision at
+high training token counts."*
+
+| Model | active | tok/param @323B | x Chinchilla | 4-bit |
+|---|---|---|---|---|
+| Micro | 12M | 26,917 | 1,346x | worst case |
+| Mini | 30M | 10,767 | 538x | worst case |
+| **Small** | **61M** | **5,295** | **265x** | **worst case** |
+| Base-v2 | 269M | 1,201 | 60x | risky |
+
+RNA worsens it: measured entropy **2.0167 bits/nt** against ~11 for an English
+token, so the corpus is more redundant than the token count implies.
+
+### Decisions
+
+| # | Decision | Status |
+|---|---|---|
+| D1 | Keep **PHAROS-Small**, 61M active / 149M total | unchanged |
+| D2 | **Token budget 323B -> staged 25B**, stop on plateau (410 tok/param) | **REV-3** |
+| D3 | **BF16 first, FP8 on Hopper after baseline. No 4-bit at this size.** | **REV-5** |
+| D4 | **No QAT in stage 1** — it is a deployment technique | new |
+| D5 | Attributes enter as **input features via one projection**, not a wider `d_model` | new |
+| D6 | **Two vocabularies**: 5 for pretraining, extended for structures (G7) | changed |
+| D7 | **Hardware-explicit cost**; A100 has no FP8 | **REV-4 / defect #15** |
+
+### Why not 4-bit here
+
+- **NF4 cannot train from scratch at all.** It is W4A16 with a *frozen* 4-bit
+  base; gradients reach only LoRA adapters. A finetuning/inference format.
+- **NVFP4 is a genuine pretraining format** (no measurable loss vs an FP8
+  baseline) — but validated at **8B / 1T tokens = 125 tok/param**. We are at
+  **5,295**. The result does not transfer.
+- **MXFP4** needs ~36% more tokens than NVFP4 for equal loss.
+
+### Defect #15 — the published cost was not a real unit
+
+A100 (Ampere) has **no FP8 tensor cores**; FP8 arrived with Hopper. The cost was
+quoted in **A100-hours** while applying a **1.60x FP8** lever, so "~79
+A100-hours" existed on no single machine, and "3.3 days on a single A100" was
+unreachable. Corrected, with levers split by what they depend on
+(hardware-independent: Muon 2.00x, read down-weighting 1.19x -> 2.38x):
+
+| Hardware + format | @323B | **@25B (decided)** |
+|---|---|---|
+| A100 bf16 | 126 h | **~10 h** |
+| H100 fp8 | 20 h | **~1.6 h** |
+
+**The token cut is a 12.9x saving against FP8's 1.6x** — and unlike a precision
+lever it costs no accuracy, because the dropped tokens are redundant.
+
+### Where the over-provisioned bits go
+
+Measured: a fully attributed nucleotide carries **58.9 bits**; a 512-dim bf16
+token holds **8,192** — **139x over-provisioned**. `d_model` is *compute* space,
+not storage. So attributes are nearly free, but **width is not**: FLOPs go as
+`6*N_active` and widening `d` is quadratic in the FFN.
+
+Only **26.0 of the 58.9 bits** are available at inference for an arbitrary
+sequence. The rest are **supervision targets, not inputs** — feeding B-factor or
+Mg-distance in would leak the answer.
+
 ## 11. Novelty claims, stated precisely
 
 | # | Claim | Prior art status |

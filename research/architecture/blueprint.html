@@ -156,6 +156,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <span class="chip ok">audited &amp; corrected</span>
     <span class="chip ok">~79 A100-h to train</span>
     <span class="chip">149M total / 61M active</span>
+    <span class="chip ok">BF16 · 25B tokens · no 4-bit</span>
   </div>
 </header>
 
@@ -1467,6 +1468,106 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <b>A single-chain RNA structure model, up to 4,096 nt, trained predominantly on ribosomal
     and complex-embedded RNA, which must report performance split by isolated vs complexed
     context.</b>
+  </div>
+</section>
+
+<!-- ================= 15. DECISIONS ================= -->
+<section>
+  <div class="sechead"><span class="secnum">15</span><h2>Decided: size, tokens, precision</h2></div>
+  <p class="lede">Asked to look at quantization-aware training and the data and <b>decide</b>,
+  the analysis surfaced a conflict the design could not satisfy. Three reversals follow.</p>
+
+  <div class="panel" style="border-left:3px solid var(--warn);margin-bottom:20px">
+    <h3>The conflict</h3>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px">The design wanted three
+    incompatible things at once: the <b>smallest viable model</b> (61M active), the
+    <b>full 323B-token corpus</b>, and <b>4-bit</b> precision.</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px"><i>Low-Bit Quantization
+    Favors Undertrained LLMs</i> (ACL 2025, 1500+ checkpoints) finds degradation is
+    <b>worst for small models trained on many tokens</b> — "smaller models require higher
+    precision at high training token counts."</p>
+    <div class="tablewrap" style="border:none">
+      <table style="min-width:0">
+        <thead><tr><th>Model</th><th class="num">active</th><th class="num">tok/param @323B</th><th class="num">× Chinchilla</th><th>4-bit</th></tr></thead>
+        <tbody>
+          <tr><td>Micro</td><td class="num">12M</td><td class="num">26,917</td><td class="num">1,346×</td><td style="color:var(--warn)">worst case</td></tr>
+          <tr><td>Mini</td><td class="num">30M</td><td class="num">10,767</td><td class="num">538×</td><td style="color:var(--warn)">worst case</td></tr>
+          <tr class="total"><td><b>Small</b></td><td class="num"><b>61M</b></td><td class="num"><b>5,295</b></td><td class="num"><b>265×</b></td><td style="color:var(--warn)"><b>worst case</b></td></tr>
+          <tr><td>Base-v2</td><td class="num">269M</td><td class="num">1,201</td><td class="num">60×</td><td>risky</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px"><b>RNA makes it worse.</b>
+    Measured sequence entropy is <span class="mono">2.0167 bits/nt</span> against ~11 for an
+    English token, so the corpus is more redundant than its token count implies.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Why not 4-bit here</h3>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Format</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td><b>NF4</b> (QLoRA)</td><td style="color:var(--warn)"><b>Cannot train from scratch.</b> W4A16 with a <i>frozen</i> 4-bit base; gradients reach only LoRA adapters. A finetuning/inference format.</td></tr>
+            <tr><td><b>NVFP4</b></td><td>A genuine pretraining format — no measurable loss vs FP8. But validated at <b>8B/1T = 125 tok/param</b>; we are at <b>5,295</b>. Does not transfer.</td></tr>
+            <tr><td>MXFP4</td><td>needs ~36% more tokens than NVFP4 for equal loss</td></tr>
+            <tr class="total"><td><b>FP8</b></td><td style="color:var(--mg)">adopt on Hopper after the BF16 baseline reproduces</td></tr>
+            <tr class="total"><td><b>BF16</b></td><td style="color:var(--mg)"><b>train here</b> — precision is not the constraint</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px"><b>QAT is deferred.</b> It is
+      a deployment technique, not a training one. It beats PTQ at INT4 — but on <i>large</i>
+      models, and at 61M/265× Chinchilla the recovery task is hardest exactly here. If 4-bit
+      inference is later needed: QAT not PTQ, and <b>measure degradation at our own size</b>
+      rather than assuming a published number transfers.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Defect #15 — the cost was not a real unit</h3>
+      <p class="note">A100 (Ampere) has no FP8 tensor cores; FP8 arrived with Hopper</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px">The cost was quoted in
+      <b>A100-hours</b> while applying a <b>1.60× FP8</b> lever. "~79 A100-hours" existed on no
+      single machine, and "3.3 days on a single A100" was unreachable.</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Hardware + format</th><th class="num">@323B</th><th class="num">@25B (decided)</th></tr></thead>
+          <tbody>
+            <tr><td>A100 bf16</td><td class="num">126 h</td><td class="num"><b>~10 h</b></td></tr>
+            <tr class="total"><td>H100 fp8</td><td class="num">20 h</td><td class="num"><b>~1.6 h</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="finding" style="margin-top:14px">
+        <span class="tag">The real lever</span>
+        <p><b>The token cut is a 12.9× saving against FP8's 1.6×</b> — and unlike a precision
+        lever it costs <i>no accuracy</i>, because the dropped tokens are redundant rather than
+        informative. Cutting 323B → 25B gives 410 tok/param, still deliberately over-trained
+        for inference efficiency, without entering the degradation corner.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>Where the over-provisioned bits actually go</h3>
+    <p class="note">the "more attributes, fewer bits" idea — corrected</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px">Measured: a fully attributed
+    nucleotide carries <b>58.9 bits</b>; a 512-dim bf16 token holds <b>8,192</b> —
+    <b>139× over-provisioned</b>. So <span class="mono">d_model</span> is <i>compute</i> space,
+    not storage.</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px"><b>The correct form of the
+    idea</b>: attributes enter as <b>input features through one projection</b>. They do
+    <i>not</i> justify a wider <span class="mono">d_model</span> — training FLOPs go as
+    <span class="mono">6·N_active</span> and widening <span class="mono">d</span> is quadratic in
+    the FFN. Attributes are nearly free; width is not.</p>
+    <div class="risk">
+      <span class="n">CARE</span>
+      <p>Only <b>26.0 of the 58.9 bits</b> are available at inference for an arbitrary sequence
+      (identity, position, local GC, recycled pairing state, ionic condition, in-complex flag).
+      The rest — B-factor, Mg distance, Saenger class, disorder — are <b>supervision targets,
+      not inputs</b>. Feeding them in would leak the answer.</p>
+    </div>
   </div>
 </section>
 

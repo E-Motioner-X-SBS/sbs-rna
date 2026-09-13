@@ -330,3 +330,37 @@ sequence", "at 671B scale", "143,871 unobserved-residue records").
 The 4 apparent gaps were formatting, verified not drift: main.tex uses LaTeX
 thousand separators (`11{,}478`, `17{,}428`, `103{,}964`) and the blueprint
 writes `8.9%` where the others write `8.90%`.
+
+## Cycle 3
+
+### P1 — precision formats, verified by search — **PASS, 1 decisive finding**
+NF4: W4A16 only, base **frozen**, gradients to LoRA adapters only -> **cannot
+train from scratch**. NVFP4: E2M1, 16-elem blocks, FP8 scale; pretraining recipe
+reports no measurable loss vs FP8, validated at **8B/1T = 125 tok/param**.
+MXFP4 needs ~36% more tokens. FP8 <0.25% at V2/V2-Lite scale.
+
+### P2 — is precision the bottleneck? — **NO, measured**
+elDORS entropy **2.0167 bits/nt**; 512-dim bf16 token = 8,192 bits = **4,062x**.
+Fully attributed nucleotide 58.9 bits -> still **139x**. Coordinates: median
+resolution 3.10 A, so fp16 is **3,100x** finer than the noise floor.
+
+### P3 — defect #15, hardware incoherence — **CONFIRMED**
+A100 (SM80) has no FP8 tensor cores. Cost quoted in A100-hours with a 1.60x FP8
+lever. Independent recomputation: A100 bf16 **299 h** (matches the doc's 299,
+confirming that figure was right and the later levers broke the unit);
+H100 fp8 **47 h**; ratio 6.3x. The published 79 sits between them.
+
+### P4 — token attributes — **16 inventoried, coverage measured**
+58.9 bits total; **26.0 available at inference**; 6 structure-only (supervision,
+not input); 3 MSA-gated; 1 not acquired (SHAPE/DMS).
+
+### P5 — repo layout — **created and tested**
+`src/pharos/{model,data,train,eval,physics}` + `configs/`. The physics module is
+real and locked: independently reproduces A-RNA theta **0.8044** and B-DNA
+**0.7625**, and demonstrates ion-conditioning (Debye length 9.61 -> 6.88 A as
+salt rises, |B_elec| falling with it). `test_manning.py` ALL TESTS PASS.
+
+### P6 — the joint decision — **3 reversals (REV-3/4/5)**
+QiD scaling law scored across the ladder; PHAROS-Small at 265x Chinchilla is the
+worst case. Token budget cut 323B -> 25B (12.9x saving, no accuracy cost)
+dominates any precision lever (FP8 1.6x).

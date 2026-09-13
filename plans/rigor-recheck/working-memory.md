@@ -108,6 +108,28 @@
   ALSO:  the §7c acceptance gate "below 14.551 nats/step" was an in-sample
         number on a favourable subset. Fair held-out M2 is **15.3424**.
 
+## Cycle 3 reversals
+- REV-3 [MAJOR]: token budget 323B -> staged 25B. The over-training defence was
+  argued at 269M active (1,201 tok/param); at 61M it is 5,295 = 265x Chinchilla,
+  the QiD worst case (arXiv 2411.17691). The corpus is redundant, not rich:
+  measured RNA entropy 2.0167 bits/nt vs ~11 for an English token.
+- REV-4 [defect #15]: cost quoted in A100-hours with a 1.60x FP8 lever applied.
+  A100 (SM80) has no FP8 tensor cores. "79 A100-hours" existed on no machine.
+  Corrected to hardware-explicit: 126 h A100 bf16 / 20 h H100 fp8 at 323B;
+  ~10 h / ~1.6 h at the decided 25B.
+- REV-5 [MAJOR]: 4-bit dropped at this size. NF4 cannot train from scratch
+  (W4A16, frozen base, adapters only). NVFP4 is a real pretraining format but
+  validated at 125 tok/param against our 5,295.
+
+## Cycle 3 discoveries
+- DISC-18 [VERIFIED]: elDORS composition entropy 2.0167 bits/nt. A 512-dim bf16
+  token is 4,062x that; a fully attributed nucleotide (58.9 bits) is still 139x
+  over-provisioned. d_model is compute space, not storage.
+- DISC-19 [VERIFIED]: only 26.0 of 58.9 bits are available at INFERENCE. The
+  rest are supervision targets; feeding them in would leak the answer.
+- DISC-20 [VERIFIED]: at 3.10 A median resolution, fp16 coordinates are 3,100x
+  finer than the experimental noise floor.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

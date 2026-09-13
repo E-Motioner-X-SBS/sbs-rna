@@ -1755,6 +1755,76 @@ structure model, up to 4,096 nt, trained predominantly on ribosomal and
 complex-embedded RNA, which must report performance split by isolated versus
 complexed context.}
 
+\section{Decided parameters and formats}
+\label{sec:decide}
+
+\subsection{A conflict the design could not satisfy}
+
+Three requirements were mutually incompatible: the \emph{smallest viable model}
+(61M active), the \emph{full 323B-token corpus}, and \emph{4-bit} precision.
+\emph{Low-Bit Quantization Favors Undertrained LLMs} (ACL 2025, arXiv
+2411.17691, 1500+ checkpoints) finds quantization-induced degradation is worst
+for small models trained on many tokens, stating that ``smaller models require
+higher precision at high training token counts''.
+
+\begin{table}[h]
+\centering
+\caption{Where each size sits relative to that law. \meas}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Model} & \textbf{active} & \textbf{tok/param @323B} & \textbf{$\times$ Chinchilla} & \textbf{4-bit} \\
+\midrule
+Micro & 12M & $26{,}917$ & $1{,}346\times$ & worst case \\
+Mini & 30M & $10{,}767$ & $538\times$ & worst case \\
+\textbf{Small} & \textbf{61M} & $\mathbf{5{,}295}$ & $\mathbf{265\times}$ & \textbf{worst case} \\
+Base-v2 & 269M & $1{,}201$ & $60\times$ & risky \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+RNA worsens it: measured sequence entropy is $2.0167$ bits/nt against roughly
+$11$ for an English token, so the corpus is more redundant than its token count
+implies.
+
+\subsection{Decisions, with three reversals}
+
+\textbf{D1} keeps PHAROS-Small. \textbf{D2} (reversal) cuts the token budget
+from 323B to a staged 25B, stopping on plateau---the over-training defence was
+argued at 269M active, and at 61M it becomes $265\times$ Chinchilla while buying
+no information. \textbf{D3} (reversal) trains in BF16, adopts FP8 on Hopper once
+the baseline reproduces, and takes \emph{no} 4-bit at this size. \textbf{D4}
+defers QAT as a deployment technique. \textbf{D5} routes new attributes in as
+input features through one projection rather than a wider $d_{\text{model}}$.
+\textbf{D6} adopts two vocabularies. \textbf{D7} (reversal) makes the cost
+hardware-explicit.
+
+\paragraph{Why not 4-bit here.} NF4 cannot train from scratch at all---it is
+W4A16 with a \emph{frozen} 4-bit base, gradients reaching only LoRA adapters.
+NVFP4 \emph{is} a genuine pretraining format, reporting no measurable loss
+against an FP8 baseline, but its validation point is 8B parameters and 1T tokens
+($125$ tok/param) against our $5{,}295$. MXFP4 needs ${\sim}36\%$ more tokens
+than NVFP4 for equal loss.
+
+\paragraph{Defect \#15: the published cost was not a real unit.} A100 (Ampere)
+has no FP8 tensor cores; FP8 arrived with Hopper. The cost was quoted in
+\textbf{A100-hours} while a $1.60\times$ \textbf{FP8} lever was applied, so
+``$\sim$79 A100-hours'' existed on no single machine and ``3.3 days on a single
+A100'' was unreachable. Corrected, with levers split by what they depend on
+(hardware-independent: Muon $2.00\times$, read down-weighting $1.19\times$,
+combined $2.38\times$): at 323B tokens, 126~h on A100 bf16 or 20~h on H100 fp8;
+at the decided 25B budget, $\sim$10~h and $\sim$1.6~h respectively.
+\textbf{The token cut is a $12.9\times$ saving against FP8's $1.6\times$}, and
+unlike a precision lever it costs no accuracy because the dropped tokens are
+redundant.
+
+\paragraph{Where the over-provisioned bits go.} A fully attributed nucleotide
+carries $58.9$ measured bits; a 512-dim bf16 token holds $8{,}192$---$139\times$
+over-provisioned. $d_{\text{model}}$ is \emph{compute} space, not storage, so
+attributes are nearly free while width is not: FLOPs go as $6N_{\text{active}}$
+and widening $d$ is quadratic in the FFN. Only $26.0$ of those bits are
+available at inference; the remainder are supervision targets, and feeding them
+in would leak the answer.
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1862,6 +1932,9 @@ large-scale training is attempted.
 \texttt{.../sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
 \texttt{.../sampling/test\_residue\_guard\_bias.py} & \texttt{residue\_guard\_bias.json} \\
 \texttt{.../sampling/audit\_generalization.py} & \texttt{generalization\_audit.json} \\
+\texttt{.../sampling/precision\_and\_hardware.py} & \texttt{precision\_hardware.json} \\
+\texttt{.../sampling/audit\_token\_attributes.py} & \texttt{token\_attributes.json} \\
+\texttt{.../sampling/decide\_precision\_and\_size.py} & \texttt{precision\_size\_decision.json} \\
 \texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
 \texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\

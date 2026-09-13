@@ -8,9 +8,9 @@ subfolder to avoid collision.
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
 | Cycle | **3** — core architecture + dataset + precision |
-| Phase | 0 DECOMPOSE -> 1 RESEARCH |
+| Phase | 6 AUDIT (cycle 3) |
 | Started | 2026-09-13 (cycle 1), cycle 2 same day |
-| Open TODO | 13 open (cycle 3) |
+| Open TODO | 0 open, 3 DEFERRED (need hardware/training) |
 
 ## Why cycle 2 exists
 
