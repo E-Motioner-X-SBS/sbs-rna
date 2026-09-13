@@ -10,20 +10,34 @@ n_refine_loops_serve: 3    # 10b.3: train 8-16, serve 3 -> SERVE depth is 16*3 =
 # mixer schedule, period-8 repeated twice: 10 GDN, 4 SWA, 2 FULL
 mixer_pattern: [GDN, GDN, SWA, GDN, GDN, SWA, GDN, FULL]
 swa_window: 128
+gdn_state_dim: 64          # per head; Gated DeltaNet recurrent state. PROVISIONAL.
+
+attention_bias_recycle_schedule:   # defect #20 + G6, cycle 5
+  B_wc:    {recycle0: on,  later: on}
+  B_elec:  {recycle0: off, later: on}   # needs a distance estimate
+  B_motif: {recycle0: off, later: on}   # needs the pair-track interaction graph
+  router:  {recycle0: sequence_only, later: structural}
 
 moe:
   routed_experts: 32
   shared_experts: 2        # always-on; absorbs Watson-Crick helix
-  top_k: 4                 # 6 of 34 active
+  top_k: 4                 # 6 of 34 active -> active FFN = 1.500x d
+  # DEFECT #21 (cycle 5): DeepSeek-V3's active FFN ratio is 2.571x d; ours is
+  # 1.500x. Per-expert width matches (0.250 vs 0.286); activation does not.
+  # top_k: 8 would give 2.50x for +12.6M active and ~0 change in total params.
+  top_k_alternative: {value: 8, active_ratio: 2.50, decide_at: "5B checkpoint"}
   d_ff: 128
   every_n_blocks: 1
   balancing: aux_loss_free # bias-based; 5S rRNA is 5,976 BGSU clusters
   router_inputs: [hidden, pairing_prob, rigidity, local_density, neff_over_L]
+  router_inputs_recycle0: [hidden, neff_over_L, local_gc, rel_position]
+  # G6 resolved: the structural inputs do not exist on the first trunk pass.
   # NOTE unresolved (finding G6): at recycle 0 the structural router inputs do
   # not exist yet. First pass must route on neff_over_L + sequence-local
   # features only. B_elec has the same first-pass rule; the router needs it too.
 
 pair_track:
+  d_pair: 128              # cycle 5: present in the reference impl, absent from this config
   b1: 16                   # dense coarse map, 0.396% of dense
   b2: 4                    # measured occupancy 1.34% on long chains
   target_c: 20             # measured need 4.4-4.9 contacts/nt, eff c 17.2
@@ -42,3 +56,12 @@ params:                    # re-derived independently, cycle 2 S3
   total_M: 148.73
   active_M: 60.65          # ONE pass; multiply by n_refine_loops_train for compute
   effective_compute_M: 488 # 60.65 x 8
+
+# ---- values still PROVISIONAL (cycle 5, B4) ----
+# These were never specified. They are set by procedure, not invention:
+# the 5B checkpoint costs ~1.5% of the run, so each is a cheap sweep.
+provisional:
+  gdn_state_dim: {value: 64, fix_by: "sweep at the 5B checkpoint"}
+  moe_bias_update_rate: {value: null, fix_by: "DeepSeek-V3 publishes gamma; adopt or sweep"}
+  decoder_diffusion_steps: {train: "random timestep per example", sample: 200,
+                            fix_by: "quality/latency curve on CASP15"}

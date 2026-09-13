@@ -231,6 +231,28 @@ more strongly. For Mg²⁺ (z=2), theta = 0.902. Debye screening
 B_elec(i,j) = -lambda * q_eff² * l_B * exp(-kappa * d_ij) / d_ij
 ```
 
+**Three bias terms consume downstream output, not one.** `B_elec` needs a
+distance estimate; `B_motif` needs the motif bank's key, which is the
+*interaction graph* produced by the pair track; and the router reads pairing
+probability, rigidity and density from the same place. All three are produced
+**after** the trunk they feed.
+
+Only `B_elec` was ever given a first-pass rule. `B_motif` had none (**defect
+#20**, cycle 5) and the router's was flagged but never written into the
+equation (**G6**). The rule is the same for all three:
+
+| Term | Recycle 0 | Recycle >= 1 |
+|---|---|---|
+| `B_wc` | active — sequence only | active |
+| `B_elec` | **disabled** | active, on the current distance map |
+| `B_motif` | **disabled** | active, keyed on the current pair-track graph |
+| router | `Neff/L` + sequence-local features only | full structural features |
+
+Within a recycle the pair track's **L1 coarse map** already gives a first pairing
+estimate, so the bank can be keyed on that rather than waiting a full cycle —
+but it is still unavailable on the very first trunk pass, which is why the
+disable is needed rather than a reorder.
+
 **Resolution of the chicken-and-egg problem**: `d_ij` is unknown on the first
 pass. B_elec is therefore **disabled in recycle 0** and switched on from recycle
 1 using the current predicted distance map. This is why recycling is structural
@@ -1401,6 +1423,62 @@ not storage. So attributes are nearly free, but **width is not**: FLOPs go as
 Only **26.0 of the 58.9 bits** are available at inference for an arbitrary
 sequence. The rest are **supervision targets, not inputs** — feeding B-factor or
 Mg-distance in would leak the answer.
+
+## 10g. Buildability audit [cycle 5]
+
+19 defects in, the newest failure mode was **components never specified at all**
+(#18 attention heads, #19 decoder), then silently assumed small. So cycle 5 asked
+one question of every component: *could a competent engineer implement this from
+the spec alone, without inventing a number?*
+
+**37 components enumerated. 27 were specified; 10 were not.**
+Seven were genuinely absent (learning rate, batch size, warmup, the five loss
+weights, diffusion steps, MoE bias-update rate, GDN state size); two existed only
+in the reference code or the catalogue and not in any config (`d_pair`, the
+md5 split rule); one exposed a circularity (below). All are now closed or marked
+**PROVISIONAL with the procedure that fixes them** — invention would have been
+worse than deferral, and the 5B checkpoint costs ~1.5% of the run, so each is a
+cheap sweep rather than a guess.
+
+### Defect #20 — `B_motif` had the same circularity as the router, unnoticed
+
+**Three** bias terms consume output produced *after* the trunk they feed, not one:
+
+| Term | Needs | Available at recycle 0? |
+|---|---|---|
+| `B_elec` | a distance estimate | no — **was** handled |
+| `B_motif` | the motif bank key = the pair track's **interaction graph** | no — **was not** |
+| router | pairing prob, rigidity, density | no — flagged (G6), never written into the equation |
+
+`B_elec` got an explicit first-pass rule in the original design. `B_motif` never
+did, and G6's router fix was described but left out of the bias schedule. All
+three now share one rule, written into `configs/model/pharos_small.yaml` as an
+explicit `attention_bias_recycle_schedule`.
+
+### Defect #21 — the MoE copied one DeepSeek ratio and not the other
+
+The design cites DeepSeekMoE fine-grained segmentation as its template.
+Checked against the verified DeepSeek-V3 configuration (d=7168, expert
+d_ff=2048, 1 shared + 256 routed, 8 activated):
+
+| | d_ff/d | active experts | **active FFN / d** | total FFN / d |
+|---|---|---|---|---|
+| DeepSeek-V3 | 0.286 | 9 | **2.571x** | 73.4 |
+| **PHAROS-Small** | **0.250** | **6** | **1.500x** | 8.5 |
+| dense FFN | — | — | 4.000x | 4.0 |
+
+Per-expert width matches the template (0.250 vs 0.286). **Active capacity does
+not**: 1.500x is **1.7x below DeepSeek and 2.7x below a dense FFN**. The design
+copied the segmentation and not the activation.
+
+This is a design gap rather than an error — PHAROS is deliberately data-limited,
+so less active capacity may well be right. But the ratio was never examined, and
+it is exactly the kind of parameter that silently caps quality.
+
+**The fix is unusually cheap**: top-8 of 32 (instead of top-4) gives 2.50x for
+**+12.6M active** (65.1 -> 77.7M) and essentially **no change in total**
+(153.1 -> 153.2M), because the experts already exist. Decide at the 5B
+checkpoint.
 
 ## 11. Novelty claims, stated precisely
 

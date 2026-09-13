@@ -140,6 +140,19 @@
   cost at 25B is 78 A100-h bf16 / 12 H100-h fp8. The activation-memory half of
   the claim survives -- only the compute half was wrong.
 
+## Cycle 5 discoveries
+- DISC-23 [DEFECT #20]: B_motif has the same recycle-0 circularity as the router
+  and B_elec -- it enters the trunk's bias but is keyed on the pair track's
+  interaction graph, produced after the trunk. Only B_elec had a first-pass
+  rule. All three now share an explicit attention_bias_recycle_schedule.
+- DISC-24 [DEFECT #21]: the MoE copied DeepSeekMoE's per-expert width (0.250 vs
+  0.286) but not its ACTIVE capacity (1.500x vs 2.571x d) -- 1.7x below the
+  cited template and 2.7x below a dense FFN. Never examined. top-8 fixes it for
+  +12.6M active and ~0 total.
+- DISC-25 [PROCESS]: 10 of 37 components were unspecified. Seven were filled
+  with a PROCEDURE rather than an invented number, on the view that a guessed
+  hyperparameter is worse than an acknowledged gap.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

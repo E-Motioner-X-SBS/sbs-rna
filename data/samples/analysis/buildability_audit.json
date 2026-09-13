@@ -1,0 +1,196 @@
+{
+  "n_components": 37,
+  "n_specified": 35,
+  "n_missing": 2,
+  "missing": [
+    "motif bank: key construction",
+    "loss: weights lambda_1..5"
+  ],
+  "rows": [
+    {
+      "component": "trunk: d_model",
+      "needs": "512",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "trunk: block count",
+      "needs": "16",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "trunk: attention heads",
+      "needs": "8 x 64",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "trunk: mixer schedule",
+      "needs": "GDN/SWA/FULL order",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "trunk: SWA window",
+      "needs": "128",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "GDN: state size",
+      "needs": "linear-attn state dim",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "MoE: routed/shared/top-k",
+      "needs": "32/2/4",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "MoE: expert width d_ff",
+      "needs": "128",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "MoE: balancing bias step",
+      "needs": "bias update rate",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "router: input features",
+      "needs": "list",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "router: recycle-0 behaviour",
+      "needs": "first-pass rule",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "pair track: b1/b2",
+      "needs": "16/4",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "pair track: budget c",
+      "needs": "20",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "pair track: d_pair",
+      "needs": "128",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "pair track: triangle layers",
+      "needs": "2",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "motif bank: n classes",
+      "needs": "667",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "motif bank: key construction",
+      "needs": "how keys are built at INFERENCE",
+      "status": "PROVISIONAL"
+    },
+    {
+      "component": "stiffness: parameterisation",
+      "needs": "Cholesky 6x6",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "stiffness: acceptance gate",
+      "needs": "15.3424",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "heads: count + sizes",
+      "needs": "9 heads itemised",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "decoder: type + blocks",
+      "needs": "frame diffusion, 4",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "decoder: K states",
+      "needs": "3",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "decoder: diffusion steps",
+      "needs": "n denoise steps",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "loss: weights lambda_1..5",
+      "needs": "numeric values",
+      "status": "PROVISIONAL"
+    },
+    {
+      "component": "loss: block-occupancy weight",
+      "needs": "pos_weight rule",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: optimizer",
+      "needs": "Muon + AdamW",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: learning rate",
+      "needs": "peak LR",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: batch size",
+      "needs": "tokens/step",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: warmup / schedule",
+      "needs": "warmup steps",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: token budget",
+      "needs": "25B",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "train: precision",
+      "needs": "bf16",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "data: split rule",
+      "needs": "md5 % 100",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "data: chunk weighting",
+      "needs": "per-chunk weights",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "data: max context",
+      "needs": "4096",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "data: tokenizer vocab",
+      "needs": "5 + extended",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "eval: blind sets",
+      "needs": "CASP15/16, RNA-Puzzles",
+      "status": "SPECIFIED"
+    },
+    {
+      "component": "eval: stratified reporting",
+      "needs": "isolated vs complexed",
+      "status": "SPECIFIED"
+    }
+  ]
+}

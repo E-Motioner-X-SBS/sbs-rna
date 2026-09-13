@@ -424,3 +424,36 @@ inside parentheticals that were *describing the all-polymer total*, producing
 "46,447 RNA all-polymer" in 5 places across 4 files. Repaired; both diagrams
 re-rendered. Exactly the unguarded-replace failure mode cycle 1 flagged -- and I
 reintroduced it while fixing a different defect.
+
+## Cycle 5 — buildability audit
+
+### B1 — could this be built from the spec? — **10 of 37 components not specified**
+27 SPECIFIED. Seven genuinely absent: learning rate, batch size, warmup, the five
+loss weights, decoder diffusion steps, MoE bias-update rate, GDN state size. Two
+existed only outside the configs (`d_pair` in the reference impl; the md5 split
+rule in the catalogue). All closed or marked **PROVISIONAL with the procedure
+that fixes them** rather than invented.
+
+### B2 — circularity sweep — **DEFECT #20**
+G6 found the router reads features produced downstream of itself. The same sweep
+had never been run on anything else. **`B_motif` has the identical shape**: it
+enters the *trunk's* attention bias but comes from a bank keyed on the
+*interaction graph*, which is the pair track's output — produced after the trunk.
+`B_elec` was given a first-pass rule; `B_motif` never was, and G6's router fix was
+described but never written into the bias equation. All three now share one
+explicit `attention_bias_recycle_schedule`.
+
+### B3 — MoE active capacity — **DEFECT #21**
+Checked against the *verified* DeepSeek-V3 config (d=7168, d_ff=2048, 1+256
+experts, 8 activated):
+
+| | d_ff/d | active | active FFN / d |
+|---|---|---|---|
+| DeepSeek-V3 | 0.286 | 9 | **2.571x** |
+| PHAROS-Small | 0.250 | 6 | **1.500x** |
+| dense | — | — | 4.000x |
+
+Per-expert width matches the template; **active capacity does not** — 1.7x below
+DeepSeek, 2.7x below dense. The design copied the segmentation and not the
+activation. Fix is cheap: top-8 gives 2.50x for +12.6M active and ~0 total.
+Design gap, not an error; decide at the 5B checkpoint.

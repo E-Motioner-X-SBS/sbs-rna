@@ -1631,6 +1631,78 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   </div>
 </section>
 
+<!-- ================= 17. BUILDABILITY ================= -->
+<section>
+  <div class="sechead"><span class="secnum">17</span><h2>Could anyone actually build it?</h2></div>
+  <p class="lede">Nineteen defects in, the newest failure mode was <b>components never specified
+  at all</b> — the attention head count, the decoder — then silently assumed small. So every
+  component was asked one question: could an engineer implement this from the spec, without
+  inventing a number?</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>37 components · 10 unspecified</h3>
+      <p style="font-size:34px;font-family:var(--display);color:var(--burnt);margin:6px 0 2px">27 / 37</p>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 12px">were specified</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">Seven genuinely absent: learning
+      rate, batch size, warmup, the five loss weights, diffusion steps, MoE bias-update rate,
+      GDN state size. Two existed only in reference code or the catalogue, never in a config.
+      One exposed a circularity.</p>
+      <div class="finding" style="margin-top:14px">
+        <span class="tag">Closed by procedure, not invention</span>
+        <p>Each is now specified or marked <b>PROVISIONAL with the sweep that fixes it</b>.
+        A guessed hyperparameter is worse than an acknowledged gap — and the 5B checkpoint
+        costs ~1.5% of the run, so these are cheap experiments rather than guesses.</p>
+      </div>
+    </div>
+
+    <div class="panel" style="border-left:3px solid var(--warn)">
+      <h3>#20 — B<sub>motif</sub> had the router's circularity too</h3>
+      <p class="note">the sweep had never been run on anything but the router</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Bias term</th><th>Needs</th><th>Had a rule?</th></tr></thead>
+          <tbody>
+            <tr><td>B<sub>elec</sub></td><td>a distance estimate</td><td style="color:var(--mg)">yes</td></tr>
+            <tr class="total"><td>B<sub>motif</sub></td><td>the pair track's <b>interaction graph</b></td><td style="color:var(--warn)"><b>no</b></td></tr>
+            <tr><td>router</td><td>pairing prob, rigidity, density</td><td style="color:var(--warn)">described, never written in</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">B<sub>motif</sub> enters the
+      <i>trunk's</i> attention bias but is keyed on the pair track's output — produced
+      <i>after</i> the trunk. All three now share one explicit
+      <span class="mono">attention_bias_recycle_schedule</span>.</p>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px;border-left:3px solid var(--warn)">
+    <h3>#21 — the MoE copied one DeepSeek ratio and not the other</h3>
+    <p class="note">checked against the verified DeepSeek-V3 config: d=7168, d_ff=2048, 1+256 experts, 8 activated</p>
+    <div class="tablewrap" style="border:none">
+      <table style="min-width:0">
+        <thead><tr><th></th><th class="num">d_ff / d</th><th class="num">active experts</th><th class="num">active FFN / d</th></tr></thead>
+        <tbody>
+          <tr><td>DeepSeek-V3</td><td class="num">0.286</td><td class="num">9</td><td class="num"><b>2.571×</b></td></tr>
+          <tr class="total"><td><b>PHAROS-Small</b></td><td class="num">0.250</td><td class="num">6</td><td class="num" style="color:var(--warn)"><b>1.500×</b></td></tr>
+          <tr><td>dense FFN</td><td class="num">—</td><td class="num">—</td><td class="num">4.000×</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px"><b>Per-expert width matches
+    the template (0.250 vs 0.286). Active capacity does not</b> — 1.7× below DeepSeek and 2.7×
+    below a dense FFN. The design copied the segmentation and not the activation, and the ratio
+    had never been examined.</p>
+    <div class="finding" style="margin-top:12px">
+      <span class="tag">Cheap to fix</span>
+      <p>A design gap rather than an error — PHAROS is deliberately data-limited, so less active
+      capacity may be right. But it is exactly the kind of parameter that silently caps quality.
+      <b>top-8 of 32 gives 2.50× for +12.6M active and essentially no change in total</b>
+      (153.1 → 153.2M), because the experts already exist. Deferred to the 5B checkpoint.</p>
+    </div>
+  </div>
+</section>
+
 <footer>
   <span>PHAROS v0.1 · design specification</span>
   <span>Measurements: 180 BGSU NR structures ≤3.0 Å</span>

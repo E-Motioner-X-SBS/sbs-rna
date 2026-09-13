@@ -137,7 +137,9 @@ def main() -> int:
                 # 488M effective compute, 78 A100-h @25B, 1.65x vs Base-v2.
                 "78", "1.65",
                 # cycle-4 defects #18/#19: heads+decoder itemised
-                "153", "12.59", "1.65", "115", "1.757"]:
+                "153", "12.59", "1.65",
+                # cycle-5 defects #20/#21
+                "2.571", "1.500", "115", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")

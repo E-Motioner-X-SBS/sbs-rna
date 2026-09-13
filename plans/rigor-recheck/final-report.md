@@ -1,3 +1,78 @@
+# Final Verification Report — Cycle 5 (buildability)
+
+| Field | Value |
+|---|---|
+| Cycles | 5 |
+| Defects this cycle | **2** (#20, #21) + 10 unspecified components |
+| **Total defects** | **21** |
+| Macro-audit | **8/8 YES** |
+| Open to-dos | 0 (2 deferred to the 5B checkpoint) |
+
+## The question this cycle asked
+
+After #18 (attention heads) and #19 (decoder) — both components *never specified
+at all*, then silently assumed small — cycle 5 asked of every component:
+**could an engineer implement this from the spec, without inventing a number?**
+
+**37 enumerated, 27 specified, 10 not.** Seven genuinely absent (learning rate,
+batch size, warmup, the five loss weights, diffusion steps, MoE bias-update rate,
+GDN state size); two present only in reference code or the catalogue, never in a
+config; one exposed a circularity.
+
+All closed or marked **PROVISIONAL with the sweep that fixes them**. A guessed
+hyperparameter is worse than an acknowledged gap, and the 5B checkpoint costs
+~1.5% of the run.
+
+## Defect #20 — the circularity sweep had only ever been run on the router
+
+G6 (cycle 2) found the router consumes features produced downstream of itself.
+**That sweep was never run on anything else.** `B_motif` has the identical shape:
+it enters the *trunk's* attention bias but is keyed on the *interaction graph*,
+which is the pair track's output — produced after the trunk. `B_elec` had a
+first-pass rule; `B_motif` never did; and G6's own fix was described in prose but
+never written into the bias equation. All three now share one explicit
+`attention_bias_recycle_schedule`.
+
+## Defect #21 — the MoE copied one DeepSeek ratio and not the other
+
+| | d_ff/d | active | **active FFN / d** |
+|---|---|---|---|
+| DeepSeek-V3 (verified) | 0.286 | 9 | **2.571x** |
+| **PHAROS-Small** | **0.250** | **6** | **1.500x** |
+| dense | — | — | 4.000x |
+
+Per-expert width matches the cited template. **Active capacity is 1.7x below it
+and 2.7x below a dense FFN.** The design copied the segmentation and not the
+activation, and the ratio had never been examined. Fix is cheap — top-8 gives
+2.50x for +12.6M active and ~0 total, since the experts already exist.
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+Unchanged from cycle 4, and for the same reason: measurements keep surviving
+independent re-derivation; things built on top of them keep not.
+
+## Defect base rate, five cycles
+
+| Cycle | Defects | Character |
+|---|---|---|
+| 0 (build) | 5 | silent parser/logic bugs |
+| 1 (audit) | 4 | wrong physics, overclaim, disclosure |
+| pre-2 | 1 | precision/rounding |
+| 2 | 4 | inflated count, unfair comparison, unimplemented code |
+| 3 | 1 | hardware incoherence |
+| 4 | 5 | **derived quantities**: cost, depth, budget |
+| **5** | **2** | **components never specified at all** |
+
+**21 defects. The rate has not fallen across five cycles.** The *character* has
+shifted though: cycles 0-2 found things that were wrong, cycles 4-5 found things
+that were **missing or never checked against their own stated template**. That
+is a meaningfully different failure mode and argues the audit should continue to
+target *absences* rather than errors.
+
+---
+
 # Final Verification Report — Cycle 4
 
 ## Summary

@@ -1888,6 +1888,62 @@ plausible 4-block frame-diffusion decoder $\mathbf{12.59}$M, which alone exceeds
 the line. Totals rise from 149M/61M to $\sim$153M/$\sim$65M. Heads are cheap;
 the decoder is not.
 
+\section{Buildability audit}
+\label{sec:build}
+
+Nineteen defects in, the newest failure mode was \emph{components never
+specified at all}---the attention head count and the decoder size---then
+silently assumed small. This section asks one question of every component:
+could a competent engineer implement it from the specification alone, without
+inventing a number?
+
+\textbf{Thirty-seven components were enumerated; ten were not specified.} Seven
+were genuinely absent (learning rate, batch size, warmup, the five loss weights,
+diffusion steps, the MoE bias-update rate, the Gated DeltaNet state size); two
+existed only in the reference code or the data catalogue rather than in any
+config; one exposed a circularity. All are now closed or marked
+\textsc{provisional} with the procedure that fixes them. Invention would have
+been worse than deferral: the 5B checkpoint costs about $1.5\%$ of the run, so
+each is a cheap sweep rather than a guess.
+
+\subsection{Defect \#20: \texorpdfstring{$B_{\mathrm{motif}}$}{B\_motif} shares the router's circularity}
+
+Three bias terms consume output produced \emph{after} the trunk they feed, not
+one. $B_{\mathrm{elec}}$ needs a distance estimate and was given an explicit
+first-pass rule. $B_{\mathrm{motif}}$ needs the motif bank's key, which is the
+\emph{interaction graph} produced by the pair track---and never had one. The
+router's own fix was described but never written into the bias equation. All
+three now share a single explicit recycle schedule in the model config.
+
+\subsection{Defect \#21: the MoE copied one DeepSeek ratio and not the other}
+
+The design cites DeepSeekMoE fine-grained segmentation as its template. Checked
+against the verified DeepSeek-V3 configuration ($d=7168$, expert
+$d_{\text{ff}}=2048$, 1 shared plus 256 routed, 8 activated):
+
+\begin{table}[h]
+\centering
+\caption{Per-expert width matches the template; active capacity does not. \meas}
+\begin{tabular}{lccc}
+\toprule
+ & \textbf{$d_{\text{ff}}/d$} & \textbf{active experts} & \textbf{active FFN $/\,d$} \\
+\midrule
+DeepSeek-V3 & $0.286$ & 9 & $\mathbf{2.571\times}$ \\
+\textbf{PHAROS-Small} & $0.250$ & 6 & $\mathbf{1.500\times}$ \\
+dense FFN & --- & --- & $4.000\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+PHAROS's active FFN capacity is $1.7\times$ below the template it cites and
+$2.7\times$ below a dense FFN. The design copied the segmentation and not the
+activation, and the ratio had never been examined. This is a design gap rather
+than an error---PHAROS is deliberately data-limited, so less active capacity may
+be correct---but it is exactly the kind of parameter that silently caps quality.
+The fix is unusually cheap: top-8 of 32 gives $2.50\times$ for $+12.6$M active
+parameters and essentially no change in total, because the experts already
+exist. The decision is deferred to the 5B checkpoint.
+
 \section{Novelty claims}
 
 \begin{table}[h]

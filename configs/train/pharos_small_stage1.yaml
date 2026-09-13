@@ -50,3 +50,32 @@ cost_estimate_gpu_hours:   # hardware-explicit (defect #15); at the REVISED 25B 
     a100_bf16: 1011
   # The token-budget cut (12.9x) dominates any precision lever (FP8 1.6x),
   # and costs no accuracy because the dropped tokens are redundant.
+
+# ---- hyperparameters that were MISSING entirely (cycle 5, B1) ----
+# Not invented. Each states the procedure that fixes it, and the 5B checkpoint
+# (~1.5% of the run) is cheap enough that these are sweeps, not guesses.
+optimization:
+  global_batch_tokens: 524288      # 0.5M tokens/step -> ~48k steps at 25B
+  # derived, not chosen: 25e9 / 524288 = 47,684 steps
+  learning_rate:
+    muon_2d:  {value: null, fix_by: "LR sweep at 5B; Moonlight publishes a Muon schedule"}
+    adamw_1d: {value: null, fix_by: "same sweep; embeddings/norms/router"}
+    status: PROVISIONAL
+  warmup_steps: {value: 2000, note: "~4% of 48k steps", status: PROVISIONAL}
+  schedule: cosine_to_10pct
+
+loss_weights:                      # lambda_1..lambda_5 were never specified
+  status: PROVISIONAL
+  method: >
+    Normalise every auxiliary loss to unit scale at initialisation, then tune on
+    the 5B checkpoint. Do NOT hand-pick: the terms have different units
+    (nats/step for stiffness, BCE for occupancy, Angstrom for distance).
+  terms: [stiff, mg, elec, violation, flex]
+  block_occupancy:
+    pos_weight: "neg/pos, computed per example"   # implemented + tested
+    note: "occupancy ~1.34% positive; a missed block is unrecoverable"
+
+data_split:                        # was only in the catalogue, not in any config
+  rule: "md5(header) % 100 < 80 train, 80-90 val, 90-100 test"
+  source: data/catalog/splits/pretrain_split.json
+  structure_dedup: "sequence-identity dedup MANDATORY (5S rRNA is 5,976 clusters)"
