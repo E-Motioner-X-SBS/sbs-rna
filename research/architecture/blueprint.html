@@ -608,9 +608,10 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <div>
         <h4>Heads</h4>
         <p>Secondary structure · contact &amp; distance maps · <b>Mg²⁺ sites with
-        inner/outer class</b> · <b>per-nucleotide rigidity</b> · SHAPE/DMS reactivity · 3D
-        coordinates. The two bold heads are supervised by labels sitting inside every mmCIF
-        the field already downloads, and used by no current predictor.</p>
+        inner/outer class</b> · <b>per-nucleotide rigidity</b> · <b>per-step 6×6 stiffness</b> ·
+        <b>per-residue disorder</b> · SHAPE/DMS reactivity · 3D coordinates, K=3 states.
+        The bold heads are supervised by labels sitting inside every mmCIF the field already
+        downloads, and used by no current predictor (§09, §13).</p>
       </div>
       <div class="cost"><b>2 free channels</b>44,708 curated Mg²⁺<br>coordinations (§09)</div>
     </div>
@@ -669,6 +670,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
     <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
+    <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 143,871 unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
+    <div class="claim"><div class="what">Structure-conditioned stiffness field feeding a harmonic ensemble</div><div class="status">Justified by a measured 3.03-nat gain of structural over sequence context. Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds those insufficient (pentameric couplings).</div></div>
     <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth. Motivated by the literature and by measured between-family variance (0.333–1.000); our own depth split is weak evidence (Spearman +0.224, n=12).</div></div>
   </div>
 </section>
@@ -682,6 +685,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~80% of backbone charge (A-form RNA, θ = 0.804) is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
     <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs <i>and</i> applying a ≥30-RNA-residue guard left 31 of 137 parsed structures usable for the density/GNRA analyses, and only <b>15</b> of those contain Mg²⁺ for the gradient itself.</p></div>
     <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
+    <div class="risk"><span class="n">R7</span><p><b>Ensemble evaluation is barely defined (§13).</b> No settled metric exists for scoring a predicted RNA ensemble against experiment; RNAnneal compares against just 16 experimentally-resolved riboswitch conformations. Single-state TM-score on blind sets stays the headline; ensemble output is reported descriptively until a protocol is agreed in advance.</p></div>
+    <div class="risk"><span class="n">R8</span><p><b>The dynamics output is equilibrium-only (§13).</b> It models breathing about a fold, not the folding pathway. Do not describe it as predicting how RNA folds.</p></div>
     <div class="risk"><span class="n">R6</span><p><b>Evaluation honesty.</b> Any improvement claim must be made on blind sets (CASP15/16, RNA-Puzzles), never on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.</p></div>
   </div>
 </section>
@@ -1274,6 +1279,66 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     retained as the documented scale-up path. With the staged token budget, the first
     informative checkpoint costs on the order of <b>one GPU-day</b> — so the sizing question
     becomes an experiment rather than an argument.</p>
+  </div>
+</section>
+
+<!-- ================= 13. DYNAMICS ================= -->
+<section>
+  <div class="sechead"><span class="secnum">13</span><h2>Dynamics: what the stiffness field licenses</h2></div>
+  <p class="lede">The brief asked for structure prediction "or maybe more to it, maybe dynamics
+  of the RNA, maybe how it will fold". §09 produced a force-constant field. This is what it
+  supports — and, just as deliberately, what it does not.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>One structure is the wrong output for much of RNA</h3>
+      <p class="note">why an ensemble, not a coordinate</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>Riboswitches are defined
+      by holding two folds</b> — apo and holo. Predicting one predicts half the biology.</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px">The field has moved off the
+      minimum-free-energy structure: functional RNAs are heterogeneous ensembles in which
+      <b>the most stable state may be a minor subpopulation</b>.</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">CASP16 now scores alternative
+      conformations as its own track. On how many states: gRNAde reports a consistent
+      <b>3–5% gain, best at 3</b>; RNAnneal uses 10. PHAROS emits <b>K = 3</b>.</p>
+    </div>
+
+    <div class="panel">
+      <h3>The ensemble is nearly free once F exists</h3>
+      <p class="note">assemble F → diagonalise → normal modes · no sampling, no MD</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Output</th><th>Supervision</th></tr></thead>
+          <tbody>
+            <tr><td>per-step 6×6 stiffness</td><td>measured F, 76 contexts</td></tr>
+            <tr><td>per-nt fluctuation amplitude</td><td>B-factors / RMSF</td></tr>
+            <tr class="total"><td><b>per-residue disorder</b></td><td><b>143,871 unobserved-residue records</b></td></tr>
+            <tr><td>K = 3 states + weights</td><td>CASP16 alt-conformations</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="finding" style="margin-top:14px">
+        <span class="tag">Cheapest addition in the design</span>
+        <p>A residue in <span class="mono">_pdbx_unobs_or_zero_occ_residues</span> is one too
+        mobile or disordered to model — <b>a direct per-residue flexibility label</b>. It sits in
+        every deposited structure, is used by <b>no</b> RNA structure predictor, and we already
+        extracted 143,871 of them at zero acquisition cost.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="risk" style="margin-top:20px;border-left-width:4px">
+    <span class="n">LIMIT</span>
+    <p><b>This is an equilibrium fluctuation model.</b> It describes breathing <i>around</i> a
+    fold. It is <b>not</b> a folding-pathway predictor and must not be presented as one.
+    Cotranscriptional folding is kinetic — structure evolves as the chain elongates and the
+    system rarely reaches equilibrium, so cotranscriptional products routinely deviate from
+    thermodynamic predictions. Reconstructing those pathways needs <b>time-resolved</b> probing
+    data (the R2D2 approach), which is in neither our catalogue nor Ribonanza.
+    Calling a harmonic ensemble "predicts how RNA folds" would be exactly the overclaim the
+    coevolution retraction in §02 was about. <b>The supportable claim: predicts the fold, its
+    local rigidity, its disorder, and the amplitude of motion about it, under stated ionic
+    conditions.</b></p>
   </div>
 </section>
 
