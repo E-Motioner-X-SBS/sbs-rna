@@ -200,3 +200,50 @@ class DensePairTrack(nn.Module):
         for layer in self.tri:
             z = z + layer(z)
         return self.out(z).squeeze(-1), None, {"dense_pairs": L * L}
+
+# ---------------------------------------------------------------------------
+# Auxiliary block-occupancy supervision.
+#
+# The selectors' scores feed only topk, which is non-differentiable, so the
+# contact loss alone reaches them just weakly (through score gating). This loss
+# supervises them DIRECTLY with binary labels derived from the ground-truth
+# contact set -- the same labels the occupancy measurement already produces.
+#
+# Occupancy is severely imbalanced (1.34% positive on long chains), and the
+# asymmetry is real: a missed block is unrecoverable downstream, a spurious one
+# only costs compute. So positives are up-weighted by neg/pos by default.
+# ---------------------------------------------------------------------------
+
+def block_occupancy_labels(contacts: torch.Tensor, L: int, b: int,
+                           n_blocks: int, device=None) -> torch.Tensor:
+    """(n_blocks, n_blocks) 0/1 map: does this block contain >=1 true contact?"""
+    lab = torch.zeros(n_blocks, n_blocks, device=device)
+    if contacts is not None and contacts.numel():
+        bi = torch.div(contacts[:, 0], b, rounding_mode="floor").clamp(max=n_blocks - 1)
+        bj = torch.div(contacts[:, 1], b, rounding_mode="floor").clamp(max=n_blocks - 1)
+        lab[bi, bj] = 1.0
+    return lab
+
+
+def block_occupancy_loss(aux: dict, contacts: torch.Tensor, L: int,
+                         cfg: HPTConfig, pos_weight: float | None = None):
+    """Recall-weighted BCE on the L1 and L2 selector scores.
+
+    Returns (total, {level: loss}, {level: recall_at_current_mask}).
+    """
+    total = 0.0
+    parts, recalls = {}, {}
+    for lvl, b in (("l1", cfg.b1), ("l2", cfg.b2)):
+        s = aux[f"{lvl}_scores"][0]                 # (nb, nb)
+        nb = s.shape[-1]
+        lab = block_occupancy_labels(contacts, L, b, nb, s.device)
+        pos = lab.sum().clamp(min=1.0)
+        pw = torch.as_tensor(pos_weight if pos_weight is not None
+                             else float((lab.numel() - pos) / pos), device=s.device)
+        parts[lvl] = F.binary_cross_entropy_with_logits(s, lab, pos_weight=pw)
+        total = total + parts[lvl]
+        with torch.no_grad():
+            kept = aux[f"{lvl}_mask"][0]
+            recalls[lvl] = float((lab.bool() & kept).sum() / lab.sum().clamp(min=1))
+    return total, parts, recalls
+

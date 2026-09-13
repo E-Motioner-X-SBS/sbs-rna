@@ -12,7 +12,8 @@ from __future__ import annotations
 import sys
 import torch
 
-from hierarchical_pair_track import HPTConfig, HierarchicalPairTrack
+from hierarchical_pair_track import (HPTConfig, HierarchicalPairTrack,
+                                     block_occupancy_loss)
 
 FAILS: list[str] = []
 
@@ -111,6 +112,47 @@ def main() -> int:
     check("same seed gives identical pair selection",
           bool(torch.equal(i1, i2) and torch.equal(j1, j2)))
     check("same seed gives identical logits", bool(torch.allclose(l1, l2)))
+
+    # ---- auxiliary block-occupancy loss: mechanism, not generalization ----
+    print("\naux block-occupancy loss")
+    torch.manual_seed(0)
+    cfg = HPTConfig()
+    L = 512
+    m = HierarchicalPairTrack(cfg).train()
+    tok = torch.randn(1, L, cfg.d_model)
+    ii, jj = [], []
+    for k in range(40):                      # helical stem
+        ii.append(60 + k); jj.append(300 - k)
+    for a in range(8):                       # tertiary cluster
+        for b in range(8):
+            ii.append(120 + a); jj.append(430 + b)
+    contacts = torch.tensor(list(zip(ii, jj)), dtype=torch.long)
+
+    _, _, st = m(tok)
+    loss0, _, rec0 = block_occupancy_loss(st["aux"], contacts, L, cfg)
+    m.zero_grad(); loss0.backward()
+    for name, mod in (("l1", m.l1), ("l2", m.l2)):
+        ps = list(mod.parameters())
+        nz = [q for q in ps if q.grad is not None and torch.count_nonzero(q.grad) > 0]
+        check(f"aux loss alone reaches {name} selector", len(nz) == len(ps),
+              f"{len(nz)}/{len(ps)} params got gradient")
+
+    opt = torch.optim.Adam(list(m.l1.parameters()) + list(m.l2.parameters()), lr=3e-2)
+    for _ in range(60):
+        opt.zero_grad()
+        _, _, st = m(tok)
+        loss, _, _ = block_occupancy_loss(st["aux"], contacts, L, cfg)
+        loss.backward(); opt.step()
+    _, _, st = m(tok)
+    lossF, _, recF = block_occupancy_loss(st["aux"], contacts, L, cfg)
+    check("optimising the aux loss decreases it", lossF.item() < loss0.item(),
+          f"{loss0.item():.4f} -> {lossF.item():.4f}")
+    check("block recall improves at both levels",
+          recF["l1"] >= rec0["l1"] and recF["l2"] >= rec0["l2"],
+          f"l1 {rec0['l1']:.3f}->{recF['l1']:.3f}, l2 {rec0['l2']:.3f}->{recF['l2']:.3f}")
+    # NOTE: this is a single-example overfit on a synthetic pattern. It shows the
+    # MECHANISM works -- the gradient path exists and the objective is
+    # optimisable. It says nothing about generalization across real RNA.
 
     print(f"\n{'ALL TESTS PASS' if not FAILS else f'{len(FAILS)} FAILURES: ' + '; '.join(FAILS)}")
     return 1 if FAILS else 0

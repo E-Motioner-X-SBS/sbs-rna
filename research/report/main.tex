@@ -893,6 +893,16 @@ long chains), so this term needs positive weighting or focal loss, and should be
 \emph{recall}-weighted: a missed block is unrecoverable, a spurious one merely
 costs compute.
 
+\paragraph{Implemented and tested in cycle 2.} Until then only a \emph{hook}
+existed---the scores were exposed, but the loss was never written.
+\texttt{block\_occupancy\_loss()} now computes recall-weighted BCE with
+$\text{pos\_weight} = \text{neg}/\text{pos}$. Gradient reaches all six selector
+parameters \emph{through this loss alone}, and 60 Adam steps drive the loss
+$3.0278 \rightarrow 0.0000$ with block recall $\mathbf{0.000 \rightarrow 1.000}$
+at both levels. This is a single-example overfit on a synthetic
+stem-plus-cluster pattern: it demonstrates that the gradient path exists and the
+objective is optimisable, \emph{not} that it generalizes across real RNA.
+
 This changes how R1 is addressed. It is no longer a matter of hoping a trained
 model finds the blocks---they are a directly supervised prediction target with
 labels already in hand, and block recall becomes measurable per level during

@@ -463,6 +463,16 @@ Two mechanisms fix it, and both are now in the reference implementation:
    true contact? We already have those labels; they are exactly what the block
    occupancy measurement of §5.2 computed (1.34% positive at b=4 on long chains).
 
+The loss is now **implemented and tested**, not merely hooked:
+`block_occupancy_loss()` in the reference implementation computes
+recall-weighted BCE (`pos_weight = neg/pos`, since occupancy is ~1.34% positive
+and a missed block is unrecoverable while a spurious one only costs compute).
+Tested: gradient reaches all 6 selector parameters **through this loss alone**,
+and 60 Adam steps drive loss 3.0278 -> 0.0000 with block recall **0.000 ->
+1.000 at both levels**. *That is a single-example overfit on a synthetic
+stem-plus-cluster pattern — it demonstrates the mechanism (the gradient path
+exists, the objective is optimisable), not generalization across real RNA.*
+
 ```
 L_block = BCE(s_b1, occupied_b1) + BCE(s_b2, occupied_b2)
 ```

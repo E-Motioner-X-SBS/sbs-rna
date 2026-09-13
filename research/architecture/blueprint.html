@@ -846,6 +846,15 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <p style="font-family:var(--mono);font-size:13px;background:var(--sunk);padding:12px;border-radius:2px;margin:10px 0">
       L<sub>block</sub> = BCE(s<sub>b1</sub>, occupied<sub>b1</sub>) + BCE(s<sub>b2</sub>, occupied<sub>b2</sub>)
     </p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px"><b>Implemented and
+    tested in cycle 2</b> — until then only a <i>hook</i> existed (the scores were exposed; the
+    loss was never written). <span class="mono">block_occupancy_loss()</span> now computes
+    recall-weighted BCE with <span class="mono">pos_weight = neg/pos</span>. Gradient reaches all
+    6 selector parameters <b>through this loss alone</b>, and 60 Adam steps drive the loss
+    3.0278 → 0.0000 with block recall <b>0.000 → 1.000 at both levels</b>.
+    <span style="color:var(--ink-3)">That is a single-example overfit on a synthetic
+    stem-plus-cluster pattern: it demonstrates the mechanism works, not that it generalizes
+    across real RNA.</span></p>
     <div class="finding">
       <span class="tag">Changes R1</span>
       <p>Blocks are no longer something we hope a trained model finds — they are a

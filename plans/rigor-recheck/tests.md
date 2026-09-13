@@ -274,3 +274,23 @@ gate moved from 14.551 to **15.3424** (fair held-out M2).
 > Also refactored `collect()` out of the original `main()` so both scripts share
 > one extractor rather than a duplicated parser that could drift. Verified the
 > refactor reproduces all four published NLLs exactly before relying on it.
+
+### S5 — aux block-occupancy loss: implemented? — **DEFECT #13, now fixed**
+The documents claimed two fixes "both implemented". Only one was. Grep across
+the repo found **no** BCE / occupancy loss anywhere — the reference code merely
+*exposed* the scores in an `aux` dict so a loss could be attached later. The R1
+downgrade rested on a hook.
+
+Implemented `block_occupancy_loss()` (recall-weighted BCE, `pos_weight=neg/pos`)
+and added a permanent test:
+
+| Check | Result |
+|---|---|
+| gradient reaches l1 selector from the aux loss ALONE | 3/3 params, PASS |
+| gradient reaches l2 selector from the aux loss ALONE | 3/3 params, PASS |
+| optimising it decreases it | 3.0278 -> 0.0000, PASS |
+| block recall improves | l1 0.000 -> 1.000, l2 0.000 -> 1.000, PASS |
+
+> Honest scope: a single-example overfit on a synthetic stem-plus-cluster
+> pattern. It shows the mechanism (gradient path + optimisability), **not**
+> generalization. Recall 1.000 on one memorised pattern is expected.
