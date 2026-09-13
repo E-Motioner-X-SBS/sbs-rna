@@ -106,7 +106,7 @@ def main() -> int:
                    .replace("\\", "").replace("−", "-").replace("–", "-"))
     for tok in ["17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
                 "0.224", "0.372", "1.514", "0.804", "9.87", "911", "382",
-                "103,964", "44,708", "143,871", "14.551", "17.579", "134", "1.757"]:
+                "103,964", "44,708", "143,871", "14.551", "17.579", "115", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")
