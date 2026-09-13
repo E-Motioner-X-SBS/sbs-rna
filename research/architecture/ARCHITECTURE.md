@@ -267,7 +267,7 @@ corpus than families are.
 | Attention (32 blocks, d=768) | 75.5M | 75.5M |
 | MoE FFN (16 blocks x 34 experts x 1.18M) | 642M | 113M |
 | Dense FFN (16 non-MoE blocks) | 113M | 113M |
-| Sparse pair track + triangle | ~45M | 45M |
+| Hierarchical pair track + triangle | ~45M | 45M |
 | Motif bank + heads + decoder | ~35M | 35M |
 | **Total** | **~911M** | **~382M** |
 
@@ -403,6 +403,51 @@ retains every occupied 4x4 block on long chains) and far above the observed
 > was clamped by masking to a quarter of its target. Both capped the effective
 > `c` at 5.0 while appearing to work. Budgets are now stated in the same units
 > as the measurement (`K = c*L` pairs) so a mismatch is visible immediately.
+
+### 5.4b The selectors need their own training signal [defect found by testing]
+
+Writing correctness tests for the reference implementation exposed a defect that
+the speed benchmark could not: **the L1 and L2 block scorers received no gradient
+at all.** Their parameters (`l1.q`, `l1.k`, `l1.sep`, and the L2 equivalents)
+were dead.
+
+The cause is structural rather than a coding slip. The scorers' outputs feed only
+`topk`, which is non-differentiable — an index selection has no useful
+derivative. The selected indices then gather pair features, but the *scores
+themselves* never enter the loss. **As originally specified, the block detectors
+could never be trained and would remain at random initialisation.** That is risk
+R1, demonstrated to be structural rather than hypothetical.
+
+The benchmark could not catch this because it ran under `torch.no_grad()`.
+
+Two mechanisms fix it, and both are now in the reference implementation:
+
+1. **Score gating.** Each retained pair feature is multiplied by
+   `sigmoid(s_b2 + s_b1)`, the scores of the b2 and b1 blocks that selected it.
+   Gradient from the downstream contact loss now reaches the selectors, keeping
+   them calibrated against the task they serve. Measured cost: none —
+   L=4096 stays at 0.47 s and 0.959% of dense, with identical pair counts.
+
+2. **An auxiliary block-occupancy loss — the primary signal.** The selectors are
+   supervised *directly* with binary labels: does this block contain at least one
+   true contact? We already have those labels; they are exactly what the block
+   occupancy measurement of §5.2 computed (1.34% positive at b=4 on long chains).
+
+```
+L_block = BCE(s_b1, occupied_b1) + BCE(s_b2, occupied_b2)
+```
+
+Class imbalance is severe and known in advance (1.34% positive), so this term
+needs positive weighting or focal loss — and it should be **recall-weighted**,
+since a missed block is unrecoverable while a spurious one merely costs compute.
+
+The reference implementation returns the block scores and masks in an `aux`
+dictionary so this loss can be attached without restructuring the module.
+
+**This changes how R1 is addressed.** It is no longer "hope the trained model
+finds the blocks" — the blocks are a *directly supervised* prediction target with
+labels already in hand, and block recall is measurable at each level during
+training rather than only at the end.
 
 ### 5.5 What is still unproven
 
@@ -586,6 +631,33 @@ uncovered steps being the structurally unusual ones that matter most.
 This is the same lesson as the GNRA negative result (§1, Fact 3-adjacent):
 **sequence context alone does not determine local structural behaviour.**
 
+### When to tabulate and when to learn — the principle
+
+§6 freezes a **tabulated** 667-entry motif bank, while this section argues a
+tabulated stiffness field is the wrong design. That looks contradictory. It is
+not, and the distinguishing principle should be stated rather than left implicit,
+because it is the obvious line of attack on the architecture.
+
+**The deciding factor is how much supervision exists for the thing in question.**
+
+| Component | Supervision available | Decision |
+|---|---|---|
+| Motif geometry | **6,661** unique sequences with 3D | **tabulate** (frozen bank) |
+| Step stiffness | **103,964** annotated step geometries | **learn** (encoder) |
+
+A **15.6x** difference. With 6,661 examples a model cannot reliably learn what a
+kink-turn looks like, so we hand it the geometry and let it learn only *where*
+motifs occur — the easier problem. With 103,964 deformation observations there is
+ample signal to learn a context-conditioned distribution, and the measurement in
+this section shows doing so beats any table by 3.028 nats/step.
+
+The rule generalises: **tabulate what is data-starved and structurally invariant;
+learn what is data-rich and context-dependent.** Both components are keyed on the
+*interaction graph* rather than sequence, consistent with the GNRA negative
+result. If motif-level supervision later grows — for example via the pseudo-label
+route in `plans/13-sequence-structure-gap-strategy.md` — the motif bank should be
+revisited under the same rule.
+
 ### The design
 
 A **stiffness encoder** head consumes the trunk representation and the pair
@@ -736,6 +808,9 @@ L = L_MLM + L_2D + L_contact + L_dist
   + lambda_3 * L_elec         (Manning-screened Coulomb consistency)
   + lambda_4 * L_violation    (steric clash, bond geometry)
   + lambda_5 * L_flex         (B-factor / RMSF, and unmodelled-residue labels)
+  + lambda_6 * L_block        (block occupancy BCE at b=16 and b=4 -- §5.4b;
+                               without this the pair-track selectors get no
+                               usable training signal at all)
 ```
 
 Precedent that this helps rather than hurts: **OpenMM-Loss** implements MD
@@ -781,11 +856,14 @@ already initialise `B_wc` (§4.2).
 
 ## 12. Risks and open questions
 
-1. **Block-detection recall.** Superseded but not eliminated. The flat top-K
-   design was measured at ~20% recall on long chains and replaced (§5.1-5.3).
-   The hierarchical track has a 100% recall *ceiling* by construction, but
-   whether a trained model hits it is unproven. Block-detection recall must be
-   reported per length bin and per level.
+1. **Block-detection recall.** Superseded twice, still not eliminated. The flat
+   top-K design was measured at ~20% recall and replaced (§5.1-5.3). Testing then
+   showed the replacement's selectors received **no gradient at all** and could
+   never have been trained (§5.4b); that is now fixed by score gating plus a
+   directly supervised block-occupancy loss. The track has a 100% recall *ceiling*
+   by construction and the selectors now have labels, but **no model has been
+   trained**, so attainment remains unproven. Recall must be reported per length
+   bin and per level.
 2. **Ionic metadata sparsity — AUDITED, partially confirmed (§7b).** ~36% of
    structures yield a recoverable ionic condition (cryo-EM 23.9% structured,
    X-ray 58.7% free-text). Worse, recorded Mg²⁺ spans only 5-15 mM because the

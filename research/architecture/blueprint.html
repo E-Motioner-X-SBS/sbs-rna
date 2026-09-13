@@ -609,7 +609,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         coordinates. The two bold heads are supervised by labels sitting inside every mmCIF
         the field already downloads, and used by no current predictor.</p>
       </div>
-      <div class="cost"><b>2 free channels</b>17,428 Mg²⁺ sites<br>from 180 structures</div>
+      <div class="cost"><b>2 free channels</b>44,708 curated Mg²⁺<br>coordinations (§09)</div>
     </div>
     <div class="connector"></div>
 
@@ -644,7 +644,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <tr><td>Attention — 32 blocks, d=768</td><td class="num">75.5M</td><td class="num">75.5M</td></tr>
         <tr><td>MoE FFN — 16 blocks × 34 experts</td><td class="num">642M</td><td class="num">113M</td></tr>
         <tr><td>Dense FFN — 16 non-MoE blocks</td><td class="num">113M</td><td class="num">113M</td></tr>
-        <tr><td>Sparse pair track + triangle updates</td><td class="num">45M</td><td class="num">45M</td></tr>
+        <tr><td>Hierarchical pair track + triangle updates</td><td class="num">45M</td><td class="num">45M</td></tr>
         <tr><td>Motif bank, heads, decoder</td><td class="num">35M</td><td class="num">35M</td></tr>
         <tr class="total"><td>PHAROS-Base</td><td class="num">~911M</td><td class="num">~382M</td></tr>
         <tr><td>NucleicBERT (dense, all active)</td><td class="num">404M</td><td class="num">404M</td></tr>
@@ -808,6 +808,37 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       instead of 16. And the L2 budget, expressed as a fraction of all pairs, was clamped by
       masking to a quarter of target. Both pinned effective c at 5.0 while the code appeared
       to work. Budgets are now stated in the same units as the measurement (K = c·L).</p>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>Testing found a defect the benchmark could not</h3>
+    <p class="note">the speed benchmark ran under torch.no_grad(), so this was invisible to it</p>
+    <div class="risk" style="border-left-color:var(--warn)">
+      <span class="n">BUG</span>
+      <p><b>The L1 and L2 block scorers received no gradient at all</b> — their parameters were
+      dead. The cause is structural, not a slip: the scores feed only <span class="mono">topk</span>,
+      which is non-differentiable. The selected indices gather pair features, but the
+      <i>scores themselves</i> never reach the loss. <b>As specified, the block detectors could
+      never have been trained</b> and would have stayed at random initialisation — risk R1,
+      shown to be structural rather than hypothetical.</p>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-top:14px"><b>Two fixes, both implemented.</b>
+    <b>Score gating</b> multiplies each pair feature by σ(s<sub>b2</sub> + s<sub>b1</sub>) so
+    gradient from the contact loss reaches the selectors — measured cost <b>none</b>
+    (L=4096 still 0.47 s, 0.959% of dense, identical pair counts). And an
+    <b>auxiliary block-occupancy loss</b>, the primary signal, supervises the selectors
+    directly with binary labels we already have from the occupancy measurement:</p>
+    <p style="font-family:var(--mono);font-size:13px;background:var(--sunk);padding:12px;border-radius:2px;margin:10px 0">
+      L<sub>block</sub> = BCE(s<sub>b1</sub>, occupied<sub>b1</sub>) + BCE(s<sub>b2</sub>, occupied<sub>b2</sub>)
+    </p>
+    <div class="finding">
+      <span class="tag">Changes R1</span>
+      <p>Blocks are no longer something we hope a trained model finds — they are a
+      <b>directly supervised prediction target with labels already in hand</b>, and block recall
+      is measurable per level <i>during</i> training rather than only at the end. Imbalance is
+      severe and known (1.34% positive), so the term needs recall-weighting: a missed block is
+      unrecoverable, a spurious one only costs compute.</p>
     </div>
   </div>
 

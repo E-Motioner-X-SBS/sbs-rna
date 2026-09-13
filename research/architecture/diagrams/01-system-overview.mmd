@@ -13,10 +13,10 @@ graph TB
         HYB --> BIAS --> MOE
     end
 
-    subgraph PAIR["B+C. ADAPTIVE SPARSE PAIR TRACK"]
-        PROP["Pair proposal O(L*w)<br/>low-rank outer product + Turner prior"]
-        SEL["Select K = 32L candidates<br/>measured need: 4.4 contacts/nt<br/>= 1.56 pct of dense at L=2048"]
-        TRI["Sparse triangle updates<br/>on induced K-edge subgraph"]
+    subgraph PAIR["B+C. HIERARCHICAL PAIR TRACK - coarse to fine"]
+        PROP["L1: DENSE block map at b=16<br/>0.396 pct of dense, 65k entries at L=4096<br/>genuinely dense = no recall loss here"]
+        SEL["L2: refine occupied b=16 blocks to b=4<br/>0.460 pct of dense"]
+        TRI["L3: refine occupied b=4 blocks to pairs<br/>1.346 pct - effective c = 17.2<br/>selects BLOCKS, never ranks pairs"]
         PROP --> SEL --> TRI
     end
 

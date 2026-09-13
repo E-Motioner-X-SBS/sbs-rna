@@ -155,10 +155,27 @@ class HierarchicalPairTrack(nn.Module):
         stats["effective_c"] = ii.numel() / L
 
         z = self.pair_proj(torch.cat([tok[0, ii], tok[0, jj]], dim=-1))
+
+        # Gate each pair feature by the score of the b2 block that selected it.
+        # Without this the selector scores reach the loss only through topk, which
+        # is non-differentiable -- so l1/l2 would receive NO gradient and could
+        # never learn to find occupied blocks. (Caught by the correctness tests;
+        # the speed benchmark ran under no_grad and never exposed it.)
+        sel_b2 = s2[0, bi, bj].repeat_interleave(cfg.b2 * cfg.b2)[keep]
+        sel_b1 = s1[0, bi // r, bj // r].repeat_interleave(cfg.b2 * cfg.b2)[keep]
+        gate = torch.sigmoid(sel_b2 + sel_b1).unsqueeze(-1)
+        z = z * gate
+
         for layer in self.tri:
             z = z + layer(z)
         logits = self.out(z).squeeze(-1)
-        return logits, (ii, jj), stats
+
+        # Expose the block scores so an auxiliary block-occupancy loss can
+        # supervise the selectors directly -- the primary training signal for
+        # them, since topk gives none.
+        aux = {"l1_scores": s1, "l2_scores": s2, "l1_mask": m1, "l2_mask": m2,
+               "b2_index": (bi, bj), "b1_index": (bi // r, bj // r)}
+        return logits, (ii, jj), {**stats, "aux": aux}
 
 
 class DensePairTrack(nn.Module):

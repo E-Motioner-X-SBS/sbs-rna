@@ -4,8 +4,8 @@ graph TB
 
     subgraph IMPL["IMPLICIT CHANNEL - monovalent, mean-field"]
         BJ["Bjerrum length l_B = e^2/(4 pi eps0 epsr kB T)<br/>= 7.1 A in water at 298 K"]
-        XI["Manning parameter xi = l_B / b<br/>b = axial charge spacing"]
-        TH["condensed fraction theta = 1 - 1/(z xi)<br/>~0.76 for monovalent RNA<br/>=> q_eff = -(1 - theta) per phosphate"]
+        XI["Manning parameter xi = l_B / b<br/>b = AXIAL charge spacing (helix-axis projection)<br/>NOT the P-P contour distance ~5.9-7.0 A"]
+        TH["condensed fraction theta = 1 - 1/(z xi)<br/>A-form RNA: b=1.40 A (AXIAL, not P-P contour)<br/>xi = 5.11, theta = 0.804, q_eff = -0.196<br/>the often-quoted 0.76 is the B-DNA figure"]
         KA["Debye screening kappa<br/>from ionic strength I"]
         BE["B_elec(i,j) = -lambda q_eff^2 l_B exp(-kappa d_ij)/d_ij<br/>ADDED TO ATTENTION LOGITS"]
         BJ --> XI --> TH --> BE

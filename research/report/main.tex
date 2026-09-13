@@ -689,7 +689,7 @@ Embeddings (vocab 5)                 & 0.01M & 0.01M \\
 Attention, 32 blocks, $d=768$        & 75.5M & 75.5M \\
 MoE FFN, 16 blocks $\times$ 34 experts & 642M  & 113M \\
 Dense FFN, 16 non-MoE blocks         & 113M  & 113M \\
-Sparse pair track and triangle updates & 45M  & 45M \\
+Hierarchical pair track and triangle updates & 45M  & 45M \\
 Motif bank, heads, decoder           & 35M   & 35M \\
 \midrule
 \textbf{PHAROS-Base total}           & $\mathbf{\sim 911M}$ & $\mathbf{\sim 382M}$ \\
@@ -853,6 +853,43 @@ was expressed as a fraction of all pairs and was clamped by masking to a quarter
 of its target. Both pinned the effective $c$ at $5.0$ while the code appeared to
 work. Budgets are now stated in the same units as the measurement ($K = cL$
 pairs) so any mismatch is immediately visible.
+
+\subsubsection{Testing exposed a defect the benchmark could not}
+
+Writing correctness tests for the reference implementation revealed that
+\textbf{the L1 and L2 block scorers received no gradient at all}. Their
+parameters were dead.
+
+The cause is structural, not a coding slip: the scorers' outputs feed only
+\texttt{topk}, which is non-differentiable. The selected indices then gather pair
+features, but the \emph{scores themselves} never enter the loss. As originally
+specified, \textcolor{risk}{\textbf{the block detectors could never be trained}}
+and would have remained at random initialisation. The speed benchmark could not
+catch this because it ran under \texttt{torch.no\_grad()}.
+
+Two mechanisms fix it, both now implemented.
+
+\textbf{Score gating.} Each retained pair feature is multiplied by
+$\sigma(s_{b_2} + s_{b_1})$, the scores of the blocks that selected it, so
+gradient from the contact loss reaches the selectors. Measured cost: none.
+$L=4096$ remains at $0.47$~s and $0.959\%$ of dense with identical pair counts.
+
+\textbf{An auxiliary block-occupancy loss}, which is the primary signal. The
+selectors are supervised directly with binary labels---does this block contain at
+least one true contact?---and those labels are exactly what the occupancy
+measurement of Table~\ref{tab:blocks} computed:
+\begin{equation}
+\mathcal{L}_{\text{block}} = \mathrm{BCE}(s_{b_1},\, \text{occupied}_{b_1}) + \mathrm{BCE}(s_{b_2},\, \text{occupied}_{b_2}).
+\end{equation}
+Class imbalance is severe and known in advance ($1.34\%$ positive at $b=4$ on
+long chains), so this term needs positive weighting or focal loss, and should be
+\emph{recall}-weighted: a missed block is unrecoverable, a spurious one merely
+costs compute.
+
+This changes how R1 is addressed. It is no longer a matter of hoping a trained
+model finds the blocks---they are a directly supervised prediction target with
+labels already in hand, and block recall becomes measurable per level during
+training rather than only at the end.
 
 \paragraph{What remains unproven.} These measurements establish that the
 information is present and the cost affordable. They do \emph{not} establish
@@ -1225,7 +1262,7 @@ through the final cycle, so recycling costs one cycle of activation memory.
 \subsection{The physics-guided objective}
 \begin{align}
 \mathcal{L} =\ & \mathcal{L}_{\text{MLM}} + \mathcal{L}_{\text{2D}} + \mathcal{L}_{\text{contact}} + \mathcal{L}_{\text{dist}} \nonumber\\
- &+ \lambda_1 \mathcal{L}_{\text{stiff}} + \lambda_2 \mathcal{L}_{\mathrm{Mg}} + \lambda_3 \mathcal{L}_{\text{elec}} + \lambda_4 \mathcal{L}_{\text{violation}} + \lambda_5 \mathcal{L}_{\text{flex}}
+ &+ \lambda_1 \mathcal{L}_{\text{stiff}} + \lambda_2 \mathcal{L}_{\mathrm{Mg}} + \lambda_3 \mathcal{L}_{\text{elec}} + \lambda_4 \mathcal{L}_{\text{violation}} + \lambda_5 \mathcal{L}_{\text{flex}} + \lambda_6 \mathcal{L}_{\text{block}}
 \end{align}
 
 The precedent that physics terms help rather than hurt is \textbf{OpenMM-Loss},
@@ -1285,11 +1322,13 @@ between-family variance ($0.333$--$1.000$); our own depth split is weak evidence
 \section{Risks and open questions}
 
 \begin{enumerate}[leftmargin=1.4em,itemsep=0.25em]
-\item \textbf{Block-detection recall.} Superseded but not eliminated. The flat
-top-$K$ design was measured at $\sim$20\% recall on long chains and replaced
-(Section~\ref{sec:hpt}). The hierarchical track has a $100\%$ recall
-\emph{ceiling} by construction, but whether a trained model attains it is
-unproven. Recall must be reported per length bin and per level.
+\item \textbf{Block-detection recall.} Superseded twice, still not eliminated.
+The flat top-$K$ design was measured at $\sim$20\% recall and replaced
+(Section~\ref{sec:hpt}). Testing then showed the replacement's selectors received
+\emph{no gradient at all} and could never have been trained; that is now fixed by
+score gating plus a directly supervised block-occupancy loss. The track has a
+$100\%$ recall ceiling and the selectors now have labels, but no model has been
+trained, so attainment remains unproven.
 \item \textbf{Ionic metadata sparsity---audited, partially confirmed}
 (Section~\ref{sec:r2}). About $36\%$ of structures yield a recoverable ionic
 condition. Worse, recorded Mg\textsuperscript{2+} spans only 5--15 mM because
@@ -1347,6 +1386,7 @@ large-scale training is attempted.
 \texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
 \texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/verify\_claims.py} & regression guard (exit 0 = reproduces) \\
+\texttt{.../reference/test\_hierarchical\_pair\_track.py} & correctness tests (exit 0 = all pass) \\
 \bottomrule
 \end{tabular}
 \end{table}

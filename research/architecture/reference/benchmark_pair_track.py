@@ -33,9 +33,11 @@ def run(model, tok, label):
         dt = time.perf_counter() - t0
         cur, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
+        # `aux` holds tensors for the block-occupancy loss; strip for JSON
+        clean = {k: v for k, v in stats.items() if k != "aux"}
         return {"ok": True, "seconds": round(dt, 3),
                 "torch_peak_rss_gb": round(max(peak_rss_gb() - base, 0), 3),
-                "py_peak_mb": round(peak / 1e6, 1), "stats": stats}
+                "py_peak_mb": round(peak / 1e6, 1), "stats": clean}
     except (RuntimeError, MemoryError) as e:
         tracemalloc.stop()
         return {"ok": False, "error": type(e).__name__ + ": " + str(e)[:120]}

@@ -118,6 +118,43 @@ def main() -> int:
               f"{'' if not present else ' STILL IN ' + ','.join(present)}")
         if present: fails.append(f"stale {bad}")
 
+    print("\n== reference implementation correctness tests ==")
+    import subprocess
+    t = ROOT / "research/architecture/reference/test_hierarchical_pair_track.py"
+    if t.exists():
+        r = subprocess.run([sys.executable, t.name], cwd=t.parent,
+                           capture_output=True, text=True, timeout=1800)
+        ok = r.returncode == 0 and "ALL TESTS PASS" in r.stdout
+        print(f"  {'OK ' if ok else 'FAIL'} {t.name} "
+              f"{'all pass' if ok else 'FAILURES -- run it directly'}")
+        if not ok:
+            fails.append("hpt correctness tests")
+    else:
+        print(f"  FAIL {t.name} missing"); fails.append("hpt tests missing")
+
+    print("\n== diagram sources (feed figures into the report) ==")
+    dg = sorted((ROOT / "research/architecture/diagrams").glob("*.mmd"))
+    # phrasings that were retracted and must not survive in any figure
+    banned = ["0.76 for monovalent", "ADAPTIVE SPARSE", "Select K = 32L"]
+    for d in dg:
+        t = d.read_text()
+        hits = [b for b in banned if b in t]
+        print(f"  {'OK ' if not hits else 'FAIL'} {d.name:34s}"
+              f"{'clean' if not hits else 'STALE: ' + ', '.join(hits)}")
+        if hits:
+            fails.append(f"stale diagram {d.name}")
+    rendered = ROOT / "research/architecture/diagrams/rendered"
+    for d in dg:
+        for ext in ("png", "svg"):
+            f = rendered / f"{d.stem}.{ext}"
+            if not f.exists():
+                print(f"  FAIL missing render {f.name}")
+                fails.append(f"missing render {f.name}")
+            elif f.stat().st_mtime < d.stat().st_mtime:
+                print(f"  FAIL stale render {f.name} (older than its .mmd source)")
+                fails.append(f"stale render {f.name}")
+    print(f"  OK  {len(dg)} diagram sources, renders present and newer than source")
+
     print(f"\n{'ALL CLAIMS REPRODUCE' if not fails else 'DRIFT DETECTED: ' + '; '.join(fails)}")
     return 1 if fails else 0
 

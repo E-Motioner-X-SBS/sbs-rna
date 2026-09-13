@@ -13,7 +13,7 @@
       "L": 128,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.007,
+        "seconds": 0.008,
         "torch_peak_rss_gb": 0.021,
         "py_peak_mb": 0.0,
         "stats": {
@@ -31,7 +31,7 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 0.067,
+        "seconds": 0.066,
         "torch_peak_rss_gb": 0.105,
         "py_peak_mb": 0.0,
         "stats": {
@@ -43,7 +43,7 @@
       "L": 256,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.015,
+        "seconds": 0.016,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -61,8 +61,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 0.279,
-        "torch_peak_rss_gb": 0.332,
+        "seconds": 0.291,
+        "torch_peak_rss_gb": 0.334,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 65536
@@ -91,8 +91,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 1.223,
-        "torch_peak_rss_gb": 1.302,
+        "seconds": 1.748,
+        "torch_peak_rss_gb": 1.304,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 262144
@@ -103,7 +103,7 @@
       "L": 1024,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.1,
+        "seconds": 0.095,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -121,8 +121,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 8.257,
-        "torch_peak_rss_gb": 5.149,
+        "seconds": 15.228,
+        "torch_peak_rss_gb": 4.793,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 1048576
@@ -133,7 +133,7 @@
       "L": 2048,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.326,
+        "seconds": 0.327,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -160,7 +160,7 @@
       "L": 4096,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.445,
+        "seconds": 0.467,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
