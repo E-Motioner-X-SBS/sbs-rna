@@ -158,3 +158,36 @@ ranking (OP2 > OP1 > O6 > O4 > O2' > N7).
 ### T27 Stiffness headroom — **PASS, justifies the encoder**
 M0 19.724 / M1 17.579 (sequence table) / M2 14.551 (sequence x structure).
 Structural context contributes MORE than sequence (+3.028 vs +2.144 nats).
+
+### T25 [CROSS-CHECK] — gradient fix verified from outside — **PASS**
+
+The second audit found the L1/L2 block scorers dead (scores fed only `topk`,
+which is non-differentiable) and applied two fixes. Verified independently here
+with a fresh script that runs a real backward pass and inspects every parameter,
+rather than re-running the audit's own test:
+
+| component | params | with grad | non-zero grad | max abs grad |
+|---|---|---|---|---|
+| l1 (coarse b=16 scorer) | 3 | 3 | **3** | 2.838e-02 |
+| l2 (b=4 scorer) | 3 | 3 | **3** | 8.699e-02 |
+| rest of module | 16 | — | 16 | — |
+
+Every block-scorer parameter now receives a non-zero gradient. The selectors are
+trainable.
+
+Cost of the fix, re-measured (the audit claimed none):
+
+| L | time | pairs | % of dense | effective c |
+|---|---|---|---|---|
+| 1024 | 0.12 s | 20,108 | 3.839% | 19.64 |
+| 2048 | 0.22 s | 40,198 | 1.918% | 19.63 |
+| 4096 | **0.45 s** | 80,396 | **0.959%** | 19.63 |
+
+Matches the pre-fix figures (0.45 s, 0.959%, c=19.63); pair counts differ by 6 of
+80,390 at L=4096, from sigmoid gating altering a tie-break. The claim that the
+fix is free stands.
+
+> Worth noting *why* the original benchmark could not have caught this: it ran
+> under `torch.no_grad()`, so it measured only forward cost. A speed benchmark
+> cannot detect an untrainable parameter. Nine silent defects now, every one
+> producing a plausible result rather than an error.
