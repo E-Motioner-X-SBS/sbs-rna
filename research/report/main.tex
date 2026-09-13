@@ -571,13 +571,15 @@ novelty claim in the design.
 \caption{Period-8 mixer interleaving, repeated four times for 32 blocks.}
 \end{figure}
 
-The trunk uses 32 blocks at $d=768$ with the repeating pattern
+The trunk uses \textbf{16 blocks at $d=512$} with the repeating pattern
 \[
 [\,\mathrm{GDN},\ \mathrm{GDN},\ \mathrm{SWA},\ \mathrm{GDN},\ \mathrm{GDN},\ \mathrm{SWA},\ \mathrm{GDN},\ \mathrm{FULL}\,],
 \]
-where GDN is Gated DeltaNet linear attention ($O(L)$, 20 of 32 blocks), SWA is
-sliding-window softmax attention with window 128 ($O(Lw)$, 8 blocks), and FULL
-is full attention with physics bias ($O(L^2)$, only 4 blocks).
+where GDN is Gated DeltaNet linear attention ($O(L)$, 10 of 16 blocks), SWA is
+sliding-window softmax attention with window 128 ($O(Lw)$, 4 blocks), and FULL
+is full attention with physics bias ($O(L^2)$, only 2 blocks). Depth does not
+come from block count: 16 blocks $\times$ 8 refinement loops give
+\textbf{128 effective layers} (Sections~\ref{sec:loop} and~\ref{sec:size}).
 
 The justification is both architectural and biological. Jamba interleaves
 Mamba, attention and MoE at a $7\!:\!1$ ratio and reaches 256K context with a
@@ -586,10 +588,10 @@ retrieval and length extrapolation; Oryx varies the mixer type \emph{within} a
 sequence. RNA has exactly the structure this exploits: long stretches of regular
 A-form helix that are locally periodic and low-information, punctuated by rare
 junctions, pseudoknots and kissing loops that require global mixing. At
-$L=4096$, an all-dense 32-block trunk would perform $537$M pair evaluations;
-PHAROS performs $67$M in its four full-attention blocks, an $8\times$ reduction
-on the quadratic term. Counting the sliding-window blocks as well
-($8 \times L \times 128$), the honest overall ratio is $7.53\times$.
+$L=4096$, a dense 16-block trunk would perform $268$M pair evaluations; PHAROS
+performs $34$M in its two full-attention blocks---the same $8\times$ reduction on
+the quadratic term, preserved under right-sizing. Counting the sliding-window
+blocks as well, the honest overall ratio is $\sim$$7.5\times$.
 
 \subsubsection{Physics-biased attention}
 
@@ -653,8 +655,10 @@ recycle sharpens both.
 \end{figure}
 
 Following DeepSeekMoE, the design uses 32 fine-grained routed experts at
-$d_{\text{ff}} = 512$ plus 2 always-on shared experts, with top-4 routing giving
-6 active experts of 34, in every second block.
+$d_{\text{ff}} = 128$ plus 2 always-on shared experts, with top-4 routing giving
+6 active experts of 34, in \textbf{every} block. Section~\ref{sec:cost} explains
+why the original every-\emph{second}-block placement, with dense FFN in between,
+was the worst trade in the design.
 
 Shared-expert isolation matters for a specific reason here: Watson--Crick helix
 formation is the highest-frequency pattern in all RNA. Placing it in an
@@ -679,29 +683,30 @@ corpus than families are.
 
 \begin{table}[h]
 \centering
-\caption{PHAROS-Base parameter budget against NucleicBERT.}
+\caption{PHAROS-Small parameter budget against NucleicBERT.}
 \label{tab:params}
 \begin{tabular}{lrr}
 \toprule
 \textbf{Component} & \textbf{Total} & \textbf{Active} \\
 \midrule
-Embeddings (vocab 5)                 & 0.01M & 0.01M \\
-Attention, 32 blocks, $d=768$        & 75.5M & 75.5M \\
-MoE FFN, 16 blocks $\times$ 34 experts & 642M  & 113M \\
-Dense FFN, 16 non-MoE blocks         & 113M  & 113M \\
-Hierarchical pair track and triangle updates & 45M  & 45M \\
-Motif bank, heads, decoder           & 35M   & 35M \\
+Embeddings (vocab 5)                 & 0.005M & 0.005M \\
+Attention, 16 blocks, $d=512$        & 16.8M & 16.8M \\
+MoE FFN, 16 blocks $\times$ 34 experts & 107.0M & 18.9M \\
+Hierarchical pair track and triangle updates & 15M & 15M \\
+Motif bank, heads, decoder           & 10M   & 10M \\
 \midrule
-\textbf{PHAROS-Base total}           & $\mathbf{\sim 911M}$ & $\mathbf{\sim 382M}$ \\
-\textbf{PHAROS-Base-v2} (Sec.~\ref{sec:cost}) & $\mathbf{\sim 1{,}401M}$ & $\mathbf{\sim 269M}$ \\
-\textbf{PHAROS-Small} (Sec.~\ref{sec:size}, \emph{default}) & $\mathbf{\sim 149M}$ & $\mathbf{\sim 61M}$ \\
+\textbf{PHAROS-Small (default)}      & $\mathbf{\sim 149M}$ & $\mathbf{\sim 61M}$ \\
+Base-v2 (scale-up path, Sec.~\ref{sec:cost}) & $\sim 1{,}401M$ & $\sim 269M$ \\
 NucleicBERT (dense)                  & 404M & 404M \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-PHAROS-Base carries $2.3\times$ the capacity of NucleicBERT at slightly lower
-active compute, with an attention term roughly $8\times$ cheaper at long context.
+PHAROS-Small uses \textbf{$6.6\times$ fewer active parameters} than NucleicBERT
+while reaching 128 effective layers, with an attention term roughly $8\times$
+cheaper at long context. Section~\ref{sec:size} gives the measured justification:
+the 3D supervision holds $\sim$2.8~MB of information, so the structure task is
+data-limited rather than capacity-limited.
 
 \subsection{Hierarchical pair track}
 \label{sec:hpt}
@@ -1118,7 +1123,7 @@ RNA structure the field downloads and are used by no current predictor.
 \texttt{\_ndb\_struct\_na\_base\_pair\_step} & 6 step deformation coordinates & 103{,}964 steps \\
 \texttt{\_ndb\_struct\_na\_base\_pair} & pair graph + Saenger / Leontis--Westhof class & 29 classes \\
 \texttt{\_struct\_conn} (\texttt{metalc}) & curated metal coordination & 44{,}708 Mg\textsuperscript{2+} \\
-\texttt{\_pdbx\_unobs\_or\_zero\_occ\_residues} & unmodelled (disordered) residues & 143{,}871 \\
+\texttt{\_pdbx\_unobs\allowbreak\_or\allowbreak\_zero\allowbreak\_occ\allowbreak\_residues} & unmodelled (disordered) residues & 143{,}871 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1247,7 +1252,7 @@ shapes rather than assumed.
 FP8 mixed precision & \textbf{Adopt.} Under $0.25\%$ loss error against BF16 at 671B scale, with block/tile quantisation and selective high-precision accumulation. The largest single memory and throughput win. \\
 Auxiliary-loss-free balancing & \textbf{Already in the design.} Essential here because 5S rRNA is 5{,}976 of the 3D clusters, so a balance \emph{loss} would fight the biology. \\
 DualPipe & \textbf{Defer} until the model spans nodes. \\
-Multi-head Latent Attention & \textbf{Skip.} Largely redundant---20 of 32 blocks are already linear attention, so the KV cache is small by construction. \\
+Multi-head Latent Attention & \textbf{Skip.} Largely redundant---10 of 16 blocks are already linear attention, so the KV cache is small by construction. \\
 Multi-token prediction & \textbf{Adapt, don't copy.} MTP is defined for causal models; our objective is span-masked. The analogue is predicting a masked span jointly. Worth an ablation, not a commitment. \\
 \bottomrule
 \end{tabular}
@@ -1525,6 +1530,113 @@ Combined with the staged token budget, the first informative checkpoint costs on
 the order of \textbf{one GPU-day}, so the sizing question becomes an experiment
 rather than an argument.
 
+\section{Dynamics: from a stiffness field to an ensemble}
+\label{sec:dyn}
+
+The brief asked for structure prediction ``or maybe more to it, maybe dynamics of
+the RNA, maybe how it will fold''. This section says what the measured stiffness
+field licenses---and, as importantly, what it does not.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.9\textwidth,keepaspectratio]{../architecture/diagrams/rendered/08-dynamics-ensemble.png}
+\caption{The dynamics module: measured inputs, the harmonic construction, and an
+explicit statement of what it does not claim.}
+\end{figure}
+
+\subsection{One structure is the wrong output for much of RNA}
+
+Riboswitches are \emph{defined} by holding two functional folds, ligand-bound and
+unbound, so predicting one is predicting half the biology. The field has moved
+off the minimum-free-energy structure: functionally relevant RNAs are
+heterogeneous ensembles in which the most stable state may be a minor
+subpopulation, and CASP16 now scores alternative conformations as its own track.
+
+\subsection{The harmonic ensemble is nearly free}
+
+Given a predicted structure and a per-step $6\times6$ stiffness field, the
+harmonic fluctuation spectrum follows by diagonalising the assembled stiffness---no
+sampling, no molecular dynamics. This is the standard elastic-network
+construction, already assessed for RNA against MD and SHAPE. PHAROS therefore
+emits three outputs alongside coordinates.
+
+\begin{table}[h]
+\centering
+\caption{Dynamics outputs and their supervision. Two of the three label sources
+are already inside every deposited structure. \meas}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.8cm}>{\raggedright\arraybackslash}p{4.6cm}@{}}
+\toprule
+\textbf{Output} & \textbf{Derived from} & \textbf{Supervision} \\
+\midrule
+per-step $6\times6$ stiffness & stiffness encoder & measured $F$, 76 contexts \\
+per-nucleotide fluctuation amplitude & assembled $F$ $\rightarrow$ normal modes & B-factors / RMSF \\
+\textbf{per-residue disorder} & dedicated head & \textbf{143,871 unobserved-residue records} \\
+$K=3$ alternative states & decoder samples, ranked & CASP16 alt-conformations \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The disorder head is the cheapest addition in the design. A residue recorded in
+\texttt{\_pdbx\_unobs\allowbreak\_or\allowbreak\_zero\allowbreak\_occ\allowbreak\_residues} is one too mobile or disordered to
+model---a direct per-residue flexibility label, present in every deposited
+structure, used by no RNA structure predictor, and we extracted 143,871 of them
+at zero acquisition cost. On state count, gRNAde's multi-state evidence is a
+consistent 3--5\% improvement with \textbf{3 states} best, and RNAnneal uses 10;
+we default to $K=3$.
+
+\subsection{Why the stiffness field is conditioned on structure}
+
+The literature is explicit that slide--rise, twist--roll and twist--slide
+couplings carry real physics, and that the \textbf{pentameric scale is the
+minimum range of elastic couplings}---concerted motion of neighbouring steps makes
+a dinucleotide step model demonstrably insufficient. Our own nested-model
+measurement reaches that conclusion independently.
+
+\begin{table}[h]
+\centering
+\caption{Negative log-likelihood of the step distribution under nested models;
+lower is better. \meas}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Model} & \textbf{NLL} & \textbf{gain} \\
+\midrule
+M0 global & $19.7235$ & --- \\
+M1 sequence context & $17.5792$ & $2.14$ nats over global \\
+M$_{\text{struct}}$ structural context only & $17.8470$ & $1.88$ over global \\
+\textbf{M2 sequence $\times$ structure} & $\mathbf{14.5510}$ & $\mathbf{3.03}$ nats over sequence \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Structural context adds more than sequence context, and the two are
+complementary. A sequence-keyed dinucleotide lookup table leaves the larger share
+of the signal unused, which is why the encoder reads the pair representation over
+a neighbourhood instead.
+
+\subsection{What this does not claim}
+
+\begin{quote}
+\textcolor{risk}{\textbf{This is an equilibrium fluctuation model.}} It describes
+breathing \emph{around} a fold. It is \textbf{not} a folding-pathway predictor.
+Cotranscriptional folding is kinetic---structure evolves as the chain elongates
+and the system rarely reaches equilibrium, so cotranscriptional products
+routinely deviate from thermodynamic predictions. Reconstructing those pathways
+requires \emph{time-resolved} probing data, which is in neither our catalogue nor
+Ribonanza. Describing a harmonic ensemble as ``predicting how RNA folds'' would
+be precisely the class of overclaim that the coevolution retraction in
+Section~\ref{sec:coev} was about. The supportable claim is: \emph{predicts the
+fold, its local rigidity, its disorder, and the amplitude of motion about it,
+under stated ionic conditions.}
+\end{quote}
+
+\paragraph{Risk this adds (R7).} No settled metric exists for scoring a predicted
+RNA ensemble against experiment; RNAnneal compares against just 16
+experimentally-resolved riboswitch conformations. Reporting ``3 states'' without
+a scoring protocol agreed in advance would be uninterpretable, so single-state
+TM-score on blind sets remains the headline and ensemble output is reported
+descriptively.
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1631,6 +1743,8 @@ large-scale training is attempted.
 \texttt{.../sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
 \texttt{.../sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
 \texttt{.../sampling/test\_residue\_guard\_bias.py} & \texttt{residue\_guard\_bias.json} \\
+\texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
+\texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
 \texttt{.../reference/benchmark\_pair\_track.py} & \texttt{pair\_track\_benchmark.json} \\
 \texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\

@@ -111,7 +111,10 @@ def main() -> int:
         txt[k] = (t.replace("{,}", ",").replace("\\%", "%").replace("$", "")
                    .replace("\\", "").replace("−", "-").replace("–", "-"))
     for tok in ["17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
-                "0.224", "0.372", "1.514", "0.804", "9.87", "911", "382",
+                "0.224", "0.372", "1.514", "0.804", "9.87",
+                # PHAROS-Small is the current headline config; 910M/382M survives
+                # only as the superseded Base row in the progression tables.
+                "149", "61",
                 "103,964", "44,708", "143,871", "14.551", "17.579", "115", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
@@ -123,6 +126,25 @@ def main() -> int:
         print(f"  {'OK ' if not present else 'FAIL'} retracted text absent: {bad!r}"
               f"{'' if not present else ' STILL IN ' + ','.join(present)}")
         if present: fails.append(f"stale {bad}")
+
+    print("\n== architecture config consistency (PHAROS-Small is the default) ==")
+    cfg_docs = {"ARCH": ROOT/"research/architecture/ARCHITECTURE.md",
+                "TEX":  ROOT/"research/report/main.tex",
+                "HTML": ROOT/"research/architecture/blueprint.html"}
+    cfg_txt = {k: v.read_text() for k, v in cfg_docs.items()}
+    # phrases describing the SUPERSEDED default; Base-v2 scale-up rows are fine
+    stale_cfg = ["32 blocks at d=768", "20 of 32 blocks", "4 of 32 blocks",
+                 "537M", "d_ff = 512", "every second block", "PHAROS-Base carries"]
+    for bad in stale_cfg:
+        hit = [k for k, t in cfg_txt.items() if bad in t]
+        print(f"  {'OK ' if not hit else 'FAIL'} superseded config absent: {bad!r}"
+              f"{'' if not hit else ' IN ' + ','.join(hit)}")
+        if hit: fails.append(f"stale config {bad}")
+    for need in ["16 blocks", "d=512", "149M", "61M", "128 effective"]:
+        miss = [k for k, t in cfg_txt.items() if need not in t]
+        print(f"  {'OK ' if not miss else 'FAIL'} current config present: {need!r}"
+              f"{'' if not miss else ' MISSING from ' + ','.join(miss)}")
+        if miss: fails.append(f"missing config {need}")
 
     print("\n== reference implementation correctness tests ==")
     import subprocess

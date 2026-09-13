@@ -29,7 +29,9 @@ import torch.nn.functional as F
 
 @dataclass
 class HPTConfig:
-    d_model: int = 768
+    # PHAROS-Small defaults (see ARCHITECTURE.md section 10d): depth comes from
+    # refinement loops, not block count, so d_model is 512 rather than 768.
+    d_model: int = 512
     d_pair: int = 128
     b1: int = 16          # coarse block size
     b2: int = 4           # intermediate block size

@@ -1,0 +1,52 @@
+graph TB
+    subgraph WHY["WHY ONE STRUCTURE IS THE WRONG OUTPUT"]
+        W1["Riboswitches are DEFINED by holding two folds<br/>apo (unbound) and holo (ligand-bound).<br/>Predicting one predicts half the biology."]
+        W2["The field has moved off the minimum-free-energy structure:<br/>functional RNAs are heterogeneous ensembles where the<br/>most stable state may be a MINOR subpopulation."]
+        W3["CASP16 now scores alternative conformations<br/>as its own track."]
+        W1 --> W2 --> W3
+    end
+
+    subgraph MEAS["MEASURED INPUTS - already in the repo"]
+        M1["103,964 annotated base-pair steps, 155/180 structures<br/>F = kT C^-1 for 76 contexts with n >= 200<br/>twist force constants span 115x<br/>UG/UG 1.343e-2 (stiff) to AA/UA 1.167e-4 (floppy)"]
+        M2["143,871 unobserved-residue records<br/>a residue too mobile to model IS a disorder label.<br/>Free, in every deposited structure,<br/>used by NO RNA structure predictor."]
+        M3["HEADROOM - negative log-likelihood, lower better<br/>M0 global 19.72<br/>M1 sequence context 17.58 (gain 2.14)<br/>M_struct structure only 17.85 (gain 1.88)<br/>M2 sequence x structure 14.55 (gain 3.03 over sequence)"]
+    end
+
+    ENC["STIFFNESS ENCODER<br/>reads the PAIR REPRESENTATION over a neighbourhood,<br/>not a 16-entry dinucleotide lookup table.<br/>Justified by M3: structural context adds MORE<br/>than sequence context (3.03 vs 2.14 nats)."]
+
+    ASM["ASSEMBLE F over the chain<br/>-> diagonalise -> low-frequency normal modes<br/>NO sampling, NO molecular dynamics"]
+
+    subgraph OUT["OUTPUTS"]
+        O1["per-step 6x6 stiffness"]
+        O2["per-nucleotide fluctuation amplitude"]
+        O3["per-residue disorder probability"]
+        O4["K = 3 alternative states + weights<br/>gRNAde: 3-5 pct gain, best at 3 states<br/>RNAnneal uses 10"]
+    end
+
+    M1 --> ENC
+    M3 --> ENC
+    ENC --> ASM
+    ASM --> O1
+    ASM --> O2
+    M2 --> O3
+    ASM --> O4
+    WHY --> ENC
+
+    LIMIT["WHAT THIS DOES NOT CLAIM<br/><br/>This is an EQUILIBRIUM FLUCTUATION model.<br/>It describes breathing AROUND a fold.<br/>It is NOT a folding-pathway predictor.<br/><br/>Cotranscriptional folding is KINETIC - structure evolves<br/>as the chain elongates and rarely equilibrates, so<br/>cotranscriptional products deviate from thermodynamics.<br/>Reconstructing pathways needs TIME-RESOLVED probing data<br/>(the R2D2 approach), which is in neither our catalogue<br/>nor Ribonanza.<br/><br/>Supportable claim: predicts the fold, its local rigidity,<br/>its disorder, and the amplitude of motion about it,<br/>under stated ionic conditions."]
+
+    R7["RISK R7 - ENSEMBLE EVALUATION IS BARELY DEFINED<br/>No settled metric for scoring a predicted RNA ensemble.<br/>RNAnneal compares against just 16 experimentally-resolved<br/>riboswitch conformations. Reporting '3 states' without a<br/>protocol agreed in advance would be uninterpretable.<br/>Single-state TM-score on blind sets stays the headline."]
+
+    OUT --> LIMIT
+    LIMIT --> R7
+
+    CAV["CAVEAT ON THE STIFFNESS ITSELF<br/>3 of 76 contexts have covariance condition number > 1e4<br/>(AU/AA, GA/AA, GC/AC) - F = kT C^-1 is least reliable<br/>exactly where the steps are floppiest."]
+    M1 -.-> CAV
+
+    classDef meas fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    classDef step fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef warn fill:#7f1d1d,stroke:#f87171,stroke-width:3px,color:#fff
+    classDef ctx fill:#164e63,stroke:#22d3ee,stroke-width:2px,color:#fff
+    class M1,M2,M3 meas
+    class ENC,ASM,O1,O2,O3,O4 step
+    class LIMIT,R7,CAV warn
+    class W1,W2,W3 ctx

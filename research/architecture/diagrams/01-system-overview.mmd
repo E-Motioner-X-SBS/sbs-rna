@@ -7,9 +7,9 @@ graph TB
     end
 
     subgraph TRUNK["A. TOKEN TRUNK - 32 hybrid blocks, d=768"]
-        HYB["Interleaved mixers per period-8 cycle<br/>20x GatedDeltaNet O(L)<br/>8x SlidingWindow O(L*w)<br/>4x FullAttention O(L^2)"]
+        HYB["16 blocks, d=512, interleaved mixers<br/>10x GatedDeltaNet O(L)<br/>4x SlidingWindow O(L*w)<br/>2x FullAttention O(L^2)<br/>depth from 8 refinement LOOPS = 128 eff. layers"]
         BIAS["Physics-biased attention logits<br/>B_wc + B_elec + B_motif + A_prev"]
-        MOE["MoE FFN every 2nd block<br/>32 fine-grained + 2 shared experts<br/>top-4 routing, bias-based balancing"]
+        MOE["MoE FFN in EVERY block<br/>32 fine-grained (d_ff=128) + 2 shared<br/>top-4 routing, bias-based balancing<br/>149M total / 61M active"]
         HYB --> BIAS --> MOE
     end
 

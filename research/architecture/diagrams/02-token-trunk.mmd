@@ -1,7 +1,7 @@
 graph TB
     IN["sequence embedding, L x 768"]
 
-    subgraph C1["PERIOD-8 CYCLE (repeated 4x = 32 blocks)"]
+    subgraph C1["PERIOD-8 CYCLE (repeated 2x = 16 blocks, d=512)"]
         direction TB
         R1["Blk 1 - GDN linear O(L)"]
         R2["Blk 2 - GDN linear O(L) + MoE"]
@@ -17,7 +17,7 @@ graph TB
     IN --> R1
     R8 --> OUT["to sparse pair track"]
 
-    COST["MIXER BUDGET<br/>GatedDeltaNet linear: 20 of 32 blocks<br/>SlidingWindow w=128: 8 of 32 blocks<br/>FULL quadratic: only 4 of 32 blocks<br/><br/>at L=4096: 67M pair evaluations<br/>vs 537M if every block were dense<br/>= 8x cheaper attention term"]
+    COST["MIXER BUDGET<br/>GatedDeltaNet linear: 10 of 16 blocks<br/>SlidingWindow w=128: 4 of 16 blocks<br/>FULL quadratic: only 2 of 16 blocks<br/><br/>at L=4096: 34M pair evaluations<br/>vs 268M if every block were dense<br/>= 8x cheaper attention term<br/><br/>DEPTH COMES FROM LOOPS, NOT BLOCKS:<br/>16 blocks x 8 refinement loops = 128 effective layers"]
 
     BIO["WHY THIS MATCHES RNA<br/>A-form helix is locally periodic and<br/>low-information: linear attention suffices.<br/>Junctions, pseudoknots and kissing loops<br/>need global mixing but are RARE.<br/>The mixer follows the biology."]
 

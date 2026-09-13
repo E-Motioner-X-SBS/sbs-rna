@@ -518,13 +518,14 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <div class="badge">A</div>
       <div>
         <h4>Token trunk — hybrid mixers + MoE</h4>
-        <p>32 blocks at d=768, repeating period-8:
+        <p><b>16 blocks at d=512</b>, repeating period-8 twice:
         <span class="mono">[GDN GDN SWA GDN GDN SWA GDN FULL]</span>.
-        Gated DeltaNet carries 20 blocks, sliding-window 8, full attention only 4 — because
+        Gated DeltaNet carries 10 blocks, sliding-window 4, full attention only 2 — because
         A-form helix is locally periodic and low-information, while junctions and pseudoknots
-        are rare but need global mixing.</p>
+        are rare but need global mixing. <b>Depth comes from 8 refinement loops, not block
+        count: 128 effective layers</b> (§11, §12).</p>
       </div>
-      <div class="cost q"><b>8× cheaper</b>67M vs 537M<br>pair evals @ L=4096</div>
+      <div class="cost q"><b>8× cheaper</b>34M vs 268M<br>pair evals @ L=4096</div>
     </div>
     <div class="connector"></div>
 
@@ -549,14 +550,14 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <div class="badge">A″</div>
       <div>
         <h4>Mixture-of-experts feed-forward</h4>
-        <p>32 fine-grained routed experts (d<sub>ff</sub>=512) + 2 always-on shared, top-4 →
-        6 active of 34. Watson–Crick helix lives in a <i>shared</i> expert so the routed 32
-        never relearn it. Balancing is auxiliary-loss-free — 5S rRNA alone is 5,976 BGSU
+        <p>32 fine-grained routed experts (d<sub>ff</sub>=128) + 2 always-on shared, top-4 →
+        6 active of 34, in <b>every</b> block. Watson–Crick helix lives in a <i>shared</i>
+        expert so the routed 32 never relearn it. Balancing is auxiliary-loss-free — 5S rRNA alone is 5,976 BGSU
         clusters, so a balance loss would fight the biology. <b>The router reads structural
         regime plus alignment depth <span class="mono">Neff/L</span>, never sequence k-mers</b>
         — the depth feature is what gates the coevolution expert (§02, Finding 4).</p>
       </div>
-      <div class="cost"><b>6 / 34 active</b>every 2nd block<br>bias-based balancing</div>
+      <div class="cost"><b>6 / 34 active</b>every block<br>bias-based balancing</div>
     </div>
     <div class="connector"></div>
 
@@ -636,21 +637,23 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
 <!-- ================= 4. BUDGET ================= -->
 <section>
   <div class="sechead"><span class="secnum">04</span><h2>Parameter budget</h2></div>
-  <p class="lede">PHAROS-Base against NucleicBERT, the dense 404M model this is meant to
-  supersede. More capacity, slightly less active compute.</p>
+  <p class="lede">PHAROS-Small against NucleicBERT, the dense 404M model this is meant to
+  supersede. <b>6.6× fewer active parameters</b>, while reaching 128 effective layers through
+  refinement loops rather than stacked blocks — see §12 for why the original 1.4B sizing did
+  not survive scrutiny.</p>
   <div class="tablewrap">
     <table>
       <thead><tr><th>Component</th><th class="num">Total</th><th class="num">Active</th></tr></thead>
       <tbody>
-        <tr><td>Embeddings (vocab 5)</td><td class="num">0.01M</td><td class="num">0.01M</td></tr>
-        <tr><td>Attention — 32 blocks, d=768</td><td class="num">75.5M</td><td class="num">75.5M</td></tr>
-        <tr><td>MoE FFN — 16 blocks × 34 experts</td><td class="num">642M</td><td class="num">113M</td></tr>
-        <tr><td>Dense FFN — 16 non-MoE blocks</td><td class="num">113M</td><td class="num">113M</td></tr>
-        <tr><td>Hierarchical pair track + triangle updates</td><td class="num">45M</td><td class="num">45M</td></tr>
-        <tr><td>Motif bank, heads, decoder</td><td class="num">35M</td><td class="num">35M</td></tr>
-        <tr class="total"><td>PHAROS-Base</td><td class="num">~911M</td><td class="num">~382M</td></tr>
+        <tr><td>Embeddings (vocab 5)</td><td class="num">0.005M</td><td class="num">0.005M</td></tr>
+        <tr><td>Attention — 16 blocks, d=512</td><td class="num">16.8M</td><td class="num">16.8M</td></tr>
+        <tr><td>MoE FFN — 16 blocks × 34 experts</td><td class="num">107.0M</td><td class="num">18.9M</td></tr>
+        <tr><td>Hierarchical pair track + triangle updates</td><td class="num">15M</td><td class="num">15M</td></tr>
+        <tr><td>Motif bank, heads, decoder</td><td class="num">10M</td><td class="num">10M</td></tr>
+        <tr class="total"><td><b>PHAROS-Small</b> (default)</td><td class="num">~149M</td><td class="num">~61M</td></tr>
+        <tr><td style="color:var(--ink-3)">Base-v2 (scale-up path, §11)</td><td class="num" style="color:var(--ink-3)">~1,401M</td><td class="num" style="color:var(--ink-3)">~269M</td></tr>
         <tr><td>NucleicBERT (dense, all active)</td><td class="num">404M</td><td class="num">404M</td></tr>
-        <tr class="total"><td>Difference</td><td class="num"><span class="delta">2.3× capacity</span></td><td class="num"><span class="delta">0.95× compute</span></td></tr>
+        <tr class="total"><td>vs NucleicBERT</td><td class="num"><span class="delta">0.37× params</span></td><td class="num"><span class="delta">6.6× fewer active</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -1063,7 +1066,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
             <tr class="total"><td>FP8 mixed precision</td><td style="color:var(--mg);font-weight:600">ADOPT — &lt;0.25% loss error vs BF16</td></tr>
             <tr><td>Aux-loss-free balancing</td><td style="color:var(--mg)">already in the design</td></tr>
             <tr><td>DualPipe</td><td style="color:var(--ink-3)">defer until multi-node</td></tr>
-            <tr><td>Multi-head Latent Attention</td><td style="color:var(--ink-3)">skip — redundant vs our linear attention</td></tr>
+            <tr><td>Multi-head Latent Attention</td><td style="color:var(--ink-3)">skip — 10 of 16 blocks already linear</td></tr>
             <tr><td>Multi-token prediction</td><td style="color:var(--burnt)">adapt, not copy — ours is span-masked</td></tr>
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 {
   "note": "CPU-only machine (no CUDA); peak RSS is process-level and approximate",
-  "hpt_params_M": 0.657,
+  "hpt_params_M": 0.46,
   "config": {
     "b1": 16,
     "b2": 4,
@@ -13,8 +13,8 @@
       "L": 128,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.008,
-        "torch_peak_rss_gb": 0.021,
+        "seconds": 0.009,
+        "torch_peak_rss_gb": 0.018,
         "py_peak_mb": 0.0,
         "stats": {
           "l1_entries_scored": 64,
@@ -31,8 +31,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 0.066,
-        "torch_peak_rss_gb": 0.105,
+        "seconds": 0.062,
+        "torch_peak_rss_gb": 0.076,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 16384
@@ -43,7 +43,7 @@
       "L": 256,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.016,
+        "seconds": 0.014,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -61,8 +61,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 0.291,
-        "torch_peak_rss_gb": 0.334,
+        "seconds": 0.259,
+        "torch_peak_rss_gb": 0.235,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 65536
@@ -73,7 +73,7 @@
       "L": 512,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.048,
+        "seconds": 0.042,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -91,8 +91,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 1.748,
-        "torch_peak_rss_gb": 1.304,
+        "seconds": 1.029,
+        "torch_peak_rss_gb": 0.911,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 262144
@@ -103,7 +103,7 @@
       "L": 1024,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.095,
+        "seconds": 0.082,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -121,8 +121,8 @@
       },
       "dense": {
         "ok": true,
-        "seconds": 15.228,
-        "torch_peak_rss_gb": 4.793,
+        "seconds": 8.05,
+        "torch_peak_rss_gb": 3.554,
         "py_peak_mb": 0.0,
         "stats": {
           "dense_pairs": 1048576
@@ -133,7 +133,7 @@
       "L": 2048,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.327,
+        "seconds": 0.151,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {
@@ -160,7 +160,7 @@
       "L": 4096,
       "hierarchical": {
         "ok": true,
-        "seconds": 0.467,
+        "seconds": 0.356,
         "torch_peak_rss_gb": 0.0,
         "py_peak_mb": 0.0,
         "stats": {

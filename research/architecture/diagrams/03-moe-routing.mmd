@@ -1,5 +1,5 @@
 graph TB
-    TOK["token hidden state h_i, d=768"]
+    TOK["token hidden state h_i, d=512"]
     CTX["local structural context<br/>pairing prob, predicted rigidity, local density"]
     DEPTH["alignment depth Neff/L<br/>computed BEFORE the model runs"]
     ROUTER{"ROUTER<br/>input = h_i CONCAT context CONCAT Neff/L<br/>NOT sequence k-mers"}
@@ -13,7 +13,7 @@ graph TB
         S2["Shared 2<br/>generic backbone"]
     end
 
-    subgraph ROUTED["ROUTED EXPERTS (32 fine-grained, d_ff=512, top-4)"]
+    subgraph ROUTED["ROUTED EXPERTS (32 fine-grained, d_ff=128, top-4)"]
         E1["Junction /<br/>multiloop"]
         E2["Pseudoknot /<br/>long-range"]
         E3["Ion pocket /<br/>Mg2+ coordination"]
@@ -25,7 +25,7 @@ graph TB
 
     ROUTER -->|always| SHARED
     ROUTER -->|"top-4"| ROUTED
-    SHARED --> SUM["weighted sum<br/>6 active of 34"]
+    SHARED --> SUM["weighted sum<br/>6 active of 34<br/>in EVERY block (16 of 16)"]
     ROUTED --> SUM
     SUM --> NEXT["to next block"]
 
