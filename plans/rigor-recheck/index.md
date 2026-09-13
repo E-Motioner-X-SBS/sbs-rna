@@ -7,7 +7,7 @@ subfolder to avoid collision.
 | Field | Value |
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
-| Cycle | 1 |
+| Cycle | 1 (extended: mmCIF mining + training design) |
 | Phase | 6 AUDIT -> EXIT (macro-audit PASS) |
 | Started | 2026-09-13 |
 | Open TODO | 0 open; 6 flagged limitations in final-report.md |

@@ -60,6 +60,20 @@ def main() -> int:
     chk("HPT L=4096 frac of dense %", round(100 * r["frac_of_dense"], 3), 0.959)
     chk("HPT L=4096 effective c", round(r["effective_c"], 1), 19.6)
 
+    bp = load("basepair_geometry.json")
+    chk("annotated base-pair steps", bp["total_annotated_steps"], 103964)
+    chk("stiffness contexts (n>=200)", len(bp["stiffness_by_step_context"]), 76)
+    chk("curated Mg coordination records", bp["metal_coordination_by_ion"]["MG"], 44708)
+    chk("unobserved-residue records", bp["unobserved_residue_records"], 143871)
+    gg = bp["stiffness_by_step_context"]["GG/CC"]["mean"]
+    chk("GG/CC rise (A-form check)", gg["rise"], 3.14, tol=0.02)
+    chk("GG/CC twist (A-form check)", gg["twist"], 29.98, tol=0.02)
+
+    hr = load("stiffness_headroom.json")
+    chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.579, tol=0.001)
+    chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551, tol=0.001)
+    chk("structure gain over sequence", hr["gain_structure_over_sequence"], 3.028, tol=0.002)
+
     print("\n== derived arithmetic ==")
     d, dff_moe, dff_dense = 768, 512, 3072
     attn = 32 * 4 * d * d
@@ -91,7 +105,8 @@ def main() -> int:
         txt[k] = (t.replace("{,}", ",").replace("\\%", "%").replace("$", "")
                    .replace("\\", "").replace("−", "-").replace("–", "-"))
     for tok in ["17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
-                "0.224", "0.372", "1.514", "0.804", "9.87", "911", "382"]:
+                "0.224", "0.372", "1.514", "0.804", "9.87", "911", "382",
+                "103,964", "44,708", "143,871", "14.551", "17.579", "134", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")

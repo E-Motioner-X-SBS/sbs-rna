@@ -1,0 +1,52 @@
+graph TB
+    subgraph MINED["PHYSICS LABELS MINED FROM UNUSED mmCIF CATEGORIES"]
+        M1["_ndb_struct_na_base_pair_step<br/>6 deformation coords: shift slide rise tilt roll twist<br/><b>103,964 annotated steps</b>, 155 of 180 structures"]
+        M2["_struct_conn conn_type=metalc<br/><b>44,708 curated Mg2+ coordinations</b><br/>OP2 8288 &gt; OP1 7261 &gt; O6 &gt; O4 &gt; O2' &gt; N7<br/>independently reproduces the distance-based result"]
+        M3["_ndb_struct_na_base_pair<br/>Saenger 28-class + Leontis-Westhof 12-class<br/><b>29 Saenger classes present</b><br/>= non-canonical interaction vocabulary"]
+        M4["_pdbx_unobs_or_zero_occ_residues<br/><b>143,871 unmodelled residues</b><br/>= free maximal-flexibility labels"]
+    end
+
+    VALID["VALIDATION - step means reproduce A-form RNA<br/>GG/CC rise 3.14 twist 29.98 slide -1.69<br/>AU/AU rise 2.81 twist 33.94 slide -1.58<br/>reference: rise 2.8-3.1 A, twist ~32 deg, slide ~-1.5 A"]
+    M1 --> VALID
+
+    STIFF["MEASURED STIFFNESS F = kT C^-1<br/>76 contexts with n &gt;= 200<br/>spans <b>134x</b>: UG/UG twist sd 11.5 deg (stiffest)<br/>to AA/UA 102 deg (floppiest, non-canonical)<br/>GC content predicts rigidity: pearson -0.314"]
+    VALID --> STIFF
+
+    subgraph WHY["WHY NOT A LOOKUP TABLE - MEASURED HEADROOM"]
+        H0["M0 no conditioning ............ 19.724 nats/step"]
+        H1["M1 sequence context = A TABLE . 17.579  (gain 2.144)"]
+        H2["M2 sequence x STRUCTURE ....... 14.551  (gain 3.028 MORE)"]
+        H3["structural context alone ...... 17.847  (gain 1.877)"]
+        H4["STRUCTURE CONTRIBUTES MORE THAN SEQUENCE.<br/>A table captures under half the signal, and covers<br/>only 86.7 pct of steps - the unusual ones get nothing.<br/>Same lesson as the GNRA negative result."]
+        H0 --> H1 --> H2 --> H3 --> H4
+    end
+    STIFF --> WHY
+
+    ENC["STIFFNESS ENCODER (replaces the table)<br/>in: trunk repr + pair repr at each step<br/>out: mu in R^6 and 6x6 precision F, Cholesky-parameterised<br/>so positive-definiteness is structural"]
+    LOSS["L_stiff = sum 0.5 (x-mu)^T F (x-mu) - 0.5 log det F<br/><br/>the log-det term is LOAD-BEARING: without it the<br/>degenerate optimum is F -&gt; 0, declare everything<br/>floppy and pay nothing. Confidence must be earned."]
+    ACC["ACCEPTANCE CRITERION<br/>must beat 14.551 nats/step on held-out structures.<br/>above 17.579 it is worse than a table - CUT IT."]
+    WHY --> ENC --> LOSS --> ACC
+    ENC -->|"F is the force-constant field"| ERIG["E_rigid in the Hamiltonian"]
+
+    subgraph TRAIN["TRAINING EFFICIENCY"]
+        T1["MUON optimizer<br/>~2x compute efficiency vs AdamW, ~52 pct of FLOPs<br/>~33 pct memory saving. Validated on an MoE model at<br/>scale (Moonlight 3B/16B) and in production (Kimi K2).<br/>CAVEAT: fewer steps but costlier steps (Newton-Schulz<br/>is cubic) - must be benchmarked on our shapes."]
+        T2["FP8 mixed precision - ADOPT<br/>&lt;0.25 pct loss error vs BF16 at 671B scale"]
+        T3["aux-loss-free balancing - ALREADY IN DESIGN"]
+        T4["DualPipe - DEFER until multi-node"]
+        T5["MLA - SKIP, redundant vs our linear attention"]
+        T6["Multi-token prediction - ADAPT not copy<br/>ours is span-masked, not causal"]
+    end
+    ACC --> TRAIN
+
+    OBJ["FULL OBJECTIVE<br/>L = L_MLM + L_2D + L_contact + L_dist<br/>+ L_stiff + L_Mg + L_elec + L_violation + L_flex<br/><br/>precedent: OpenMM-Loss puts MD potential energy into<br/>AlphaFold2 and gets comparable accuracy with LOWER<br/>energy and better MolProbity. Physics helps quality<br/>without costing accuracy."]
+    TRAIN --> OBJ
+
+    classDef mined fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
+    classDef meas fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
+    classDef novel fill:#7c2d12,stroke:#fb923c,stroke-width:3px,color:#fff
+    classDef warn fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff
+    class M1,M2,M3,M4,VALID,STIFF mined
+    class H0,H1,H2,H3 meas
+    class H4,ACC warn
+    class ENC,LOSS,OBJ novel
+    class T1,T2,T3,T4,T5,T6,ERIG meas

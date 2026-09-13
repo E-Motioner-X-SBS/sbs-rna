@@ -19,8 +19,26 @@ import sqlite3
 import time
 from pathlib import Path
 
-ROOT = Path("/store/shuvam/E-motioner-X-SBS/sbs-rna")
-DATA = ROOT / "data"
+# Data root resolution order:
+#   1. $SBS_RNA_DATA
+#   2. <repo>/data                     (this checkout)
+#   3. /store/shuvam/E-motioner-X-SBS/sbs-rna/data   (the original server path)
+# The server path is a fallback, not a hard-coded assumption -- on any other
+# machine it does not exist.
+def _resolve_data_root() -> Path:
+    import os
+    env = os.environ.get("SBS_RNA_DATA")
+    if env:
+        return Path(env).expanduser().resolve()
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / "data"
+        if (cand / "catalog").is_dir():
+            return cand
+    return Path("/store/shuvam/E-motioner-X-SBS/sbs-rna/data")
+
+DATA = _resolve_data_root()
+ROOT = DATA.parent
 DB_DIR = DATA / "catalog"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +54,10 @@ def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def count_fasta(path: Path, sample: int = 50_000) -> tuple[int | None, bool]:
+FASTA_SCAN_CAP = 50_000
+
+
+def count_fasta(path: Path, sample: int = FASTA_SCAN_CAP) -> tuple[int | None, bool]:
     """Count FASTA records. Returns (count, exact). For .gz streams whole file."""
     import gzip
 
@@ -421,6 +442,18 @@ SPLITS = [
 
 
 def main() -> None:
+    # This rebuild DROPs and rescans. If the bulk data tree is absent -- which is
+    # the normal state of a fresh checkout, where only data/catalog/ is versioned
+    # -- rescanning would replace a good catalog with an empty one. Refuse.
+    present = [d for d in ("sequences", "structures", "families", "benchmarks")
+               if (DATA / d).is_dir()]
+    if not present:
+        raise SystemExit(
+            f"refusing to rebuild: no bulk data under {DATA}\n"
+            f"  Only data/catalog/ is versioned; the corpus lives on the server.\n"
+            f"  Set SBS_RNA_DATA to a populated tree, or run this on the server.\n"
+            f"  (Rebuilding here would DROP the existing catalog and reindex nothing.)")
+
     con = sqlite3.connect(DB_DIR / "catalog.sqlite")
     cur = con.cursor()
     cur.executescript(
@@ -526,7 +559,12 @@ def main() -> None:
                 bytes_total += m.get("size_bytes") or 0
         manifest["sources"].append(entry)
 
-    # Merge exact counts produced by background counters
+    # Merge exact counts produced by background counters.
+    # NOTE: this must run BEFORE the manifest is serialised. Previously the
+    # manifest was built from `measure()` output alone, which caps FASTA scans at
+    # 50,000 records, so elDORS and RNAcentral were understated ~1,300x in
+    # MANIFEST.json while catalog.sqlite held the true counts.
+    exact_by_path: dict[str, int] = {}
     for counts_file, prefix in [
         (DATA / "sequences" / "elDORS_v1" / "seq_counts.txt", "sequences/elDORS_v1/"),
         (DATA / "sequences" / "rnacentral" / "seq_count.txt", "sequences/rnacentral/"),
@@ -535,9 +573,11 @@ def main() -> None:
             for line in counts_file.read_text().splitlines():
                 parts = line.split()
                 if len(parts) == 2 and parts[1].isdigit():
+                    rel = prefix + parts[0]
+                    exact_by_path[rel] = int(parts[1])
                     cur.execute(
                         "UPDATE files SET n_records=?, count_exact=1 WHERE path=?",
-                        (int(parts[1]), prefix + parts[0]),
+                        (int(parts[1]), rel),
                     )
         con.commit()
 
@@ -550,6 +590,23 @@ def main() -> None:
         )
 
     con.commit()
+
+    # Fold exact counts into the manifest and label every remaining capped count,
+    # so a consumer can tell a measured number from a scan-capped estimate.
+    n_exact, n_capped = 0, 0
+    for src in manifest["sources"]:
+        for entry in src["files"]:
+            if entry["path"] in exact_by_path:
+                entry["n_records"] = exact_by_path[entry["path"]]
+                entry["count_exact"] = True
+                n_exact += 1
+            elif entry.get("n_records") == FASTA_SCAN_CAP:
+                entry["count_exact"] = False
+                entry["n_records_note"] = f"scan capped at {FASTA_SCAN_CAP}; lower bound"
+                n_capped += 1
+            else:
+                entry["count_exact"] = True
+    print(f"manifest: {n_exact} exact counts merged, {n_capped} still scan-capped")
 
     manifest["totals"] = {
         "files": n_files_total,

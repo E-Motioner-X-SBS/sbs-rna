@@ -50,7 +50,22 @@ coordination is to phosphate OP1/OP2, and Mg²⁺ outnumbers all other cations 9
 folded cores, so the gradient might merely restate that cores are ordered.
 Controlling for local density reduces the association only from **+0.420** to
 **+0.372** (partial correlation), so the signal is largely *independent* of
-packing. A within-structure estimate — comparing nucleotides within 4 A against
+packing.
+
+**The selection objection is closed too.** The gradient applies a >=30-RNA-residue
+guard, and small RNAs are exactly where the inner-sphere Mg²⁺ fraction is lowest
+(0.296 vs 0.511), so the exclusion could have inflated the result. Sweeping the
+guard independently verifies it does not:
+
+| guard | structures | nucleotides | span (sigma) | monotonic |
+|---|---|---|---|---|
+| >=30 | 15 | 24,623 | **1.760** | yes |
+| >=20 | 16 | 24,646 | 1.757 | yes |
+| >=10 | 17 | 24,660 | 1.757 | yes |
+| none | 19 | 24,666 | **1.757** | yes |
+
+The span moves by 0.003 sigma across the entire sweep and stays monotonic
+throughout — a variance control, not a bias. A within-structure estimate — comparing nucleotides within 4 A against
 those beyond 12 A *inside the same structure*, removing all between-structure
 heterogeneity — gives **+1.514 sigma**, positive in **4/4** structures holding
 both groups, bootstrap 95% CI [+1.256, +1.661]. The selection objection is also

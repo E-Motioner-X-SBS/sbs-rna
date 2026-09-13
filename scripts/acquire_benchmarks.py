@@ -18,7 +18,25 @@ import sys
 import time
 from pathlib import Path
 
-DATA = Path("/store/shuvam/E-motioner-X-SBS/sbs-rna/data")
+# Data root resolution order:
+#   1. $SBS_RNA_DATA
+#   2. <repo>/data                     (this checkout)
+#   3. /store/shuvam/E-motioner-X-SBS/sbs-rna/data   (the original server path)
+# The server path is a fallback, not a hard-coded assumption -- on any other
+# machine it does not exist.
+def _resolve_data_root() -> Path:
+    import os
+    env = os.environ.get("SBS_RNA_DATA")
+    if env:
+        return Path(env).expanduser().resolve()
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / "data"
+        if (cand / "catalog").is_dir():
+            return cand
+    return Path("/store/shuvam/E-motioner-X-SBS/sbs-rna/data")
+
+DATA = _resolve_data_root()
 DATA.mkdir(parents=True, exist_ok=True)
 LOG = DATA / "benchmarks" / "acquisition.log"
 

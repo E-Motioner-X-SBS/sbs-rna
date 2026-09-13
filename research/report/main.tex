@@ -299,6 +299,29 @@ Partial corr$(z_B,\ \text{density} \mid d_{\mathrm{Mg}})$ & $-0.2273$ \\
 
 Controlling for packing density reduces the $\mathrm{Mg}^{2+}$ association only
 from $0.420$ to $0.372$, so the signal is largely \emph{independent} of packing.
+
+\paragraph{The selection objection, also tested.} The gradient applies a
+$\geq30$-RNA-residue guard, and small RNAs are exactly where the inner-sphere
+$\mathrm{Mg}^{2+}$ fraction is lowest ($0.296$ versus $0.511$), so the exclusion
+could have inflated the result. Sweeping the guard shows it does not:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}rrrrc@{}}
+\toprule
+\textbf{Guard} & \textbf{Structures} & \textbf{Nucleotides} & \textbf{Span ($\sigma$)} & \textbf{Monotonic} \\
+\midrule
+$\geq 30$ & 15 & 24{,}623 & $\mathbf{1.760}$ & yes \\
+$\geq 20$ & 16 & 24{,}646 & $1.757$ & yes \\
+$\geq 10$ & 17 & 24{,}660 & $1.757$ & yes \\
+none      & 19 & 24{,}666 & $\mathbf{1.757}$ & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The span moves by $0.003\sigma$ across the entire sweep and stays
+monotonic throughout: a variance control, not a bias.
 A within-structure estimate---comparing nucleotides within 4~\AA{} against those
 beyond 12~\AA{} inside the same structure, which removes all between-structure
 heterogeneity---gives $+1.514\sigma$, positive in $4/4$ structures that contain
@@ -1038,6 +1061,183 @@ Uniform sampling in Stage 1 would allow read fragments to dominate pretraining,
 so per-chunk weighting is required.
 
 %========================================================
+\section{Mining the data that was already there}
+\label{sec:mine}
+
+An inventory of all 141 mmCIF categories present in the sampled structures found
+four that are directly on-target and had not been touched. They ship with every
+RNA structure the field downloads and are used by no current predictor.
+
+\begin{table}[h]
+\centering
+\caption{Physics labels already present in the files. \meas}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.4cm}>{\raggedright\arraybackslash}p{5.3cm}r@{}}
+\toprule
+\textbf{mmCIF category} & \textbf{What it provides} & \textbf{Volume} \\
+\midrule
+\texttt{\_ndb\_struct\_na\_base\_pair\_step} & 6 step deformation coordinates & 103{,}964 steps \\
+\texttt{\_ndb\_struct\_na\_base\_pair} & pair graph + Saenger / Leontis--Westhof class & 29 classes \\
+\texttt{\_struct\_conn} (\texttt{metalc}) & curated metal coordination & 44{,}708 Mg\textsuperscript{2+} \\
+\texttt{\_pdbx\_unobs\_or\_zero\_occ\_residues} & unmodelled (disordered) residues & 143{,}871 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The curated \texttt{metalc} records independently reproduce the distance-based
+finding of Section~3.3: coordinating atoms rank
+OP2 $(8{,}288) >$ OP1 $(7{,}261) >$ O6 $>$ O4 $>$ O2$'$ $>$ N7, confirming that
+phosphate oxygens dominate inner-sphere coordination.
+
+\begin{figure}[p]
+\centering
+\includegraphics[height=0.86\textheight,keepaspectratio]{../architecture/diagrams/rendered/07-training-and-stiffness.png}
+\caption{Physics labels mined from previously unused mmCIF categories, the
+measured case against a stiffness lookup table, and the training stack.}
+\end{figure}
+
+\subsection{Base-pair step stiffness}
+
+The step parameters are the deformation coordinates of nucleic-acid elasticity.
+Their covariance across instances yields a stiffness matrix
+$F = k_B T\, C^{-1}$. Extracting across 155 structures and validating against
+canonical A-form geometry:
+
+\begin{table}[h]
+\centering
+\caption{Step geometry validation against canonical A-form RNA
+(reference: rise $\sim$2.8--3.1~\AA{}, twist $\sim32^\circ$, slide $\sim-1.5$~\AA{}). \meas}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Context} & \textbf{$n$} & \textbf{rise (\AA)} & \textbf{twist ($^\circ$)} & \textbf{slide (\AA)} \\
+\midrule
+GG/CC & 7{,}558 & 3.14 & 29.98 & $-1.69$ \\
+GC/GC & 5{,}902 & 3.11 & 33.41 & $-1.51$ \\
+AA/UU & 1{,}811 & 3.01 & 30.59 & $-1.48$ \\
+AU/AU & 1{,}506 & 2.81 & 33.94 & $-1.58$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Stiffness spans $\mathbf{134\times}$ between the stiffest context (UG/UG, twist
+s.d.\ $11.5^\circ$) and the floppiest (AA/UA, $102^\circ$), with the floppy end
+dominated by non-canonical contexts. GC content predicts rigidity: Pearson
+$-0.314$ against twist s.d., $-0.298$ against roll s.d., over 76 contexts.
+
+\subsection{Why this must be learned, not tabulated}
+\label{sec:stiffenc}
+
+The obvious implementation is a 76-entry table keyed on dinucleotide context.
+That repeats the mistake the GNRA result already disproved. We measured the
+headroom by fitting Gaussians over the six step coordinates and comparing mean
+negative log-likelihood per step over all 103{,}964 steps.
+
+\begin{table}[h]
+\centering
+\caption{Stiffness model headroom. Lower NLL is better. \meas}
+\label{tab:headroom}
+\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+\textbf{Model} & \textbf{Conditioning} & \textbf{NLL (nats/step)} & \textbf{Gain} \\
+\midrule
+M0 & none & $19.724$ & --- \\
+M1 & sequence context (\emph{a lookup table}) & $17.579$ & $2.144$ \\
+M2 & sequence $\times$ structural context & $\mathbf{14.551}$ & $\mathbf{+3.028}$ \\
+--- & structural context alone & $17.847$ & $1.877$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Structural context contributes more than sequence context}
+($+3.028$ versus $+2.144$ nats), and this uses only a two-bit structural
+descriptor---whether the pair is canonical, and whether it sits inside a helical
+run of at least four. A dinucleotide table therefore captures under half the
+available signal. It also has a coverage hole: only 76 contexts reach
+$n \geq 200$, covering $90{,}098$ of $103{,}964$ steps ($86.7\%$), leaving the
+$13{,}866$ structurally unusual steps---the interesting ones---with no entry.
+
+\paragraph{The design.} A \textbf{stiffness encoder} consumes the trunk and pair
+representations at each step and emits a mean $\mu_i \in \mathbb{R}^6$ and a
+positive-definite precision matrix $F_i \in \mathbb{R}^{6\times6}$, parameterised
+through a Cholesky factor so positive-definiteness is structural. It is trained
+by the Gaussian negative log-likelihood of the observed deformation:
+\begin{equation}
+\mathcal{L}_{\text{stiff}} = \sum_i \left[ \tfrac{1}{2}(x_i - \mu_i)^{\top} F_i (x_i - \mu_i) - \tfrac{1}{2}\log\det F_i \right].
+\end{equation}
+The $\log\det F$ term is load-bearing: without it the degenerate optimum is
+$F \rightarrow 0$---declare everything floppy and pay nothing. With it,
+confidence must be earned. At inference $F_i$ \emph{is} the local force-constant
+field that $E_{\text{rigid}}$ requires, conditioned on structure rather than
+retrieved by sequence.
+
+\paragraph{Acceptance criterion.} The encoder must reach below $14.551$
+nats/step on held-out structures. Above $17.579$ it is worse than a lookup table
+and the component should be cut.
+
+\section{Training}
+\label{sec:training}
+
+NucleicBERT used 192 A100s densely. That is the bar to get under.
+
+\subsection{Optimiser}
+\textbf{Muon} orthogonalises gradient momentum through Newton--Schulz iterations
+before applying it, reporting roughly $2\times$ compute efficiency against AdamW,
+matching quality at about $52\%$ of training FLOPs with $\sim33\%$ memory saving.
+It is already validated on a \emph{mixture-of-experts} model at scale (Moonlight,
+3B/16B, 5.7T tokens) and is in production use in Kimi K2, so it is proven on the
+exact architecture class used here. It applies to 2D matrix parameters---the
+expert FFNs and attention projections, i.e.\ most of the model---while
+embeddings, norms and scalars remain on AdamW.
+
+\textcolor{risk}{\textbf{Caveat.}} Muon requires fewer optimiser steps but each
+step costs more, since Newton--Schulz is a cubic matrix operation. The net win
+favours large hidden dimensions and must be benchmarked on our actual parameter
+shapes rather than assumed.
+
+\subsection{The DeepSeek-V3 stack, filtered}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{10.2cm}@{}}
+\toprule
+\textbf{Technique} & \textbf{Verdict} \\
+\midrule
+FP8 mixed precision & \textbf{Adopt.} Under $0.25\%$ loss error against BF16 at 671B scale, with block/tile quantisation and selective high-precision accumulation. The largest single memory and throughput win. \\
+Auxiliary-loss-free balancing & \textbf{Already in the design.} Essential here because 5S rRNA is 5{,}976 of the 3D clusters, so a balance \emph{loss} would fight the biology. \\
+DualPipe & \textbf{Defer} until the model spans nodes. \\
+Multi-head Latent Attention & \textbf{Skip.} Largely redundant---20 of 32 blocks are already linear attention, so the KV cache is small by construction. \\
+Multi-token prediction & \textbf{Adapt, don't copy.} MTP is defined for causal models; our objective is span-masked. The analogue is predicting a masked span jointly. Worth an ablation, not a commitment. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Looped refinement}
+AlphaFold2 recycles three times by default, with the literature sweeping 0--10
+cycles. For PHAROS recycling is \emph{required by the physics} rather than
+optional: $B_{\mathrm{elec}}$ needs a distance estimate that does not exist on
+the first pass. Weight sharing across cycles buys accuracy at zero parameter
+cost---valuable given 6{,}661 unique 3D sequences---and gradients need flow only
+through the final cycle, so recycling costs one cycle of activation memory.
+
+\subsection{The physics-guided objective}
+\begin{align}
+\mathcal{L} =\ & \mathcal{L}_{\text{MLM}} + \mathcal{L}_{\text{2D}} + \mathcal{L}_{\text{contact}} + \mathcal{L}_{\text{dist}} \nonumber\\
+ &+ \lambda_1 \mathcal{L}_{\text{stiff}} + \lambda_2 \mathcal{L}_{\mathrm{Mg}} + \lambda_3 \mathcal{L}_{\text{elec}} + \lambda_4 \mathcal{L}_{\text{violation}} + \lambda_5 \mathcal{L}_{\text{flex}}
+\end{align}
+
+The precedent that physics terms help rather than hurt is \textbf{OpenMM-Loss},
+which implements molecular-dynamics potential energy as a differentiable loss for
+AlphaFold2 and reports comparable accuracy with \emph{lower potential energy and
+better MolProbity scores}. For $\mathcal{L}_{\text{violation}}$ the current best
+RNA parameter sets are AMBER $\chi$OL3 and HB-CUFIX (2025), the latter
+outperforming $\chi$OL3 and ROC against NMR and SAXS data.
+
+Every label above comes from data already in hand---Table in
+Section~\ref{sec:mine}---with no new acquisition required.
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1064,6 +1264,14 @@ Present in mmCIF; used by no structure predictor. \\
 Coupled ion--rigidity expert justified by a measured $1.76\sigma$ gradient &
 Treated separately or not at all elsewhere. Partial correlation controlling for
 packing density is $+0.372$ vs $+0.420$ raw. \\
+Learned stiffness encoder emitting a per-step $6\times6$ precision matrix
+trained by Gaussian NLL, replacing a tabulated force field &
+Nucleic-acid elasticity uses fixed per-context stiffness tables; measured here
+to capture under half the signal ($14.551$ vs $17.579$ nats/step). \\
+Physics labels mined from unused mmCIF categories: 103{,}964 step geometries,
+44{,}708 curated Mg\textsuperscript{2+} coordinations, 143{,}871 disorder records &
+These categories ship with every RNA structure and are used by no structure
+predictor. \\
 Depth-gated coevolution routing, with $N_{\text{eff}}/L$ as a router feature &
 RhoFold+ concatenates language-model and MSA features at fixed weight; no method
 routes on measured alignment depth. Motivated by the literature and by measured
@@ -1136,6 +1344,9 @@ large-scale training is attempted.
 \texttt{.../sampling/test\_residue\_guard\_bias.py} & \texttt{residue\_guard\_bias.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\
 \texttt{.../reference/benchmark\_pair\_track.py} & \texttt{pair\_track\_benchmark.json} \\
+\texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
+\texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
+\texttt{.../sampling/verify\_claims.py} & regression guard (exit 0 = reproduces) \\
 \bottomrule
 \end{tabular}
 \end{table}

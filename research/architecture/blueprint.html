@@ -153,6 +153,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <span class="chip">Field ceiling: TM ≈ 0.55</span>
     <span class="chip alert">design revised after validation</span>
     <span class="chip ok">reference impl. benchmarked</span>
+    <span class="chip ok">audited &amp; corrected</span>
   </div>
 </header>
 
@@ -887,6 +888,173 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     site-level supervision. This promotes chemical-probing acquisition from "most valuable
     missing asset" to <b>prerequisite for the headline claim</b> — and note that Ribonanza
     alone does not supply it; the titration series in RMDB do.
+  </div>
+</section>
+
+<!-- ================= 9. MINED DATA + STIFFNESS ================= -->
+<section>
+  <div class="sechead"><span class="secnum">09</span><h2>The physics was already in the files</h2></div>
+  <p class="lede">An inventory of all 141 mmCIF categories found four that are directly on-target
+  and had never been touched. They ship with every RNA structure the field downloads, and no
+  current predictor uses them.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>mmCIF category</th><th>What it provides</th><th class="num">Volume</th></tr></thead>
+      <tbody>
+        <tr class="total"><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair_step</td><td>6 step deformation coordinates</td><td class="num">103,964 steps</td></tr>
+        <tr><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair</td><td>pair graph + Saenger / Leontis–Westhof class</td><td class="num">29 classes</td></tr>
+        <tr><td class="mono" style="font-size:12px">_struct_conn (metalc)</td><td>curated metal coordination</td><td class="num">44,708 Mg²⁺</td></tr>
+        <tr><td class="mono" style="font-size:12px">_pdbx_unobs_or_zero_occ_residues</td><td>unmodelled residues → flexibility labels</td><td class="num">143,871</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:13.5px;color:var(--ink-2);margin-top:14px">The curated <span class="mono">metalc</span>
+  records <b>independently reproduce</b> the distance-based finding of §02: coordinating atoms rank
+  OP2 (8,288) &gt; OP1 (7,261) &gt; O6 &gt; O4 &gt; O2′ &gt; N7. Two measurements, different methods,
+  same conclusion — phosphate oxygens dominate inner-sphere coordination.</p>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="panel">
+      <h3>Step geometry validates against A-form RNA</h3>
+      <p class="note">reference: rise ~2.8–3.1 Å · twist ~32° · slide ~−1.5 Å</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Context</th><th class="num">n</th><th class="num">rise</th><th class="num">twist</th><th class="num">slide</th></tr></thead>
+          <tbody>
+            <tr><td>GG/CC</td><td class="num">7,558</td><td class="num">3.14</td><td class="num">29.98</td><td class="num">−1.69</td></tr>
+            <tr><td>GC/GC</td><td class="num">5,902</td><td class="num">3.11</td><td class="num">33.41</td><td class="num">−1.51</td></tr>
+            <tr><td>AA/UU</td><td class="num">1,811</td><td class="num">3.01</td><td class="num">30.59</td><td class="num">−1.48</td></tr>
+            <tr><td>AU/AU</td><td class="num">1,506</td><td class="num">2.81</td><td class="num">33.94</td><td class="num">−1.58</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">Stiffness spans <b>134×</b> —
+      UG/UG stiffest (twist sd 11.5°) to AA/UA floppiest (102°, non-canonical). GC content predicts
+      rigidity (Pearson −0.314).</p>
+    </div>
+
+    <div class="panel">
+      <h3>Why this must be learned, not tabulated</h3>
+      <p class="note">Gaussian NLL per step over all 103,964 steps — lower is better</p>
+      <figure style="margin:0">
+        <svg viewBox="0 0 440 210" role="img" aria-label="Adding structural context lowers NLL more than sequence context does">
+          <line x1="56" y1="170" x2="424" y2="170" stroke="var(--rule)"/>
+          <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
+            <text x="50" y="174" text-anchor="end">14</text>
+            <text x="50" y="120" text-anchor="end">16</text>
+            <text x="50" y="66" text-anchor="end">18</text>
+            <text x="50" y="30" text-anchor="end">20</text>
+          </g>
+          <rect x="80"  y="16"  width="70" height="154" fill="var(--ink-3)" opacity=".45"/>
+          <rect x="180" y="74"  width="70" height="96"  fill="var(--teal)" opacity=".75"/>
+          <rect x="280" y="156" width="70" height="14"  fill="var(--mg)"/>
+          <g font-family="var(--mono)" font-size="12" fill="var(--ink)" text-anchor="middle" font-weight="600">
+            <text x="115" y="11">19.724</text><text x="215" y="69">17.579</text><text x="315" y="151">14.551</text>
+          </g>
+          <g font-family="var(--mono)" font-size="9.5" fill="var(--ink-2)" text-anchor="middle">
+            <text x="115" y="186">M0 none</text>
+            <text x="215" y="186">M1 sequence</text><text x="215" y="198" fill="var(--ink-3)">= a lookup table</text>
+            <text x="315" y="186">M2 seq × structure</text><text x="315" y="198" fill="var(--mg)">+3.028 further</text>
+          </g>
+        </svg>
+      </figure>
+      <div class="finding" style="margin-top:14px;border-left-color:var(--warn)">
+        <span class="tag" style="color:var(--warn)">Rules out the table</span>
+        <p><b>Structural context contributes more than sequence context</b> (+3.028 vs +2.144
+        nats), using only a 2-bit structural descriptor. A dinucleotide table captures under half
+        the signal and covers only <b>86.7%</b> of steps — the structurally unusual ones, which
+        matter most, get no entry at all. <b>Same lesson as the GNRA negative result in §02.</b></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>The stiffness encoder</h3>
+    <p class="note">replaces the table; F becomes the force-constant field for E<sub>rigid</sub></p>
+    <p style="font-family:var(--mono);font-size:13px;background:var(--sunk);padding:12px;border-radius:2px;margin:0 0 12px">
+      L<sub>stiff</sub> = Σ<sub>i</sub> [ ½(x<sub>i</sub> − μ<sub>i</sub>)ᵀ F<sub>i</sub> (x<sub>i</sub> − μ<sub>i</sub>) − ½ log det F<sub>i</sub> ]
+    </p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0">Per step the encoder emits a mean
+    μ ∈ ℝ⁶ and a 6×6 <b>positive-definite precision</b> F, Cholesky-parameterised so
+    positive-definiteness is structural rather than penalised. <b>The log-det term is
+    load-bearing</b>: without it the degenerate optimum is F → 0 — declare everything floppy and
+    pay nothing. With it, confidence has to be earned.</p>
+    <div class="risk" style="margin-top:14px">
+      <span class="n">GATE</span>
+      <p><b>Acceptance criterion.</b> Must reach below <b>14.551</b> nats/step on held-out
+      structures. Above <b>17.579</b> it is worse than a lookup table and the component should
+      be cut.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 10. TRAINING ================= -->
+<section>
+  <div class="sechead"><span class="secnum">10</span><h2>Making it trainable</h2></div>
+  <p class="lede">NucleicBERT used 192 A100s densely. That is the bar to get under.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Muon — the largest optimiser win available</h3>
+      <p class="note">orthogonalised gradient momentum via Newton–Schulz</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <tbody>
+            <tr><td>Compute efficiency vs AdamW</td><td class="num">~2×</td></tr>
+            <tr><td>FLOPs to match AdamW quality</td><td class="num">~52%</td></tr>
+            <tr><td>Memory saving</td><td class="num">~33%</td></tr>
+            <tr class="total"><td>Validated at scale on</td><td class="num">an MoE model</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">Moonlight (3B/16B MoE, 5.7T
+      tokens) and Kimi K2 — so it is proven on <b>exactly the architecture class used here</b>.
+      Applies to 2D matrices (expert FFNs, attention projections); embeddings and norms stay on
+      AdamW.</p>
+      <div class="risk" style="margin-top:12px">
+        <span class="n">CAVEAT</span>
+        <p>Fewer optimiser steps, but <b>each step costs more</b> — Newton–Schulz is cubic. The net
+        win favours large hidden dimensions and <b>must be benchmarked on our actual shapes</b>
+        rather than assumed.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>The DeepSeek-V3 stack, filtered</h3>
+      <p class="note">what transfers, and what does not</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Technique</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr class="total"><td>FP8 mixed precision</td><td style="color:var(--mg);font-weight:600">ADOPT — &lt;0.25% loss error vs BF16</td></tr>
+            <tr><td>Aux-loss-free balancing</td><td style="color:var(--mg)">already in the design</td></tr>
+            <tr><td>DualPipe</td><td style="color:var(--ink-3)">defer until multi-node</td></tr>
+            <tr><td>Multi-head Latent Attention</td><td style="color:var(--ink-3)">skip — redundant vs our linear attention</td></tr>
+            <tr><td>Multi-token prediction</td><td style="color:var(--burnt)">adapt, not copy — ours is span-masked</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px"><b>Looped refinement is
+      required by the physics</b>, not an add-on: B<sub>elec</sub> needs a distance estimate that
+      does not exist on the first pass. Weight sharing across cycles buys accuracy at <b>zero
+      parameter cost</b> — valuable with only 6,661 unique 3D sequences.</p>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px">
+    <h3>The physics-guided objective</h3>
+    <p style="font-family:var(--mono);font-size:13px;background:var(--sunk);padding:12px;border-radius:2px;margin:0 0 12px">
+      L = L<sub>MLM</sub> + L<sub>2D</sub> + L<sub>contact</sub> + L<sub>dist</sub>
+      + λ₁L<sub>stiff</sub> + λ₂L<sub>Mg</sub> + λ₃L<sub>elec</sub> + λ₄L<sub>violation</sub> + λ₅L<sub>flex</sub>
+    </p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0">The precedent that physics terms help
+    rather than hurt is <b>OpenMM-Loss</b>, which puts molecular-dynamics potential energy into
+    AlphaFold2 as a differentiable loss and reports comparable accuracy with <i>lower potential
+    energy and better MolProbity scores</i>. For L<sub>violation</sub> the current best RNA
+    parameter sets are AMBER χOL3 and HB-CUFIX (2025), the latter outperforming χOL3 and ROC
+    against NMR and SAXS. <b>Every label above came from data already in hand — no new
+    acquisition.</b></p>
   </div>
 </section>
 

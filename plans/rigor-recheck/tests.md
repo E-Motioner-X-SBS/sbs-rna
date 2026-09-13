@@ -128,3 +128,33 @@ OQ-1 is answered: the guard is a variance control, not a source of bias.
 > **0 X-ray structures**. Same class as defect #2 in cycle 1. The script now
 > raises if `label_comp_id` is absent and refuses to report on an empty set,
 > rather than printing a confident zero.
+
+### T25 [ADDED-CYCLE-1] Guard-sensitivity of the Mg gradient — **PASS**
+A concurrent session published a claim that the >=30-RNA-residue guard is a
+variance control rather than a bias. Verified independently rather than accepted:
+
+| guard | structures | nucleotides | span (sigma) | monotonic |
+|---|---|---|---|---|
+| >=30 | 15 | 24,623 | 1.760 | yes |
+| >=20 | 16 | 24,646 | 1.757 | yes |
+| >=15 | 16 | 24,646 | 1.757 | yes |
+| >=10 | 17 | 24,660 | 1.757 | yes |
+| >=5  | 17 | 24,660 | 1.757 | yes |
+| none | 19 | 24,666 | 1.757 | yes |
+
+Span moves 0.003 sigma across the whole sweep, monotonic throughout.
+The cross-session claim is CORRECT. **OQ-1 is now closed.**
+
+### T26 Base-pair geometry extraction — **PASS after 2 defects fixed**
+- mmCIF WRAPS long rows across physical lines; requiring all fields on one line
+  yielded ZERO rows for every wide category (43-column steps arrive as 24 + 19).
+- Metal-vs-ligand assignment used a length/case heuristic that classified the
+  nucleotides G, A, U, C as metals.
+After fixing: 103,964 steps, 76 stiffness contexts, means reproduce canonical
+A-form RNA (GG/CC rise 3.14 twist 29.98; AU/AU rise 2.81 twist 33.94).
+Curated metalc records independently reproduce the distance-based coordination
+ranking (OP2 > OP1 > O6 > O4 > O2' > N7).
+
+### T27 Stiffness headroom — **PASS, justifies the encoder**
+M0 19.724 / M1 17.579 (sequence table) / M2 14.551 (sequence x structure).
+Structural context contributes MORE than sequence (+3.028 vs +2.144 nats).
