@@ -685,6 +685,10 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~80% of backbone charge (A-form RNA, θ = 0.804) is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
     <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs <i>and</i> applying a ≥30-RNA-residue guard left 31 of 137 parsed structures usable for the density/GNRA analyses, and only <b>15</b> of those contain Mg²⁺ for the gradient itself.</p></div>
     <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
+    <div class="risk"><span class="n">G2</span><p><b>99% of 3D supervision is RNA in complex (§14).</b> The model predicts single chains but learns folds stabilised by unseen partners. Not fixable by tuning. Performance must be reported split by isolated vs complexed.</p></div>
+    <div class="risk"><span class="n">G3</span><p><b>Residue-weighted statistics are 93% ribosomal (§14).</b> The length-stratified tables show the sparse budget is safe at both ends, but the headline figures must be labelled as ribosome measurements.</p></div>
+    <div class="risk"><span class="n">G7</span><p><b>8.9% of real polymer residues fall outside vocab-5 (§14)</b> — DNA hybrids, inosine, UNK. "Any RNA" is not supportable without widening the structural vocabulary or stating the N-mapping.</p></div>
+    <div class="risk"><span class="n">G6</span><p><b>Router behaviour at recycle 0 is undefined (§14).</b> B<sub>elec</sub> got an explicit first-pass rule; the router did not.</p></div>
     <div class="risk"><span class="n">R7</span><p><b>Ensemble evaluation is barely defined (§13).</b> No settled metric exists for scoring a predicted RNA ensemble against experiment; RNAnneal compares against just 16 experimentally-resolved riboswitch conformations. Single-state TM-score on blind sets stays the headline; ensemble output is reported descriptively until a protocol is agreed in advance.</p></div>
     <div class="risk"><span class="n">R8</span><p><b>The dynamics output is equilibrium-only (§13).</b> It models breathing about a fold, not the folding pathway. Do not describe it as predicting how RNA folds.</p></div>
     <div class="risk"><span class="n">R6</span><p><b>Evaluation honesty.</b> Any improvement claim must be made on blind sets (CASP15/16, RNA-Puzzles), never on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.</p></div>
@@ -1339,6 +1343,107 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     coevolution retraction in §02 was about. <b>The supportable claim: predicts the fold, its
     local rigidity, its disorder, and the amplitude of motion about it, under stated ionic
     conditions.</b></p>
+  </div>
+</section>
+
+<!-- ================= 14. GENERALIZATION ================= -->
+<section>
+  <div class="sechead"><span class="secnum">14</span><h2>Can this handle <i>any</i> RNA?</h2></div>
+  <p class="lede">The design claims contact maps, structure and other properties for RNA in
+  general. Tested against the 180 sampled structures rather than asserted. <b>Four limits are
+  real; three were undocumented before this audit.</b></p>
+
+  <div class="grid2">
+    <div class="panel" style="border-left:3px solid var(--warn)">
+      <h3>G2 — 99% of the evidence is RNA <i>in complex</i></h3>
+      <p class="note">the single largest generalization hazard, previously unacknowledged</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <tbody>
+            <tr><td>Structures containing protein</td><td class="num">159/180 = 88.3%</td></tr>
+            <tr><td>Median protein chains when present</td><td class="num">10</td></tr>
+            <tr><td>Structures with &gt;1 RNA chain</td><td class="num">150/180 = 83.3%</td></tr>
+            <tr class="total"><td><b>RNA residues in protein-containing entries</b></td><td class="num"><b>98.96%</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">The architecture takes one
+      sequence and predicts its fold — but essentially <b>all</b> 3D supervision comes from RNA
+      stabilised by partners the model never sees. Training on isolated chains asks it to
+      reproduce, from sequence alone, a fold that exists only inside a ribonucleoprotein.
+      <b>Not fixable by tuning</b> — it is a property of what structural biology has deposited.
+      Reporting performance split by complexed vs isolated is mandatory regardless.</p>
+    </div>
+
+    <div class="panel">
+      <h3>G3 — the residue statistics are ribosome measurements</h3>
+      <p class="note">61 ribosome-like entries = 33.9% of structures</p>
+      <p style="font-size:34px;font-family:var(--display);color:var(--burnt);margin:6px 0 2px">93.07%</p>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 12px">of all RNA residues come from them</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0">Stiffness, ion coordination, block
+      occupancy and the contact-scaling law are therefore predominantly <i>ribosomal</i>.
+      <b>Mitigation already present, by luck rather than design</b>: the length-binned tables
+      stratify it — short chains show occupancy 16.34% and effective c of 7.9 against 1.34% and
+      17.2 for long — so the c = 20 budget is generous at <i>both</i> ends and the sparse track is
+      safe. But "1.34% occupancy" is a ribosome figure and must be labelled as such.</p>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="panel">
+      <h3>G7 — 8.9% of residues cannot be tokenised</h3>
+      <p class="note">vocabulary is 5 symbols; structures are not normalised</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Class</th><th class="num">count</th><th>in vocab-5?</th></tr></thead>
+          <tbody>
+            <tr><td>DNA (hybrid duplexes)</td><td class="num">17,767</td><td style="color:var(--warn)">no</td></tr>
+            <tr><td>UNK (identity unmodelled)</td><td class="num">7,036</td><td>only as N</td></tr>
+            <tr><td>Inosine and other true modifications</td><td class="num">2,634</td><td style="color:var(--warn)">no</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">elDORS is pre-normalised to
+      5 symbols, which is why vocab-5 looked sufficient. Nature has <b>&gt;170 RNA
+      modifications</b>, and tRNA — the best-characterised small RNA — is among the most heavily
+      modified. <b>A model that cannot represent inosine cannot be said to handle "any RNA".</b></p>
+    </div>
+
+    <div class="panel">
+      <h3>G1 · G6 — scope and one undefined behaviour</h3>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>G1 length.</b> Longest
+      chain: median 67 nt, max 3,679 — every single chain fits 4096. But <i>total</i> RNA per
+      entry reaches <b>11,478</b>, and 44 of 180 entries exceed the context. lncRNAs (~19 knt)
+      and viral genomes (~30 knt) are an order of magnitude beyond it.</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>G6 router circularity.</b>
+      The router reads pairing probability, rigidity and density — all produced by the pair track,
+      which runs <i>after</i> the trunk. At recycle 0 none exist. B<sub>elec</sub> had exactly this
+      problem and was fixed explicitly; <b>the router never was</b>. An undefined router decides
+      which experts fire.</p>
+      <div class="finding" style="border-left-color:var(--warn)">
+        <span class="tag" style="color:var(--warn)">Scope statement</span>
+        <p><b>PHAROS predicts single RNA chains up to 4,096 nt.</b> It is not a whole-transcript
+        or whole-ribosome model.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+      <tbody>
+        <tr><td><b>Is it efficient?</b></td><td style="color:var(--mg)"><b>Yes — the best-verified part.</b> 0.96% of dense at L=4096 while the dense baseline cannot run at all; parameter and FLOP arithmetic reproduces exactly; ~79 A100-h against NucleicBERT's 192 GPUs.</td></tr>
+        <tr><td><b>Will it generalize to any RNA?</b></td><td style="color:var(--warn)"><b>Not as scoped.</b> Four measured limits (G1, G2, G3, G7) plus one undefined behaviour (G6).</td></tr>
+        <tr><td>Contact map, structure, other properties?</td><td>The heads are specified and supervised for all of them. What is unproven is that any is trained; what is now measured is that the evidence base is narrower than the claim.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="recycle" style="border-style:solid;margin-top:18px">
+    HONEST HEADLINE — none of these invalidate the design; they bound it.
+    <b>A single-chain RNA structure model, up to 4,096 nt, trained predominantly on ribosomal
+    and complex-embedded RNA, which must report performance split by isolated vs complexed
+    context.</b>
   </div>
 </section>
 

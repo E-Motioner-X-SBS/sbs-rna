@@ -68,6 +68,23 @@
   free flexibility-label source we have, but a third of what was published.
   Top contributor 8FKW: 8,932 unobserved rows of which only 3,896 are RNA.
 
+- DISC-13 [ARCHITECTURE, G2, MOST SERIOUS]: 98.96% of RNA residues in the
+  sample sit in entries containing protein (159/180 structures, median 10
+  protein chains). The design predicts single chains from sequence, so it would
+  learn folds that are partner-stabilised. Undocumented before cycle 2.
+- DISC-14 [ARCHITECTURE, G3]: 93.07% of RNA residues come from 61 ribosome-like
+  entries (33.9% of structures). Every residue-weighted statistic is primarily
+  ribosomal. The length-binned tables happen to stratify it, and show the c=20
+  budget is safe at both ends, but the headline 1.34% occupancy is a ribosome
+  number.
+- DISC-15 [ARCHITECTURE, G7]: 27,437 residues (8.90%) fall outside {A,C,G,U} --
+  17,767 DNA, 7,036 UNK, 2,634 inosine/other. Vocab-5 cannot represent any of
+  them. Caution: my first pass mislabelled DNA as "modification"; corrected.
+- DISC-16 [ARCHITECTURE, G6, design gap]: the router reads structural features
+  produced by the pair track, which runs after the trunk, so routing at
+  recycle 0 is undefined. B_elec has an explicit first-pass rule; the router
+  does not.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

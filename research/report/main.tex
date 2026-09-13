@@ -1637,6 +1637,104 @@ a scoring protocol agreed in advance would be uninterpretable, so single-state
 TM-score on blind sets remains the headline and ensemble output is reported
 descriptively.
 
+\section{Generalization audit: can this handle \emph{any} RNA?}
+\label{sec:gen}
+
+The design claims contact maps, structure and other properties for RNA in
+general. This section tests that against the 180 sampled structures rather than
+asserting it. Four limits are real; three were undocumented before this audit.
+
+\subsection{G1 --- single chains fit the context, whole entries do not}
+
+The longest RNA chain has median $67$~nt and maximum $3{,}679$~nt, so a
+$4{,}096$ context covers every single chain we hold, with $56$ of $180$ chains
+exceeding $2{,}048$. But \emph{total} RNA per entry reaches $\mathbf{11{,}478}$
+residues, and $44$ of $180$ entries exceed a $4{,}096$ context. Outside this
+sample the gap is larger: lncRNAs ($\sim$19 knt) and viral genomes ($\sim$30 knt)
+are an order of magnitude beyond anything considered here.
+\textbf{Scope statement required}: PHAROS predicts single RNA chains up to
+$4{,}096$~nt; it is not a whole-transcript or whole-ribosome model.
+
+\subsection{G2 --- 99\% of the structural evidence is RNA \emph{in complex}}
+
+\begin{table}[h]
+\centering
+\caption{How much of the 3D evidence base is isolated RNA. \meas}
+\begin{tabular}{lc}
+\toprule
+\textbf{Quantity} & \textbf{Value} \\
+\midrule
+Structures containing protein & $159/180 = \mathbf{88.3\%}$ \\
+Median protein chains when present & $\mathbf{10}$ \\
+Structures with more than one RNA chain & $150/180 = 83.3\%$ \\
+\textbf{RNA residues in protein-containing entries} & $\mathbf{98.96\%}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The architecture takes one RNA sequence and predicts its fold, but essentially
+all 3D supervision comes from RNA whose conformation is stabilised by partners
+the model never sees. Training on isolated chains asks the model to reproduce,
+from sequence alone, a fold that in reality exists only inside a
+ribonucleoprotein.
+
+\textcolor{risk}{\textbf{This is the single largest generalization hazard in the
+design}}, and it was not acknowledged anywhere before this audit. It is not
+fixable by tuning---it is a property of what RNA structural biology has
+deposited. The honest options are to restrict claims to plausibly autonomous
+folds (riboswitches, aptamers, ribozymes), to supply partner context as an
+input, or to report performance split by complexed versus isolated. The last is
+mandatory regardless.
+
+\subsection{G3 --- the residue-weighted statistics are ribosome measurements}
+
+Sixty-one ribosome-like entries ($33.9\%$ of structures) contribute
+$\mathbf{93.07\%}$ of all RNA residues. Every residue-weighted number in this
+report---stiffness, ion coordination, block occupancy, the contact-scaling
+law---is therefore predominantly a \emph{ribosomal} measurement.
+
+The mitigation is already present, by luck rather than design: the
+length-binned tables stratify it. Short chains show block occupancy $16.34\%$
+and effective $c$ of $7.9$ against $1.34\%$ and $17.2$ for long chains, so the
+$c=20$ budget is generous at \emph{both} ends and the sparse track is safe. But
+the headline ``$1.34\%$ occupancy'' is a ribosome figure and must be labelled as
+such rather than quoted as ``RNA''.
+
+\subsection{G7 --- 8.9\% of real polymer residues cannot be tokenised}
+
+The vocabulary is five symbols. Measured over the sample, $27{,}437$ residues
+($\mathbf{8.90\%}$) fall outside $\{A,C,G,U\}$: $17{,}767$ DNA (hybrid
+duplexes), $7{,}036$ UNK, and $2{,}634$ inosine and other true RNA
+modifications. elDORS is pre-normalised to five symbols, which is why vocab-5
+looked sufficient---but structures are not normalised. Nature has more than 170
+RNA modifications, and tRNA, the best-characterised small RNA, is among the most
+heavily modified. A model that cannot represent inosine cannot be said to handle
+``any RNA''.
+
+\subsection{G6 --- router behaviour at recycle 0 is undefined}
+
+The router is specified to read pairing probability, predicted rigidity and
+local density---all produced by the pair track, which runs \emph{after} the
+trunk. At recycle 0 none of them exist. $B_{\mathrm{elec}}$ has exactly this
+problem and it was resolved explicitly; the router never was. The fix has the
+same shape---route on $N_{\text{eff}}/L$ and sequence-local features on the
+first pass, switch to structural routing from recycle 1---but it has to be
+stated, because an undefined router decides which experts fire.
+
+\subsection{Verdict}
+
+\textbf{Efficiency is the best-verified part of the design.} The hierarchical
+pair track runs at $0.96\%$ of dense at $L=4096$ while the dense baseline cannot
+run at all; the parameter and FLOP arithmetic reproduces exactly; training is
+costed at $\sim$79 A100-hours against NucleicBERT's 192 GPUs.
+
+\textbf{Generalization to ``any RNA'' is not supportable as scoped.} Four
+measured limits and one undefined behaviour bound it. None invalidates the
+design; together they fix the honest headline: \emph{a single-chain RNA
+structure model, up to 4,096 nt, trained predominantly on ribosomal and
+complex-embedded RNA, which must report performance split by isolated versus
+complexed context.}
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1743,6 +1841,7 @@ large-scale training is attempted.
 \texttt{.../sampling/audit\_ionic\_metadata.py} & \texttt{ionic\_metadata\_audit.json} \\
 \texttt{.../sampling/audit\_em\_buffers.py} & \texttt{em\_buffer\_audit.json} \\
 \texttt{.../sampling/test\_residue\_guard\_bias.py} & \texttt{residue\_guard\_bias.json} \\
+\texttt{.../sampling/audit\_generalization.py} & \texttt{generalization\_audit.json} \\
 \texttt{.../sampling/extract\_basepair\_geometry.py} & \texttt{basepair\_geometry.json} \\
 \texttt{.../sampling/measure\_stiffness\_headroom.py} & \texttt{stiffness\_headroom.json} \\
 \texttt{.../sampling/measure\_coevolution.py} & \texttt{coevolution\_signal.json} \\

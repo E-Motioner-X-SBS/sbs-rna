@@ -1144,6 +1144,114 @@ with the staged token budget (§10c), the first informative checkpoint costs on
 the order of **one GPU-day** — so the sizing question becomes an experiment
 rather than an argument.
 
+## 10e. Generalization audit — can this handle *any* RNA? [measured]
+
+Cycle-2 question: the design claims contact maps, structure and other
+properties for RNA in general. `scripts/sampling/audit_generalization.py`
+tests that against the 180 sampled structures instead of asserting it.
+**Four limits are real and three were previously undocumented.**
+
+### G1 — Length: single chains fit, whole entries do not
+
+| Quantity | Value |
+|---|---|
+| Longest RNA chain, median | **67 nt** |
+| Longest RNA chain, max | 3,679 nt |
+| Chains > 2048 nt | 56 of 180 |
+| Chains > 4096 nt | **0** |
+| **Total RNA residues per entry, max** | **11,478** |
+| Entries whose total RNA exceeds 4096 | **44 of 180** |
+
+A 4096 context covers every *single chain* we hold. It does **not** cover whole
+entries. Outside this sample the gap is larger still: lncRNAs (XIST ~19 knt) and
+viral genomes (SARS-CoV-2 ~30 knt) are an order of magnitude beyond any context
+considered here. **Scope statement required: PHAROS predicts single RNA chains
+up to 4,096 nt. It is not a whole-transcript or whole-ribosome model.**
+
+### G2 — 99% of the structural evidence is RNA *in complex* [most serious]
+
+| Quantity | Value |
+|---|---|
+| Structures containing protein | 159/180 = **88.3%** |
+| Median protein chains when present | **10** |
+| Structures with >1 RNA chain | 150/180 = **83.3%** |
+| **RNA residues in protein-containing entries** | **305,167 / 308,370 = 98.96%** |
+
+The architecture takes a single RNA sequence and predicts its fold. But
+essentially **all** the 3D supervision comes from RNA whose conformation is
+stabilised by partners the model never sees. Training on isolated chains teaches
+the model to reproduce, from sequence alone, a fold that in reality only exists
+inside a ribonucleoprotein.
+
+This is the **single largest generalization hazard in the design** and was not
+acknowledged anywhere before this audit. It is not fixable by tuning: it is a
+property of what RNA structural biology has deposited. Honest options are
+(a) restrict claims to chains whose fold is plausibly autonomous (riboswitches,
+aptamers, ribozymes), (b) add partner context as an input, or (c) report
+performance split by "in complex" vs "isolated". **(c) is mandatory regardless.**
+
+### G3 — The residue-weighted statistics are ribosome measurements
+
+| Quantity | Value |
+|---|---|
+| Ribosome-like entries (>2,000 RNA res + >500 protein res) | 61/180 = 33.9% |
+| **RNA residues they contribute** | **286,990 / 308,370 = 93.07%** |
+
+A third of the structures carry **93% of the residues**. Every residue-weighted
+number in this document — stiffness matrices, ion coordination, block occupancy,
+the contact-scaling law — is therefore predominantly a *ribosomal* measurement.
+
+**Mitigation already present, by luck rather than design**: the length-binned
+tables stratify it. Short chains show block occupancy **16.34%** and effective
+`c` **7.9**, against 1.34% and 17.2 for long chains — so the `c = 20` budget is
+generous at *both* ends and the sparse track is safe. But the headline "1.34%
+occupancy" is a ribosome figure and must be labelled as such, not quoted as
+"RNA".
+
+### G7 — 8.9% of polymer residues cannot be tokenised at all
+
+Vocabulary is 5 symbols (A, C, G, U, N). Measured over the sample, **27,437
+residues (8.90%)** fall outside {A,C,G,U}:
+
+| Class | Count | Representable in vocab-5? |
+|---|---|---|
+| DNA (DA/DC/DG/DT/DU — hybrid duplexes) | 17,767 | **no** |
+| UNK (identity unmodelled) | 7,036 | only as N |
+| Inosine (I) and other true RNA modifications | 2,634 | **no** |
+
+elDORS is pre-normalised to 5 symbols, which is why vocab-5 looked sufficient —
+but *structures* are not normalised. Nature has >170 RNA modifications, and tRNA,
+the best-characterised small RNA, is among the most heavily modified. A model
+that cannot represent inosine cannot be said to handle "any RNA". **Either widen
+the structural-side vocabulary or state that modified residues are mapped to N
+and their geometry is not predicted.**
+
+### G6 — Router circularity at recycle 0 [design gap, unmeasured]
+
+§4.3 specifies that the router reads "pairing probability, predicted rigidity,
+local density" — all produced by the **pair track, which runs after the trunk**.
+At recycle 0 none of them exist.
+
+`B_elec` has exactly this problem and it was resolved explicitly (disabled at
+recycle 0, enabled from recycle 1). **The router was never given the same
+treatment.** As specified, routing at recycle 0 is undefined. The fix is the
+same shape — route on `Neff/L` plus sequence-local features on the first pass and
+switch to full structural routing from recycle 1 — but it must be *stated*,
+because an undefined router is not a detail: it decides which experts fire.
+
+### Verdict on the user's question
+
+| Question | Answer |
+|---|---|
+| Is the architecture **efficient**? | **Yes, and this is the best-verified part.** The hierarchical pair track is measured at 0.96% of dense at L=4096 with the dense baseline unable to run at all; parameter and FLOP arithmetic reproduces exactly; training is costed at ~79 A100-h against NucleicBERT's 192 GPUs. |
+| Will it **generalize to any RNA**? | **Not as currently scoped.** Four measured limits: single chains only (G1), 99% of evidence is RNA-in-complex (G2), residue statistics are 93% ribosomal (G3), and 8.9% of real residues are untokenisable (G7). Plus one undefined behaviour (G6). |
+| Contact map, structure, other properties? | The *heads* are specified and supervised for all of these. What is unproven is that any of them is trained, and what is now measured is that the evidence base is narrower than the claim. |
+
+**None of these invalidate the design.** They bound it. The honest headline is:
+*a single-chain RNA structure model, up to 4,096 nt, trained predominantly on
+ribosomal and complex-embedded RNA, which must report performance split by
+isolated vs complexed context.*
+
 ## 11. Novelty claims, stated precisely
 
 | # | Claim | Prior art status |
@@ -1197,6 +1305,19 @@ rather than an argument.
    equilibrates; reconstructing pathways needs time-resolved probing data that is
    in neither our catalogue nor Ribonanza. Do not describe this as predicting how
    RNA folds.
-9. **Evaluation honesty.** TM-score ~0.5 is the field ceiling. Any claim of
+9. **G2 — 99% of 3D supervision is RNA in complex** (§10e). The model predicts
+   single chains but learns from folds stabilised by unseen partners. Not
+   fixable by tuning. Performance MUST be reported split by isolated vs
+   complexed context.
+10. **G3 — residue-weighted statistics are 93% ribosomal** (§10e). Block
+   occupancy, stiffness and ion numbers are ribosome measurements; the
+   length-stratified tables show the sparse budget is safe at both ends, but
+   the headline figures must be labelled.
+11. **G7 — 8.9% of real polymer residues are outside vocab-5** (§10e): DNA
+   hybrids, inosine, UNK. "Any RNA" is not supportable without widening the
+   structural vocabulary or stating the N-mapping.
+12. **G6 — router behaviour at recycle 0 is undefined** (§10e). `B_elec` got an
+   explicit first-pass rule; the router did not.
+13. **Evaluation honesty.** TM-score ~0.5 is the field ceiling. Any claim of
    improvement must be on blind sets (CASP16, RNA-Puzzles), never on
    rRNA-saturated random splits.
