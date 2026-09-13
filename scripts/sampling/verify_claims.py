@@ -179,6 +179,31 @@ def main() -> int:
         t = p.read_text()
         txt[k] = (t.replace("{,}", ",").replace("\\%", "%").replace("$", "")
                    .replace("\\", "").replace("−", "-").replace("–", "-"))
+    # Defect #28 (cycle 10): this check used `tok in text`, which proves a
+    # string occurs SOMEWHERE, not that it occurs in the claim it guards. Short
+    # tokens matched inside longer numbers: half of `61`'s matches in
+    # ARCHITECTURE.md sit inside other numbers, and its first standalone match is
+    # a contact-sparsity table row (`| 1500+ | 61 |`), nothing to do with the 61M
+    # active-parameter claim. Proven adversarially: deleting `149M/61M` and
+    # `~153M/~65M` outright left all four tokens reporting OK and the suite
+    # exiting 0. Numbers are now matched at NUMBER BOUNDARIES, and the tokens
+    # that remain ambiguous carry an explicit context pattern.
+    def numpat(tok):
+        """A number not embedded in a longer number."""
+        return r"(?<![\d.,])" + re.escape(tok) + r"(?![\d,]*\d)"
+
+    ANCHORED = {
+        # short numbers that collide with unrelated values in the documents
+        "78":  r"A100[^\n]{0,60}?78|78[^\n]{0,60}?A100",
+        "115": r"115(?:\.1)?\s*(?:x|\u00d7|times)",
+        "149": r"149\s*M",
+        "61":  r"61\s*M",
+        "153": r"153\s*M",
+        "82":  r"82[^\n]{0,40}(?:distinct|modification)"
+               r"|(?:distinct|modification)[^\n]{0,40}82",
+        "179": r"(?:/|of\s+|across\s+)179|179\s*(?:of|parsed|structures|\.|,)",
+    }
+
     for tok in ["17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
                 "0.224", "0.372", "1.514", "0.804", "9.87",
                 # PHAROS-Small is the current headline config; 910M/382M survives
@@ -189,29 +214,39 @@ def main() -> int:
                 # and 67.5% of it is protein (defect #11, cycle 2).
                 "46,448",
                 # held-out, common-subset figures (REV-2); the in-sample
-                # 14.551 / 17.579 pair was not a fair comparison.
-                "15.342", "16.376", "1.0336",
+                # 14.551 / 17.579 pair was not a fair comparison. The tokens were
+                # written truncated ("15.342", "16.376") and only ever matched as
+                # PREFIXES of 15.3424 / 16.3760 -- invisible until defect #28
+                # switched to boundary matching. 16.3760 is written both ways
+                # across the three documents, so it is anchored to accept either.
+                "15.3424", ("16.376", r"16\.376(?:0)?(?![\d])"), "1.0336",
                 # cycle-4 defect #17: loops enter the FLOP count.
                 # 488M effective compute, 78 A100-h @25B, 1.65x vs Base-v2.
                 "78", "1.65",
                 # cycle-4 defects #18/#19: heads+decoder itemised
-                "153", "12.59", "1.65",
+                "153", "12.59",
                 # cycle-5 defects #20/#21
                 "2.571", "1.500", "115", "1.757",
-                # cycle-6 defects #22/#23/#24: the canonical RNA-residue basis.
-                # Every structure-count denominator is 162, not 180.
-                # cycle-7 defect #25: both mmCIF serialisations now parse, so
-                # the 16 single-entity isolated RNAs are back. 179, not 162.
+                # cycle-6 defects #22/#23/#24 and cycle-7 defect #25: the
+                # canonical RNA-residue basis. Both mmCIF serialisations now
+                # parse, so every structure-count denominator is 179, not 162.
                 "309,197", "179", "98.95", "1.05", "3,764",
                 "73.7", "33.5", "286,458", "92.65", "3,237", "82",
                 # defect #24: the PUBLISHED column of the correction table must
                 # survive. An unguarded replace once overwrote it with the
                 # canonical values, making the table read "99.70 -> 99.70".
                 "98.96", "8.90"]:
-        missing = [k for k, v in txt.items() if tok not in v]
-        print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
+        if isinstance(tok, tuple):
+            tok, pat = tok
+            how = "anchored"
+        else:
+            pat = ANCHORED.get(tok) or numpat(tok)
+            how = "anchored" if tok in ANCHORED else "boundary"
+        missing = [k for k, v in txt.items() if not re.search(pat, v, re.I)]
+        print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} ({how:8s}) "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")
         if missing: fails.append(f"doc-token {tok}")
+
     print("\n== defect #24 guard: the correction table must record BOTH columns ==")
     arch = txt["ARCH"]
     # In the cycle-6 comparison table every row is "published | canonical". If a

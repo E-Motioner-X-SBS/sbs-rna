@@ -1,4 +1,4 @@
-# Master To-Do — Cycles 8-9
+# Master To-Do — Cycles 8-10
 
 Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 
@@ -19,11 +19,10 @@ Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 - [ ] C14 Re-derive the residue-weighted measurements (stiffness, ion
       coordination, block occupancy, contact scaling) on the canonical basis.
       Only the G-findings have been done.
-- [ ] C32 [ADDED-CYCLE-9] Audit the cross-document token check (OQ-6). It uses
-      `tok in text`, which proves a string appears *somewhere*, not that it
-      appears in the right claim. Given that cycles 7-9 found a defect in every
-      instrument examined, this is the remaining unaudited one — and it is weak
-      by construction, not by accident.
+- [x] C32 Audit the cross-document token check (OQ-6) — **defect #28**
+- [x] C33 Adversarially verify it by deleting every occurrence of the claims
+- [x] C34 Fix the two latent truncated tokens exposed by the tightening
+- [x] C35 Boundary matching + context patterns; print which mode each check used
 
 ## Deferred
 - [DEFERRED: 5B checkpoint] top_k 4 -> 8 decision (defect #21)

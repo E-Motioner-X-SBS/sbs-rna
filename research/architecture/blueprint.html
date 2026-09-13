@@ -1558,6 +1558,22 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       adversarially: injecting the retracted cycle-6 value (0.9970) and a +1 count drift both now
       <b>fail the build</b>, and both passed before.</p>
     </div>
+    <div class="finding" style="margin-top:12px;border-left-color:var(--warn)">
+      <span class="tag" style="color:var(--warn)">Defect #28 — the cross-document check proved the wrong thing</span>
+      <p>The same guard verifies each headline appears in all three deliverables, via
+      <span class="mono">tok in text</span> — which proves a string occurs <i>somewhere</i>, not
+      that it occurs in the claim it guards. Of 43 tokens, <b>7 are ≤3 characters and match inside
+      longer numbers</b>: half of <span class="mono">61</span>'s matches sit inside other numbers,
+      and its first standalone match is a contact-sparsity table row (<span class="mono">| 1500+ |
+      61 |</span>) — nothing to do with the 61M active-parameter claim. Measured adversarially by
+      deleting <i>every</i> occurrence of the 149M / 61M / 153M / A100-hour / 115× claims: the old
+      check <b>still passed 3 of the 5</b>. Numbers are now matched at <b>number boundaries</b>,
+      with explicit context patterns for the seven ambiguous tokens; all five now fail when the
+      claim is removed. Tightening also exposed two <b>latent</b> defects — the tokens
+      <span class="mono">15.342</span> and <span class="mono">16.376</span> were written truncated
+      and had only ever matched as <i>prefixes</i> of 15.3424 and 16.3760, so they had never
+      guarded those values exactly.</p>
+    </div>
   </div>
 
   <div class="tablewrap" style="margin-top:20px">

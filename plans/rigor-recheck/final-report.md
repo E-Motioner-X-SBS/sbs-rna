@@ -1,3 +1,131 @@
+# Final Verification Report — Cycle 10 (the last unaudited instrument)
+
+| Field | Value |
+|---|---|
+| Cycles | 10 |
+| Defects this cycle | **1** (#28), plus **2 latent** defects exposed by the fix |
+| **Total defects** | **28** |
+| Macro-audit | **FAIL — 2 open items (C13, C14), by design** |
+| Tests | 3 suites pass; `verify_claims.py` **ALL CLAIMS REPRODUCE**; both guards adversarially verified |
+
+## The question
+
+Cycles 7-9 found a defect in every instrument they examined. One remained: the
+guard's **cross-document consistency check**, which verifies that each headline
+number appears in all three deliverables using `tok in text`.
+
+That proves a string occurs **somewhere**. It does not prove it occurs in the
+claim it is supposed to guard.
+
+## Defect #28 — the check proved the wrong thing
+
+Of 43 guarded tokens, **7 are three characters or fewer** and match inside longer
+numbers. `61` has 20 matches in ARCHITECTURE.md, **10 of them embedded in other
+numbers**, and its first standalone match is a contact-sparsity table row —
+`| 1500+ | 61 | 4.85 |` — which has nothing whatever to do with the **61M
+active-parameter** claim it exists to guard.
+
+### Adversarially verified
+
+Every occurrence of `149M`, `61M`, `153M`, `A100` and `115x` was deleted from
+ARCHITECTURE.md and both checks run against the mutilated file:
+
+| token | old `tok in text` | what it matched instead | new check |
+|---|---|---|---|
+| `61` | **PASS** | `\| 1500+ \| 61 \| 4.85 \|` | **FAIL** |
+| `153` | **PASS** | `153.1 -> 153.2M` | **FAIL** |
+| `78` | **PASS** | `1.78` in a density table | **FAIL** |
+| `149` | fail | — | **FAIL** |
+| `115` | fail | — | **FAIL** |
+
+**Three of five guards were vacuous, and the suite exited 0 with the claims
+deleted outright.** It now exits 1.
+
+## Two latent defects the fix exposed
+
+Switching to boundary matching immediately failed two tokens that had passed
+every previous cycle:
+
+```
+FAIL token 15.342   MISSING from ARCH,TEX,HTML
+FAIL token 16.376   MISSING from TEX
+```
+
+No document had drifted. The **tokens were written truncated**: `15.342` and
+`16.376` had only ever matched as *prefixes* of `15.3424` and `16.3760`, so they
+had never guarded those values exactly in any cycle.
+
+This is the general lesson of cycles 9-10 stated concretely: **tightening a check
+finds defects that no amount of re-running the loose version ever could.** Nine
+cycles of "ALL CLAIMS REPRODUCE" did not surface these; one precision change did.
+
+## An honest note on my own tooling
+
+Two of this cycle's own instruments were wrong, and both are recorded rather than
+quietly re-run:
+
+1. The first adversarial test deleted only *two* occurrences of the claims; the
+   new check passed, and it passed **correctly**, because the claim was still in
+   the document. The test was wrong, not the guard.
+2. The throwaway script that inventoried the token list used
+   `re.findall(r'"([^"]+)"', ...)` and picked up a **comment** string, reporting a
+   non-existent token `"99.70 -> 99.70"` as missing from all three documents. The
+   tool written to audit an instrument had the same class of defect as the
+   instrument it was auditing.
+
+## The fix
+
+- Numbers match at **number boundaries**: `(?<![\d.,])N(?![\d,]*\d)`.
+- The seven ambiguous tokens carry explicit context patterns — `61\s*M`,
+  `149\s*M`, `153\s*M`, `A100…78`, `115(\.1)?\s*(x|×|times)`,
+  `82…(distinct|modification)`, `(/|of |across )179`.
+- The list accepts `(token, pattern)` pairs for values written more than one way
+  across documents.
+- **Every check prints the mode it used** — `(boundary)` or `(anchored)` — so a
+  weak guard is visible in the output rather than indistinguishable from a strong
+  one. That was the shared failure mode of #27 and #28: a check that *looked*
+  like evidence.
+
+## The completed pattern
+
+| Cycle | Instrument audited | Defect | Was it producing wrong results? |
+|---|---|---|---|
+| 7 | the RNA resolver | #25 | **Yes — published "G2 strengthens", a false finding** |
+| 8 | the shared mmCIF parser | #26 | Yes, negligibly — 9 rows, no headline moved |
+| 9 | the guard's tolerances | #27 | No, but the #25 retraction came within 1.5x of passing |
+| 10 | the guard's token check | #28 | No, but 3 of 5 guards proved nothing at all |
+
+**Four instruments examined, four defects.** Cycles 0-6 audited outputs and
+treated the tooling as given; when the tooling was finally examined it had a 100%
+defect rate. Two of the four were actively producing wrong or empty results, and
+two were producing *correct results for no reason* — passing because the check
+was too weak to fail, not because the claim was right.
+
+The durable lesson: **re-deriving a number through a shared instrument does not
+test that instrument, and agreement between results that share a tool is not
+independent evidence — it is the same computation run twice.**
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+Unchanged in level, stronger in basis for the second cycle running: all 54
+numeric claims reproduce at exact quoted precision, the cross-document check now
+proves what it claims to, and both guards have been verified by making them fail.
+What holds it below HIGH is unchanged and unchangeable by auditing — nothing has
+been trained, so every claim about model behaviour remains an argument.
+
+## Known limitations carried forward
+
+- **C13 / C14 are now four cycles old.** 13 analysis scripts still carry their own
+  RNA definitions, and only the G-findings have been re-derived canonically. The
+  resolver has changed twice since C13 was raised. **These should take priority
+  over opening any further instrument audit** — the instrument sweep is complete
+  (four examined, four fixed), and the outstanding work is now ordinary.
+- No claim about model behaviour is verified, and none can be until training.
+
+---
+
 # Final Verification Report — Cycles 8-9 (auditing the verification apparatus)
 
 | Field | Value |

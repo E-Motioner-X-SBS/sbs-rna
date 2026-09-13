@@ -1842,6 +1842,22 @@ claims were accurate to their stated digits, the guard was simply not proving it
 Verified adversarially---injecting the retracted cycle-6 value ($0.9970$) and a
 $+1$ count drift both now fail the build, and both passed before.
 
+\paragraph{Defect \#28 --- the cross-document check proved the wrong thing.} The
+same guard verifies that each headline appears in all three deliverables, using
+substring containment. That proves a string occurs \emph{somewhere}, not that it
+occurs in the claim it guards. Of $43$ guarded tokens, \textbf{seven are three
+characters or fewer and match inside longer numbers}: half of \texttt{61}'s
+matches in the architecture spec sit inside other numbers, and its first
+standalone match is a contact-sparsity table row, nothing to do with the 61M
+active-parameter claim. Measured adversarially by deleting \emph{every}
+occurrence of the 149M/61M/153M/A100-hour/$115\times$ claims: the old check
+\textbf{still passed three of the five}. Numbers are now matched at number
+boundaries, with explicit context patterns for the seven ambiguous tokens, and
+all five fail when the claim is removed. Tightening also exposed two
+\emph{latent} defects---the tokens \texttt{15.342} and \texttt{16.376} were
+written truncated and had only ever matched as prefixes of $15.3424$ and
+$16.3760$, so they had never guarded those values exactly.
+
 \subsection{G6 --- router behaviour at recycle 0 is undefined}
 
 The router is specified to read pairing probability, predicted rigidity and

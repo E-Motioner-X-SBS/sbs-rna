@@ -371,3 +371,41 @@
 - OQ-2 / C13 / C14 [STILL OPEN]: 13 analysis scripts still carry their own RNA
   definitions, and only the G-findings have been re-derived canonically. Three
   cycles have now passed with these open; they are the oldest outstanding items.
+
+## Cycle 10 decisions
+- D18: **A guard must state what it proved.** Every token check now prints
+  `(boundary)` or `(anchored)`, so a weak check is visible in the output instead
+  of being indistinguishable from a strong one. The failure mode of #27 and #28
+  was identical: a check that *looked* like evidence.
+- D19: **Adversarial tests delete every occurrence, not a representative one.**
+  The first attempt at C33 removed two of several instances, the new check passed,
+  and it passed *correctly* — the claim was still in the document. The test was
+  wrong, not the guard. Logged rather than quietly re-run, because it is the same
+  error class the cycle is about.
+
+## Cycle 10 discoveries
+- DISC-41 [DEFECT #28]: `tok in text` proved the wrong thing. **3 of 5** guards
+  tested adversarially were vacuous — `61` was satisfied by a contact-sparsity
+  table row, `153` by "153.1 -> 153.2M", `78` by "1.78" in a density table. The
+  suite exited **0** with the guarded claims deleted outright.
+- DISC-42 [LATENT, found by the fix]: the tokens `15.342` and `16.376` were
+  written truncated and had only ever matched as **prefixes** of 15.3424 and
+  16.3760. They passed nine cycles while guarding nothing exactly. Tightening a
+  check found defects that no amount of re-running the loose version could.
+- DISC-43 [MY OWN TOOL HAD THE BUG]: the throwaway script that inventoried the
+  token list used `re.findall(r'"([^"]+)"', ...)` and picked up a **comment**
+  string, reporting a non-existent token `"99.70 -> 99.70"` as missing from all
+  three documents. The analysis tool written to audit an instrument had the same
+  class of defect as the instrument. Recorded because it is the cleanest possible
+  illustration of DISC-40.
+- DISC-44 [THE PATTERN COMPLETES]: cycles 7-10 audited four instruments — the
+  resolver, the shared mmCIF parser, the guard's tolerances, the guard's token
+  check — and found a defect in **every one**. Four for four.
+
+## Open Questions
+- OQ-6 [**ANSWERED — defect #28**]: vacuous for 3 of 5 tokens tested; fixed and
+  adversarially verified; two latent token defects exposed as a side effect.
+- OQ-2 / C13 / C14 [STILL OPEN, now four cycles old]: the analysis scripts have
+  still not been migrated onto the shared resolver, and only the G-findings are
+  canonical. **These are now the oldest outstanding items by a wide margin and
+  should take priority over opening any further instrument audit.**

@@ -1439,6 +1439,23 @@ pseudouridine cannot be said to handle "any RNA".**
 > guard simply was not proving it. Verified adversarially: injecting the retracted
 > cycle-6 value (0.9970) and a +1 count drift both now **fail** the build, and
 > both passed before.
+>
+> **Defect #28 — the cross-document check proved the wrong thing.** The same
+> guard verifies that each headline number appears in all three deliverables, via
+> `tok in text`. That proves a string occurs *somewhere*, not that it occurs in
+> the claim it guards. Of 43 guarded tokens, **7 are three characters or fewer and
+> match inside longer numbers**: half of `61`'s matches in this file sit inside
+> other numbers, and its first standalone match is a contact-sparsity table row
+> (`| 1500+ | 61 |`) — nothing to do with the 61M active-parameter claim.
+> Measured adversarially by deleting *every* occurrence of the 149M / 61M / 153M /
+> A100-hour / 115x claims from this document: the old check **still passed 3 of
+> the 5** (`61` on that table row, `153` on "153.1 → 153.2M", `78` on "1.78" in a
+> density table). Numbers are now matched at **number boundaries**, and the seven
+> ambiguous tokens carry explicit context patterns (`61\s*M`, `A100…78`,
+> `115(\.1)?\s*x`, `82…distinct`, …). All five now fail when the claim is
+> removed. Tightening also exposed two **latent** defects: the tokens `15.342` and
+> `16.376` were written truncated and had only ever matched as *prefixes* of
+> 15.3424 and 16.3760 — they had never guarded those values exactly at all.
 
 ### G6 — Router circularity at recycle 0 [design gap, unmeasured]
 

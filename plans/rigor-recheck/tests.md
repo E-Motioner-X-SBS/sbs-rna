@@ -851,3 +851,66 @@ suite re-run clean afterwards.
 | `research/report/main.pdf` | **40 pages, 0 overfull, 0 underfull** |
 | `research/architecture/blueprint.html` | **v26**; tags balanced (div 235/235, p 159/159, td 510/510) |
 | `scripts/sampling/verify_claims.py` | **ALL CLAIMS REPRODUCE** at exact quoted precision |
+
+## Cycle 10 — the last unaudited instrument
+
+### C32 — the cross-document token check — **DEFECT #28**
+The guard verifies each headline appears in all three deliverables using
+`tok in text`. That proves a string occurs **somewhere**, not that it occurs in
+the claim it guards. Of 43 guarded tokens, **7 are three characters or fewer**
+and match inside longer numbers:
+
+| token | matches in ARCHITECTURE.md | embedded in a longer number | first standalone match |
+|---|---|---|---|
+| `61` | 20 | **10** | `\| 1500+ \| 61 \| 4.85 \|` — a contact-sparsity row |
+| `78` | 11 | **8** | `78 nt` median contact separation |
+| `82` | 7 | 3 | — |
+| `149` `153` `115` `179` | 4 / 4 / 2 / 12 | 0 | — |
+
+`61`'s guard was meant for the **61M active-parameter** claim and its first
+standalone match is a table of contact densities.
+
+### C33 — adversarial: delete every occurrence of the claims
+Not two occurrences — *every* one. `149M`, `61M`, `153M`, `A100`, `115x` all
+removed from ARCHITECTURE.md, then both checks run against the mutilated file:
+
+| token | old `tok in text` | matched on | new check |
+|---|---|---|---|
+| `61` | **PASS** | `\| 1500+ \| 61 \| 4.85 \|` | **FAIL** |
+| `153` | **PASS** | `153.1 -> 153.2M` | **FAIL** |
+| `78` | **PASS** | `1.78` in a density table | **FAIL** |
+| `149` | fail | — | **FAIL** |
+| `115` | fail | — | **FAIL** |
+
+**Three of five guards were vacuous**, and the suite exited 0 with the claims
+gone. It now exits 1. (A first attempt at this test deleted only *two*
+occurrences and the new check passed — correctly, since the claim was still in
+the document. The test was wrong, not the guard; recorded because it is the same
+error class the cycle is about.)
+
+### C34 — two latent defects exposed by the tightening
+Switching to boundary matching immediately failed two tokens that had passed
+every previous cycle:
+
+```
+FAIL token 15.342   MISSING from ARCH,TEX,HTML
+FAIL token 16.376   MISSING from TEX
+```
+
+Neither document had drifted. The **tokens** were written truncated — `15.342`
+and `16.376` had only ever matched as *prefixes* of `15.3424` and `16.3760`, so
+they had never guarded those values exactly. `16.3760` is written both ways
+across the three documents, so it now carries a pattern accepting either.
+
+### C35 — fix
+- Numbers match at **number boundaries**: `(?<![\d.,])N(?![\d,]*\d)`.
+- The 7 ambiguous tokens carry explicit context patterns: `61\s*M`,
+  `149\s*M`, `153\s*M`, `A100…78`, `115(\.1)?\s*(x|×|times)`,
+  `82…(distinct|modification)`, `(/|of |across )179`.
+- The token list accepts `(token, pattern)` pairs for values written more than
+  one way across documents.
+- Every check prints which mode it used — `(boundary)` or `(anchored)` — so a
+  weak guard is visible in the output rather than implicit.
+
+**ALL CLAIMS REPRODUCE.** main.pdf **40pp, 0 boxes**; blueprint **v27**, tags
+balanced (div 236/236, p 160/160).
