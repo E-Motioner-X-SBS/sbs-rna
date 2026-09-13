@@ -1,0 +1,39 @@
+# PHAROS-Small — the default. Every number traces to a measurement.
+name: pharos-small
+d_model: 512
+n_blocks: 16
+n_refine_loops: 8          # effective depth 16*8 = 128 layers
+# mixer schedule, period-8 repeated twice: 10 GDN, 4 SWA, 2 FULL
+mixer_pattern: [GDN, GDN, SWA, GDN, GDN, SWA, GDN, FULL]
+swa_window: 128
+
+moe:
+  routed_experts: 32
+  shared_experts: 2        # always-on; absorbs Watson-Crick helix
+  top_k: 4                 # 6 of 34 active
+  d_ff: 128
+  every_n_blocks: 1
+  balancing: aux_loss_free # bias-based; 5S rRNA is 5,976 BGSU clusters
+  router_inputs: [hidden, pairing_prob, rigidity, local_density, neff_over_L]
+  # NOTE unresolved (finding G6): at recycle 0 the structural router inputs do
+  # not exist yet. First pass must route on neff_over_L + sequence-local
+  # features only. B_elec has the same first-pass rule; the router needs it too.
+
+pair_track:
+  b1: 16                   # dense coarse map, 0.396% of dense
+  b2: 4                    # measured occupancy 1.34% on long chains
+  target_c: 20             # measured need 4.4-4.9 contacts/nt, eff c 17.2
+  keep_frac_l1: 0.12       # measured b1 occupancy 7.26%
+  n_tri_layers: 2
+
+context:
+  max_len: 4096            # every sampled single chain fits (max 3,679)
+  # G1: whole ENTRIES reach 11,478 RNA residues. Single-chain scope only.
+
+vocab:
+  pretraining: 5           # elDORS is pre-normalised; vocab-25 was NucleicBERT's mistake
+  structural: extended     # see src/pharos/data/VOCAB.md -- G7: 8.9% outside ACGU
+
+params:                    # re-derived independently, cycle 2 S3
+  total_M: 148.73
+  active_M: 60.65

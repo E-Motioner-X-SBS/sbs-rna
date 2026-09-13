@@ -1,0 +1,74 @@
+{
+  "chinchilla_tokens_per_param": 20.0,
+  "ladder": [
+    {
+      "model": "PHAROS-Micro",
+      "active_M": 12,
+      "ratios": {
+        "5B": 416.7,
+        "25B": 2083.3,
+        "100B": 8333.3,
+        "323B": 26916.7
+      }
+    },
+    {
+      "model": "PHAROS-Mini",
+      "active_M": 30,
+      "ratios": {
+        "5B": 166.7,
+        "25B": 833.3,
+        "100B": 3333.3,
+        "323B": 10766.7
+      }
+    },
+    {
+      "model": "PHAROS-Small",
+      "active_M": 61,
+      "ratios": {
+        "5B": 82.0,
+        "25B": 409.8,
+        "100B": 1639.3,
+        "323B": 5295.1
+      }
+    },
+    {
+      "model": "PHAROS-Base-v2",
+      "active_M": 269,
+      "ratios": {
+        "5B": 18.6,
+        "25B": 92.9,
+        "100B": 371.7,
+        "323B": 1200.7
+      }
+    }
+  ],
+  "qid_verdicts": [
+    {
+      "model": "PHAROS-Micro",
+      "tok_per_param": 26917,
+      "x_chinchilla": 1346,
+      "verdict": "WORST CASE - avoid 4-bit"
+    },
+    {
+      "model": "PHAROS-Mini",
+      "tok_per_param": 10767,
+      "x_chinchilla": 538,
+      "verdict": "WORST CASE - avoid 4-bit"
+    },
+    {
+      "model": "PHAROS-Small",
+      "tok_per_param": 5295,
+      "x_chinchilla": 265,
+      "verdict": "WORST CASE - avoid 4-bit"
+    },
+    {
+      "model": "PHAROS-Base-v2",
+      "tok_per_param": 1201,
+      "x_chinchilla": 60,
+      "verdict": "risky - validate QiD first"
+    }
+  ],
+  "sequence_entropy_bits": 2.0167,
+  "full_attribute_bits": 58.9,
+  "conflict": "smallest model + full corpus + 4-bit are mutually incompatible"
+}

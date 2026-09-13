@@ -1,0 +1,73 @@
+{
+  "corrected_ladder": [
+    {
+      "hw": "A100-80G",
+      "format": "bf16",
+      "raw_hours": 299.0,
+      "with_levers_hours": 125.6,
+      "note": ""
+    },
+    {
+      "hw": "H100-80G",
+      "format": "bf16",
+      "raw_hours": 94.3,
+      "with_levers_hours": 39.6,
+      "note": ""
+    },
+    {
+      "hw": "H100-80G",
+      "format": "fp8",
+      "raw_hours": 47.1,
+      "with_levers_hours": 19.8,
+      "note": "needs Hopper+"
+    },
+    {
+      "hw": "B200",
+      "format": "bf16",
+      "raw_hours": 41.5,
+      "with_levers_hours": 17.4,
+      "note": ""
+    },
+    {
+      "hw": "B200",
+      "format": "fp8",
+      "raw_hours": 20.7,
+      "with_levers_hours": 8.7,
+      "note": "needs Hopper+"
+    },
+    {
+      "hw": "B200",
+      "format": "fp4",
+      "raw_hours": 10.4,
+      "with_levers_hours": 4.4,
+      "note": "needs Blackwell (NVFP4)"
+    }
+  ],
+  "hw_independent_factor": 2.38,
+  "defect_15": {
+    "published_unit": "A100-hours with an FP8 lever applied",
+    "problem": "A100 (SM80) has no FP8 tensor cores; FP8 is Hopper+",
+    "a100_bf16_hours": 299.0,
+    "h100_fp8_hours": 47.1
+  },
+  "hardware_explicit_hours": {
+    "A100-80G  (Ampere)": {
+      "bf16": 299.0,
+      "fp8": null,
+      "fp4": null
+    },
+    "H100-80G  (Hopper)": {
+      "bf16": 94.3,
+      "fp8": 47.1,
+      "fp4": null
+    },
+    "B200      (Blackwell)": {
+      "bf16": 41.5,
+      "fp8": 20.7,
+      "fp4": 10.4
+    }
+  },
+  "H1_token_entropy_bits": 2.0167,
+  "H1_overprovision_512d_bf16": 4062,
+  "H2_median_resolution_A": 3.1
+}

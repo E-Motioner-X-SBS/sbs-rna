@@ -1,0 +1,120 @@
+{
+  "attributes": [
+    {
+      "name": "nucleotide identity",
+      "bits": 2.0167,
+      "coverage": 1.0,
+      "source": "elDORS composition entropy (measured)",
+      "availability": "free"
+    },
+    {
+      "name": "relative position in chain",
+      "bits": 6.0,
+      "coverage": 1.0,
+      "source": "trivially computed",
+      "availability": "free"
+    },
+    {
+      "name": "local GC in +/-16 window",
+      "bits": 4.0,
+      "coverage": 1.0,
+      "source": "computed from sequence",
+      "availability": "free"
+    },
+    {
+      "name": "predicted pairing state",
+      "bits": 1.0,
+      "coverage": 1.0,
+      "source": "2D head output, recycled",
+      "availability": "recycle"
+    },
+    {
+      "name": "base-pair class (Saenger)",
+      "bits": 4.857980995127572,
+      "coverage": 0.0,
+      "source": "_ndb_struct_na_base_pair",
+      "availability": "structures only"
+    },
+    {
+      "name": "base-pair class (Leontis-Westhof)",
+      "bits": 3.0,
+      "coverage": 0.0,
+      "source": "_ndb_struct_na_base_pair",
+      "availability": "structures only"
+    },
+    {
+      "name": "modified-residue flag",
+      "bits": 1.0,
+      "coverage": 0.08897,
+      "source": "mmCIF comp_id != ACGU",
+      "availability": "structures only"
+    },
+    {
+      "name": "disorder / unobserved label",
+      "bits": 1.0,
+      "coverage": 0.15062100723157246,
+      "source": "_pdbx_unobs (RNA rows)",
+      "availability": "structures only"
+    },
+    {
+      "name": "normalised B-factor (rigidity)",
+      "bits": 4.0,
+      "coverage": 0.0,
+      "source": "B_iso, X-ray only",
+      "availability": "structures only"
+    },
+    {
+      "name": "Mg2+ distance class",
+      "bits": 3.0,
+      "coverage": 0.0,
+      "source": "computed from mmCIF",
+      "availability": "structures only"
+    },
+    {
+      "name": "alignment depth Neff/L (global)",
+      "bits": 4.0,
+      "coverage": 0.0,
+      "source": "Rfam / homology search",
+      "availability": "MSA required"
+    },
+    {
+      "name": "per-column conservation",
+      "bits": 4.0,
+      "coverage": 0.0,
+      "source": "MSA column entropy",
+      "availability": "MSA required"
+    },
+    {
+      "name": "coevolution partner score",
+      "bits": 4.0,
+      "coverage": 0.0,
+      "source": "APC-MI, needs MSA",
+      "availability": "MSA required"
+    },
+    {
+      "name": "SHAPE / DMS reactivity",
+      "bits": 4.0,
+      "coverage": 0.0,
+      "source": "probing data",
+      "availability": "NOT ACQUIRED"
+    },
+    {
+      "name": "ionic condition (global)",
+      "bits": 12.0,
+      "coverage": 1.0,
+      "source": "user-supplied c_ion",
+      "availability": "free"
+    },
+    {
+      "name": "in-complex flag (RNP context)",
+      "bits": 1.0,
+      "coverage": 0.9896,
+      "source": "G2 finding: 98.96% are in complexes",
+      "availability": "free at train time"
+    }
+  ],
+  "total_bits_if_all_present": 58.87,
+  "token_bits_512d_bf16": 8192,
+  "overprovision_ratio": 139.1,
+  "inference_available_bits": 26.02
+}

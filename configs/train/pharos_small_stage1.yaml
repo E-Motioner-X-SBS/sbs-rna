@@ -1,0 +1,51 @@
+# Stage 1: MLM pretraining. Staged budget -- stop when metrics flatten.
+stage: 1_mlm_pretraining
+# REVISED cycle 3 (D2/REV-3): 323B on 61M active = 5,295 tok/param = 265x
+# Chinchilla, the QiD worst case per arXiv 2411.17691. 25B gives 410 tok/param
+# (~20x Chinchilla) -- still deliberately over-trained, without the degradation.
+tokens_total: 25e9
+expected_stop: 25e9
+checkpoints_at: [5e9, 25e9]
+ceiling_if_metrics_still_improving: 100e9
+
+optimizer:
+  name: muon                # 2D matrices only
+  fallback: adamw           # embeddings, norms, router
+  # ~2x compute efficiency REPORTED (Moonlight 3B/16B, 5.7T tokens, ~52% FLOPs).
+  # NOT benchmarked on our shapes -- must be measured before the factor is claimed.
+
+precision:                  # D3/REV-5
+  default: bf16             # train here; precision is NOT the constraint
+  fp8: {enabled: false, requires: hopper, adopt_after: baseline_reproduced}
+  nvfp4:
+    enabled: false
+    requires: blackwell
+    decision: DO_NOT_ADOPT_AT_THIS_SIZE
+    reason: >
+      The NVFP4 pretraining recipe was validated at 8B params / 1T tokens
+      ~= 125 tok/param. PHAROS-Small is 5,295 tok/param. The "no measurable
+      accuracy loss" result does not transfer to this regime.
+  nf4:
+    enabled: false
+    decision: NEVER
+    reason: >
+      W4A16 with a FROZEN 4-bit base; gradients reach only LoRA adapters.
+      It is a finetuning/inference format and cannot train from scratch.
+  qat:
+    enabled: false          # D4 -- deployment technique, not a training one
+    if_4bit_inference_needed: use_QAT_not_PTQ_and_measure_QiD_at_our_size
+  keep_high_precision: [embeddings, norms, router, attention_softmax]
+
+corpus_weighting:
+  down_weight_151nt_reads: true    # 9/20 chunks median exactly 151 nt; 16.2% of mass
+  long_context_sources: [chunk_006, chunk_009]   # median 2,193-2,389 nt
+
+cost_estimate_gpu_hours:   # hardware-explicit (defect #15); at the REVISED 25B budget
+  at_25B_tokens:
+    a100_bf16: 10
+    h100_fp8: 1.6
+  at_323B_tokens_for_reference:
+    a100_bf16: 126
+    h100_fp8: 20
+  # The token-budget cut (12.9x) dominates any precision lever (FP8 1.6x),
+  # and costs no accuracy because the dropped tokens are redundant.
