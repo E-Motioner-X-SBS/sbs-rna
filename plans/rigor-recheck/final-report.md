@@ -1,3 +1,178 @@
+# Final Verification Report — Cycle 6 (the unit of measurement)
+
+| Field | Value |
+|---|---|
+| Cycles | 6 |
+| Defects this cycle | **3** (#22, #23, #24) |
+| **Total defects** | **24** |
+| Macro-audit | **8/8 YES** |
+| Tests run | 3 suites, 15 + 6 + N properties — **all pass**; `verify_claims.py` **ALL CLAIMS REPRODUCE** |
+| Open to-dos | 0 open, 3 deferred, **2 opened for cycle 7** (C13, C14) |
+
+## The question this cycle asked
+
+Cycle 5 concluded that the newest defects were *absences* rather than errors, and
+argued the audit should target absences. Cycle 6 targeted the most basic absence
+available: **does the project have a definition of its own unit of measurement?**
+
+It did not. Two scripts reading the same 180 files reported 307,965 and 308,370
+RNA residues — a discrepancy visible since cycle 2 and never chased. Neither was
+wrong about its own rule, because **there was no shared rule**. Every script had
+invented one, and they disagreed on **72 of 180 structures, in both directions**.
+
+Every residue-weighted number in the project — stiffness, ion coordination, block
+occupancy, contact scaling, all four G-findings — is a count of RNA residues.
+
+## Defect #22 — no definition
+
+| script | residues | structures | rule |
+|---|---|---|---|
+| `analyze_ions_motifs.py` | 307,965 | 179 | hardcoded list of 16 residue names |
+| `audit_generalization.py` | 308,370 | 180 | `len(comp) <= 3`, not water, `group=ATOM` |
+
+7PKT: the hardcoded list is **767 short** (misses modifications not on the list).
+8JDJ: the permissive rule is **156 short the other way** (drops HETATM-coded RNA).
+
+Resolved by taking the definition from the format rather than from a curated
+list: mmCIF *declares* polymer type in `_entity_poly.type`, so a residue is RNA
+iff its chain is a `polyribonucleotide`. A depositor's declaration is complete by
+construction; a residue-name list can only be as complete as its author's
+knowledge, and RNA has >170 known modifications.
+`src/pharos/data/mmcif_entities.py` is now the single shared resolver.
+
+## Defect #23 — 24.87% "modified" was 90% contamination
+
+The first canonical implementation gave **404,205 residues, 24.87% outside
+A/C/G/U**. RNA modification rates are 1-2%, so that number diagnosed itself.
+Composition dump: **HOH 37,857 and MG 9,997 in the first 60 files alone** —
+water and ions sit in the *same auth chain* as the RNA they solvate. mmCIF
+assigns `label_seq_id` only to polymer positions:
+
+```python
+if r.get("label_seq_id", ".") in (".", "?"):
+    continue
+```
+
+**404,205 -> 306,857 residues; 24.87% -> 1.04%; solvent leakage 0.**
+
+The same contamination class explains the published G7. Its 8.90% counted
+**DT 4,608 + DG 4,556 + DA 4,440 + DC 4,135 + UNK 7,036 = 24,775 of 27,437**
+instances — 90% of the "modified nucleotides" were DNA from hybrid duplexes and
+unknown records not in RNA chains at all. **G7 was 8.6x too high.**
+
+## Defect #24 — the repair carried its own defect, again
+
+Cycle 4's #18b established that a repair can introduce a new defect. The cycle-6
+propagation was therefore audited, and it had failed twice:
+
+1. **Partial.** Only **4 of 11** affected numbers moved to the 162-structure
+   basis. G2's protein row read `157/162` while the multi-chain row directly
+   beneath it still read `150/180`; G3 carried the canonical *ratio* `93.35%`
+   over the stale `286,990 / 308,370`. Three tables mixed two denominators inside
+   a single row-set — invisible to a reader, because every individual number was
+   defensible in isolation.
+2. **Self-corrupting.** An unguarded global replace of the canonical values
+   overwrote the **published** column of the correction table itself, so it read
+   `99.70 -> 99.70` and `1.04 -> 1.04 (8.6x too high)`. Third occurrence of the
+   unguarded-replace failure mode, and the first to destroy a table whose only
+   purpose was to record a correction.
+
+The durable fix is not vigilance — vigilance was already in place and failed —
+but two new guards that make the failure fatal to the build:
+
+- **Guard A**: each correction row must contain *both* columns
+  (`308,370`&`306,857`, `98.96`&`99.70`, `93.07`&`93.35`, `8.90`&`1.04`).
+  A replace that collapses one into the other now fails.
+- **Guard B**: stale denominators (`150/180`, `61/180`, `159/180`) may appear
+  **at most once per document** — legitimate in a published column, a failure
+  anywhere else.
+
+## What moved
+
+| Finding | published | **canonical** | verdict |
+|---|---|---|---|
+| structures with a declared RNA entity | 180 | **162** | 18 had none |
+| RNA residues | 308,370 | **306,857** | −0.5% |
+| G1 longest chain median / max | 67 / 3,679 | **86.5 / 3,764** | median was dragged down by non-RNA chains |
+| G2 structures with protein | 88.3% | **96.9%** | **stronger** |
+| G2 structures with >1 RNA chain | 83.3% | **72.8%** | −10.5 pts |
+| G2 RNA residues in complexes | 98.96% | **99.70%** | **stronger** |
+| G3 ribosome-like entries | 33.9% | **37.0%** | +3.1 pts |
+| G3 residues ribosomal | 93.07% | **93.35%** | unchanged |
+| G7 outside A/C/G/U | 8.90% | **1.04%** | **8.6x too high** |
+| G7 distinct modification types | 8 | **76** | undercounted 9.5x |
+
+**G2 — the largest generalization hazard in the design — strengthens.** 99.70% of
+RNA residues sit in protein-containing entries. **G3 is unchanged.** **G7's number
+was wrong but its argument is now better founded**: not a percentage inflated by
+DNA, but 76 chemically distinct modifications led by pseudouridine (999), OMG
+(373), A2M (365), OMC/OMU (268 each), inosine (80). "A model that cannot
+represent pseudouridine cannot be said to handle any RNA" is the stronger claim.
+
+## What was tested, not asserted
+
+The resolver is load-bearing for every count in the project, so it is now tested
+rather than trusted — `src/pharos/data/test_mmcif_entities.py`, 15 properties over
+all 180 files, **ALL TESTS PASS**: solvent excluded, DNA excluded, every residue
+at a resolved polymer position, the five aggregate totals, PSU top, determinism,
+and the `;`-delimited multi-line `_entity_poly` block parsed correctly on the
+largest entry (7QVP, 162 chains).
+
+Hybrid chains are excluded by the definition, which is a *choice*, so it was
+measured: 3 entries, 59 residues, **6 of them A/C/G/U = 0.002%** of the total.
+Immaterial here, documented in the resolver, with instructions for a corpus where
+it would not be.
+
+All three suites now run inside `verify_claims.py`.
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+Unchanged in level, but the reasoning behind the first term has shifted. Six
+cycles of independent re-derivation kept confirming the measurements, and that
+was read as evidence they were sound. Cycle 6 shows part of it was evidence that
+**the same undefined rule was being re-applied**. The measurements that have now
+survived a *definitional* check — the four G-findings — deserve the MEDIUM-HIGH.
+The rest inherit whichever rule their script invented, and that exposure is
+**unmeasured rather than zero** (-> C13, C14).
+
+## Known limitations carried out of cycle 6
+
+- **Only the G-findings were re-derived canonically.** 103,964 base-pair steps,
+  44,708 Mg coordination records, block occupancy and contact scaling still come
+  from scripts with their own definitions. They key on different mmCIF categories
+  that carry their own chain references, so the exposure is plausibly smaller —
+  but "plausibly" is the word this cycle exists to eliminate. **OQ-2, priority
+  HIGH.**
+- **18 of 180 sampled structures declare no RNA polymer entity.** They contribute
+  zero residues under either definition, so no published number depends on it,
+  but a BGSU non-redundant *RNA* list containing entries with no RNA entity is
+  unexplained. Either the sampler or the `_entity_poly` parse is wrong for those
+  files. **OQ-3, priority MEDIUM.**
+
+## Defect base rate, six cycles
+
+| Cycle | Defects | Character |
+|---|---|---|
+| 0 (build) | 5 | silent parser/logic bugs |
+| 1 (audit) | 4 | wrong physics, overclaim, disclosure |
+| pre-2 | 1 | precision/rounding |
+| 2 | 4 | inflated count, unfair comparison, unimplemented code |
+| 3 | 1 | hardware incoherence |
+| 4 | 5 | derived quantities: cost, depth, budget |
+| 5 | 2 | components never specified at all |
+| **6** | **3** | **no definition of the unit of measurement; and a repair that damaged its own record** |
+
+**Twenty-four defects across six cycles. The rate has still not fallen**, and the
+character has shifted once more — from *wrong values* (0-2), to *wrong
+derivations* (3-4), to *missing specifications* (5), to **missing definitions and
+self-inflicted regressions (6)**. Defect #24 is the first caused by a previous
+cycle's repair, which is the argument for continuing: the corrections themselves
+are now a defect source, and only a guard that fails the build catches that.
+
+---
+
 # Final Verification Report — Cycle 5 (buildability)
 
 | Field | Value |

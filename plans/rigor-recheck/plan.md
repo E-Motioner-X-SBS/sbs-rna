@@ -1,36 +1,39 @@
-# Plan — Cycle 5: buildability audit
+# Plan — Cycle 6: one canonical definition of "an RNA residue"
 
 ## Why this framing
 
-19 defects so far. The pattern across cycles 3-4 is that **derived quantities**
-fail more often than measurements, and the newest category — #18 (attention head
-count) and #19 (decoder size) — is **components never specified at all**, then
-silently assumed small or free.
+Cycles 3-5 established that **derived** quantities fail more often than
+measurements, and cycle 5 sharpened it: the newest failures are *absences* —
+a component never specified, a check never run on anything but its first
+subject. Cycle 6 tests the most basic absence available:
 
-So cycle 5 asks one question of every component:
+> **Does the project have a definition of its own unit of measurement?**
 
-> **Could a competent engineer implement this from the specification alone,
-> without inventing a number?**
-
-Anything requiring invention is an unspecified component, and #19 showed those
-are not small.
+Every residue-weighted number in the work — stiffness, ion coordination, block
+occupancy, contact scaling, the G-findings — is a count of RNA residues. If the
+scripts disagree about what one is, every such number inherits the disagreement.
 
 ## Method
 
-1. Enumerate every component the architecture needs to run end to end.
-2. For each, locate its spec in ARCHITECTURE.md / configs / reference code.
-3. Classify: SPECIFIED / PARTIAL / **MISSING**.
-4. For MISSING items, check whether the gap hides a *circularity* — G6 found the
-   router reads features produced downstream of itself. The motif bank is keyed
-   on the interaction graph, which comes from the pair track: **same shape**.
-   That check was never run on anything but the router.
+1. Quantify the disagreement: run every parser over the same 180 files and diff
+   per structure, in **both** directions.
+2. Derive the authoritative definition from the format itself, not from a
+   curated residue list. mmCIF *declares* polymer type.
+3. Implement it once, in `src/pharos/data/`, and **test it** — a shared
+   definition that is untested only relocates the problem.
+4. Re-derive every affected finding under it.
+5. Propagate to all deliverables. **Audit the propagation**, because cycle 4
+   already showed a repair can introduce its own defect (#18b).
 
 ## Step-locked order
 
-| Step | Target |
-|---|---|
-| B1 | Enumerate components; classify SPECIFIED / PARTIAL / MISSING |
-| B2 | Circularity sweep: which components consume outputs produced after them? |
-| B3 | MoE expert width d_ff=128 at d=512 — is 0.25x below a useful floor? Never questioned |
-| B4 | Loss weights lambda_1..5 — are any values specified? |
-| B5 | Fix or explicitly defer every MISSING item; update all deliverables |
+| Step | Target | Outcome |
+|---|---|---|
+| C1 | Diff the parsers per structure | **defect #22** — disagree on 72/180 |
+| C2 | Build `mmcif_entities.py` from `_entity_poly.type` | first run: 404,205 |
+| C3 | Why is it 24.87% non-ACGU? | **defect #23** — HOH/MG in RNA auth chains |
+| C4 | Add the `label_seq_id` polymer test | 306,857, 1.04%, solvent leakage 0 |
+| C5 | Re-derive G1/G2/G3/G7 canonically | G2 strengthens, G7 was 8.6x too high |
+| C6 | Propagate to ARCHITECTURE / main.tex / blueprint | partial — see C7 |
+| C7 | **Audit the propagation itself** | **defect #24** — 4 of 11 numbers moved |
+| C8 | Test the resolver; wire every suite into the guard | 15 properties, all pass |

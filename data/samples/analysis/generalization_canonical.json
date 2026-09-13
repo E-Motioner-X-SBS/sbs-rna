@@ -1,0 +1,1669 @@
+{
+  "summary": {
+    "canonical_definition": "chain _entity_poly.type == polyribonucleotide AND label_seq_id assigned",
+    "structures_with_RNA": 162,
+    "structures_scanned": 180,
+    "G1": {
+      "longest_chain_median": 86.5,
+      "longest_chain_max": 3764,
+      "chains_over_2048": 56,
+      "chains_over_4096": 0,
+      "total_rna_res_max": 11478,
+      "entries_over_4096_total": 44
+    },
+    "G2": {
+      "structures_with_protein": 157,
+      "frac_structures_with_protein": 0.9691,
+      "multi_rna_chain": 118,
+      "frac_multi_chain": 0.7284,
+      "median_protein_chains": 11,
+      "rna_residues_total": 306857,
+      "rna_residues_in_complexes": 305934,
+      "frac_rna_residues_in_complexes": 0.997
+    },
+    "G3": {
+      "ribosome_like": 60,
+      "frac_structures": 0.3704,
+      "frac_rna_residues": 0.9335
+    },
+    "G7": {
+      "modified_instances": 3189,
+      "frac_of_rna_residues": 0.01039,
+      "distinct_types": 76,
+      "top": {
+        "PSU": 999,
+        "OMG": 373,
+        "A2M": 365,
+        "OMC": 268,
+        "OMU": 268,
+        "5MC": 124,
+        "I": 80,
+        "2MG": 74,
+        "N": 73,
+        "MA6": 63
+      }
+    }
+  },
+  "structures": [
+    {
+      "pdb": "5J8B",
+      "n_rna_chains": 7,
+      "longest_chain": 2874,
+      "total_rna_res": 4730,
+      "n_modified": 17,
+      "protein_residues": 6642,
+      "protein_chains": 52,
+      "has_dna": false
+    },
+    {
+      "pdb": "7M2T",
+      "n_rna_chains": 79,
+      "longest_chain": 22,
+      "total_rna_res": 655,
+      "n_modified": 0,
+      "protein_residues": 4320,
+      "protein_chains": 30,
+      "has_dna": false
+    },
+    {
+      "pdb": "7M2V",
+      "n_rna_chains": 20,
+      "longest_chain": 10,
+      "total_rna_res": 200,
+      "n_modified": 0,
+      "protein_residues": 2887,
+      "protein_chains": 20,
+      "has_dna": false
+    },
+    {
+      "pdb": "7M50",
+      "n_rna_chains": 19,
+      "longest_chain": 12,
+      "total_rna_res": 133,
+      "n_modified": 0,
+      "protein_residues": 2916,
+      "protein_chains": 20,
+      "has_dna": false
+    },
+    {
+      "pdb": "7MJV",
+      "n_rna_chains": 1,
+      "longest_chain": 15,
+      "total_rna_res": 15,
+      "n_modified": 1,
+      "protein_residues": 444,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7MLX",
+      "n_rna_chains": 1,
+      "longest_chain": 65,
+      "total_rna_res": 65,
+      "n_modified": 0,
+      "protein_residues": 429,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7MQF",
+      "n_rna_chains": 8,
+      "longest_chain": 2,
+      "total_rna_res": 16,
+      "n_modified": 0,
+      "protein_residues": 1608,
+      "protein_chains": 8,
+      "has_dna": false
+    },
+    {
+      "pdb": "7MSF",
+      "n_rna_chains": 2,
+      "longest_chain": 14,
+      "total_rna_res": 25,
+      "n_modified": 0,
+      "protein_residues": 387,
+      "protein_chains": 3,
+      "has_dna": false
+    },
+    {
+      "pdb": "7N06",
+      "n_rna_chains": 6,
+      "longest_chain": 3,
+      "total_rna_res": 18,
+      "n_modified": 0,
+      "protein_residues": 2082,
+      "protein_chains": 6,
+      "has_dna": false
+    },
+    {
+      "pdb": "7N2V",
+      "n_rna_chains": 6,
+      "longest_chain": 2904,
+      "total_rna_res": 4722,
+      "n_modified": 45,
+      "protein_residues": 6683,
+      "protein_chains": 53,
+      "has_dna": false
+    },
+    {
+      "pdb": "7NDJ",
+      "n_rna_chains": 1,
+      "longest_chain": 6,
+      "total_rna_res": 6,
+      "n_modified": 0,
+      "protein_residues": 358,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7NHN",
+      "n_rna_chains": 5,
+      "longest_chain": 2908,
+      "total_rna_res": 4617,
+      "n_modified": 0,
+      "protein_residues": 5715,
+      "protein_chains": 47,
+      "has_dna": false
+    },
+    {
+      "pdb": "7O1C",
+      "n_rna_chains": 5,
+      "longest_chain": 2897,
+      "total_rna_res": 4638,
+      "n_modified": 34,
+      "protein_residues": 6041,
+      "protein_chains": 51,
+      "has_dna": false
+    },
+    {
+      "pdb": "7O7Z",
+      "n_rna_chains": 7,
+      "longest_chain": 3764,
+      "total_rna_res": 6057,
+      "n_modified": 299,
+      "protein_residues": 12118,
+      "protein_chains": 79,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OB9",
+      "n_rna_chains": 1,
+      "longest_chain": 21,
+      "total_rna_res": 21,
+      "n_modified": 0,
+      "protein_residues": 4397,
+      "protein_chains": 13,
+      "has_dna": true
+    },
+    {
+      "pdb": "7OEA",
+      "n_rna_chains": 1,
+      "longest_chain": 7,
+      "total_rna_res": 7,
+      "n_modified": 0,
+      "protein_residues": 1432,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OG0",
+      "n_rna_chains": 2,
+      "longest_chain": 17,
+      "total_rna_res": 34,
+      "n_modified": 0,
+      "protein_residues": 995,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OIF",
+      "n_rna_chains": 5,
+      "longest_chain": 2903,
+      "total_rna_res": 4651,
+      "n_modified": 35,
+      "protein_residues": 5738,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OIZ",
+      "n_rna_chains": 5,
+      "longest_chain": 2753,
+      "total_rna_res": 4472,
+      "n_modified": 34,
+      "protein_residues": 5603,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OJN",
+      "n_rna_chains": 4,
+      "longest_chain": 12,
+      "total_rna_res": 39,
+      "n_modified": 0,
+      "protein_residues": 2010,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ONU",
+      "n_rna_chains": 1,
+      "longest_chain": 66,
+      "total_rna_res": 66,
+      "n_modified": 0,
+      "protein_residues": 1763,
+      "protein_chains": 6,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ORN",
+      "n_rna_chains": 2,
+      "longest_chain": 18,
+      "total_rna_res": 35,
+      "n_modified": 0,
+      "protein_residues": 1700,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ORO",
+      "n_rna_chains": 4,
+      "longest_chain": 14,
+      "total_rna_res": 48,
+      "n_modified": 0,
+      "protein_residues": 2008,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OYB",
+      "n_rna_chains": 4,
+      "longest_chain": 3263,
+      "total_rna_res": 5035,
+      "n_modified": 0,
+      "protein_residues": 10795,
+      "protein_chains": 73,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OYC",
+      "n_rna_chains": 4,
+      "longest_chain": 3245,
+      "total_rna_res": 5006,
+      "n_modified": 0,
+      "protein_residues": 11387,
+      "protein_chains": 77,
+      "has_dna": false
+    },
+    {
+      "pdb": "7OZQ",
+      "n_rna_chains": 4,
+      "longest_chain": 32,
+      "total_rna_res": 127,
+      "n_modified": 0,
+      "protein_residues": 489,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "7P7T",
+      "n_rna_chains": 6,
+      "longest_chain": 2901,
+      "total_rna_res": 4697,
+      "n_modified": 5,
+      "protein_residues": 6097,
+      "protein_chains": 48,
+      "has_dna": false
+    },
+    {
+      "pdb": "7PKT",
+      "n_rna_chains": 9,
+      "longest_chain": 578,
+      "total_rna_res": 1901,
+      "n_modified": 0,
+      "protein_residues": 8300,
+      "protein_chains": 45,
+      "has_dna": false
+    },
+    {
+      "pdb": "7PLI",
+      "n_rna_chains": 6,
+      "longest_chain": 23,
+      "total_rna_res": 137,
+      "n_modified": 6,
+      "protein_residues": 2725,
+      "protein_chains": 6,
+      "has_dna": false
+    },
+    {
+      "pdb": "7PMM",
+      "n_rna_chains": 2,
+      "longest_chain": 44,
+      "total_rna_res": 86,
+      "n_modified": 0,
+      "protein_residues": 896,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7PWG",
+      "n_rna_chains": 5,
+      "longest_chain": 2450,
+      "total_rna_res": 2722,
+      "n_modified": 25,
+      "protein_residues": 5769,
+      "protein_chains": 39,
+      "has_dna": false
+    },
+    {
+      "pdb": "7PZY",
+      "n_rna_chains": 5,
+      "longest_chain": 3209,
+      "total_rna_res": 5196,
+      "n_modified": 2,
+      "protein_residues": 11142,
+      "protein_chains": 75,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QCA",
+      "n_rna_chains": 3,
+      "longest_chain": 2499,
+      "total_rna_res": 3972,
+      "n_modified": 0,
+      "protein_residues": 10629,
+      "protein_chains": 71,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QEP",
+      "n_rna_chains": 3,
+      "longest_chain": 2319,
+      "total_rna_res": 3733,
+      "n_modified": 0,
+      "protein_residues": 10884,
+      "protein_chains": 74,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QGG",
+      "n_rna_chains": 7,
+      "longest_chain": 3679,
+      "total_rna_res": 5841,
+      "n_modified": 33,
+      "protein_residues": 11624,
+      "protein_chains": 77,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QH7",
+      "n_rna_chains": 2,
+      "longest_chain": 1256,
+      "total_rna_res": 1312,
+      "n_modified": 0,
+      "protein_residues": 7017,
+      "protein_chains": 47,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QI4",
+      "n_rna_chains": 7,
+      "longest_chain": 1558,
+      "total_rna_res": 2762,
+      "n_modified": 13,
+      "protein_residues": 14796,
+      "protein_chains": 87,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QIW",
+      "n_rna_chains": 4,
+      "longest_chain": 3098,
+      "total_rna_res": 3379,
+      "n_modified": 127,
+      "protein_residues": 6330,
+      "protein_chains": 41,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QIZ",
+      "n_rna_chains": 7,
+      "longest_chain": 3098,
+      "total_rna_res": 4980,
+      "n_modified": 204,
+      "protein_residues": 10965,
+      "protein_chains": 73,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QQP",
+      "n_rna_chains": 1,
+      "longest_chain": 84,
+      "total_rna_res": 84,
+      "n_modified": 0,
+      "protein_residues": 1334,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "7QR8",
+      "n_rna_chains": 1,
+      "longest_chain": 85,
+      "total_rna_res": 85,
+      "n_modified": 0,
+      "protein_residues": 1332,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "7QTN",
+      "n_rna_chains": 2,
+      "longest_chain": 14,
+      "total_rna_res": 28,
+      "n_modified": 3,
+      "protein_residues": 0,
+      "protein_chains": 0,
+      "has_dna": false
+    },
+    {
+      "pdb": "7QVP",
+      "n_rna_chains": 14,
+      "longest_chain": 3611,
+      "total_rna_res": 11478,
+      "n_modified": 0,
+      "protein_residues": 22170,
+      "protein_chains": 148,
+      "has_dna": false
+    },
+    {
+      "pdb": "7R6Q",
+      "n_rna_chains": 3,
+      "longest_chain": 295,
+      "total_rna_res": 439,
+      "n_modified": 0,
+      "protein_residues": 2423,
+      "protein_chains": 16,
+      "has_dna": false
+    },
+    {
+      "pdb": "7R81",
+      "n_rna_chains": 7,
+      "longest_chain": 3123,
+      "total_rna_res": 5339,
+      "n_modified": 0,
+      "protein_residues": 11137,
+      "protein_chains": 76,
+      "has_dna": false
+    },
+    {
+      "pdb": "7R9G",
+      "n_rna_chains": 1,
+      "longest_chain": 12,
+      "total_rna_res": 12,
+      "n_modified": 0,
+      "protein_residues": 386,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7RQB",
+      "n_rna_chains": 10,
+      "longest_chain": 2872,
+      "total_rna_res": 8999,
+      "n_modified": 50,
+      "protein_residues": 11849,
+      "protein_chains": 102,
+      "has_dna": false
+    },
+    {
+      "pdb": "7RQE",
+      "n_rna_chains": 10,
+      "longest_chain": 2872,
+      "total_rna_res": 8999,
+      "n_modified": 48,
+      "protein_residues": 11849,
+      "protein_chains": 102,
+      "has_dna": false
+    },
+    {
+      "pdb": "7RYF",
+      "n_rna_chains": 5,
+      "longest_chain": 2685,
+      "total_rna_res": 4408,
+      "n_modified": 25,
+      "protein_residues": 5497,
+      "protein_chains": 48,
+      "has_dna": false
+    },
+    {
+      "pdb": "7SBA",
+      "n_rna_chains": 1,
+      "longest_chain": 43,
+      "total_rna_res": 43,
+      "n_modified": 0,
+      "protein_residues": 3669,
+      "protein_chains": 11,
+      "has_dna": true
+    },
+    {
+      "pdb": "7SOV",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 89,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7TUV",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 672,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7UCK",
+      "n_rna_chains": 6,
+      "longest_chain": 3546,
+      "total_rna_res": 5593,
+      "n_modified": 137,
+      "protein_residues": 11143,
+      "protein_chains": 73,
+      "has_dna": false
+    },
+    {
+      "pdb": "7UOB",
+      "n_rna_chains": 2,
+      "longest_chain": 36,
+      "total_rna_res": 69,
+      "n_modified": 0,
+      "protein_residues": 1375,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "7UQB",
+      "n_rna_chains": 4,
+      "longest_chain": 2991,
+      "total_rna_res": 3328,
+      "n_modified": 57,
+      "protein_residues": 10806,
+      "protein_chains": 56,
+      "has_dna": false
+    },
+    {
+      "pdb": "7UU5",
+      "n_rna_chains": 2,
+      "longest_chain": 11,
+      "total_rna_res": 22,
+      "n_modified": 0,
+      "protein_residues": 758,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7V4G",
+      "n_rna_chains": 3,
+      "longest_chain": 4,
+      "total_rna_res": 12,
+      "n_modified": 3,
+      "protein_residues": 640,
+      "protein_chains": 3,
+      "has_dna": false
+    },
+    {
+      "pdb": "7VKI",
+      "n_rna_chains": 1,
+      "longest_chain": 3,
+      "total_rna_res": 3,
+      "n_modified": 0,
+      "protein_residues": 113,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7VSJ",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 160,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7VTN",
+      "n_rna_chains": 2,
+      "longest_chain": 56,
+      "total_rna_res": 76,
+      "n_modified": 0,
+      "protein_residues": 692,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7WAY",
+      "n_rna_chains": 1,
+      "longest_chain": 115,
+      "total_rna_res": 115,
+      "n_modified": 0,
+      "protein_residues": 960,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "7WJU",
+      "n_rna_chains": 1,
+      "longest_chain": 133,
+      "total_rna_res": 133,
+      "n_modified": 0,
+      "protein_residues": 607,
+      "protein_chains": 2,
+      "has_dna": true
+    },
+    {
+      "pdb": "7WV3",
+      "n_rna_chains": 2,
+      "longest_chain": 80,
+      "total_rna_res": 160,
+      "n_modified": 80,
+      "protein_residues": 2672,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "7XPL",
+      "n_rna_chains": 4,
+      "longest_chain": 25,
+      "total_rna_res": 72,
+      "n_modified": 0,
+      "protein_residues": 1211,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "7XSP",
+      "n_rna_chains": 2,
+      "longest_chain": 35,
+      "total_rna_res": 50,
+      "n_modified": 0,
+      "protein_residues": 1271,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Y2P",
+      "n_rna_chains": 2,
+      "longest_chain": 13,
+      "total_rna_res": 26,
+      "n_modified": 0,
+      "protein_residues": 0,
+      "protein_chains": 0,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Y7G",
+      "n_rna_chains": 6,
+      "longest_chain": 2753,
+      "total_rna_res": 4558,
+      "n_modified": 57,
+      "protein_residues": 5593,
+      "protein_chains": 49,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Y7P",
+      "n_rna_chains": 4,
+      "longest_chain": 11,
+      "total_rna_res": 35,
+      "n_modified": 0,
+      "protein_residues": 1842,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Y7Q",
+      "n_rna_chains": 3,
+      "longest_chain": 10,
+      "total_rna_res": 23,
+      "n_modified": 0,
+      "protein_residues": 1857,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Y82",
+      "n_rna_chains": 2,
+      "longest_chain": 41,
+      "total_rna_res": 66,
+      "n_modified": 0,
+      "protein_residues": 1341,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7YEW",
+      "n_rna_chains": 2,
+      "longest_chain": 4,
+      "total_rna_res": 8,
+      "n_modified": 0,
+      "protein_residues": 320,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "7YEX",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 160,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7YGB",
+      "n_rna_chains": 3,
+      "longest_chain": 393,
+      "total_rna_res": 407,
+      "n_modified": 1,
+      "protein_residues": 0,
+      "protein_chains": 0,
+      "has_dna": false
+    },
+    {
+      "pdb": "7YGC",
+      "n_rna_chains": 3,
+      "longest_chain": 393,
+      "total_rna_res": 407,
+      "n_modified": 1,
+      "protein_residues": 0,
+      "protein_chains": 0,
+      "has_dna": false
+    },
+    {
+      "pdb": "7Z42",
+      "n_rna_chains": 2,
+      "longest_chain": 13,
+      "total_rna_res": 26,
+      "n_modified": 0,
+      "protein_residues": 4425,
+      "protein_chains": 10,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZGP",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 1767,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZHG",
+      "n_rna_chains": 3,
+      "longest_chain": 1497,
+      "total_rna_res": 1533,
+      "n_modified": 69,
+      "protein_residues": 3601,
+      "protein_chains": 28,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZHH",
+      "n_rna_chains": 1,
+      "longest_chain": 6,
+      "total_rna_res": 6,
+      "n_modified": 0,
+      "protein_residues": 219,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZJW",
+      "n_rna_chains": 7,
+      "longest_chain": 3764,
+      "total_rna_res": 6128,
+      "n_modified": 207,
+      "protein_residues": 12504,
+      "protein_chains": 79,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZTA",
+      "n_rna_chains": 7,
+      "longest_chain": 2903,
+      "total_rna_res": 4788,
+      "n_modified": 56,
+      "protein_residues": 5700,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZUX",
+      "n_rna_chains": 6,
+      "longest_chain": 3163,
+      "total_rna_res": 5364,
+      "n_modified": 0,
+      "protein_residues": 11140,
+      "protein_chains": 74,
+      "has_dna": false
+    },
+    {
+      "pdb": "7ZW0",
+      "n_rna_chains": 7,
+      "longest_chain": 3217,
+      "total_rna_res": 5442,
+      "n_modified": 0,
+      "protein_residues": 12371,
+      "protein_chains": 79,
+      "has_dna": false
+    },
+    {
+      "pdb": "8A22",
+      "n_rna_chains": 13,
+      "longest_chain": 534,
+      "total_rna_res": 2685,
+      "n_modified": 0,
+      "protein_residues": 17557,
+      "protein_chains": 106,
+      "has_dna": false
+    },
+    {
+      "pdb": "8A3W",
+      "n_rna_chains": 10,
+      "longest_chain": 1663,
+      "total_rna_res": 4848,
+      "n_modified": 141,
+      "protein_residues": 10338,
+      "protein_chains": 72,
+      "has_dna": false
+    },
+    {
+      "pdb": "8A5I",
+      "n_rna_chains": 2,
+      "longest_chain": 2908,
+      "total_rna_res": 3022,
+      "n_modified": 0,
+      "protein_residues": 2973,
+      "protein_chains": 27,
+      "has_dna": false
+    },
+    {
+      "pdb": "8AF0",
+      "n_rna_chains": 2,
+      "longest_chain": 19,
+      "total_rna_res": 38,
+      "n_modified": 0,
+      "protein_residues": 246,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8AS7",
+      "n_rna_chains": 3,
+      "longest_chain": 17,
+      "total_rna_res": 37,
+      "n_modified": 0,
+      "protein_residues": 1575,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8AUV",
+      "n_rna_chains": 2,
+      "longest_chain": 1626,
+      "total_rna_res": 1638,
+      "n_modified": 81,
+      "protein_residues": 4773,
+      "protein_chains": 33,
+      "has_dna": false
+    },
+    {
+      "pdb": "8B2L",
+      "n_rna_chains": 7,
+      "longest_chain": 3196,
+      "total_rna_res": 5268,
+      "n_modified": 216,
+      "protein_residues": 11217,
+      "protein_chains": 76,
+      "has_dna": false
+    },
+    {
+      "pdb": "8B6Z",
+      "n_rna_chains": 1,
+      "longest_chain": 8,
+      "total_rna_res": 8,
+      "n_modified": 0,
+      "protein_residues": 442,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8B9I",
+      "n_rna_chains": 1,
+      "longest_chain": 11,
+      "total_rna_res": 11,
+      "n_modified": 0,
+      "protein_residues": 984,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8BE0",
+      "n_rna_chains": 3,
+      "longest_chain": 20,
+      "total_rna_res": 44,
+      "n_modified": 3,
+      "protein_residues": 2179,
+      "protein_chains": 3,
+      "has_dna": false
+    },
+    {
+      "pdb": "8BF9",
+      "n_rna_chains": 2,
+      "longest_chain": 1766,
+      "total_rna_res": 1864,
+      "n_modified": 0,
+      "protein_residues": 2050,
+      "protein_chains": 17,
+      "has_dna": false
+    },
+    {
+      "pdb": "8BHN",
+      "n_rna_chains": 6,
+      "longest_chain": 2758,
+      "total_rna_res": 4575,
+      "n_modified": 10,
+      "protein_residues": 5683,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "8BUU",
+      "n_rna_chains": 5,
+      "longest_chain": 2852,
+      "total_rna_res": 4584,
+      "n_modified": 2,
+      "protein_residues": 5859,
+      "protein_chains": 46,
+      "has_dna": false
+    },
+    {
+      "pdb": "8CBK",
+      "n_rna_chains": 1,
+      "longest_chain": 93,
+      "total_rna_res": 93,
+      "n_modified": 0,
+      "protein_residues": 1833,
+      "protein_chains": 6,
+      "has_dna": false
+    },
+    {
+      "pdb": "8CWO",
+      "n_rna_chains": 2,
+      "longest_chain": 1034,
+      "total_rna_res": 1044,
+      "n_modified": 10,
+      "protein_residues": 1508,
+      "protein_chains": 13,
+      "has_dna": false
+    },
+    {
+      "pdb": "8D29",
+      "n_rna_chains": 4,
+      "longest_chain": 34,
+      "total_rna_res": 136,
+      "n_modified": 0,
+      "protein_residues": 1738,
+      "protein_chains": 8,
+      "has_dna": false
+    },
+    {
+      "pdb": "8D4A",
+      "n_rna_chains": 2,
+      "longest_chain": 41,
+      "total_rna_res": 69,
+      "n_modified": 0,
+      "protein_residues": 1207,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8DFA",
+      "n_rna_chains": 1,
+      "longest_chain": 46,
+      "total_rna_res": 46,
+      "n_modified": 0,
+      "protein_residues": 2855,
+      "protein_chains": 11,
+      "has_dna": true
+    },
+    {
+      "pdb": "8DFS",
+      "n_rna_chains": 1,
+      "longest_chain": 48,
+      "total_rna_res": 48,
+      "n_modified": 0,
+      "protein_residues": 3082,
+      "protein_chains": 12,
+      "has_dna": false
+    },
+    {
+      "pdb": "8DZJ",
+      "n_rna_chains": 1,
+      "longest_chain": 153,
+      "total_rna_res": 153,
+      "n_modified": 0,
+      "protein_residues": 613,
+      "protein_chains": 2,
+      "has_dna": true
+    },
+    {
+      "pdb": "8DZK",
+      "n_rna_chains": 5,
+      "longest_chain": 5,
+      "total_rna_res": 22,
+      "n_modified": 5,
+      "protein_residues": 1745,
+      "protein_chains": 5,
+      "has_dna": false
+    },
+    {
+      "pdb": "8E2A",
+      "n_rna_chains": 1,
+      "longest_chain": 15,
+      "total_rna_res": 15,
+      "n_modified": 0,
+      "protein_residues": 686,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8E74",
+      "n_rna_chains": 1,
+      "longest_chain": 32,
+      "total_rna_res": 32,
+      "n_modified": 0,
+      "protein_residues": 3048,
+      "protein_chains": 6,
+      "has_dna": true
+    },
+    {
+      "pdb": "8EHQ",
+      "n_rna_chains": 1,
+      "longest_chain": 29,
+      "total_rna_res": 29,
+      "n_modified": 0,
+      "protein_residues": 3051,
+      "protein_chains": 6,
+      "has_dna": true
+    },
+    {
+      "pdb": "8EPK",
+      "n_rna_chains": 2,
+      "longest_chain": 31,
+      "total_rna_res": 62,
+      "n_modified": 60,
+      "protein_residues": 564,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "8ESQ",
+      "n_rna_chains": 3,
+      "longest_chain": 2230,
+      "total_rna_res": 2461,
+      "n_modified": 0,
+      "protein_residues": 10263,
+      "protein_chains": 55,
+      "has_dna": false
+    },
+    {
+      "pdb": "8EUG",
+      "n_rna_chains": 3,
+      "longest_chain": 2869,
+      "total_rna_res": 3138,
+      "n_modified": 0,
+      "protein_residues": 7108,
+      "protein_chains": 43,
+      "has_dna": false
+    },
+    {
+      "pdb": "8EVS",
+      "n_rna_chains": 5,
+      "longest_chain": 3198,
+      "total_rna_res": 5454,
+      "n_modified": 66,
+      "protein_residues": 12280,
+      "protein_chains": 77,
+      "has_dna": false
+    },
+    {
+      "pdb": "8EWG",
+      "n_rna_chains": 1,
+      "longest_chain": 56,
+      "total_rna_res": 56,
+      "n_modified": 0,
+      "protein_residues": 1017,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8EX9",
+      "n_rna_chains": 1,
+      "longest_chain": 102,
+      "total_rna_res": 102,
+      "n_modified": 0,
+      "protein_residues": 166,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8EY7",
+      "n_rna_chains": 1,
+      "longest_chain": 6,
+      "total_rna_res": 6,
+      "n_modified": 0,
+      "protein_residues": 93,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8F5G",
+      "n_rna_chains": 3,
+      "longest_chain": 26,
+      "total_rna_res": 78,
+      "n_modified": 0,
+      "protein_residues": 488,
+      "protein_chains": 3,
+      "has_dna": false
+    },
+    {
+      "pdb": "8FKW",
+      "n_rna_chains": 3,
+      "longest_chain": 2277,
+      "total_rna_res": 2498,
+      "n_modified": 0,
+      "protein_residues": 10864,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "8FMW",
+      "n_rna_chains": 4,
+      "longest_chain": 2929,
+      "total_rna_res": 4646,
+      "n_modified": 0,
+      "protein_residues": 6347,
+      "protein_chains": 54,
+      "has_dna": false
+    },
+    {
+      "pdb": "8FR8",
+      "n_rna_chains": 5,
+      "longest_chain": 3119,
+      "total_rna_res": 4843,
+      "n_modified": 0,
+      "protein_residues": 6298,
+      "protein_chains": 53,
+      "has_dna": false
+    },
+    {
+      "pdb": "8FRU",
+      "n_rna_chains": 3,
+      "longest_chain": 2551,
+      "total_rna_res": 2809,
+      "n_modified": 0,
+      "protein_residues": 5870,
+      "protein_chains": 40,
+      "has_dna": false
+    },
+    {
+      "pdb": "8FVY",
+      "n_rna_chains": 2,
+      "longest_chain": 1441,
+      "total_rna_res": 1515,
+      "n_modified": 0,
+      "protein_residues": 4347,
+      "protein_chains": 32,
+      "has_dna": false
+    },
+    {
+      "pdb": "8G90",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 1,
+      "protein_residues": 88,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8GKH",
+      "n_rna_chains": 1,
+      "longest_chain": 76,
+      "total_rna_res": 76,
+      "n_modified": 0,
+      "protein_residues": 600,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8GS2",
+      "n_rna_chains": 2,
+      "longest_chain": 38,
+      "total_rna_res": 61,
+      "n_modified": 0,
+      "protein_residues": 1916,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8H0I",
+      "n_rna_chains": 2,
+      "longest_chain": 19,
+      "total_rna_res": 38,
+      "n_modified": 0,
+      "protein_residues": 1710,
+      "protein_chains": 10,
+      "has_dna": false
+    },
+    {
+      "pdb": "8H0S",
+      "n_rna_chains": 2,
+      "longest_chain": 17,
+      "total_rna_res": 34,
+      "n_modified": 0,
+      "protein_residues": 719,
+      "protein_chains": 4,
+      "has_dna": false
+    },
+    {
+      "pdb": "8H1B",
+      "n_rna_chains": 2,
+      "longest_chain": 17,
+      "total_rna_res": 34,
+      "n_modified": 0,
+      "protein_residues": 382,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8HHL",
+      "n_rna_chains": 1,
+      "longest_chain": 49,
+      "total_rna_res": 49,
+      "n_modified": 0,
+      "protein_residues": 592,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8HKU",
+      "n_rna_chains": 3,
+      "longest_chain": 2995,
+      "total_rna_res": 3135,
+      "n_modified": 0,
+      "protein_residues": 4922,
+      "protein_chains": 39,
+      "has_dna": false
+    },
+    {
+      "pdb": "8HMY",
+      "n_rna_chains": 1,
+      "longest_chain": 90,
+      "total_rna_res": 90,
+      "n_modified": 0,
+      "protein_residues": 1368,
+      "protein_chains": 5,
+      "has_dna": false
+    },
+    {
+      "pdb": "8HMZ",
+      "n_rna_chains": 2,
+      "longest_chain": 45,
+      "total_rna_res": 82,
+      "n_modified": 1,
+      "protein_residues": 1367,
+      "protein_chains": 5,
+      "has_dna": false
+    },
+    {
+      "pdb": "8I3Z",
+      "n_rna_chains": 2,
+      "longest_chain": 31,
+      "total_rna_res": 55,
+      "n_modified": 1,
+      "protein_residues": 0,
+      "protein_chains": 0,
+      "has_dna": false
+    },
+    {
+      "pdb": "8IAZ",
+      "n_rna_chains": 1,
+      "longest_chain": 163,
+      "total_rna_res": 163,
+      "n_modified": 0,
+      "protein_residues": 384,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8ID2",
+      "n_rna_chains": 2,
+      "longest_chain": 24,
+      "total_rna_res": 48,
+      "n_modified": 0,
+      "protein_residues": 184,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8IYQ",
+      "n_rna_chains": 1,
+      "longest_chain": 109,
+      "total_rna_res": 109,
+      "n_modified": 0,
+      "protein_residues": 1198,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "8JDJ",
+      "n_rna_chains": 7,
+      "longest_chain": 3512,
+      "total_rna_res": 5586,
+      "n_modified": 216,
+      "protein_residues": 11105,
+      "protein_chains": 73,
+      "has_dna": false
+    },
+    {
+      "pdb": "8JOZ",
+      "n_rna_chains": 1,
+      "longest_chain": 88,
+      "total_rna_res": 88,
+      "n_modified": 9,
+      "protein_residues": 257,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8JY0",
+      "n_rna_chains": 3,
+      "longest_chain": 64,
+      "total_rna_res": 192,
+      "n_modified": 0,
+      "protein_residues": 305,
+      "protein_chains": 3,
+      "has_dna": false
+    },
+    {
+      "pdb": "8K34",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 0,
+      "protein_residues": 863,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8KD9",
+      "n_rna_chains": 5,
+      "longest_chain": 73,
+      "total_rna_res": 365,
+      "n_modified": 0,
+      "protein_residues": 2228,
+      "protein_chains": 12,
+      "has_dna": false
+    },
+    {
+      "pdb": "8OIV",
+      "n_rna_chains": 1,
+      "longest_chain": 4,
+      "total_rna_res": 4,
+      "n_modified": 1,
+      "protein_residues": 578,
+      "protein_chains": 2,
+      "has_dna": false
+    },
+    {
+      "pdb": "8OP2",
+      "n_rna_chains": 2,
+      "longest_chain": 70,
+      "total_rna_res": 140,
+      "n_modified": 0,
+      "protein_residues": 7380,
+      "protein_chains": 20,
+      "has_dna": false
+    },
+    {
+      "pdb": "8P8B",
+      "n_rna_chains": 7,
+      "longest_chain": 2893,
+      "total_rna_res": 3195,
+      "n_modified": 5,
+      "protein_residues": 3578,
+      "protein_chains": 31,
+      "has_dna": false
+    },
+    {
+      "pdb": "8PV7",
+      "n_rna_chains": 4,
+      "longest_chain": 3078,
+      "total_rna_res": 3435,
+      "n_modified": 34,
+      "protein_residues": 10514,
+      "protein_chains": 55,
+      "has_dna": false
+    },
+    {
+      "pdb": "8R6C",
+      "n_rna_chains": 7,
+      "longest_chain": 2753,
+      "total_rna_res": 4548,
+      "n_modified": 35,
+      "protein_residues": 5595,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "8SJ7",
+      "n_rna_chains": 1,
+      "longest_chain": 9,
+      "total_rna_res": 9,
+      "n_modified": 0,
+      "protein_residues": 404,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "8WRP",
+      "n_rna_chains": 1,
+      "longest_chain": 39,
+      "total_rna_res": 39,
+      "n_modified": 0,
+      "protein_residues": 583,
+      "protein_chains": 1,
+      "has_dna": true
+    },
+    {
+      "pdb": "9AXU",
+      "n_rna_chains": 3,
+      "longest_chain": 3212,
+      "total_rna_res": 3488,
+      "n_modified": 0,
+      "protein_residues": 6133,
+      "protein_chains": 40,
+      "has_dna": false
+    },
+    {
+      "pdb": "9BUP",
+      "n_rna_chains": 8,
+      "longest_chain": 3193,
+      "total_rna_res": 5307,
+      "n_modified": 0,
+      "protein_residues": 10350,
+      "protein_chains": 74,
+      "has_dna": false
+    },
+    {
+      "pdb": "9EY2",
+      "n_rna_chains": 1,
+      "longest_chain": 68,
+      "total_rna_res": 68,
+      "n_modified": 0,
+      "protein_residues": 1982,
+      "protein_chains": 6,
+      "has_dna": false
+    },
+    {
+      "pdb": "9FCO",
+      "n_rna_chains": 2,
+      "longest_chain": 1046,
+      "total_rna_res": 1052,
+      "n_modified": 8,
+      "protein_residues": 1446,
+      "protein_chains": 14,
+      "has_dna": false
+    },
+    {
+      "pdb": "9FHL",
+      "n_rna_chains": 4,
+      "longest_chain": 1430,
+      "total_rna_res": 1460,
+      "n_modified": 35,
+      "protein_residues": 3937,
+      "protein_chains": 31,
+      "has_dna": false
+    },
+    {
+      "pdb": "9FXO",
+      "n_rna_chains": 13,
+      "longest_chain": 1852,
+      "total_rna_res": 5711,
+      "n_modified": 175,
+      "protein_residues": 11704,
+      "protein_chains": 76,
+      "has_dna": false
+    },
+    {
+      "pdb": "9G6J",
+      "n_rna_chains": 7,
+      "longest_chain": 3066,
+      "total_rna_res": 5198,
+      "n_modified": 2,
+      "protein_residues": 10783,
+      "protein_chains": 73,
+      "has_dna": false
+    },
+    {
+      "pdb": "9GHE",
+      "n_rna_chains": 5,
+      "longest_chain": 2782,
+      "total_rna_res": 4501,
+      "n_modified": 35,
+      "protein_residues": 5725,
+      "protein_chains": 50,
+      "has_dna": false
+    },
+    {
+      "pdb": "9GYT",
+      "n_rna_chains": 3,
+      "longest_chain": 2922,
+      "total_rna_res": 4806,
+      "n_modified": 18,
+      "protein_residues": 15008,
+      "protein_chains": 84,
+      "has_dna": false
+    },
+    {
+      "pdb": "9JKD",
+      "n_rna_chains": 2,
+      "longest_chain": 13,
+      "total_rna_res": 22,
+      "n_modified": 0,
+      "protein_residues": 672,
+      "protein_chains": 1,
+      "has_dna": false
+    },
+    {
+      "pdb": "9JPP",
+      "n_rna_chains": 6,
+      "longest_chain": 2761,
+      "total_rna_res": 4553,
+      "n_modified": 53,
+      "protein_residues": 5593,
+      "protein_chains": 49,
+      "has_dna": false
+    },
+    {
+      "pdb": "9KZU",
+      "n_rna_chains": 7,
+      "longest_chain": 3663,
+      "total_rna_res": 5978,
+      "n_modified": 0,
+      "protein_residues": 14883,
+      "protein_chains": 85,
+      "has_dna": false
+    },
+    {
+      "pdb": "9N3Y",
+      "n_rna_chains": 1,
+      "longest_chain": 61,
+      "total_rna_res": 61,
+      "n_modified": 0,
+      "protein_residues": 2888,
+      "protein_chains": 9,
+      "has_dna": true
+    },
+    {
+      "pdb": "9O3V",
+      "n_rna_chains": 6,
+      "longest_chain": 3546,
+      "total_rna_res": 5575,
+      "n_modified": 224,
+      "protein_residues": 11437,
+      "protein_chains": 76,
+      "has_dna": false
+    },
+    {
+      "pdb": "9PJ7",
+      "n_rna_chains": 5,
+      "longest_chain": 2903,
+      "total_rna_res": 4620,
+      "n_modified": 34,
+      "protein_residues": 5746,
+      "protein_chains": 49,
+      "has_dna": false
+    },
+    {
+      "pdb": "9PJ9",
+      "n_rna_chains": 5,
+      "longest_chain": 2903,
+      "total_rna_res": 4613,
+      "n_modified": 34,
+      "protein_residues": 5746,
+      "protein_chains": 49,
+      "has_dna": false
+    },
+    {
+      "pdb": "9Q2P",
+      "n_rna_chains": 8,
+      "longest_chain": 3543,
+      "total_rna_res": 5744,
+      "n_modified": 0,
+      "protein_residues": 12137,
+      "protein_chains": 78,
+      "has_dna": false
+    }
+  ]
+}

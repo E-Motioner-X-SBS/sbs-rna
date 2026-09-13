@@ -1664,12 +1664,21 @@ The design claims contact maps, structure and other properties for RNA in
 general. This section tests that against the 180 sampled structures rather than
 asserting it. Four limits are real; three were undocumented before this audit.
 
+\paragraph{Basis.} Every figure below is re-derived under the single canonical
+RNA definition of \S\ref{sec:gen}: a residue is RNA iff its chain declares
+\texttt{\_entity\_poly.type = polyribonucleotide} \emph{and} it occupies a
+polymer position. \textbf{162 of the 180 sampled structures contain an RNA
+polymer entity}, so every structure-count denominator here is $162$, not $180$.
+The first pass at this correction updated only four of eleven affected numbers
+and left three tables mixing denominators; that inconsistency is defect~\#24.
+
 \subsection{G1 --- single chains fit the context, whole entries do not}
 
-The longest RNA chain has median $67$~nt and maximum $3{,}679$~nt, so a
-$4{,}096$ context covers every single chain we hold, with $56$ of $180$ chains
-exceeding $2{,}048$. But \emph{total} RNA per entry reaches $\mathbf{11{,}478}$
-residues, and $44$ of $180$ entries exceed a $4{,}096$ context. Outside this
+The longest RNA chain has median $86.5$~nt and maximum $3{,}764$~nt, so a
+$4{,}096$ context covers every single chain we hold, with $56$ of $162$
+structures whose longest chain exceeds $2{,}048$. But \emph{total} RNA per entry
+reaches $\mathbf{11{,}478}$ residues, and $44$ of $162$ entries exceed a
+$4{,}096$ context. Outside this
 sample the gap is larger: lncRNAs ($\sim$19 knt) and viral genomes ($\sim$30 knt)
 are an order of magnitude beyond anything considered here.
 \textbf{Scope statement required}: PHAROS predicts single RNA chains up to
@@ -1684,10 +1693,10 @@ $4{,}096$~nt; it is not a whole-transcript or whole-ribosome model.
 \toprule
 \textbf{Quantity} & \textbf{Value} \\
 \midrule
-Structures containing protein & $159/180 = \mathbf{88.3\%}$ \\
-Median protein chains when present & $\mathbf{10}$ \\
-Structures with more than one RNA chain & $150/180 = 83.3\%$ \\
-\textbf{RNA residues in protein-containing entries} & $\mathbf{98.96\%}$ \\
+Structures containing protein & $157/162 = \mathbf{96.9\%}$ \\
+Median protein chains when present & $\mathbf{11}$ \\
+Structures with more than one RNA chain & $118/162 = 72.8\%$ \\
+\textbf{RNA residues in protein-containing entries} & $\mathbf{99.70\%}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1708,8 +1717,8 @@ mandatory regardless.
 
 \subsection{G3 --- the residue-weighted statistics are ribosome measurements}
 
-Sixty-one ribosome-like entries ($33.9\%$ of structures) contribute
-$\mathbf{93.07\%}$ of all RNA residues. Every residue-weighted number in this
+Sixty ribosome-like entries ($60/162 = 37.0\%$ of structures) contribute
+$286{,}458/306{,}857 = \mathbf{93.35\%}$ of all RNA residues. Every residue-weighted number in this
 report---stiffness, ion coordination, block occupancy, the contact-scaling
 law---is therefore predominantly a \emph{ribosomal} measurement.
 
@@ -1720,16 +1729,38 @@ $c=20$ budget is generous at \emph{both} ends and the sparse track is safe. But
 the headline ``$1.34\%$ occupancy'' is a ribosome figure and must be labelled as
 such rather than quoted as ``RNA''.
 
-\subsection{G7 --- 8.9\% of real polymer residues cannot be tokenised}
+\subsection{G7 --- modified nucleotides cannot be tokenised}
 
-The vocabulary is five symbols. Measured over the sample, $27{,}437$ residues
-($\mathbf{8.90\%}$) fall outside $\{A,C,G,U\}$: $17{,}767$ DNA (hybrid
-duplexes), $7{,}036$ UNK, and $2{,}634$ inosine and other true RNA
-modifications. elDORS is pre-normalised to five symbols, which is why vocab-5
-looked sufficient---but structures are not normalised. Nature has more than 170
-RNA modifications, and tRNA, the best-characterised small RNA, is among the most
-heavily modified. A model that cannot represent inosine cannot be said to handle
-``any RNA''.
+The vocabulary is five symbols. Measured canonically, $\mathbf{1.04\%}$ of RNA
+polymer residues fall outside $\{A,C,G,U\}$---$3{,}189$ instances across
+$\mathbf{76}$ distinct modification types, led by pseudouridine ($999$), OMG
+($373$), A2M ($365$), OMC and OMU ($268$ each) and inosine ($80$). elDORS is
+pre-normalised to five symbols, which is why vocab-5 looked sufficient for
+pretraining; structures are not normalised. Seventy-six chemically distinct
+modifications observed in 180 structures, led by the most abundant modification
+in cellular RNA, is a stronger case for widening the structural vocabulary than
+any percentage.
+
+\paragraph{Re-derived in cycle 6 (defects \#22, \#23).} Every analysis script had
+rolled its own definition of an RNA residue, and they disagreed on \textbf{72 of
+180 structures}. mmCIF declares polymer type, so a residue is RNA iff its chain's
+\texttt{\_entity\_poly.type} is \texttt{polyribonucleotide} \emph{and} it occupies
+a polymer position. Under that definition G2 \emph{strengthens} ($98.96 \rightarrow
+\mathbf{99.70\%}$ of RNA residues in protein-containing entries) and G3 is
+unchanged ($93.35\%$), but \textbf{G7's published $8.90\%$ was wrong by
+$8.6\times$}: it counted DNA from hybrid duplexes (DT $4{,}608$, DG $4{,}556$,
+DA $4{,}440$, DC $4{,}135$) and UNK records ($7{,}036$) that are not in RNA chains
+at all---$24{,}775$ of the $27{,}437$ ``modified'' instances.
+
+\paragraph{Defect \#24 --- partial propagation.} The first pass at this
+correction updated four of the eleven affected numbers and stopped, and an
+unguarded global replace of the canonical values overwrote the \emph{published}
+column of the comparison table in the architecture spec, making it read
+``$99.70 \rightarrow 99.70$''. Three tables were left mixing the $180$ and $162$
+denominators inside a single row-set. It is the third occurrence of the
+unguarded-replace failure mode, and the first to corrupt a table whose only
+purpose was to record a correction. Every substitution in the repair was made
+with an exact-match, count-asserted replace.
 
 \subsection{G6 --- router behaviour at recycle 0 is undefined}
 

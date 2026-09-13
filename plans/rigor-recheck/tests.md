@@ -457,3 +457,140 @@ Per-expert width matches the template; **active capacity does not** — 1.7x bel
 DeepSeek, 2.7x below dense. The design copied the segmentation and not the
 activation. Fix is cheap: top-8 gives 2.50x for +12.6M active and ~0 total.
 Design gap, not an error; decide at the 5B checkpoint.
+
+## Cycle 6 — one canonical definition of "an RNA residue"
+
+### C1 — do the parsers agree? — **DEFECT #22**
+Two scripts reading the same 180 files reported different totals, and the gap
+had been visible since cycle 2 without being chased:
+
+| script | RNA residues | structures | definition used |
+|---|---|---|---|
+| `analyze_ions_motifs.py` | 307,965 | 179 | hardcoded list of 16 residue names |
+| `audit_generalization.py` | 308,370 | 180 | `len(comp) <= 3 and not water and group=ATOM` |
+
+Per-structure diff: they disagree on **72 of 180 structures, in both
+directions**. 7PKT: the hardcoded list is **767 residues short** (it misses every
+modification not on the list). 8JDJ: the permissive rule is **156 short the
+other way** (it drops RNA coded as HETATM). Neither is authoritative because
+**neither is a definition** — each script invented one.
+
+### C2-C4 — the canonical definition — **DEFECT #23**
+mmCIF *declares* polymer type. First implementation (`_entity_poly.type ==
+polyribonucleotide`, chains from `pdbx_strand_id`):
+
+```
+RNA residues: 404,205     outside A/C/G/U: 24.87%
+```
+
+24.87% is not a modification rate, it is contamination. Composition dump:
+**HOH 37,857 and MG 9,997 in the first 60 files alone** — water and ions sit in
+the *same auth chain* as the RNA they solvate. Fix: mmCIF assigns `label_seq_id`
+only to polymer positions, so a non-polymer entry carries `.`:
+
+```python
+if r.get("label_seq_id", ".") in (".", "?"):
+    continue
+```
+
+| | before | after |
+|---|---|---|
+| RNA residues | 404,205 | **306,857** |
+| outside A/C/G/U | 24.87% | **1.04%** |
+| solvent leakage | HOH 37,857, MG 9,997 | **0 — CLEAN** |
+
+### C5 — canonical re-derivation of the G-findings
+`scripts/sampling/audit_generalization_canonical.py`:
+
+| Finding | published | **canonical** | verdict |
+|---|---|---|---|
+| structures with a declared RNA entity | 180 | **162** | 18 had none |
+| RNA residues | 308,370 | **306,857** | −0.5% |
+| G1 longest chain median / max | 67 / 3,679 | **86.5 / 3,764** | non-RNA chains dragged the median down |
+| G2 structures with protein | 159/180 = 88.3% | **157/162 = 96.9%** | **stronger** |
+| G2 structures with >1 RNA chain | 150/180 = 83.3% | **118/162 = 72.8%** | −10.5 pts |
+| G2 RNA residues in complexes | 98.96% | **99.70%** | **stronger** |
+| G3 ribosome-like entries | 61/180 = 33.9% | **60/162 = 37.0%** | +3.1 pts |
+| G3 residues ribosomal | 93.07% | **93.35%** | unchanged |
+| G7 outside A/C/G/U | 8.90% | **1.04%** | **8.6x too high** |
+| G7 distinct modification types | 8 | **76** | undercounted 9.5x |
+
+G7's published 8.90% was DNA and UNK: DT 4,608 + DG 4,556 + DA 4,440 + DC 4,135
++ UNK 7,036 = **24,775 of 27,437** "modified" instances — 90% contamination. The
+*argument* survives on better ground: 3,189 genuinely-RNA modified residues
+across 76 distinct types, led by PSU (999), OMG (373), A2M (365), OMC/OMU (268
+each), inosine (80). "Seventy-six chemically distinct modifications in 180
+structures" is a stronger case for widening the vocabulary than a percentage
+inflated by DNA ever was.
+
+### C7 — audit of the propagation — **DEFECT #24**
+The correction was propagated and the propagation was then checked, on the
+principle from cycle 4 that a repair can carry its own defect. It did, twice:
+
+1. **Partial**: only **4 of the 11** affected numbers were moved to the 162
+   basis. G2's protein row read `157/162` while the multi-chain row directly
+   beneath it still read `150/180`. G3 carried the canonical *ratio* 93.35% over
+   the stale numerator and denominator `286,990 / 308,370`. Three tables were
+   left mixing two denominators inside one row-set — undetectable to a reader,
+   because every individual number was defensible in isolation.
+2. **Corrupted the correction table**: an unguarded global replace of the
+   canonical values rewrote the **published** column of the cycle-6 comparison
+   table in ARCHITECTURE.md, so it read `99.70 -> 99.70` and
+   `1.04 -> 1.04 (8.6x too high)`. **Third occurrence of the unguarded-replace
+   failure mode** (after #18b in cycle 4), and the first to destroy a table whose
+   only purpose was to record a correction.
+
+All 11 numbers are now on the 162 basis; the denominator is stated in each
+section preamble rather than implied; every repair substitution was made with an
+exact-match, count-asserted replace.
+
+### C8 — the resolver is now tested (`src/pharos/data/test_mmcif_entities.py`)
+A shared definition that is itself untested only relocates the problem.
+15 properties over all 180 files — **ALL TESTS PASS**:
+
+| Property | Result |
+|---|---|
+| no water/ion/ligand counted as a residue (defect #23) | clean |
+| no deoxyribonucleotide counted as a residue (the 8.6x) | clean |
+| every residue carries a resolved `auth_seq_id` | clean |
+| structures with a declared RNA entity | 162 |
+| canonical RNA residues | 306,857 |
+| residues outside A/C/G/U | 3,189 |
+| distinct modification types | 76 |
+| non-ACGU fraction below 2% | 1.04% |
+| pseudouridine is the top modification | PSU = 999 |
+| repeated calls agree (determinism) | pass |
+| largest entry (7QVP) parses to a chain->type map | 162 chains, 2 types |
+| chain ids plausible — no stray `;`-block sequence text | max id len 2 |
+
+### C11 — hybrid chains: measured, not assumed
+`polydeoxyribonucleotide/polyribonucleotide hybrid` chains are excluded because
+the declaration does not say which of their residues are RNA. That is a choice,
+so it was measured: **3 entries** carry hybrid chains (7PU7 P/T, 7S3B B, 8DFA N),
+holding 59 residues of which **6 are A/C/G/U — 0.002%** of 306,857. Immaterial at
+this sample size, and now documented in the resolver rather than silent.
+
+### C9-C10 — regression guard extended
+`scripts/sampling/verify_claims.py` — **ALL CLAIMS REPRODUCE**:
+- 12 new canonical measurements pinned (162, 306,857, 86.5, 3,764, 0.9970,
+  0.7284, 60, 0.9335, 3,189, 0.01039, 76) plus the published contamination
+  (24,775 of 27,437) so the 8.6x stays explainable rather than asserted.
+- 9 new cross-document tokens required in all three deliverables.
+- **Defect #24 guard A**: each row of the correction table must contain *both*
+  columns (`308,370`&`306,857`, `98.96`&`99.70`, `93.07`&`93.35`, `8.90`&`1.04`).
+  A global replace that collapses one into the other now fails the build.
+- **Defect #24 guard B**: the stale denominators `150/180`, `61/180`, `159/180`
+  may appear **at most once per document** — legitimate in the published column,
+  a failure anywhere else.
+- 5 superseded strings banned outright (`median 67 nt`, `max 3,679`,
+  `286,990 / 308,370`, `44 of 180`, `56 of 180`).
+- All three test suites now run inside the guard:
+  `test_hierarchical_pair_track.py`, `test_manning.py`, `test_mmcif_entities.py`.
+
+### C12 — deliverables rebuilt
+| Artifact | State |
+|---|---|
+| `research/report/main.pdf` | **39 pages, 0 overfull, 0 underfull** |
+| `research/architecture/blueprint.html` | **v23**; tags balanced (section 17/17, div 232/232, table 31/31, p 156/156, tr 163/163, td 496/496) |
+| `research/architecture/ARCHITECTURE.md` | canonical basis stated in §10e preamble |
+| `scripts/sampling/verify_claims.py` | ALL CLAIMS REPRODUCE |

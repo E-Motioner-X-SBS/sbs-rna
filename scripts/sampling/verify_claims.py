@@ -85,6 +85,27 @@ def main() -> int:
                   for v in bp["stiffness_by_step_context"].values()), reverse=True)
     chk("stiffness ratio (stiffest/floppiest twist)", round(fcs[0]/fcs[-1], 1), 115.1, tol=0.01)
 
+    gc = load("generalization_canonical.json")["summary"]
+    chk("canonical structures with RNA entity", gc["structures_with_RNA"], 162)
+    chk("canonical RNA residues", gc["G2"]["rna_residues_total"], 306857)
+    chk("G1 longest chain, median", gc["G1"]["longest_chain_median"], 86.5)
+    chk("G1 longest chain, max", gc["G1"]["longest_chain_max"], 3764)
+    chk("G2 frac RNA res in complexes", gc["G2"]["frac_rna_residues_in_complexes"], 0.9970)
+    chk("G2 frac multi-RNA-chain", gc["G2"]["frac_multi_chain"], 0.7284)
+    chk("G3 ribosome-like structures", gc["G3"]["ribosome_like"], 60)
+    chk("G3 frac RNA res ribosomal", gc["G3"]["frac_rna_residues"], 0.9335)
+    chk("G7 modified instances (RNA only)", gc["G7"]["modified_instances"], 3189)
+    chk("G7 frac of RNA residues", gc["G7"]["frac_of_rna_residues"], 0.01039, tol=0.01)
+    chk("G7 distinct modification types", gc["G7"]["distinct_types"], 76)
+    # defect #23: the published G7 counted DNA and UNK. Pin the contamination so
+    # the 8.6x correction stays explainable rather than merely asserted.
+    ga = load("generalization_audit.json")["summary"]
+    gtop = ga["G7_modified_nucleotides"]["top_modifications"]
+    contam = sum(gtop[k] for k in ("UNK", "DT", "DG", "DA", "DC"))
+    chk("published G7 DNA+UNK contamination", contam, 24775)
+    chk("published G7 total instances",
+        ga["G7_modified_nucleotides"]["modified_residue_instances"], 27437)
+
     hr = load("stiffness_headroom.json")
     chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.579, tol=0.001)
     chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551, tol=0.001)
@@ -139,13 +160,51 @@ def main() -> int:
                 # cycle-4 defects #18/#19: heads+decoder itemised
                 "153", "12.59", "1.65",
                 # cycle-5 defects #20/#21
-                "2.571", "1.500", "115", "1.757"]:
+                "2.571", "1.500", "115", "1.757",
+                # cycle-6 defects #22/#23/#24: the canonical RNA-residue basis.
+                # Every structure-count denominator is 162, not 180.
+                "306,857", "162", "99.70", "1.04", "86.5", "3,764",
+                "72.8", "37.0", "286,458",
+                # defect #24: the PUBLISHED column of the correction table must
+                # survive. An unguarded replace once overwrote it with the
+                # canonical values, making the table read "99.70 -> 99.70".
+                "98.96", "8.90"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")
         if missing: fails.append(f"doc-token {tok}")
+    print("\n== defect #24 guard: the correction table must record BOTH columns ==")
+    arch = txt["ARCH"]
+    # In the cycle-6 comparison table every row is "published | canonical". If a
+    # global replace ever rewrites the published side again, these pairs vanish.
+    for pub, can, what in [("308,370", "306,857", "RNA residues"),
+                           ("98.96", "99.70", "G2 residues in complexes"),
+                           ("93.07", "93.35", "G3 residues ribosomal"),
+                           ("8.90", "1.04", "G7 outside ACGU")]:
+        ok = pub in arch and can in arch
+        print(f"  {'OK ' if ok else 'FAIL'} both columns present: {what:28s} "
+              f"{pub} -> {can}")
+        if not ok:
+            fails.append(f"correction table collapsed: {what}")
+
+    print("\n== defect #24 guard: no stale 180-structure denominators ==")
+    # These denominators were superseded by the canonical 162 basis. They are
+    # legitimate ONLY inside the published column of the correction table, so
+    # each must appear at most once per document.
+    for stale in ["150/180", "61/180", "159/180"]:
+        for k, v in txt.items():
+            n = v.count(stale)
+            ok = n <= 1
+            print(f"  {'OK ' if ok else 'FAIL'} {k}: {stale!r} x{n}"
+                  f"{'' if ok else ' -- appears outside the published column'}")
+            if not ok:
+                fails.append(f"stale denominator {stale} in {k}")
     for bad in ["decisive pattern", "strongest argument for MoE",
-                "0.76 for monovalent RNA", "spaced b ~ 5.9"]:
+                "0.76 for monovalent RNA", "spaced b ~ 5.9",
+                # cycle-6: these were superseded outright, not moved to a
+                # published column, so they must be gone everywhere.
+                "median 67 nt", "max 3,679", "286,990 / 308,370",
+                "44 of 180", "56 of 180"]:
         present = [k for k, v in txt.items() if re.search(re.escape(bad), v)]
         print(f"  {'OK ' if not present else 'FAIL'} retracted text absent: {bad!r}"
               f"{'' if not present else ' STILL IN ' + ','.join(present)}")
@@ -172,17 +231,19 @@ def main() -> int:
 
     print("\n== reference implementation correctness tests ==")
     import subprocess
-    t = ROOT / "research/architecture/reference/test_hierarchical_pair_track.py"
-    if t.exists():
+    suites = [ROOT / "research/architecture/reference/test_hierarchical_pair_track.py",
+              ROOT / "src/pharos/physics/test_manning.py",
+              ROOT / "src/pharos/data/test_mmcif_entities.py"]
+    for t in suites:
+        if not t.exists():
+            print(f"  FAIL {t.name} missing"); fails.append(f"{t.name} missing"); continue
         r = subprocess.run([sys.executable, t.name], cwd=t.parent,
                            capture_output=True, text=True, timeout=1800)
         ok = r.returncode == 0 and "ALL TESTS PASS" in r.stdout
-        print(f"  {'OK ' if ok else 'FAIL'} {t.name} "
+        print(f"  {'OK ' if ok else 'FAIL'} {t.name:34s} "
               f"{'all pass' if ok else 'FAILURES -- run it directly'}")
         if not ok:
-            fails.append("hpt correctness tests")
-    else:
-        print(f"  FAIL {t.name} missing"); fails.append("hpt tests missing")
+            fails.append(f"{t.name} failing")
 
     print("\n== diagram sources (feed figures into the report) ==")
     dg = sorted((ROOT / "research/architecture/diagrams").glob("*.mmd"))

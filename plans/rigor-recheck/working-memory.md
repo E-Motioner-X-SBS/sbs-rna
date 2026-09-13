@@ -165,3 +165,62 @@
 - OQ-1-orig: Does the <30-residue exclusion bias the rigidity result? Small RNAs are
   exactly where Mg2+ inner-sphere fraction was measured lowest (0.296). Excluding
   them could inflate the Mg-rigidity gradient. MUST TEST (-> T11).
+
+## Cycle 6 decisions
+- D8: **The RNA-residue definition comes from the format, not from a curated
+  list.** A hardcoded residue-name list can only ever be as complete as the
+  modifications its author knew about, and RNA has >170. `_entity_poly.type` is
+  a declaration the depositor made, so it is complete by construction.
+  Alternatives rejected: (a) extend the hardcoded list — fails on the next novel
+  modification; (b) chemical-component-dictionary lookup — needs a 500 MB
+  external file and still disagrees on hybrids.
+- D9: **Hybrid chains excluded.** Measured impact 6 residues, 0.002%. If a future
+  corpus carries many, resolve per-residue instead. Recorded in the resolver.
+- D10: **Every repair substitution is exact-match and count-asserted.** After
+  three occurrences of the unguarded-replace failure mode (#18b, and twice in
+  #24), no global `replace()` is used on a deliverable without asserting the
+  match count first.
+
+## Cycle 6 reversals
+- REV-6 [MAJOR]: **G7's headline was 8.90% of residues outside A/C/G/U; it is
+  1.04%.** The published figure was 90% contamination — DNA from hybrid duplexes
+  and UNK records that are not in RNA chains at all. The *conclusion* (vocab-5
+  cannot represent real RNA) is unchanged, but the evidence for it is now "76
+  distinct modification types led by pseudouridine", not a percentage.
+- REV-7: **G2 strengthens rather than weakens.** 98.96% -> 99.70% of RNA residues
+  sit in protein-containing entries. The largest generalization hazard in the
+  design is slightly larger than reported, not smaller.
+- REV-8: the structure-count denominator is **162, not 180**. 18 of the sampled
+  structures contain no RNA polymer entity at all.
+
+## Cycle 6 discoveries
+- DISC-26 [DEFECT #22]: the project had **no definition of its own unit of
+  measurement**. Every script invented one, and they disagreed on 72 of 180
+  structures in both directions. This had been visible as a two-line discrepancy
+  since cycle 2 and was never chased.
+- DISC-27 [DEFECT #23]: water and ions share the auth chain of the RNA they
+  solvate. A naive entity-based selection therefore over-counts by ~24%
+  (404,205 vs 306,857). `label_seq_id` is the polymer test that separates them.
+- DISC-28 [DEFECT #24]: **a repair introduced its own defect, again.** 4 of 11
+  affected numbers were propagated, and an unguarded replace corrupted the
+  published column of the very table recording the correction. Cycle 4 flagged
+  this exact failure mode as "#18b"; it recurred despite being flagged. The
+  durable fix is not vigilance but the two new guards in `verify_claims.py` —
+  a collapsed correction table now fails the build.
+- DISC-29 [SCOPE]: cycle 6 re-derived only the **G-findings**. Every other
+  residue-weighted measurement — 103,964 base-pair steps, 44,708 Mg coordination
+  records, block occupancy, contact scaling — still comes from a script with its
+  own invented definition. Their exposure is **unmeasured**, not zero. -> C13/C14.
+
+## Open Questions
+- OQ-2 [OPEN -> cycle 7]: do the residue-weighted measurements change under the
+  canonical definition? The G-findings moved by −0.5% (counts) to 8.6x (G7).
+  The base-pair-step and ion-coordination numbers are keyed on different mmCIF
+  categories (`_ndb_struct_na_base_pair_step`, `_struct_conn`) that carry their
+  own chain references, so the exposure is probably smaller — but "probably" is
+  exactly the word cycle 6 exists to eliminate. Priority HIGH.
+- OQ-3 [OPEN -> cycle 7]: 18 of 180 sampled structures declare no RNA polymer
+  entity. What are they? If the BGSU non-redundant RNA list contains entries with
+  no RNA entity, either the sampler or the parse of `_entity_poly` is wrong for
+  those files. Priority MEDIUM — it does not affect any published number
+  (they contribute 0 residues either way) but it is an unexplained 10%.
