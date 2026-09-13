@@ -96,7 +96,9 @@ nucleotides G, A, U and C as metals. Replaced with an explicit metal set.
 - **103,964 base-pair steps** across 155/180 structures; stiffness matrices
   `F = kT C^-1` for **76 contexts**. Validated: Watson-Crick means reproduce
   canonical A-form RNA (GG/CC rise 3.14 twist 29.98; AU/AU rise 2.81 twist 33.94).
-- Stiffness spans **134x**; GC content predicts rigidity (Pearson -0.314).
+- Stiffness spans **115x** (twist force constants; the earlier 134x came from
+  4-decimal rounding that left the softest constants with one significant
+  figure). GC content predicts rigidity (Pearson -0.314).
 - **44,708 curated Mg²⁺ coordination records** whose coordinating-atom ranking
   (OP2 > OP1 > O6 > O4 > O2' > N7) **independently reproduces** the earlier
   distance-based result. Two methods, same conclusion.

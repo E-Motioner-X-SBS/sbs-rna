@@ -149,12 +149,13 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   <div class="statusbar">
     <span class="chip alert">Design only — no model trained</span>
     <span class="chip ok">180 structures analysed</span>
-    <span class="chip">~911M total / ~382M active params</span>
+    
     <span class="chip">Field ceiling: TM ≈ 0.55</span>
     <span class="chip alert">design revised after validation</span>
     <span class="chip ok">reference impl. benchmarked</span>
     <span class="chip ok">audited &amp; corrected</span>
-    <span class="chip ok">~347 A100-h to train</span>
+    <span class="chip ok">~79 A100-h to train</span>
+    <span class="chip">149M total / 61M active</span>
   </div>
 </header>
 
@@ -961,7 +962,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           </tbody>
         </table>
       </div>
-      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">Stiffness spans <b>134×</b> —
+      <p style="font-size:13.5px;color:var(--ink-2);margin-top:12px">Stiffness spans <b>115×</b> in twist force constant —
       UG/UG stiffest (twist sd 11.5°) to AA/UA floppiest (102°, non-canonical). GC content predicts
       rigidity (Pearson −0.314).</p>
     </div>
@@ -1196,6 +1197,80 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       occupancy rather than by analogy to brain oscillations. The architectural novelty in HRM
       was oversold; the loop is what works.</p>
     </div>
+  </div>
+</section>
+
+<!-- ================= 12. RIGHT-SIZING ================= -->
+<section>
+  <div class="sechead"><span class="secnum">12</span><h2>Why so many parameters?</h2></div>
+  <p class="lede">Asked directly, the 1,401M / 269M figure turned out never to have been
+  justified against the data. It did not survive the test. This section records what replaced it.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>How much information is actually in the supervision</h3>
+      <p class="note">upper bounds — the 3D figure is generous and still tiny</p>
+      <div class="tablewrap" style="border:none">
+        <table style="min-width:0">
+          <thead><tr><th>Channel</th><th class="num">volume</th><th class="num">information</th></tr></thead>
+          <tbody>
+            <tr class="total"><td><b>3D structure</b> (the task that matters)</td><td class="num">6,661 seqs · 3.25M contacts</td><td class="num">~2.8 MB</td></tr>
+            <tr><td>2D structure</td><td class="num">~160,000</td><td class="num">~9.0 MB</td></tr>
+            <tr><td>Pretraining corpus</td><td class="num">323B tokens</td><td class="num">~80 GB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="risk" style="margin-top:14px">
+        <span class="n">THE ERROR</span>
+        <p>At ~2 bits per trained parameter, Base-v2 carries <b>350 MB of capacity — 127× the
+        entire 3D information content</b>. One parameter budget was used for two very different
+        tasks: the corpus justifies trunk capacity, but the structure head is fit on
+        <b>2.8 MB</b>. The structure task is <b>data-limited, not capacity-limited</b>.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Three arguments, all pointing the same way</h3>
+      <p class="note">including two of our own</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>1. Our own headline
+      evidence.</b> ERNIE-RNA at <b>86M beats RiNALMo at 650M</b> (§01). Every model in that
+      comparison which beats a larger one is <i>smaller</i>.</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>2. Our own thesis.</b>
+      §01 argues inductive bias beats scale — and then §04 specified a 1.4B model. That was
+      internally inconsistent.</p>
+      <p style="font-size:13.5px;color:var(--ink-2);margin:0"><b>3. HRM.</b> 27M parameters,
+      ~1,000 examples, no pretraining, beating far larger models — with the independent ablation
+      crediting the <i>refinement loop</i>, not size (§11).</p>
+    </div>
+  </div>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <thead><tr><th>Model</th><th class="num">d</th><th class="num">blocks</th><th class="num">loops</th><th class="num">effective layers</th><th class="num">total</th><th class="num">active</th><th class="num">A100-h</th></tr></thead>
+      <tbody>
+        <tr><td>Base-v2 (scale-up path)</td><td class="num">768</td><td class="num">32</td><td class="num">3</td><td class="num">96</td><td class="num">1,401M</td><td class="num">269M</td><td class="num">1,325</td></tr>
+        <tr class="total"><td><b>PHAROS-Small</b> — new default</td><td class="num">512</td><td class="num">16</td><td class="num">8</td><td class="num">128</td><td class="num">149M</td><td class="num">61M</td><td class="num">299</td></tr>
+        <tr><td>PHAROS-Mini</td><td class="num">384</td><td class="num">12</td><td class="num">12</td><td class="num">144</td><td class="num">67M</td><td class="num">30M</td><td class="num">148</td></tr>
+        <tr><td>PHAROS-Micro</td><td class="num">256</td><td class="num">8</td><td class="num">16</td><td class="num">128</td><td class="num">23M</td><td class="num">12M</td><td class="num">61</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="finding" style="margin-top:16px">
+    <span class="tag">Result</span>
+    <p><b>PHAROS-Small reaches MORE effective depth than Base-v2 — 128 layers against 96 — at
+    9.4× fewer total parameters.</b> Depth now comes from refinement loops rather than stacked
+    blocks, and with the one-step gradient (§11) those loops cost compute but <b>no additional
+    activation memory</b>. Full stack: <b>1,883 → ~79 A100-hours, a 24× reduction</b> —
+    <b>3.3 days on a single A100</b>, or ten hours on eight, against NucleicBERT's 192.</p>
+  </div>
+  <div class="risk" style="margin-top:14px">
+    <span class="n">RISK</span>
+    <p><b>Small could simply underperform.</b> The evidence points the other way, but it is
+    evidence about <i>related</i> tasks, not ours. The mitigation is that this is now cheap to
+    test: train PHAROS-Small first and scale only if the measurements demand it, with Base-v2
+    retained as the documented scale-up path. With the staged token budget, the first
+    informative checkpoint costs on the order of <b>one GPU-day</b> — so the sizing question
+    becomes an experiment rather than an argument.</p>
   </div>
 </section>
 

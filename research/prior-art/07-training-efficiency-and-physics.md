@@ -108,7 +108,8 @@ Validation — the Watson-Crick means reproduce canonical A-form RNA:
 (reference A-form RNA: rise ~2.8-3.1 A, twist ~32 deg, slide ~-1.5 A)
 
 Findings:
-- **Stiffness spans 134x** across contexts. Stiffest UG/UG (twist sd 11.5 deg);
+- **Stiffness spans 115x** across contexts (twist force constants, UG/UG 1.343e-2
+  to AA/UA 1.167e-4). Stiffest UG/UG (twist sd 11.5 deg);
   floppiest AA/UA (102 deg) — the floppy end is dominated by non-canonical
   contexts, exactly as expected.
 - **GC content predicts rigidity**: Pearson(GC fraction, twist sd) = **-0.314**,

@@ -191,3 +191,37 @@ fix is free stands.
 > under `torch.no_grad()`, so it measured only forward cost. A speed benchmark
 > cannot detect an untrainable parameter. Nine silent defects now, every one
 > producing a plausible result rather than an error.
+
+### T26 [CROSS-CHECK] — stiffness ratio was inflated by rounding — **DEFECT (#10)**
+
+The "134x stiffness span" is quoted to three significant figures, but
+`extract_basepair_geometry.py` stored force constants with `round(F[i,i], 4)`.
+Twist/roll/tilt constants run to ~1e-4, so the softest values were left with
+**one significant figure** and the ratio inherited that.
+
+Recomputed at 6 significant figures:
+
+| quantity | value |
+|---|---|
+| twist force constant, stiffest (UG/UG) | 1.34269e-2 |
+| twist force constant, floppiest (AA/UA) | 1.16663e-4 |
+| **true ratio** | **115.1x** (not 134x) |
+| twist sd span, same endpoints | 11.48 deg -> 102.44 deg = 8.9x |
+
+The named endpoints were correct; only the ratio was wrong. (At 4 dp, AU/AA and
+AA/UA both read 0.0001, so which one is the minimum was decided by dict order,
+not by the data.)
+
+Also added: the covariance **condition number** per context. 3 of 76 exceed 1e4
+(AU/AA, GA/AA, GC/AC), i.e. `F = kT C^-1` is least trustworthy exactly where the
+steps are floppiest, so the softest constants carry the largest uncertainty.
+This was not previously disclosed.
+
+Corrected in all six places the figure appeared: ARCHITECTURE.md, main.tex,
+blueprint.html, prior-art 07, diagram 07 (source + re-rendered SVG/PNG), and the
+audit's own final-report.md. Script now rounds to significant figures rather
+than fixed decimals.
+
+> Defect #10, and the second caused by *formatting* rather than logic (the first
+> being trailing-space column names). Numbers that survive a correctness review
+> can still be wrong at the precision they are quoted to.

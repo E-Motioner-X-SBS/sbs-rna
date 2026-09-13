@@ -694,6 +694,7 @@ Motif bank, heads, decoder           & 35M   & 35M \\
 \midrule
 \textbf{PHAROS-Base total}           & $\mathbf{\sim 911M}$ & $\mathbf{\sim 382M}$ \\
 \textbf{PHAROS-Base-v2} (Sec.~\ref{sec:cost}) & $\mathbf{\sim 1{,}401M}$ & $\mathbf{\sim 269M}$ \\
+\textbf{PHAROS-Small} (Sec.~\ref{sec:size}, \emph{default}) & $\mathbf{\sim 149M}$ & $\mathbf{\sim 61M}$ \\
 NucleicBERT (dense)                  & 404M & 404M \\
 \bottomrule
 \end{tabular}
@@ -1158,10 +1159,10 @@ AU/AU & 1{,}506 & 2.81 & 33.94 & $-1.58$ \\
 \end{tabular}
 \end{table}
 
-Stiffness spans $\mathbf{134\times}$ between the stiffest context (UG/UG, twist
+Stiffness spans $\mathbf{115\times}$ in the twist force constant (UG/UG $1.343\times10^{-2}$ to AA/UA $1.167\times10^{-4}$) between the stiffest context (UG/UG, twist
 s.d.\ $11.5^\circ$) and the floppiest (AA/UA, $102^\circ$), with the floppy end
 dominated by non-canonical contexts. GC content predicts rigidity: Pearson
-$-0.314$ against twist s.d., $-0.298$ against roll s.d., over 76 contexts.
+$-0.314$ against twist s.d., $-0.298$ against roll s.d., over 76 contexts. The inversion is least reliable exactly where the steps are floppiest: 3 of 76 contexts have covariance condition number $>10^4$ (AU/AA, GA/AA, GC/AC), so the softest force constants carry the largest uncertainty.
 
 \subsection{Why this must be learned, not tabulated}
 \label{sec:stiffenc}
@@ -1427,6 +1428,103 @@ tokens, stopping when downstream metrics flatten. The first checkpoint costs
 $\sim$1.5\% of the full run, converting an unfalsifiable guess about data volume
 into an empirical decision.
 
+\section{Why so many parameters? A challenge the design did not survive}
+\label{sec:size}
+
+The specification proposed 1{,}401M total and 269M active parameters. That number
+was never justified against the data, and it does not hold up.
+
+\subsection{The information content of the supervision}
+
+\begin{table}[h]
+\centering
+\caption{Upper-bound information in each supervision channel. \meas}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Channel} & \textbf{Volume} & \textbf{Information} \\
+\midrule
+\textbf{3D structure} (the task that matters) & 6{,}661 sequences, 3.25M contacts & $\mathbf{\sim 2.8}$ MB \\
+2D structure & $\sim$160{,}000 annotations & $\sim$9.0 MB \\
+Pretraining corpus & 323B tokens $\times$ $\sim$2 bits & $\sim$80 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 3D figure uses the measured $4.397$ contacts/nt with a generous $\log_2 L$
+bits per contact, which \emph{overstates} it since nested helices are
+near-deterministic given one anchor. At a realistic $\sim$2 bits per trained
+parameter, Base-v2 carries $350$~MB of capacity: \textbf{$127\times$ the entire
+3D information content}.
+
+\subsection{Three arguments, all pointing the same way}
+
+First, our own headline evidence: ERNIE-RNA at \textbf{86M beats RiNALMo at
+650M}. Every model in Table~\ref{tab:ernie} that beats a larger one is smaller.
+Second, our own thesis---Section~2 argues inductive bias beats scale, and then
+Section~4 specified a 1.4B model. That was internally inconsistent. Third, HRM:
+27M parameters, $\sim$1{,}000 examples, beating far larger models, with the
+independent ablation crediting the \emph{refinement loop} rather than size.
+
+\paragraph{The real error.} One parameter budget was used for two very different
+tasks. The corpus ($\sim$80~GB of information) can justify substantial trunk
+capacity; the structure head is fit on $\sim$2.8~MB. The structure task is
+\textbf{data-limited, not capacity-limited}.
+
+\subsection{PHAROS-Small, the new default}
+
+\begin{table}[h]
+\centering
+\caption{Right-sizing. Depth now comes from refinement loops, not stacked blocks. \meas}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{$d$} & \textbf{Blocks} & \textbf{Loops} & \textbf{Eff.\ layers} & \textbf{Total} & \textbf{Active} & \textbf{A100-h} \\
+\midrule
+Base-v2 & 768 & 32 & 3 & 96 & 1{,}401M & 269M & 1{,}325 \\
+\textbf{PHAROS-Small} & \textbf{512} & \textbf{16} & \textbf{8} & \textbf{128} & \textbf{149M} & \textbf{61M} & \textbf{299} \\
+PHAROS-Mini & 384 & 12 & 12 & 144 & 67M & 30M & 148 \\
+PHAROS-Micro & 256 & 8 & 16 & 128 & 23M & 12M & 61 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent PHAROS-Small reaches \emph{more} effective depth than Base-v2---128
+layers against 96---at $9.4\times$ fewer total parameters, because depth comes
+from refinement loops which, with the one-step gradient of
+Section~\ref{sec:loop}, cost compute but \textbf{no additional activation
+memory}.
+
+\begin{table}[h]
+\centering
+\caption{Revised cost stack.}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Lever} & \textbf{Factor} & \textbf{A100-h} \\
+\midrule
+baseline (Base, as first specified) & --- & 1{,}883 \\
+all-MoE fine-grained (Base-v2) & $1.42\times$ & 1{,}326 \\
+\textbf{right-size to PHAROS-Small} & $\mathbf{4.43\times}$ & $\mathbf{299}$ \\
+Muon optimiser & $2.00\times$ & 150 \\
+FP8 (H100-class) & $1.60\times$ & 94 \\
+down-weight 151-nt read chunks & $1.19\times$ & $\mathbf{79}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{$24\times$ total: 1{,}883 $\rightarrow$ $\sim$79
+A100-hours---3.3 days on a \emph{single} A100}, or ten hours on eight, against
+NucleicBERT's 192.
+
+\paragraph{The honest risk.} Small could simply underperform. The evidence points
+the other way, but it is evidence about \emph{related} tasks, not ours. The
+mitigation is that this is now cheap to test: train PHAROS-Small first and scale
+only if measurements demand it, with Base-v2 retained as the scale-up path.
+Combined with the staged token budget, the first informative checkpoint costs on
+the order of \textbf{one GPU-day}, so the sizing question becomes an experiment
+rather than an argument.
+
 \section{Novelty claims}
 
 \begin{table}[h]
@@ -1541,6 +1639,7 @@ large-scale training is attempted.
 \texttt{.../reference/test\_hierarchical\_pair\_track.py} & correctness tests (exit 0 = all pass) \\
 \texttt{.../sampling/training\_cost\_model.py} & \texttt{training\_cost\_base.json} \\
 \texttt{.../sampling/optimize\_architecture.py} & \texttt{architecture\_optimization.json} \\
+\texttt{.../sampling/parameter\_budget\_justification.py} & sizing analysis (stdout) \\
 \bottomrule
 \end{tabular}
 \end{table}

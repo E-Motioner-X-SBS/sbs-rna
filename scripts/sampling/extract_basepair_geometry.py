@@ -181,7 +181,12 @@ def main():
             "n": len(vecs),
             "mean": {c: round(float(m), 3) for c, m in zip(STEP_COORDS, A.mean(0))},
             "sd": {c: round(float(v), 3) for c, v in zip(STEP_COORDS, A.std(0))},
-            "force_constants_diag": {c: round(float(F[i, i]), 4) for i, c in enumerate(STEP_COORDS)},
+            # Significant-figure rounding, not fixed decimals. Twist/roll/tilt force
+            # constants run to ~1e-4, so round(x, 4) left them with ONE significant
+            # figure -- and a ratio quoted from them (e.g. "134x") then carried far
+            # more precision than the data supported.
+            "force_constants_diag": {c: float(f"{float(F[i, i]):.6g}") for i, c in enumerate(STEP_COORDS)},
+            "condition_number": float(f"{float(np.linalg.cond(C)):.4g}"),
         }
 
     summary = {

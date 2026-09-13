@@ -72,13 +72,14 @@
         "twist": 17.276
       },
       "force_constants_diag": {
-        "shift": 1.5467,
-        "slide": 2.4291,
-        "rise": 1.666,
-        "tilt": 0.0091,
-        "roll": 0.0045,
-        "twist": 0.0067
-      }
+        "shift": 1.54669,
+        "slide": 2.42906,
+        "rise": 1.66595,
+        "tilt": 0.00912642,
+        "roll": 0.00453509,
+        "twist": 0.00667563
+      },
+      "condition_number": 1140.0
     },
     "CC/GG": {
       "n": 7288,
@@ -99,13 +100,14 @@
         "twist": 20.459
       },
       "force_constants_diag": {
-        "shift": 0.9455,
-        "slide": 2.2598,
-        "rise": 1.5044,
-        "tilt": 0.0089,
-        "roll": 0.0057,
-        "twist": 0.0044
-      }
+        "shift": 0.945474,
+        "slide": 2.25978,
+        "rise": 1.50445,
+        "tilt": 0.00885117,
+        "roll": 0.00574711,
+        "twist": 0.00443938
+      },
+      "condition_number": 1455.0
     },
     "GC/GC": {
       "n": 5902,
@@ -126,13 +128,14 @@
         "twist": 20.0
       },
       "force_constants_diag": {
-        "shift": 1.4152,
-        "slide": 1.9754,
-        "rise": 1.7215,
-        "tilt": 0.0051,
-        "roll": 0.0045,
-        "twist": 0.0033
-      }
+        "shift": 1.41517,
+        "slide": 1.97543,
+        "rise": 1.72149,
+        "tilt": 0.00512322,
+        "roll": 0.00453319,
+        "twist": 0.00332612
+      },
+      "condition_number": 1138.0
     },
     "CG/CG": {
       "n": 4760,
@@ -153,13 +156,14 @@
         "twist": 23.497
       },
       "force_constants_diag": {
-        "shift": 0.9149,
-        "slide": 1.7682,
-        "rise": 1.3902,
-        "tilt": 0.0041,
-        "roll": 0.0032,
-        "twist": 0.0033
-      }
+        "shift": 0.914902,
+        "slide": 1.76816,
+        "rise": 1.39023,
+        "tilt": 0.00409954,
+        "roll": 0.00321397,
+        "twist": 0.00329071
+      },
+      "condition_number": 1829.0
     },
     "AG/CU": {
       "n": 3499,
@@ -180,13 +184,14 @@
         "twist": 37.327
       },
       "force_constants_diag": {
-        "shift": 0.6782,
-        "slide": 1.4946,
-        "rise": 1.0332,
-        "tilt": 0.0035,
-        "roll": 0.0034,
-        "twist": 0.0011
-      }
+        "shift": 0.678231,
+        "slide": 1.49455,
+        "rise": 1.03315,
+        "tilt": 0.00346153,
+        "roll": 0.00341192,
+        "twist": 0.00106611
+      },
+      "condition_number": 2616.0
     },
     "CU/AG": {
       "n": 3272,
@@ -207,13 +212,14 @@
         "twist": 31.195
       },
       "force_constants_diag": {
-        "shift": 0.6987,
-        "slide": 1.6213,
-        "rise": 0.8466,
-        "tilt": 0.0031,
-        "roll": 0.0021,
-        "twist": 0.0016
-      }
+        "shift": 0.698708,
+        "slide": 1.62128,
+        "rise": 0.846626,
+        "tilt": 0.0030859,
+        "roll": 0.00206575,
+        "twist": 0.00156399
+      },
+      "condition_number": 1820.0
     },
     "UG/CA": {
       "n": 3041,
@@ -234,13 +240,14 @@
         "twist": 30.233
       },
       "force_constants_diag": {
-        "shift": 0.7287,
-        "slide": 1.6119,
-        "rise": 0.7438,
-        "tilt": 0.0019,
-        "roll": 0.0016,
-        "twist": 0.002
-      }
+        "shift": 0.728732,
+        "slide": 1.61188,
+        "rise": 0.743753,
+        "tilt": 0.00186996,
+        "roll": 0.00158723,
+        "twist": 0.00203961
+      },
+      "condition_number": 2985.0
     },
     "GA/UC": {
       "n": 2993,
@@ -261,13 +268,14 @@
         "twist": 24.274
       },
       "force_constants_diag": {
-        "shift": 0.7339,
-        "slide": 1.7232,
-        "rise": 1.2807,
-        "tilt": 0.0047,
-        "roll": 0.0029,
-        "twist": 0.0029
-      }
+        "shift": 0.733876,
+        "slide": 1.72319,
+        "rise": 1.28067,
+        "tilt": 0.00466687,
+        "roll": 0.00293449,
+        "twist": 0.00288657
+      },
+      "condition_number": 1736.0
     },
     "GU/AC": {
       "n": 2938,
@@ -288,13 +296,14 @@
         "twist": 28.423
       },
       "force_constants_diag": {
-        "shift": 0.9417,
-        "slide": 1.7104,
-        "rise": 1.1718,
-        "tilt": 0.0027,
-        "roll": 0.0021,
-        "twist": 0.0019
-      }
+        "shift": 0.941738,
+        "slide": 1.71044,
+        "rise": 1.17184,
+        "tilt": 0.00270788,
+        "roll": 0.00211136,
+        "twist": 0.00189787
+      },
+      "condition_number": 1946.0
     },
     "AC/GU": {
       "n": 2791,
@@ -315,13 +324,14 @@
         "twist": 29.261
       },
       "force_constants_diag": {
-        "shift": 0.7463,
-        "slide": 1.506,
-        "rise": 0.915,
-        "tilt": 0.0031,
-        "roll": 0.0075,
-        "twist": 0.0015
-      }
+        "shift": 0.746265,
+        "slide": 1.50598,
+        "rise": 0.915007,
+        "tilt": 0.00311168,
+        "roll": 0.00748485,
+        "twist": 0.00150505
+      },
+      "condition_number": 1573.0
     },
     "UC/GA": {
       "n": 2711,
@@ -342,13 +352,14 @@
         "twist": 26.01
       },
       "force_constants_diag": {
-        "shift": 1.0893,
-        "slide": 1.18,
-        "rise": 0.9568,
-        "tilt": 0.0058,
-        "roll": 0.0023,
-        "twist": 0.0024
-      }
+        "shift": 1.08929,
+        "slide": 1.18005,
+        "rise": 0.956845,
+        "tilt": 0.00583155,
+        "roll": 0.00232146,
+        "twist": 0.00242731
+      },
+      "condition_number": 1373.0
     },
     "CA/UG": {
       "n": 2587,
@@ -369,13 +380,14 @@
         "twist": 22.684
       },
       "force_constants_diag": {
-        "shift": 1.5584,
-        "slide": 2.2684,
-        "rise": 1.3801,
-        "tilt": 0.0025,
-        "roll": 0.0055,
-        "twist": 0.0028
-      }
+        "shift": 1.55839,
+        "slide": 2.26837,
+        "rise": 1.38011,
+        "tilt": 0.00251866,
+        "roll": 0.00553226,
+        "twist": 0.00278742
+      },
+      "condition_number": 1723.0
     },
     "GC/GU": {
       "n": 1829,
@@ -396,13 +408,14 @@
         "twist": 23.581
       },
       "force_constants_diag": {
-        "shift": 2.7369,
-        "slide": 3.2901,
-        "rise": 0.9415,
-        "tilt": 0.0153,
-        "roll": 0.016,
-        "twist": 0.0021
-      }
+        "shift": 2.73689,
+        "slide": 3.29015,
+        "rise": 0.941474,
+        "tilt": 0.0153191,
+        "roll": 0.0160426,
+        "twist": 0.00209346
+      },
+      "condition_number": 2080.0
     },
     "AA/UU": {
       "n": 1811,
@@ -423,13 +436,14 @@
         "twist": 31.519
       },
       "force_constants_diag": {
-        "shift": 0.7702,
-        "slide": 1.1943,
-        "rise": 0.818,
-        "tilt": 0.002,
-        "roll": 0.0042,
-        "twist": 0.0014
-      }
+        "shift": 0.770225,
+        "slide": 1.19428,
+        "rise": 0.817955,
+        "tilt": 0.00202148,
+        "roll": 0.0041678,
+        "twist": 0.00135589
+      },
+      "condition_number": 2063.0
     },
     "UU/AA": {
       "n": 1803,
@@ -450,13 +464,14 @@
         "twist": 36.123
       },
       "force_constants_diag": {
-        "shift": 0.595,
-        "slide": 0.8153,
-        "rise": 0.7309,
-        "tilt": 0.0021,
-        "roll": 0.0009,
-        "twist": 0.0012
-      }
+        "shift": 0.595031,
+        "slide": 0.815257,
+        "rise": 0.73093,
+        "tilt": 0.00206757,
+        "roll": 0.00090824,
+        "twist": 0.00123066
+      },
+      "condition_number": 1650.0
     },
     "GU/GC": {
       "n": 1713,
@@ -478,12 +493,13 @@
       },
       "force_constants_diag": {
         "shift": 3.0097,
-        "slide": 4.1938,
-        "rise": 2.2474,
-        "tilt": 0.0152,
-        "roll": 0.0092,
-        "twist": 0.0039
-      }
+        "slide": 4.19376,
+        "rise": 2.24744,
+        "tilt": 0.0151503,
+        "roll": 0.00921129,
+        "twist": 0.00393665
+      },
+      "condition_number": 2170.0
     },
     "GG/CU": {
       "n": 1538,
@@ -504,13 +520,14 @@
         "twist": 18.127
       },
       "force_constants_diag": {
-        "shift": 2.3352,
+        "shift": 2.33519,
         "slide": 3.2997,
-        "rise": 2.4221,
-        "tilt": 0.0103,
-        "roll": 0.0059,
-        "twist": 0.0048
-      }
+        "rise": 2.42211,
+        "tilt": 0.0103165,
+        "roll": 0.00589205,
+        "twist": 0.00481616
+      },
+      "condition_number": 4949.0
     },
     "UA/UA": {
       "n": 1515,
@@ -531,13 +548,14 @@
         "twist": 32.113
       },
       "force_constants_diag": {
-        "shift": 0.7655,
-        "slide": 0.6107,
-        "rise": 0.5641,
-        "tilt": 0.0013,
-        "roll": 0.0027,
-        "twist": 0.0012
-      }
+        "shift": 0.765523,
+        "slide": 0.610722,
+        "rise": 0.564053,
+        "tilt": 0.0013109,
+        "roll": 0.0026534,
+        "twist": 0.00120246
+      },
+      "condition_number": 995.7
     },
     "AU/AU": {
       "n": 1506,
@@ -558,13 +576,14 @@
         "twist": 28.835
       },
       "force_constants_diag": {
-        "shift": 0.6047,
+        "shift": 0.604713,
         "slide": 1.7723,
-        "rise": 1.1088,
-        "tilt": 0.0017,
-        "roll": 0.0063,
-        "twist": 0.0015
-      }
+        "rise": 1.10881,
+        "tilt": 0.00171699,
+        "roll": 0.00625456,
+        "twist": 0.00149659
+      },
+      "condition_number": 3198.0
     },
     "CU/GG": {
       "n": 1459,
@@ -585,13 +604,14 @@
         "twist": 26.293
       },
       "force_constants_diag": {
-        "shift": 2.0171,
-        "slide": 3.9626,
-        "rise": 2.6599,
-        "tilt": 0.0142,
-        "roll": 0.0068,
-        "twist": 0.003
-      }
+        "shift": 2.01706,
+        "slide": 3.96263,
+        "rise": 2.65991,
+        "tilt": 0.0141643,
+        "roll": 0.00677821,
+        "twist": 0.00296617
+      },
+      "condition_number": 4068.0
     },
     "AG/CG": {
       "n": 1333,
@@ -612,13 +632,14 @@
         "twist": 35.144
       },
       "force_constants_diag": {
-        "shift": 0.7053,
-        "slide": 0.9358,
-        "rise": 1.1073,
-        "tilt": 0.004,
-        "roll": 0.0024,
-        "twist": 0.0013
-      }
+        "shift": 0.705303,
+        "slide": 0.935827,
+        "rise": 1.10729,
+        "tilt": 0.00398219,
+        "roll": 0.0023645,
+        "twist": 0.00133426
+      },
+      "condition_number": 4834.0
     },
     "CG/AG": {
       "n": 1320,
@@ -639,13 +660,14 @@
         "twist": 29.813
       },
       "force_constants_diag": {
-        "shift": 0.3398,
-        "slide": 1.5193,
-        "rise": 1.3202,
-        "tilt": 0.0056,
-        "roll": 0.0026,
-        "twist": 0.002
-      }
+        "shift": 0.33984,
+        "slide": 1.51934,
+        "rise": 1.32023,
+        "tilt": 0.0055954,
+        "roll": 0.0026317,
+        "twist": 0.00201739
+      },
+      "condition_number": 1932.0
     },
     "GG/UC": {
       "n": 1253,
@@ -666,13 +688,14 @@
         "twist": 21.997
       },
       "force_constants_diag": {
-        "shift": 0.6557,
-        "slide": 1.766,
+        "shift": 0.65573,
+        "slide": 1.76597,
         "rise": 1.2333,
-        "tilt": 0.0037,
-        "roll": 0.0041,
-        "twist": 0.0031
-      }
+        "tilt": 0.00373226,
+        "roll": 0.00405483,
+        "twist": 0.00308075
+      },
+      "condition_number": 2427.0
     },
     "UC/GG": {
       "n": 1090,
@@ -693,13 +716,14 @@
         "twist": 19.841
       },
       "force_constants_diag": {
-        "shift": 1.2052,
-        "slide": 2.6079,
-        "rise": 1.8132,
-        "tilt": 0.009,
-        "roll": 0.0121,
-        "twist": 0.0038
-      }
+        "shift": 1.20525,
+        "slide": 2.60791,
+        "rise": 1.81319,
+        "tilt": 0.00895256,
+        "roll": 0.0120537,
+        "twist": 0.00376689
+      },
+      "condition_number": 1482.0
     },
     "AC/GG": {
       "n": 957,
@@ -720,13 +744,14 @@
         "twist": 36.191
       },
       "force_constants_diag": {
-        "shift": 0.9356,
-        "slide": 0.7976,
-        "rise": 0.6562,
-        "tilt": 0.0054,
-        "roll": 0.0035,
-        "twist": 0.0009
-      }
+        "shift": 0.935588,
+        "slide": 0.797586,
+        "rise": 0.65622,
+        "tilt": 0.00536869,
+        "roll": 0.00351598,
+        "twist": 0.000868289
+      },
+      "condition_number": 2035.0
     },
     "UA/GA": {
       "n": 881,
@@ -747,13 +772,14 @@
         "twist": 32.231
       },
       "force_constants_diag": {
-        "shift": 0.2571,
-        "slide": 0.5819,
-        "rise": 0.6927,
-        "tilt": 0.0017,
-        "roll": 0.0014,
-        "twist": 0.0012
-      }
+        "shift": 0.257145,
+        "slide": 0.581902,
+        "rise": 0.692725,
+        "tilt": 0.00167094,
+        "roll": 0.00140561,
+        "twist": 0.00121445
+      },
+      "condition_number": 824.4
     },
     "CG/UG": {
       "n": 859,
@@ -774,13 +800,14 @@
         "twist": 30.84
       },
       "force_constants_diag": {
-        "shift": 0.3955,
-        "slide": 0.9931,
-        "rise": 0.8386,
-        "tilt": 0.003,
-        "roll": 0.0068,
-        "twist": 0.0021
-      }
+        "shift": 0.395463,
+        "slide": 0.993092,
+        "rise": 0.838628,
+        "tilt": 0.00301433,
+        "roll": 0.00682116,
+        "twist": 0.00214416
+      },
+      "condition_number": 1946.0
     },
     "GG/AC": {
       "n": 761,
@@ -801,13 +828,14 @@
         "twist": 54.378
       },
       "force_constants_diag": {
-        "shift": 0.5694,
-        "slide": 0.4831,
-        "rise": 0.7458,
-        "tilt": 0.0009,
-        "roll": 0.0008,
-        "twist": 0.0007
-      }
+        "shift": 0.569412,
+        "slide": 0.483118,
+        "rise": 0.745789,
+        "tilt": 0.00086541,
+        "roll": 0.000836402,
+        "twist": 0.000691651
+      },
+      "condition_number": 3236.0
     },
     "UG/CG": {
       "n": 748,
@@ -828,13 +856,14 @@
         "twist": 30.608
       },
       "force_constants_diag": {
-        "shift": 0.6977,
-        "slide": 1.6233,
-        "rise": 0.7981,
-        "tilt": 0.0065,
-        "roll": 0.0029,
-        "twist": 0.0018
-      }
+        "shift": 0.697738,
+        "slide": 1.62328,
+        "rise": 0.798112,
+        "tilt": 0.00647779,
+        "roll": 0.00291014,
+        "twist": 0.00184606
+      },
+      "condition_number": 2661.0
     },
     "GA/GA": {
       "n": 724,
@@ -855,13 +884,14 @@
         "twist": 33.961
       },
       "force_constants_diag": {
-        "shift": 0.6056,
+        "shift": 0.605641,
         "slide": 1.5031,
-        "rise": 0.7919,
-        "tilt": 0.0035,
-        "roll": 0.0029,
-        "twist": 0.0011
-      }
+        "rise": 0.791926,
+        "tilt": 0.00346059,
+        "roll": 0.00291063,
+        "twist": 0.00108156
+      },
+      "condition_number": 2796.0
     },
     "GA/UA": {
       "n": 676,
@@ -882,13 +912,14 @@
         "twist": 44.976
       },
       "force_constants_diag": {
-        "shift": 0.2416,
-        "slide": 0.3128,
-        "rise": 0.5079,
-        "tilt": 0.0009,
-        "roll": 0.0021,
-        "twist": 0.0006
-      }
+        "shift": 0.24163,
+        "slide": 0.312808,
+        "rise": 0.507919,
+        "tilt": 0.000912234,
+        "roll": 0.00209957,
+        "twist": 0.000625236
+      },
+      "condition_number": 1121.0
     },
     "GU/AU": {
       "n": 660,
@@ -909,13 +940,14 @@
         "twist": 17.488
       },
       "force_constants_diag": {
-        "shift": 1.8135,
-        "slide": 7.7575,
-        "rise": 5.3701,
-        "tilt": 0.0058,
-        "roll": 0.0134,
-        "twist": 0.0082
-      }
+        "shift": 1.81353,
+        "slide": 7.75751,
+        "rise": 5.37013,
+        "tilt": 0.00577027,
+        "roll": 0.0133873,
+        "twist": 0.00817179
+      },
+      "condition_number": 4960.0
     },
     "AA/UG": {
       "n": 621,
@@ -936,13 +968,14 @@
         "twist": 56.262
       },
       "force_constants_diag": {
-        "shift": 0.4234,
-        "slide": 0.7598,
-        "rise": 0.5242,
-        "tilt": 0.0009,
-        "roll": 0.0007,
-        "twist": 0.0005
-      }
+        "shift": 0.423398,
+        "slide": 0.759789,
+        "rise": 0.524155,
+        "tilt": 0.000865865,
+        "roll": 0.00067753,
+        "twist": 0.000461458
+      },
+      "condition_number": 3574.0
     },
     "UU/AG": {
       "n": 618,
@@ -963,13 +996,14 @@
         "twist": 23.226
       },
       "force_constants_diag": {
-        "shift": 0.5221,
-        "slide": 2.6479,
-        "rise": 1.009,
-        "tilt": 0.0048,
-        "roll": 0.002,
-        "twist": 0.0024
-      }
+        "shift": 0.522085,
+        "slide": 2.64792,
+        "rise": 1.00895,
+        "tilt": 0.00484827,
+        "roll": 0.00197576,
+        "twist": 0.00244162
+      },
+      "condition_number": 2313.0
     },
     "AG/UU": {
       "n": 617,
@@ -990,13 +1024,14 @@
         "twist": 38.613
       },
       "force_constants_diag": {
-        "shift": 0.42,
-        "slide": 0.8772,
-        "rise": 1.2228,
-        "tilt": 0.0013,
-        "roll": 0.0013,
-        "twist": 0.0007
-      }
+        "shift": 0.420038,
+        "slide": 0.877171,
+        "rise": 1.22283,
+        "tilt": 0.0013438,
+        "roll": 0.0013019,
+        "twist": 0.000731241
+      },
+      "condition_number": 4587.0
     },
     "GA/UU": {
       "n": 612,
@@ -1017,13 +1052,14 @@
         "twist": 26.915
       },
       "force_constants_diag": {
-        "shift": 1.5518,
-        "slide": 1.4168,
-        "rise": 0.9032,
-        "tilt": 0.0041,
-        "roll": 0.0026,
-        "twist": 0.0027
-      }
+        "shift": 1.55183,
+        "slide": 1.41679,
+        "rise": 0.903188,
+        "tilt": 0.00414653,
+        "roll": 0.00258628,
+        "twist": 0.00269637
+      },
+      "condition_number": 2081.0
     },
     "AU/GU": {
       "n": 568,
@@ -1045,12 +1081,13 @@
       },
       "force_constants_diag": {
         "shift": 1.7251,
-        "slide": 4.9161,
-        "rise": 3.4832,
-        "tilt": 0.0169,
-        "roll": 0.0106,
-        "twist": 0.0095
-      }
+        "slide": 4.91609,
+        "rise": 3.48317,
+        "tilt": 0.0168583,
+        "roll": 0.0105793,
+        "twist": 0.00946009
+      },
+      "condition_number": 1179.0
     },
     "UU/GA": {
       "n": 539,
@@ -1071,13 +1108,14 @@
         "twist": 19.113
       },
       "force_constants_diag": {
-        "shift": 1.078,
-        "slide": 3.3735,
+        "shift": 1.07795,
+        "slide": 3.37345,
         "rise": 2.428,
-        "tilt": 0.0061,
-        "roll": 0.0067,
-        "twist": 0.0054
-      }
+        "tilt": 0.0061228,
+        "roll": 0.00665758,
+        "twist": 0.00541074
+      },
+      "condition_number": 1861.0
     },
     "AG/AU": {
       "n": 528,
@@ -1098,13 +1136,14 @@
         "twist": 49.977
       },
       "force_constants_diag": {
-        "shift": 0.3317,
-        "slide": 0.5833,
-        "rise": 0.4903,
-        "tilt": 0.0005,
-        "roll": 0.0007,
-        "twist": 0.0005
-      }
+        "shift": 0.331671,
+        "slide": 0.583312,
+        "rise": 0.490261,
+        "tilt": 0.000483198,
+        "roll": 0.000738823,
+        "twist": 0.000479203
+      },
+      "condition_number": 1959.0
     },
     "UA/UG": {
       "n": 521,
@@ -1125,13 +1164,14 @@
         "twist": 27.339
       },
       "force_constants_diag": {
-        "shift": 0.5427,
-        "slide": 2.0088,
-        "rise": 0.8042,
-        "tilt": 0.0113,
-        "roll": 0.003,
-        "twist": 0.0019
-      }
+        "shift": 0.542723,
+        "slide": 2.00877,
+        "rise": 0.804208,
+        "tilt": 0.0112854,
+        "roll": 0.00296829,
+        "twist": 0.00185801
+      },
+      "condition_number": 1867.0
     },
     "AU/AA": {
       "n": 515,
@@ -1152,13 +1192,14 @@
         "twist": 94.139
       },
       "force_constants_diag": {
-        "shift": 0.5826,
-        "slide": 1.0164,
-        "rise": 0.3553,
-        "tilt": 0.0004,
-        "roll": 0.0004,
-        "twist": 0.0001
-      }
+        "shift": 0.582624,
+        "slide": 1.01642,
+        "rise": 0.35528,
+        "tilt": 0.000428947,
+        "roll": 0.000379556,
+        "twist": 0.000135442
+      },
+      "condition_number": 18030.0
     },
     "AG/UG": {
       "n": 511,
@@ -1179,13 +1220,14 @@
         "twist": 17.403
       },
       "force_constants_diag": {
-        "shift": 0.8743,
-        "slide": 2.4384,
-        "rise": 2.4224,
-        "tilt": 0.0307,
-        "roll": 0.0233,
-        "twist": 0.0045
-      }
+        "shift": 0.874266,
+        "slide": 2.43838,
+        "rise": 2.42237,
+        "tilt": 0.0306686,
+        "roll": 0.0233148,
+        "twist": 0.00447692
+      },
+      "condition_number": 1674.0
     },
     "GA/GC": {
       "n": 487,
@@ -1206,13 +1248,14 @@
         "twist": 44.913
       },
       "force_constants_diag": {
-        "shift": 0.5617,
-        "slide": 0.3246,
-        "rise": 0.4172,
-        "tilt": 0.0012,
-        "roll": 0.0023,
-        "twist": 0.0007
-      }
+        "shift": 0.56175,
+        "slide": 0.324631,
+        "rise": 0.417161,
+        "tilt": 0.00115622,
+        "roll": 0.00225588,
+        "twist": 0.000706568
+      },
+      "condition_number": 1843.0
     },
     "AA/GA": {
       "n": 483,
@@ -1233,13 +1276,14 @@
         "twist": 76.942
       },
       "force_constants_diag": {
-        "shift": 0.2662,
-        "slide": 0.9407,
-        "rise": 0.5555,
-        "tilt": 0.0016,
-        "roll": 0.0017,
-        "twist": 0.0002
-      }
+        "shift": 0.266167,
+        "slide": 0.940747,
+        "rise": 0.555514,
+        "tilt": 0.00163806,
+        "roll": 0.00166458,
+        "twist": 0.000248332
+      },
+      "condition_number": 6086.0
     },
     "AA/AU": {
       "n": 479,
@@ -1260,13 +1304,14 @@
         "twist": 77.389
       },
       "force_constants_diag": {
-        "shift": 0.5521,
-        "slide": 0.7555,
-        "rise": 0.4011,
-        "tilt": 0.0027,
-        "roll": 0.0016,
-        "twist": 0.0004
-      }
+        "shift": 0.552086,
+        "slide": 0.755504,
+        "rise": 0.40105,
+        "tilt": 0.00271849,
+        "roll": 0.00160701,
+        "twist": 0.000362371
+      },
+      "condition_number": 4847.0
     },
     "UG/UA": {
       "n": 453,
@@ -1287,13 +1332,14 @@
         "twist": 31.319
       },
       "force_constants_diag": {
-        "shift": 0.6196,
-        "slide": 0.8512,
-        "rise": 0.4415,
-        "tilt": 0.001,
-        "roll": 0.0028,
-        "twist": 0.0025
-      }
+        "shift": 0.619556,
+        "slide": 0.851155,
+        "rise": 0.441512,
+        "tilt": 0.000951013,
+        "roll": 0.0027716,
+        "twist": 0.00250119
+      },
+      "condition_number": 1788.0
     },
     "UG/AG": {
       "n": 447,
@@ -1314,13 +1360,14 @@
         "twist": 20.414
       },
       "force_constants_diag": {
-        "shift": 0.4115,
-        "slide": 2.1449,
-        "rise": 2.9465,
-        "tilt": 0.0056,
-        "roll": 0.0026,
-        "twist": 0.0036
-      }
+        "shift": 0.411544,
+        "slide": 2.14486,
+        "rise": 2.94645,
+        "tilt": 0.00560935,
+        "roll": 0.0026383,
+        "twist": 0.00358116
+      },
+      "condition_number": 2723.0
     },
     "GA/AA": {
       "n": 421,
@@ -1341,13 +1388,14 @@
         "twist": 89.013
       },
       "force_constants_diag": {
-        "shift": 0.522,
-        "slide": 0.6345,
-        "rise": 0.3435,
-        "tilt": 0.0008,
-        "roll": 0.0005,
-        "twist": 0.0002
-      }
+        "shift": 0.522012,
+        "slide": 0.634472,
+        "rise": 0.343496,
+        "tilt": 0.000814943,
+        "roll": 0.000525543,
+        "twist": 0.000236106
+      },
+      "condition_number": 15220.0
     },
     "UG/UG": {
       "n": 419,
@@ -1368,13 +1416,14 @@
         "twist": 11.483
       },
       "force_constants_diag": {
-        "shift": 0.8429,
-        "slide": 4.6205,
-        "rise": 6.5918,
-        "tilt": 0.0163,
-        "roll": 0.0203,
-        "twist": 0.0134
-      }
+        "shift": 0.842876,
+        "slide": 4.62055,
+        "rise": 6.59183,
+        "tilt": 0.0162637,
+        "roll": 0.0202619,
+        "twist": 0.0134269
+      },
+      "condition_number": 1101.0
     },
     "UG/AA": {
       "n": 390,
@@ -1395,13 +1444,14 @@
         "twist": 44.651
       },
       "force_constants_diag": {
-        "shift": 0.3581,
-        "slide": 0.5885,
-        "rise": 0.7322,
-        "tilt": 0.0009,
-        "roll": 0.0026,
-        "twist": 0.0012
-      }
+        "shift": 0.35806,
+        "slide": 0.588515,
+        "rise": 0.732215,
+        "tilt": 0.000876254,
+        "roll": 0.00261629,
+        "twist": 0.0011985
+      },
+      "condition_number": 3654.0
     },
     "GU/UC": {
       "n": 376,
@@ -1422,13 +1472,14 @@
         "twist": 22.398
       },
       "force_constants_diag": {
-        "shift": 0.6831,
-        "slide": 1.1008,
-        "rise": 1.1291,
-        "tilt": 0.0037,
-        "roll": 0.003,
-        "twist": 0.0022
-      }
+        "shift": 0.683078,
+        "slide": 1.10083,
+        "rise": 1.12915,
+        "tilt": 0.00372477,
+        "roll": 0.0030344,
+        "twist": 0.00219257
+      },
+      "condition_number": 1420.0
     },
     "UG/CU": {
       "n": 355,
@@ -1450,12 +1501,13 @@
       },
       "force_constants_diag": {
         "shift": 0.7489,
-        "slide": 0.9817,
-        "rise": 0.9864,
-        "tilt": 0.0032,
-        "roll": 0.0014,
-        "twist": 0.0019
-      }
+        "slide": 0.981679,
+        "rise": 0.986375,
+        "tilt": 0.00316141,
+        "roll": 0.00139326,
+        "twist": 0.0019426
+      },
+      "condition_number": 2913.0
     },
     "GG/CA": {
       "n": 349,
@@ -1476,13 +1528,14 @@
         "twist": 40.802
       },
       "force_constants_diag": {
-        "shift": 0.4166,
-        "slide": 0.5466,
-        "rise": 0.4102,
-        "tilt": 0.0005,
-        "roll": 0.0032,
-        "twist": 0.0007
-      }
+        "shift": 0.416581,
+        "slide": 0.54665,
+        "rise": 0.410222,
+        "tilt": 0.000496257,
+        "roll": 0.00315084,
+        "twist": 0.000718846
+      },
+      "condition_number": 3153.0
     },
     "AG/CA": {
       "n": 339,
@@ -1503,13 +1556,14 @@
         "twist": 72.729
       },
       "force_constants_diag": {
-        "shift": 0.2428,
-        "slide": 0.2263,
-        "rise": 0.2819,
-        "tilt": 0.0008,
-        "roll": 0.0004,
-        "twist": 0.0003
-      }
+        "shift": 0.242756,
+        "slide": 0.226293,
+        "rise": 0.28186,
+        "tilt": 0.000774048,
+        "roll": 0.000362246,
+        "twist": 0.000301429
+      },
+      "condition_number": 1827.0
     },
     "AA/UA": {
       "n": 319,
@@ -1530,13 +1584,14 @@
         "twist": 102.436
       },
       "force_constants_diag": {
-        "shift": 0.2295,
-        "slide": 0.5325,
-        "rise": 0.3746,
-        "tilt": 0.0007,
-        "roll": 0.0006,
-        "twist": 0.0001
-      }
+        "shift": 0.229455,
+        "slide": 0.532534,
+        "rise": 0.374559,
+        "tilt": 0.000673147,
+        "roll": 0.000608262,
+        "twist": 0.000116663
+      },
+      "condition_number": 8476.0
     },
     "GC/GA": {
       "n": 314,
@@ -1557,13 +1612,14 @@
         "twist": 32.053
       },
       "force_constants_diag": {
-        "shift": 0.8157,
-        "slide": 0.7237,
-        "rise": 0.5154,
-        "tilt": 0.0008,
-        "roll": 0.0073,
-        "twist": 0.0013
-      }
+        "shift": 0.815721,
+        "slide": 0.723735,
+        "rise": 0.515399,
+        "tilt": 0.000763398,
+        "roll": 0.00730171,
+        "twist": 0.00131145
+      },
+      "condition_number": 3878.0
     },
     "AU/AG": {
       "n": 297,
@@ -1584,13 +1640,14 @@
         "twist": 57.088
       },
       "force_constants_diag": {
-        "shift": 0.6132,
-        "slide": 0.6839,
-        "rise": 0.3993,
-        "tilt": 0.0006,
-        "roll": 0.0006,
-        "twist": 0.0004
-      }
+        "shift": 0.613156,
+        "slide": 0.683924,
+        "rise": 0.399304,
+        "tilt": 0.000642043,
+        "roll": 0.000598109,
+        "twist": 0.000362552
+      },
+      "condition_number": 4592.0
     },
     "CA/AG": {
       "n": 293,
@@ -1611,13 +1668,14 @@
         "twist": 79.276
       },
       "force_constants_diag": {
-        "shift": 0.3272,
-        "slide": 0.5187,
-        "rise": 0.329,
-        "tilt": 0.0011,
-        "roll": 0.0003,
-        "twist": 0.0005
-      }
+        "shift": 0.327201,
+        "slide": 0.518705,
+        "rise": 0.328988,
+        "tilt": 0.00113791,
+        "roll": 0.000254999,
+        "twist": 0.000450293
+      },
+      "condition_number": 6786.0
     },
     "AA/GU": {
       "n": 287,
@@ -1638,13 +1696,14 @@
         "twist": 61.8
       },
       "force_constants_diag": {
-        "shift": 0.114,
-        "slide": 0.3424,
-        "rise": 0.3353,
-        "tilt": 0.0006,
-        "roll": 0.0006,
-        "twist": 0.0004
-      }
+        "shift": 0.11399,
+        "slide": 0.34245,
+        "rise": 0.335312,
+        "tilt": 0.000640162,
+        "roll": 0.000593873,
+        "twist": 0.000414026
+      },
+      "condition_number": 1958.0
     },
     "AG/CC": {
       "n": 285,
@@ -1665,13 +1724,14 @@
         "twist": 57.469
       },
       "force_constants_diag": {
-        "shift": 0.5245,
-        "slide": 0.8469,
-        "rise": 0.5207,
-        "tilt": 0.0093,
-        "roll": 0.003,
-        "twist": 0.0006
-      }
+        "shift": 0.524471,
+        "slide": 0.846926,
+        "rise": 0.52073,
+        "tilt": 0.00928073,
+        "roll": 0.00299819,
+        "twist": 0.000615685
+      },
+      "condition_number": 3118.0
     },
     "CA/GG": {
       "n": 275,
@@ -1692,13 +1752,14 @@
         "twist": 57.287
       },
       "force_constants_diag": {
-        "shift": 0.3054,
-        "slide": 0.3867,
-        "rise": 0.372,
-        "tilt": 0.0008,
-        "roll": 0.0019,
-        "twist": 0.0007
-      }
+        "shift": 0.305406,
+        "slide": 0.386746,
+        "rise": 0.371978,
+        "tilt": 0.000755183,
+        "roll": 0.00191061,
+        "twist": 0.000738007
+      },
+      "condition_number": 2193.0
     },
     "AU/UU": {
       "n": 275,
@@ -1719,13 +1780,14 @@
         "twist": 30.187
       },
       "force_constants_diag": {
-        "shift": 0.5994,
-        "slide": 2.0383,
-        "rise": 0.8615,
-        "tilt": 0.002,
-        "roll": 0.0057,
-        "twist": 0.0019
-      }
+        "shift": 0.599415,
+        "slide": 2.03835,
+        "rise": 0.861492,
+        "tilt": 0.0020237,
+        "roll": 0.00566411,
+        "twist": 0.00193922
+      },
+      "condition_number": 4030.0
     },
     "UC/GU": {
       "n": 273,
@@ -1746,13 +1808,14 @@
         "twist": 28.966
       },
       "force_constants_diag": {
-        "shift": 1.0975,
+        "shift": 1.09748,
         "slide": 2.5488,
         "rise": 1.1868,
-        "tilt": 0.0219,
-        "roll": 0.0338,
-        "twist": 0.002
-      }
+        "tilt": 0.021856,
+        "roll": 0.0338035,
+        "twist": 0.00201087
+      },
+      "condition_number": 3178.0
     },
     "GG/UU": {
       "n": 268,
@@ -1773,13 +1836,14 @@
         "twist": 15.037
       },
       "force_constants_diag": {
-        "shift": 4.2066,
-        "slide": 4.2374,
-        "rise": 3.9602,
-        "tilt": 0.008,
-        "roll": 0.009,
-        "twist": 0.0079
-      }
+        "shift": 4.20661,
+        "slide": 4.23742,
+        "rise": 3.96019,
+        "tilt": 0.00797948,
+        "roll": 0.0089668,
+        "twist": 0.00786736
+      },
+      "condition_number": 4164.0
     },
     "AC/GA": {
       "n": 264,
@@ -1800,13 +1864,14 @@
         "twist": 50.497
       },
       "force_constants_diag": {
-        "shift": 0.7682,
-        "slide": 1.1159,
-        "rise": 0.3713,
-        "tilt": 0.0014,
-        "roll": 0.0009,
-        "twist": 0.0007
-      }
+        "shift": 0.768244,
+        "slide": 1.11591,
+        "rise": 0.371336,
+        "tilt": 0.00142384,
+        "roll": 0.000896307,
+        "twist": 0.000709769
+      },
+      "condition_number": 5106.0
     },
     "CU/UG": {
       "n": 261,
@@ -1827,13 +1892,14 @@
         "twist": 27.262
       },
       "force_constants_diag": {
-        "shift": 0.8566,
-        "slide": 1.7703,
-        "rise": 0.867,
-        "tilt": 0.0071,
-        "roll": 0.0047,
-        "twist": 0.0028
-      }
+        "shift": 0.856616,
+        "slide": 1.77028,
+        "rise": 0.866982,
+        "tilt": 0.00710518,
+        "roll": 0.00467551,
+        "twist": 0.00284254
+      },
+      "condition_number": 1973.0
     },
     "GA/AC": {
       "n": 257,
@@ -1854,13 +1920,14 @@
         "twist": 51.119
       },
       "force_constants_diag": {
-        "shift": 0.1912,
-        "slide": 0.4536,
-        "rise": 0.415,
-        "tilt": 0.0008,
-        "roll": 0.0004,
-        "twist": 0.0004
-      }
+        "shift": 0.191195,
+        "slide": 0.453636,
+        "rise": 0.414965,
+        "tilt": 0.000779822,
+        "roll": 0.000433257,
+        "twist": 0.000394767
+      },
+      "condition_number": 1394.0
     },
     "UA/AA": {
       "n": 254,
@@ -1881,13 +1948,14 @@
         "twist": 91.988
       },
       "force_constants_diag": {
-        "shift": 0.1706,
-        "slide": 0.4414,
-        "rise": 0.4592,
-        "tilt": 0.0005,
-        "roll": 0.0004,
-        "twist": 0.0002
-      }
+        "shift": 0.170592,
+        "slide": 0.441419,
+        "rise": 0.459226,
+        "tilt": 0.000523054,
+        "roll": 0.00037366,
+        "twist": 0.000204643
+      },
+      "condition_number": 4628.0
     },
     "GA/CC": {
       "n": 245,
@@ -1908,13 +1976,14 @@
         "twist": 56.772
       },
       "force_constants_diag": {
-        "shift": 0.266,
-        "slide": 0.4341,
-        "rise": 0.5918,
-        "tilt": 0.0025,
-        "roll": 0.0023,
-        "twist": 0.0003
-      }
+        "shift": 0.265966,
+        "slide": 0.434121,
+        "rise": 0.591793,
+        "tilt": 0.00245156,
+        "roll": 0.00226704,
+        "twist": 0.000334763
+      },
+      "condition_number": 1970.0
     },
     "AA/AA": {
       "n": 231,
@@ -1935,13 +2004,14 @@
         "twist": 81.381
       },
       "force_constants_diag": {
-        "shift": 0.2245,
-        "slide": 0.5618,
-        "rise": 0.2064,
-        "tilt": 0.0019,
-        "roll": 0.001,
-        "twist": 0.0002
-      }
+        "shift": 0.224456,
+        "slide": 0.561815,
+        "rise": 0.206375,
+        "tilt": 0.00187542,
+        "roll": 0.00104598,
+        "twist": 0.000189653
+      },
+      "condition_number": 4342.0
     },
     "GG/GC": {
       "n": 222,
@@ -1962,13 +2032,14 @@
         "twist": 69.461
       },
       "force_constants_diag": {
-        "shift": 0.2851,
-        "slide": 0.3818,
-        "rise": 0.2892,
-        "tilt": 0.0004,
-        "roll": 0.0009,
-        "twist": 0.0004
-      }
+        "shift": 0.285144,
+        "slide": 0.381825,
+        "rise": 0.289171,
+        "tilt": 0.000402882,
+        "roll": 0.000940868,
+        "twist": 0.000389265
+      },
+      "condition_number": 2190.0
     },
     "GC/AC": {
       "n": 221,
@@ -1989,13 +2060,14 @@
         "twist": 37.8
       },
       "force_constants_diag": {
-        "shift": 0.5388,
-        "slide": 3.362,
-        "rise": 1.2747,
-        "tilt": 0.0051,
-        "roll": 0.0056,
-        "twist": 0.003
-      }
+        "shift": 0.538808,
+        "slide": 3.36196,
+        "rise": 1.27466,
+        "tilt": 0.00514622,
+        "roll": 0.00562711,
+        "twist": 0.00295724
+      },
+      "condition_number": 15680.0
     },
     "AC/GC": {
       "n": 216,
@@ -2016,13 +2088,14 @@
         "twist": 15.56
       },
       "force_constants_diag": {
-        "shift": 1.1286,
-        "slide": 4.7034,
-        "rise": 5.9355,
-        "tilt": 0.0027,
-        "roll": 0.0179,
-        "twist": 0.0086
-      }
+        "shift": 1.12865,
+        "slide": 4.70337,
+        "rise": 5.93551,
+        "tilt": 0.0026518,
+        "roll": 0.0179398,
+        "twist": 0.00862808
+      },
+      "condition_number": 5557.0
     },
     "UU/AU": {
       "n": 208,
@@ -2043,13 +2116,14 @@
         "twist": 34.907
       },
       "force_constants_diag": {
-        "shift": 0.9922,
-        "slide": 1.0568,
-        "rise": 1.0563,
-        "tilt": 0.0019,
-        "roll": 0.0016,
-        "twist": 0.001
-      }
+        "shift": 0.992164,
+        "slide": 1.05677,
+        "rise": 1.05626,
+        "tilt": 0.0019338,
+        "roll": 0.00160634,
+        "twist": 0.00101475
+      },
+      "condition_number": 3878.0
     },
     "AA/CU": {
       "n": 205,
@@ -2070,13 +2144,14 @@
         "twist": 32.925
       },
       "force_constants_diag": {
-        "shift": 0.5323,
+        "shift": 0.532345,
         "slide": 1.6189,
-        "rise": 2.3063,
-        "tilt": 0.0063,
-        "roll": 0.008,
-        "twist": 0.0017
-      }
+        "rise": 2.30632,
+        "tilt": 0.00629344,
+        "roll": 0.0079984,
+        "twist": 0.00165025
+      },
+      "condition_number": 2603.0
     },
     "GG/CG": {
       "n": 204,
@@ -2097,13 +2172,14 @@
         "twist": 61.183
       },
       "force_constants_diag": {
-        "shift": 0.579,
-        "slide": 0.4166,
-        "rise": 0.3048,
-        "tilt": 0.0007,
-        "roll": 0.0008,
-        "twist": 0.0004
-      }
+        "shift": 0.578972,
+        "slide": 0.416629,
+        "rise": 0.304832,
+        "tilt": 0.000687645,
+        "roll": 0.000774591,
+        "twist": 0.00038459
+      },
+      "condition_number": 2629.0
     }
   }
 }

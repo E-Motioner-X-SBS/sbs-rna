@@ -279,7 +279,8 @@ corpus than families are.
 | Hierarchical pair track + triangle | ~45M | 45M |
 | Motif bank + heads + decoder | ~35M | 35M |
 | **Total (Base)** | **~911M** | **~382M** |
-| **Total (Base-v2, recommended — §10c)** | **~1,401M** | **~269M** |
+| **Total (Base-v2, scale-up path — §10c)** | **~1,401M** | **~269M** |
+| **Total (PHAROS-Small, NEW DEFAULT — §10d)** | **~149M** | **~61M** |
 
 Versus **NucleicBERT: 404M, all active.** PHAROS-Base carries 2.3x the capacity
 at comparable active compute, and its attention term is ~8x cheaper at long
@@ -620,9 +621,10 @@ matrices `F = kT C^-1` for 76 dinucleotide contexts (n >= 200).
 
 Validation: Watson-Crick means reproduce canonical A-form RNA (GG/CC rise 3.14 A
 twist 29.98; AU/AU rise 2.81 twist 33.94; reference ~2.8-3.1 A, ~32 deg).
-**Stiffness spans 134x** between the stiffest (UG/UG, twist sd 11.5 deg) and
+**Stiffness spans 115x** (twist force constants, UG/UG 1.343e-2 to AA/UA
+1.167e-4) between the stiffest (UG/UG, twist sd 11.5 deg) and
 floppiest (AA/UA, 102 deg) contexts, and GC content predicts rigidity
-(Pearson -0.314 with twist sd).
+(Pearson -0.314 with twist sd). The inversion is least reliable exactly where steps are floppiest: 3 of 76 contexts have covariance condition number > 1e4 (AU/AA, GA/AA, GC/AC), so the softest force constants carry the largest uncertainty.
 
 ### Why a lookup table is the wrong design
 
@@ -952,6 +954,83 @@ The actionable form is a **staged budget with checkpoints at 5B / 25B / 100B /
 323B tokens**, stopping when downstream metrics flatten. The first checkpoint
 costs ~1.5% of the full run, so the measurement is nearly free — and it converts
 an unfalsifiable guess about data volume into an empirical decision.
+
+## 10d. Why so many parameters? — a challenge the design did not survive
+
+The specification proposed 1,401M total / 269M active. That number was never
+justified against the data, and when tested it does not hold up. The revision
+below is the result.
+
+### The information content of the supervision [measured]
+
+| Channel | Volume | Upper-bound information |
+|---|---|---|
+| **3D structure** (the task that matters) | 6,661 unique sequences, 3.25M contacts | **~2.8 MB** |
+| 2D structure | ~160,000 annotations | ~9.0 MB |
+| Pretraining corpus | 323B tokens x ~2 bits | ~80 GB |
+
+The 3D contact figure uses the measured 4.397 contacts/nt and a generous
+`log2(L)` bits per contact, which *overstates* it — nested helices are
+near-deterministic given one anchor.
+
+At a realistic ~2 bits per trained parameter, Base-v2 carries **350 MB** of
+capacity: **127x the entire 3D information content.**
+
+### Three independent arguments all point the same way
+
+1. **Our own headline evidence.** ERNIE-RNA at **86M beats RiNALMo at 650M** on
+   2D structure and nearly doubles cross-family F1. Every model in our comparison
+   that beats a larger one is smaller.
+2. **Our own thesis.** §1 argues inductive bias beats scale — then §4.4 specified
+   a 1.4B model. That was internally inconsistent.
+3. **HRM.** 27M parameters, ~1,000 examples, no pretraining, beating models
+   orders of magnitude larger; the independent ablation attributes the gain to
+   the **refinement loop**, not to size or to the hierarchy (§10b.3).
+
+### The real error: one parameter budget for two very different tasks
+
+The pretraining corpus (~80 GB of information) can justify substantial trunk
+capacity. The structure head is fit on **~2.8 MB**. Sizing both from one budget
+is the mistake; the structure task is **data-limited, not capacity-limited**, and
+no model in the table below is capacity-limited for it.
+
+### PHAROS-Small — the new default
+
+| Model | d | blocks | loops | effective layers | total | active | A100-h |
+|---|---|---|---|---|---|---|---|
+| Base-v2 | 768 | 32 | 3 | 96 | 1,401M | 269M | 1,325 |
+| **PHAROS-Small** | **512** | **16** | **8** | **128** | **149M** | **61M** | **299** |
+| PHAROS-Mini | 384 | 12 | 12 | 144 | 67M | 30M | 148 |
+| PHAROS-Micro | 256 | 8 | 16 | 128 | 23M | 12M | 61 |
+
+**PHAROS-Small reaches *more* effective depth than Base-v2 (128 layers vs 96) at
+9.4x fewer total parameters**, because depth now comes from refinement loops
+rather than stacked blocks — and with the one-step gradient (§10b.3) those loops
+cost compute but **no additional activation memory**.
+
+### Revised cost
+
+| Lever | Factor | A100-h |
+|---|---|---|
+| baseline (Base, as first specified) | — | 1,883 |
+| all-MoE fine-grained (Base-v2) | 1.42x | 1,326 |
+| **right-size to PHAROS-Small** | **4.43x** | **299** |
+| Muon optimiser | 2.00x | 150 |
+| FP8 (H100-class) | 1.60x | 94 |
+| down-weight 151-nt read chunks | 1.19x | **79** |
+
+**24x total: 1,883 -> ~79 A100-hours — 3.3 days on a *single* A100**, or ten
+hours on eight. Against NucleicBERT's 192 A100s.
+
+### The honest risk
+
+Small could simply underperform. The evidence points the other way (ERNIE-RNA,
+HRM), but it is evidence about *related* tasks, not ours. The mitigation is that
+this is now cheap to test: **train PHAROS-Small first**, and scale only if the
+measurements demand it. Base-v2 remains specified as the scale-up path. Combined
+with the staged token budget (§10c), the first informative checkpoint costs on
+the order of **one GPU-day** — so the sizing question becomes an experiment
+rather than an argument.
 
 ## 11. Novelty claims, stated precisely
 
