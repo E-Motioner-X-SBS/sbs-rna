@@ -58,6 +58,16 @@
   definitions: 31 is the X-ray set used for the density/GNRA analyses; 15 is the
   Mg-containing subset. The nucleotide count 24,623 is correct for the 15.
 
+## Cycle 2 discoveries
+- DISC-12 [DEFECT #11, INFLATION]: the 143,871 unobserved-residue count is not
+  RNA. `_pdbx_unobs_or_zero_occ_residues` covers every polymer in the entry, and
+  `extract_basepair_geometry.py:163` counts rows without filtering residue type.
+  Split: protein/other 97,131 (67.5%), **RNA 46,447 (32.3%)**, DNA 293.
+  The figure had been promoted to a novelty claim ("free per-residue disorder
+  labels"). Overstated 3.1x. The claim stands at 46,447 — still the largest
+  free flexibility-label source we have, but a third of what was published.
+  Top contributor 8FKW: 8,932 unobserved rows of which only 3,896 are RNA.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

@@ -97,8 +97,7 @@ representation, not on the k-mer.
 
 ### (c) Disorder labels nobody is using [measured]
 
-`_pdbx_unobs_or_zero_occ_residues` yielded **143,871 unobserved-residue
-records**. A residue that could not be modelled is a residue too mobile or too
+`_pdbx_unobs_or_zero_occ_residues` yielded **46,447 RNA unobserved-residue records**. A residue that could not be modelled is a residue too mobile or too
 poorly ordered to resolve — a **direct, free, per-residue disorder label**,
 present in every deposited structure and used by no RNA structure predictor.
 Together with B-factors (the 1.76 sigma Mg gradient) this is a second
@@ -115,7 +114,7 @@ flexibility channel at zero acquisition cost.
    slide-rise, twist-roll and twist-slide matter, and that couplings extend to
    the pentameric scale — so a learned encoder over a structural neighbourhood,
    not a 16-entry dinucleotide lookup table.
-4. **Add unobserved-residue disorder as an auxiliary head.** 143,871 free labels.
+4. **Add unobserved-residue disorder as an auxiliary head.** 46,447 RNA free labels.
 5. **Emit K states, not one.** gRNAde's evidence is that **3 states** is the
    sweet spot; RNAnneal uses 10. Start at 3.
 6. **Be honest about kinetics.** Cotranscriptional pathway prediction needs

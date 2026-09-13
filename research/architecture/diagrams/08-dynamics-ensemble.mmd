@@ -8,7 +8,7 @@ graph TB
 
     subgraph MEAS["MEASURED INPUTS - already in the repo"]
         M1["103,964 annotated base-pair steps, 155/180 structures<br/>F = kT C^-1 for 76 contexts with n >= 200<br/>twist force constants span 115x<br/>UG/UG 1.343e-2 (stiff) to AA/UA 1.167e-4 (floppy)"]
-        M2["143,871 unobserved-residue records<br/>a residue too mobile to model IS a disorder label.<br/>Free, in every deposited structure,<br/>used by NO RNA structure predictor."]
+        M2["46,447 RNA unobserved-residue records<br/>(46,447 RNA raw rows, but 67.5 pct are protein)<br/>a residue too mobile to model IS a disorder label.<br/>Free, in every deposited structure,<br/>used by NO RNA structure predictor."]
         M3["HEADROOM - negative log-likelihood, lower better<br/>M0 global 19.72<br/>M1 sequence context 17.58 (gain 2.14)<br/>M_struct structure only 17.85 (gain 1.88)<br/>M2 sequence x structure 14.55 (gain 3.03 over sequence)"]
     end
 

@@ -30,7 +30,10 @@
     "O3'": 664,
     "N7": 403
   },
-  "unobserved_residue_records": 143871,
+  "unobserved_residue_records_ALL_POLYMERS": 143871,
+  "unobserved_residue_records_RNA": 46447,
+  "unobserved_residue_records_DNA": 293,
+  "unobserved_residue_records_protein_other": 97131,
   "saenger_classes_present": 29,
   "top_saenger": {
     "19": 52543,

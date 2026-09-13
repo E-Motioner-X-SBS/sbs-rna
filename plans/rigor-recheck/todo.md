@@ -1,43 +1,26 @@
-# Master To-Do — Cycle 1
+# Master To-Do — Cycle 2
 
 Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 
-## Priority 0 — known discrepancy
-- [x] T1  X-RAY COUNT CONFLICT -> RESOLVED, not a data bug. 63 is correct;
-          rigidity uses 31 after a <30-RNA-residue guard. See doubts D1.
-- [x] T20 -> FIXED in all three deliverables
-- [x] T22 -> RETRACTED in all three; PK omission disclosed
-- [x] T23 -> FIXED in all three (b=1.40 A, xi=5.11, theta=0.804)
-- [x] T21 -> ADDED to all three deliverables
+## Priority 0 — suspected defects
+- [ ] S1  Is the 143,871 unobserved-residue count RNA-only, or does it include
+          protein chains from ribosome structures? Now a novelty claim.
+- [ ] S2  A100-hours: table 299 vs text ~79 for PHAROS-Small. Reconcile.
 
-## Priority 1 — re-derive measurements independently
-- [x] T2  Ion inventory -> PASS (independent parser: MG 17,428, K 1,868, OP share 0.828)
-- [x] T3  Rigidity gradient -> PASS, reproduces 1.760 sigma exactly
-- [x] T4a Contact prefilter safety -> PASS (bound 22.20 A, 0 missed)
-- [x] T4b Contact sparsity -> PASS; bins n=3/6/9 flagged as thin
-- [x] T5  Proposal recall index arithmetic -> PASS
-- [x] T6  Contact separation -> PASS
-- [x] T7  Block sparsity effective_c -> PASS (2.9% conservative overstatement)
-- [x] T8  Coevolution -> Neff PASS; ground truth omits 9.87% PK pairs
-          (conservative); depth split OVERCLAIMED -> see T22
+## Priority 1 — re-derive the right-sizing
+- [ ] S3a PHAROS-Small 149M total / 61M active from component arithmetic
+- [ ] S3b 128 vs 96 effective layers; 9.4x total-parameter ratio
+- [ ] S3c Mini/Micro rows (67M/30M, 23M/12M) internally consistent
 
-## Priority 2 — statistical validity
-- [x] T9  Sample sizes + bootstrap CIs computed; thin bins flagged
-- [x] T10 Depth split -> NOT adequately supported. p=0.046 post-hoc,
-          Spearman +0.224, deep arm n=2, shallow family reaches 1.000
-- [x] T11 Mg/rigidity confound -> PASS, partial corr +0.372 vs +0.420 raw
-- [x] T12 -> NOT load-bearing. O(L) rests on n=38 and n=61 ends. Flagged.
+## Priority 2 — re-derive the new measurements
+- [ ] S4  Stiffness headroom: NLL values and the three gains
+- [ ] S5  Aux block-occupancy loss implemented + tested, not just specified
 
-## Priority 3 — derived arithmetic
-- [x] T13 Parameter budget -> PASS exact (910.5M / 382.0M)
-- [x] T14 8x attention -> PASS (8.0x quadratic-only; 7.53x incl. SWA)
-- [x] T15 309 GB -> PASS exact
-- [x] T16 Physics -> **FAIL**: b~5.9-7.0 A is wrong (contour vs axial).
-          Correct A-RNA: b=1.40 A, xi=5.11, theta=0.804 -> T23
+## Priority 3 — literature (anti-hallucination rules 1, 10)
+- [ ] S6a gRNAde multi-state "3-5%, best at 3"
+- [ ] S6b RNAnneal "16 experimentally-resolved conformations", 10 states
+- [ ] S6c "pentameric scale = minimum range of elastic couplings"
+- [ ] S6d Muon ~2x compute efficiency; FP8 <0.25% loss error; HRM +13pp loop
 
-## Priority 4 — literature + consistency
-- [x] T17 -> PASS; benchmark is n=52 monomers, now stated in the report
-- [x] T18 -> found a silent edit failure (6 vs 7 novelty rows); fixed. 15/15 now consistent
-- [x] T19 -> ONE OVERREACH FOUND (coevolution depth gate); retracted
-
-- [x] T24 [ADDED-CYCLE-1] Regression guard scripts/sampling/verify_claims.py
+## Priority 4 — consistency
+- [ ] S7  Cross-document scan after 16 commits; guard still catches regressions

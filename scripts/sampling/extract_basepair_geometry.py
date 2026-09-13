@@ -112,6 +112,10 @@ def fnum(v):
         return None
 
 
+RNA_RES = {"A", "C", "G", "U"}
+DNA_RES = {"DA", "DC", "DG", "DT", "DU"}
+
+
 def main():
     WANT = {"_ndb_struct_na_base_pair", "_ndb_struct_na_base_pair_step",
             "_struct_conn", "_pdbx_unobs_or_zero_occ_residues"}
@@ -119,7 +123,8 @@ def main():
     pair_by_class = defaultdict(list)
     saenger = Counter(); lw = Counter(); conn = Counter()
     metal_partners = Counter(); metal_by_ion = Counter()
-    n_unobs = 0; n_struct = 0; n_with_bp = 0
+    n_unobs = 0; n_unobs_rna = 0; n_unobs_dna = 0; n_unobs_other = 0
+    n_struct = 0; n_with_bp = 0
 
     files = sorted(S.glob("*.cif.gz"))
     for k, f in enumerate(files, 1):
@@ -160,7 +165,21 @@ def main():
                         metal_by_ion[ion] += 1
                         metal_partners[atom.strip('"')] += 1
             elif cat == "_pdbx_unobs_or_zero_occ_residues":
+                # This category covers EVERY polymer in the entry. The sample
+                # contains ribosomes whose protein chains dominate the count, so
+                # an unfiltered total is ~3x the usable RNA figure. Split by
+                # residue type and report the RNA count separately.
                 n_unobs += len(rows)
+                key = ("auth_comp_id" if "auth_comp_id" in cols
+                       else "label_comp_id" if "label_comp_id" in cols else None)
+                for r in rows:
+                    comp = (r.get(key, "?") if key else "?").strip()
+                    if comp in RNA_RES:
+                        n_unobs_rna += 1
+                    elif comp in DNA_RES:
+                        n_unobs_dna += 1
+                    else:
+                        n_unobs_other += 1
         if got_bp:
             n_with_bp += 1
         if k % 40 == 0:
@@ -197,7 +216,10 @@ def main():
         "connectivity_records": dict(conn.most_common()),
         "metal_coordination_by_ion": dict(metal_by_ion.most_common(8)),
         "metal_coordinating_atoms": dict(metal_partners.most_common(10)),
-        "unobserved_residue_records": n_unobs,
+        "unobserved_residue_records_ALL_POLYMERS": n_unobs,
+        "unobserved_residue_records_RNA": n_unobs_rna,
+        "unobserved_residue_records_DNA": n_unobs_dna,
+        "unobserved_residue_records_protein_other": n_unobs_other,
         "saenger_classes_present": len([k for k in saenger if k not in "?."]),
         "top_saenger": dict(saenger.most_common(8)),
         "top_leontis_westhof": dict(lw.most_common(8)),

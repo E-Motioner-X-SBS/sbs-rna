@@ -7,27 +7,43 @@ subfolder to avoid collision.
 | Field | Value |
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
-| Cycle | 1 (extended: mmCIF mining + training design) |
-| Phase | 6 AUDIT -> EXIT (macro-audit PASS) |
-| Started | 2026-09-13 |
-| Open TODO | 0 open; 6 flagged limitations in final-report.md |
+| Cycle | **2** — scope: everything added AFTER cycle 1 closed |
+| Phase | 0 DECOMPOSE |
+| Started | 2026-09-13 (cycle 1), cycle 2 same day |
+| Open TODO | see todo.md |
 
-## Scope
+## Why cycle 2 exists
 
-Artifacts under audit:
-- `scripts/sampling/*.py` (7 analysis scripts)
-- `research/architecture/reference/*.py` (2)
-- `data/samples/analysis/*.json` (11 outputs)
-- `research/architecture/ARCHITECTURE.md`
-- `research/report/main.tex` -> main.pdf (21pp)
-- `research/architecture/blueprint.html` (published artifact v5)
-- `research/prior-art/01-06`
+Cycle 1 exited macro-audit PASS with scope fixed at: prior-art 01-06,
+ARCHITECTURE.md, main.tex (**21pp**), blueprint (**v5**). Since that audit
+closed, 16 commits added **6,259 insertions across 55 files**. main.tex is now
+**33pp** and the blueprint is **v14**. The following entered *unaudited*:
 
-## Prior known defects (found during session 1, already fixed)
-1. BGSU nrlist endpoint returned HTML, parsed as CSV -> 0 structures
-2. `_exptl.method_details` overwrote `_exptl.method` -> 0 X-ray detected
-3. MI outer-product broadcast (C,q,1) vs (C,q,q) -> precision 17x too low
-4. HPT L3 expansion took block diagonal only -> quarter of pair budget
-5. HPT L2 budget clamped by masking -> effective c pinned at 5.0
+| Added since cycle 1 | Status |
+|---|---|
+| mmCIF mining: 103,964 steps, 44,708 metalc, 143,871 unobs | UNAUDITED |
+| Stiffness encoder (§7c) + headroom NLL model | UNAUDITED |
+| **Dynamics module (§7d) + prior-art 08 + diagram 08 + blueprint §13** | UNAUDITED (newest) |
+| Right-sizing to PHAROS-Small (149M/61M) | partially self-audited |
+| Training cost model, Muon/FP8/HRM claims | flagged "reported, must benchmark" |
+| 115x stiffness correction (mine, cycle-2 pre-work) | self-verified only |
+| Gradient fix: score gating + aux occupancy loss | fix verified; aux loss untested |
+| 5 new scripts, 2 new prior-art docs | UNAUDITED |
 
-Five defects in one session is a high base rate. Assume more exist.
+## Scope — cycle 2
+
+- `scripts/sampling/{extract_basepair_geometry,measure_stiffness_headroom,
+  optimize_architecture,parameter_budget_justification,training_cost_model,
+  test_residue_guard_bias}.py`
+- `research/architecture/reference/{hierarchical_pair_track,
+  test_hierarchical_pair_track}.py`
+- `research/prior-art/07`, `research/prior-art/08`
+- ARCHITECTURE.md §7c, §7d, §10b-d; main.tex new sections; blueprint §09-13
+- `data/samples/analysis/{basepair_geometry,stiffness_headroom,
+  architecture_optimization,training_cost_base,residue_guard_bias}.json`
+
+## Prior defect base rate
+
+Cycle 0 (build): 5 silent defects. Cycle 1 (audit): 4 more. Pre-cycle-2: 1
+(stiffness rounding). **Ten defects, every one producing a plausible number
+rather than an error.** Assume more exist in the 6,259 unaudited lines.

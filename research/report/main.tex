@@ -1571,7 +1571,7 @@ are already inside every deposited structure. \meas}
 \midrule
 per-step $6\times6$ stiffness & stiffness encoder & measured $F$, 76 contexts \\
 per-nucleotide fluctuation amplitude & assembled $F$ $\rightarrow$ normal modes & B-factors / RMSF \\
-\textbf{per-residue disorder} & dedicated head & \textbf{143,871 unobserved-residue records} \\
+\textbf{per-residue disorder} & dedicated head & \textbf{46,447 RNA unobserved-residue records} \\
 $K=3$ alternative states & decoder samples, ranked & CASP16 alt-conformations \\
 \bottomrule
 \end{tabular}
@@ -1580,7 +1580,7 @@ $K=3$ alternative states & decoder samples, ranked & CASP16 alt-conformations \\
 The disorder head is the cheapest addition in the design. A residue recorded in
 \texttt{\_pdbx\_unobs\allowbreak\_or\allowbreak\_zero\allowbreak\_occ\allowbreak\_residues} is one too mobile or disordered to
 model---a direct per-residue flexibility label, present in every deposited
-structure, used by no RNA structure predictor, and we extracted 143,871 of them
+structure, used by no RNA structure predictor, and we extracted 46,447 RNA ones (of 46,447 RNA rows across all polymers)
 at zero acquisition cost. On state count, gRNAde's multi-state evidence is a
 consistent 3--5\% improvement with \textbf{3 states} best, and RNAnneal uses 10;
 we default to $K=3$.

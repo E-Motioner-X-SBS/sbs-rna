@@ -670,7 +670,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
     <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
-    <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 143,871 unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
+    <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 46,447 RNA unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
     <div class="claim"><div class="what">Structure-conditioned stiffness field feeding a harmonic ensemble</div><div class="status">Justified by a measured 3.03-nat gain of structural over sequence context. Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds those insufficient (pentameric couplings).</div></div>
     <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth. Motivated by the literature and by measured between-family variance (0.333–1.000); our own depth split is weak evidence (Spearman +0.224, n=12).</div></div>
   </div>
@@ -946,7 +946,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <tr class="total"><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair_step</td><td>6 step deformation coordinates</td><td class="num">103,964 steps</td></tr>
         <tr><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair</td><td>pair graph + Saenger / Leontis–Westhof class</td><td class="num">29 classes</td></tr>
         <tr><td class="mono" style="font-size:12px">_struct_conn (metalc)</td><td>curated metal coordination</td><td class="num">44,708 Mg²⁺</td></tr>
-        <tr><td class="mono" style="font-size:12px">_pdbx_unobs_or_zero_occ_residues</td><td>unmodelled residues → flexibility labels</td><td class="num">143,871</td></tr>
+        <tr><td class="mono" style="font-size:12px">_pdbx_unobs_or_zero_occ_residues</td><td>unmodelled residues → flexibility labels</td><td class="num">46,447 RNA</td></tr>
       </tbody>
     </table>
   </div>
@@ -1312,7 +1312,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           <tbody>
             <tr><td>per-step 6×6 stiffness</td><td>measured F, 76 contexts</td></tr>
             <tr><td>per-nt fluctuation amplitude</td><td>B-factors / RMSF</td></tr>
-            <tr class="total"><td><b>per-residue disorder</b></td><td><b>143,871 unobserved-residue records</b></td></tr>
+            <tr class="total"><td><b>per-residue disorder</b></td><td><b>46,447 RNA unobserved-residue records</b></td></tr>
             <tr><td>K = 3 states + weights</td><td>CASP16 alt-conformations</td></tr>
           </tbody>
         </table>
@@ -1322,7 +1322,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p>A residue in <span class="mono">_pdbx_unobs_or_zero_occ_residues</span> is one too
         mobile or disordered to model — <b>a direct per-residue flexibility label</b>. It sits in
         every deposited structure, is used by <b>no</b> RNA structure predictor, and we already
-        extracted 143,871 of them at zero acquisition cost.</p>
+        extracted 46,447 RNA ones (the raw category total of 46,447 RNA is 67.5% protein) at zero acquisition cost.</p>
       </div>
     </div>
   </div>

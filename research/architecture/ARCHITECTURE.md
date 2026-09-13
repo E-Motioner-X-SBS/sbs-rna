@@ -743,14 +743,14 @@ Concretely PHAROS emits, alongside coordinates:
 |---|---|---|
 | per-step 6x6 stiffness | stiffness encoder (§7c) | measured `F` over 76 contexts |
 | per-nucleotide fluctuation amplitude | assembled `F` -> normal modes | B-factors / RMSF |
-| **per-residue disorder probability** | dedicated head | **143,871 unobserved-residue records** |
+| **per-residue disorder probability** | dedicated head | **46,447 RNA unobserved-residue records** |
 | K alternative states | K decoder samples, ranked | CASP16 / riboswitch apo-holo pairs |
 
 **The disorder head is the cheapest addition in the whole design.** A residue
 recorded in `_pdbx_unobs_or_zero_occ_residues` is one too mobile or disordered to
 model. That is a direct per-residue flexibility label, present in every deposited
 structure, **used by no RNA structure predictor**, and we already extracted
-143,871 of them. It costs nothing and supervises exactly the quantity a dynamics
+46,447 RNA ones (of 46,447 RNA rows across all polymers). It costs nothing and supervises exactly the quantity a dynamics
 output needs.
 
 ### How many states
@@ -817,7 +817,7 @@ ensemble output reported separately and descriptively.
 | **Mg²⁺ sites** | density + inner/outer | **extracted from mmCIF ourselves** | **17,428 from 180 structures alone** |
 | **Rigidity** | per-nt z_B / RMSF | B-factors from mmCIF | every X-ray structure |
 | **Per-step stiffness** | 6x6 `F` matrix | `_ndb_struct_na_base_pair_step` | **103,964 steps, 76 contexts** |
-| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues` | **143,871 records** |
+| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues`, RNA rows only | **46,447 RNA** (46,447 RNA all-polymer) |
 | **Ensemble** | K=3 states + weights | CASP16 alt-conformations, apo/holo pairs | small; see R7 |
 | Reactivity | per-nt SHAPE/DMS | **not yet acquired** (§9) | — |
 | 3D coordinates | frames -> all-atom | RNA3DB | 6,661 unique seqs |
@@ -980,7 +980,7 @@ improve structural quality without costing accuracy.
 |---|---|---|
 | `L_stiff` | `_ndb_struct_na_base_pair_step` | **103,964 annotated steps** |
 | `L_Mg` | `_struct_conn` `metalc` | **44,708 Mg²⁺ coordination records** |
-| `L_flex` | B-factors + `_pdbx_unobs_or_zero_occ_residues` | **143,871 unobserved-residue records** |
+| `L_flex` | B-factors + `_pdbx_unobs_or_zero_occ_residues` | **46,447 RNA unobserved-residue records** |
 | motif vocabulary | Saenger `hbond_type_28` / LW `hbond_type_12` | **29 Saenger classes** |
 | `L_elec` | closed form from `c_ion` | no labels needed |
 
@@ -1155,9 +1155,9 @@ rather than an argument.
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
 | 8 | **Learned stiffness encoder** emitting a per-step 6x6 precision matrix trained by Gaussian NLL, replacing a tabulated force field | Nucleic-acid elasticity uses fixed per-context stiffness tables; measured here to capture <half the signal (14.551 vs 17.579 nats/step) |
-| 9 | **Physics labels mined from unused mmCIF categories** — 103,964 step geometries, 44,708 curated Mg²⁺ coordinations, 143,871 disorder records | These categories ship with every RNA structure and are used by no structure predictor |
+| 9 | **Physics labels mined from unused mmCIF categories** — 103,964 step geometries, 44,708 curated Mg²⁺ coordinations, 46,447 RNA disorder records | These categories ship with every RNA structure and are used by no structure predictor |
 | 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature) | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth. *Motivated by the literature and by measured between-family variance (0.333-1.000); our own depth split is weak evidence (Spearman +0.224, n=12)* |
-| 8 | **Per-residue disorder as a supervised head**, from 143,871 `_pdbx_unobs_or_zero_occ_residues` records | Present in every deposited structure; used by no RNA structure predictor |
+| 8 | **Per-residue disorder as a supervised head**, from 46,447 RNA `_pdbx_unobs_or_zero_occ_residues` records | Present in every deposited structure; used by no RNA structure predictor |
 | 9 | **Structure-conditioned stiffness field** feeding a harmonic ensemble, justified by a measured 3.03-nat gain of structural over sequence context | Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds dinucleotide models insufficient (pentameric couplings) |
 
 ## 12. Risks and open questions

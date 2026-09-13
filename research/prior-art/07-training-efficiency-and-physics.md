@@ -173,7 +173,7 @@ than a lookup table and the design should be abandoned.
 - **Saenger 28-class / Leontis-Westhof 12-class** base-pair annotations:
   **29 Saenger classes present**, giving a ready-made non-canonical interaction
   vocabulary for the motif machinery.
-- **`_pdbx_unobs_or_zero_occ_residues`**: **143,871 records** of unmodelled
+- **`_pdbx_unobs_or_zero_occ_residues`**: **46,447 RNA records** of unmodelled
   residues — regions too disordered to resolve, i.e. a free maximal-flexibility
   label complementary to B-factors.
 

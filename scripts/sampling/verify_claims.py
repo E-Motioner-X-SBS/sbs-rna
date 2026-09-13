@@ -64,7 +64,8 @@ def main() -> int:
     chk("annotated base-pair steps", bp["total_annotated_steps"], 103964)
     chk("stiffness contexts (n>=200)", len(bp["stiffness_by_step_context"]), 76)
     chk("curated Mg coordination records", bp["metal_coordination_by_ion"]["MG"], 44708)
-    chk("unobserved-residue records", bp["unobserved_residue_records"], 143871)
+    chk("unobs residues, RNA only", bp["unobserved_residue_records_RNA"], 46447)
+    chk("unobs residues, all polymers", bp["unobserved_residue_records_ALL_POLYMERS"], 143871)
     gg = bp["stiffness_by_step_context"]["GG/CC"]["mean"]
     chk("GG/CC rise (A-form check)", gg["rise"], 3.14, tol=0.02)
     chk("GG/CC twist (A-form check)", gg["twist"], 29.98, tol=0.02)
@@ -116,7 +117,10 @@ def main() -> int:
                 # PHAROS-Small is the current headline config; 910M/382M survives
                 # only as the superseded Base row in the progression tables.
                 "149", "61",
-                "103,964", "44,708", "143,871", "14.551", "17.579", "115", "1.757"]:
+                "103,964", "44,708",
+                # RNA-only disorder labels; 143,871 was the all-polymer total
+                # and 67.5% of it is protein (defect #11, cycle 2).
+                "46,447", "14.551", "17.579", "115", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")
