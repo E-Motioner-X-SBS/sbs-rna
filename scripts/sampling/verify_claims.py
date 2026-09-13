@@ -69,6 +69,12 @@ def main() -> int:
     chk("GG/CC rise (A-form check)", gg["rise"], 3.14, tol=0.02)
     chk("GG/CC twist (A-form check)", gg["twist"], 29.98, tol=0.02)
 
+    # derive the stiffness ratio from UNROUNDED values -- quoting it from the
+    # 4-dp rounded display once produced a spurious 134x instead of 115x
+    fcs = sorted((v["force_constants_diag"]["twist"]
+                  for v in bp["stiffness_by_step_context"].values()), reverse=True)
+    chk("stiffness ratio (stiffest/floppiest twist)", round(fcs[0]/fcs[-1], 1), 115.1, tol=0.01)
+
     hr = load("stiffness_headroom.json")
     chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.579, tol=0.001)
     chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551, tol=0.001)
