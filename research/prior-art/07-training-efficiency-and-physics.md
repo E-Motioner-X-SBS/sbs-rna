@@ -131,12 +131,33 @@ log-likelihood per step (`measure_stiffness_headroom.py`, 103,964 steps):
 | M2 | **sequence x structural context** | **14.551** | **+3.028 further** |
 | — | structural context *alone*, ignoring sequence | 17.847 | 1.877 |
 
-**Structural context buys more than sequence context does** (3.028 vs 2.144
-nats), and structure alone is nearly as informative as sequence alone. A
-dinucleotide lookup table therefore captures **less than half** the available
-signal — and this is with only a crude 2-bit structural descriptor (is the pair
-canonical? is it inside a helical run of >= 4?). A learned encoder with the full
-representation should do better still.
+**Sequence and structural context are near-equal, complementary contributors.**
+Held-out: sequence +1.7847, structure-only +1.7409, and combining them adds a
+further +1.0336 beyond sequence. (An earlier version claimed structure buys
+*more* than sequence, 3.028 vs 2.144; that was an in-sample artefact — see the
+correction table below.)
+
+| Model | in-sample (published) | **held-out, common subset** |
+|---|---|---|
+| M0 global | 19.7235 | **18.1607** |
+| M1 sequence context | 17.5792 | **16.3760** (gain **1.7847**) |
+| M_struct structure only | 17.8470 | **16.4198** (gain **1.7409**) |
+| M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
+
+> **Corrected in cycle 2 (REV-2).** The published figures fit every group
+> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
+> M2's subset is the better-populated, more regular steps. Rescored on the
+> common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
+> falls from 3.0282 to **1.0336 nats (2.9x)** and **the order inverts**:
+> sequence adds more than structure, not less.
+>
+> **What survives, and it is enough**: structural context still adds a real
+> **+1.03 nats beyond sequence**. Sequence-alone (+1.78) and structure-alone
+> (+1.74) are near-identical and complementary — 3.53 nats if they were
+> independent against 2.82 actual. So an encoder reading **both** is correct,
+> and a sequence-keyed dinucleotide lookup table still leaves ~1.03 nats
+> unused. Only the comparative superlative is retracted.
 
 The table also has a coverage hole: only 76 contexts reach n >= 200, covering
 90,098 of 103,964 steps (**86.7%**). The remaining 13,866 steps — the unusual,

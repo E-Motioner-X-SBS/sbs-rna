@@ -983,7 +983,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <h3>Why this must be learned, not tabulated</h3>
       <p class="note">Gaussian NLL per step over all 103,964 steps — lower is better</p>
       <figure style="margin:0">
-        <svg viewBox="0 0 440 210" role="img" aria-label="Adding structural context lowers NLL more than sequence context does">
+        <svg viewBox="0 0 440 210" role="img" aria-label="Sequence and structural context lower NLL by near-equal amounts and combine">
           <line x1="56" y1="170" x2="424" y2="170" stroke="var(--rule)"/>
           <g font-family="var(--mono)" font-size="9" fill="var(--ink-3)">
             <text x="50" y="174" text-anchor="end">14</text>
@@ -1000,16 +1000,24 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           <g font-family="var(--mono)" font-size="9.5" fill="var(--ink-2)" text-anchor="middle">
             <text x="115" y="186">M0 none</text>
             <text x="215" y="186">M1 sequence</text><text x="215" y="198" fill="var(--ink-3)">= a lookup table</text>
-            <text x="315" y="186">M2 seq × structure</text><text x="315" y="198" fill="var(--mg)">+3.028 further</text>
+            <text x="315" y="186">M2 seq × structure</text><text x="315" y="198" fill="var(--mg)">+1.03 held-out</text>
           </g>
         </svg>
       </figure>
       <div class="finding" style="margin-top:14px;border-left-color:var(--warn)">
         <span class="tag" style="color:var(--warn)">Rules out the table</span>
-        <p><b>Structural context contributes more than sequence context</b> (+3.028 vs +2.144
-        nats), using only a 2-bit structural descriptor. A dinucleotide table captures under half
-        the signal and covers only <b>86.7%</b> of steps — the structurally unusual ones, which
-        matter most, get no entry at all. <b>Same lesson as the GNRA negative result in §02.</b></p>
+        <p><b>Sequence and structural context are near-equal, complementary contributors.</b>
+        Held-out on the common subset: sequence <span class="mono">+1.7847</span>, structure-only
+        <span class="mono">+1.7409</span>, and combining them adds a further
+        <span class="mono">+1.0336</span> beyond sequence. A dinucleotide table is sequence-only,
+        so it leaves ~1.03 nats unused and covers only <b>86.7%</b> of steps — the structurally
+        unusual ones, which matter most, get no entry at all.</p>
+        <p style="margin-top:10px"><b>Corrected in cycle 2 (REV-2).</b> An earlier version of this
+        page claimed structure contributes <i>more</i> than sequence (+3.028 vs +2.144). That was
+        an artefact: each model was fitted in-sample and scored on its <i>own</i> covered subset
+        (103,964 / 90,098 / 78,076 steps), and finer partitioning lowers in-sample NLL
+        mechanically. Rescored fairly, the gain shrinks <b>2.9×</b> and <b>the order inverts</b>.
+        The learned-encoder decision stands; the superlative does not.</p>
       </div>
     </div>
   </div>
@@ -1027,8 +1035,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     pay nothing. With it, confidence has to be earned.</p>
     <div class="risk" style="margin-top:14px">
       <span class="n">GATE</span>
-      <p><b>Acceptance criterion.</b> Must reach below <b>14.551</b> nats/step on held-out
-      structures. Above <b>17.579</b> it is worse than a lookup table and the component should
+      <p><b>Acceptance criterion.</b> Must reach below <b>15.3424</b> nats/step (fair held-out M2) on held-out
+      structures. Above <b>16.376</b> (held-out sequence-only) it is worse than a lookup table and the component should
       be cut.</p>
     </div>
   </div>

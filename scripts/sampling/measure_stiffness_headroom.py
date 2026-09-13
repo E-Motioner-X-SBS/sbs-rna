@@ -51,7 +51,7 @@ def gauss_nll(A: np.ndarray, mu=None, C=None) -> tuple[float, int]:
     return float(0.5 * (maha.mean() + logdet + k * math.log(2 * math.pi))), len(A)
 
 
-def main():
+def collect():
     WANT = {"_ndb_struct_na_base_pair_step", "_ndb_struct_na_base_pair"}
     recs = []
     files = sorted(S.glob("*.cif.gz"))
@@ -96,6 +96,11 @@ def main():
         if k % 40 == 0:
             print(f"  {k}/{len(files)}  ({len(recs):,} steps)", flush=True)
 
+    return recs
+
+
+def main():
+    recs = collect()
     A = np.array([r["vec"] for r in recs], float)
     print(f"\ntotal steps: {len(recs):,}")
 

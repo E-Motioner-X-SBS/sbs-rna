@@ -1,0 +1,37 @@
+{
+  "n_records": 103964,
+  "coverage": {
+    "M0": 103964,
+    "M1": 90098,
+    "Mstruct": 103964,
+    "M2": 78076
+  },
+  "common_subset": 78076,
+  "A_in_sample_common_subset": {
+    "M0": 18.1564,
+    "M1": 15.7873,
+    "Mstruct": 16.4023,
+    "M2": 14.551
+  },
+  "B_held_out_2fold": {
+    "M0": 18.1607,
+    "M1": 16.376,
+    "Mstruct": 16.4198,
+    "M2": 15.3424
+  },
+  "gains_in_sample": {
+    "sequence_over_global": 2.3691,
+    "structure_over_sequence": 1.2363,
+    "structure_only_over_global": 1.7541
+  },
+  "gains_held_out": {
+    "sequence_over_global": 1.7847,
+    "structure_over_sequence": 1.0336,
+    "structure_only_over_global": 1.7409
+  },
+  "published_gains": {
+    "sequence_over_global": 2.1443,
+    "structure_over_sequence": 3.0282,
+    "structure_only_over_global": 1.8765
+  }
+}

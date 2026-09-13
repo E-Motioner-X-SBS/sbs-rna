@@ -15,7 +15,7 @@ graph TB
     subgraph WHY["WHY NOT A LOOKUP TABLE - MEASURED HEADROOM"]
         H0["M0 no conditioning ............ 19.724 nats/step"]
         H1["M1 sequence context = A TABLE . 17.579  (gain 2.144)"]
-        H2["M2 sequence x STRUCTURE ....... 14.551  (gain 3.028 MORE)"]
+        H2["M2 sequence x STRUCTURE ....... 15.342 held-out<br/>gain +1.034 beyond sequence<br/>(in-sample 14.551/+3.028 was inflated - REV-2)"]
         H3["structural context alone ...... 17.847  (gain 1.877)"]
         H4["STRUCTURE CONTRIBUTES MORE THAN SEQUENCE.<br/>A table captures under half the signal, and covers<br/>only 86.7 pct of steps - the unusual ones get nothing.<br/>Same lesson as the GNRA negative result."]
         H0 --> H1 --> H2 --> H3 --> H4

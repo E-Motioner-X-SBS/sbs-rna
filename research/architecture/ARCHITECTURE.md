@@ -654,7 +654,7 @@ floppiest (AA/UA, 102 deg) contexts, and GC content predicts rigidity
 | M2 | sequence x structural context | **14.551** |
 | — | structural context alone | 17.847 |
 
-**Structural context contributes more than sequence context** (+3.028 vs +2.144
+**Sequence and structural context are near-equal contributors** (held-out +1.7847 vs +1.7409, with the combination adding +1.0336 beyond sequence; the in-sample +3.028 vs +2.144 was an artefact — REV-2)(
 nats), using only a 2-bit structural descriptor. A dinucleotide table captures
 under half the available signal, and covers only 86.7% of steps — the 13,866
 uncovered steps being the structurally unusual ones that matter most.
@@ -680,7 +680,7 @@ A **15.6x** difference. With 6,661 examples a model cannot reliably learn what a
 kink-turn looks like, so we hand it the geometry and let it learn only *where*
 motifs occur — the easier problem. With 103,964 deformation observations there is
 ample signal to learn a context-conditioned distribution, and the measurement in
-this section shows doing so beats any table by 3.028 nats/step.
+this section shows doing so beats a sequence-only table by **1.0336 nats/step held-out** (the in-sample 3.028 was inflated — REV-2).
 
 The rule generalises: **tabulate what is data-starved and structurally invariant;
 learn what is data-rich and context-dependent.** Both components are keyed on the
@@ -709,7 +709,7 @@ The `log det F` term is load-bearing: without it the degenerate optimum is
 be earned.
 
 **Acceptance criterion**: the encoder must reach below **14.551 nats/step** on
-held-out structures. Above **17.579** it is worse than a lookup table and the
+held-out structures. Above **16.376** (held-out sequence-only) it is worse than a lookup table and the
 component should be cut.
 
 `F_i` then *is* the local force-constant field for `E_rigid`, conditioned on
@@ -775,13 +775,30 @@ Our own headroom measurement reaches the same conclusion independently
 | M0 global | 19.7235 | — |
 | M1 sequence context | 17.5792 | 2.14 nats over global |
 | M_struct structural context only | 17.8470 | 1.88 over global |
-| **M2 sequence x structure** | **14.5510** | **3.03 nats over sequence alone** |
+| **M2 sequence x structure** | **14.5510** in-sample / **15.3424** held-out | **1.0336 nats** over sequence, held-out |
 
-**Structural context adds more than sequence context** (3.03 vs 2.14), and the
-two are complementary. This is why §7c's encoder reads the pair representation
-over a neighbourhood rather than looking up a 16-entry dinucleotide table — the
-measurement says a sequence-keyed table leaves the larger share of the signal on
-the floor.
+**Sequence and structural context are near-equal and complementary.**
+
+| Model | in-sample (published) | **held-out, common subset** |
+|---|---|---|
+| M0 global | 19.7235 | **18.1607** |
+| M1 sequence context | 17.5792 | **16.3760** (gain **1.7847**) |
+| M_struct structure only | 17.8470 | **16.4198** (gain **1.7409**) |
+| M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
+
+> **Corrected in cycle 2 (REV-2).** The published figures fit every group
+> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
+> M2's subset is the better-populated, more regular steps. Rescored on the
+> common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
+> falls from 3.0282 to **1.0336 nats (2.9x)** and **the order inverts**:
+> sequence adds more than structure, not less.
+>
+> **What survives, and it is enough**: structure still adds a real **+1.03 nats
+> beyond sequence**. Sequence-alone (+1.78) and structure-alone (+1.74) are
+> near-identical and complementary — 3.53 nats if independent against 2.82
+> actual. An encoder reading **both** is correct, and a sequence-keyed lookup
+> table still leaves ~1.03 nats unused. Only the superlative is retracted.
 
 ### What this does NOT claim
 
@@ -1266,7 +1283,7 @@ isolated vs complexed context.*
 | 9 | **Physics labels mined from unused mmCIF categories** — 103,964 step geometries, 44,708 curated Mg²⁺ coordinations, 46,447 RNA disorder records | These categories ship with every RNA structure and are used by no structure predictor |
 | 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature) | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth. *Motivated by the literature and by measured between-family variance (0.333-1.000); our own depth split is weak evidence (Spearman +0.224, n=12)* |
 | 8 | **Per-residue disorder as a supervised head**, from 46,447 RNA `_pdbx_unobs_or_zero_occ_residues` records | Present in every deposited structure; used by no RNA structure predictor |
-| 9 | **Structure-conditioned stiffness field** feeding a harmonic ensemble, justified by a measured 3.03-nat gain of structural over sequence context | Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds dinucleotide models insufficient (pentameric couplings) |
+| 9 | **Structure-conditioned stiffness field** feeding a harmonic ensemble, justified by a measured +1.03-nat held-out gain of structure *beyond* sequence, the two being near-equal on their own | Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds dinucleotide models insufficient (pentameric couplings) |
 
 ## 12. Risks and open questions
 

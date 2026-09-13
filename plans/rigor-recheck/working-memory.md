@@ -85,6 +85,29 @@
   recycle 0 is undefined. B_elec has an explicit first-pass rule; the router
   does not.
 
+- DISC-17 [DEFECT #12, METHOD]: `measure_stiffness_headroom.py` fits every
+  group Gaussian in-sample and scores each model on its own covered subset
+  (M0 103,964 / M1 90,098 / M2 78,076 steps). Finer partitioning lowers
+  in-sample NLL mechanically, and M2's subset is the well-populated, more
+  regular steps. Both biases inflate M2.
+
+## Reversals (cycle 2)
+- REV-2 [MAJOR]: "structural context contributes more than sequence context".
+  FROM: +3.0282 nats structure-over-sequence vs +2.1443 sequence-over-global,
+        used to justify the learned stiffness encoder over a lookup table and
+        quoted in ARCHITECTURE.md, main.tex, blueprint and prior-art 07/08.
+  TO:   on the common 78,076-step subset with 2-fold held-out scoring,
+        structure-over-sequence is **+1.0336** and sequence-over-global is
+        **+1.7847** — the order INVERTS and the gain shrinks 2.9x.
+  SURVIVES: structural context still adds a real +1.03 nats beyond sequence.
+        Sequence-alone (+1.7847) and structure-alone (+1.7409) are near-equal
+        and complementary (3.53 if independent vs 2.82 actual), so an encoder
+        reading BOTH is still correct and a sequence-only lookup table still
+        leaves ~1.03 nats unused. The architectural decision stands; only the
+        comparative superlative is retracted.
+  ALSO:  the §7c acceptance gate "below 14.551 nats/step" was an in-sample
+        number on a favourable subset. Fair held-out M2 is **15.3424**.
+
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly

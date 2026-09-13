@@ -1188,19 +1188,29 @@ negative log-likelihood per step over all 103{,}964 steps.
 \midrule
 M0 & none & $19.724$ & --- \\
 M1 & sequence context (\emph{a lookup table}) & $17.579$ & $2.144$ \\
-M2 & sequence $\times$ structural context & $\mathbf{14.551}$ & $\mathbf{+3.028}$ \\
+M2 & sequence $\times$ structural context & $\mathbf{14.551}$ & $\mathbf{+1.0336}$ held-out \\
 --- & structural context alone & $17.847$ & $1.877$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Structural context contributes more than sequence context}
-($+3.028$ versus $+2.144$ nats), and this uses only a two-bit structural
-descriptor---whether the pair is canonical, and whether it sits inside a helical
-run of at least four. A dinucleotide table therefore captures under half the
-available signal. It also has a coverage hole: only 76 contexts reach
-$n \geq 200$, covering $90{,}098$ of $103{,}964$ steps ($86.7\%$), leaving the
-$13{,}866$ structurally unusual steps---the interesting ones---with no entry.
+\textcolor{risk}{\textbf{Corrected in cycle 2 (REV-2).}} The figures above fit
+every group \emph{in-sample} and scored each model on its \emph{own} covered
+subset ($103{,}964$ / $90{,}098$ / $78{,}076$ steps). Finer partitioning lowers
+in-sample NLL mechanically, and M2's subset is the better-populated, more
+regular steps. Rescored on the common $78{,}076$ steps with two-fold held-out
+evaluation: M0 $18.1607$, M1 $16.3760$ (gain $\mathbf{1.7847}$),
+M$_{\text{struct}}$ $16.4198$ (gain $1.7409$), M2 $15.3424$
+(gain over sequence $\mathbf{1.0336}$). Structure-over-sequence falls
+$2.9\times$ and \textbf{the order inverts}: sequence adds more than structure.
+
+What survives is enough. Structure still adds a real $+1.03$ nats \emph{beyond}
+sequence, and sequence-alone ($+1.78$) and structure-alone ($+1.74$) are
+near-identical and complementary---$3.53$ nats if independent against $2.82$
+actual. An encoder reading \textbf{both} is therefore correct, and a
+sequence-keyed dinucleotide lookup table still leaves $\sim$$1.03$ nats unused.
+Only the comparative superlative is retracted.
+
 
 \paragraph{The design.} A \textbf{stiffness encoder} consumes the trunk and pair
 representations at each step and emits a mean $\mu_i \in \mathbb{R}^6$ and a
@@ -1609,10 +1619,10 @@ M$_{\text{struct}}$ structural context only & $17.8470$ & $1.88$ over global \\
 \end{tabular}
 \end{table}
 
-Structural context adds more than sequence context, and the two are
-complementary. A sequence-keyed dinucleotide lookup table leaves the larger share
-of the signal unused, which is why the encoder reads the pair representation over
-a neighbourhood instead.
+Sequence and structural context are near-equal, complementary contributors
+(held-out $+1.7847$ and $+1.7409$; the combination adds a further $+1.0336$
+beyond sequence). An earlier version claimed structure dominates; that was an
+in-sample artefact, corrected in Section~\ref{sec:dyn} (REV-2).
 
 \subsection{What this does not claim}
 

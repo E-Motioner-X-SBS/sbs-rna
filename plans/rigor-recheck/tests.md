@@ -225,3 +225,52 @@ than fixed decimals.
 > Defect #10, and the second caused by *formatting* rather than logic (the first
 > being trailing-space column names). Numbers that survive a correctness review
 > can still be wrong at the precision they are quoted to.
+
+## Cycle 2
+
+### S1 — disorder-label count RNA-only? — **DEFECT #11**
+Independent parser reproduces the documented total exactly (143,871), then splits:
+protein/other 97,131 (67.5%) · **RNA 46,447 (32.3%)** · DNA 293.
+`extract_basepair_geometry.py:163` had `n_unobs += len(rows)` with no residue
+filter. A novelty claim was overstated **3.1x**. Corrected everywhere; the
+extractor now reports RNA/DNA/protein separately and the guard re-derives both.
+
+### S2 — A100-hours 299 vs 79 — **PASS, not a discrepancy**
+The lever table is cumulative, not parallel. Chained: 1883 /1.42 -> 1326
+/4.43 -> 299 /2.00 -> 150 /1.60 -> 94 /1.19 -> 79. Total 24.0x. Both figures
+are correct at different points in the chain. **My suspicion was wrong.**
+
+### S3 — right-sizing arithmetic — **PASS exact**
+attention 4d^2*16 = 16.78M (doc 16.8M); MoE total 34*3*512*128*16 = 106.95M
+(doc 107.0M); active 6/34 -> 18.87M (doc 18.9M); TOTAL 148.73M (doc 149M);
+ACTIVE 60.65M (doc 61M); 16x8 = 128 vs 32x3 = 96 layers; 1401/149 = 9.40x.
+Size ladder consistent with cost ~ 6*N_active: Small 299 h, Mini predicted
+147.0 vs doc 148, Micro predicted 58.8 vs doc 61.
+
+### S4 — stiffness headroom NLLs — **DEFECT #12, and it REVERSES the claim**
+Each model was fitted **in-sample** and scored on its **own covered subset**
+(M0 103,964 / M1 90,098 / M2 78,076 steps). Finer partitioning lowers in-sample
+NLL mechanically, and M2's subset is the better-populated, more regular steps.
+
+Rescored on the common 78,076 steps, 2-fold held-out
+(`measure_stiffness_headroom_heldout.py`):
+
+| Model | in-sample (published) | held-out, common subset |
+|---|---|---|
+| M0 global | 19.7235 | 18.1607 |
+| M1 sequence | 17.5792 | 16.3760 (gain **1.7847**) |
+| M_struct structure only | 17.8470 | 16.4198 (gain 1.7409) |
+| M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
+
+structure-over-sequence: **3.0282 -> 1.0336, a 2.9x shrink, and the order
+INVERTS** — sequence adds more than structure.
+
+**Survives**: structure still adds a real +1.03 nats beyond sequence;
+sequence-alone (+1.78) and structure-alone (+1.74) are near-equal and
+complementary (3.53 if independent vs 2.82 actual). The learned-encoder
+decision stands; only the superlative is retracted (REV-2). The §7c acceptance
+gate moved from 14.551 to **15.3424** (fair held-out M2).
+
+> Also refactored `collect()` out of the original `main()` so both scripts share
+> one extractor rather than a duplicated parser that could drift. Verified the
+> refactor reproduces all four published NLLs exactly before relying on it.

@@ -64,6 +64,10 @@ def main() -> int:
     chk("annotated base-pair steps", bp["total_annotated_steps"], 103964)
     chk("stiffness contexts (n>=200)", len(bp["stiffness_by_step_context"]), 76)
     chk("curated Mg coordination records", bp["metal_coordination_by_ion"]["MG"], 44708)
+    ho = json.load(open(A / "stiffness_headroom_heldout.json"))
+    chk("held-out M2 (common subset)", ho["B_held_out_2fold"]["M2"], 15.3424)
+    chk("held-out structure-beyond-sequence", ho["gains_held_out"]["structure_over_sequence"], 1.0336)
+    chk("held-out sequence-over-global", ho["gains_held_out"]["sequence_over_global"], 1.7847)
     chk("unobs residues, RNA only", bp["unobserved_residue_records_RNA"], 46447)
     chk("unobs residues, all polymers", bp["unobserved_residue_records_ALL_POLYMERS"], 143871)
     gg = bp["stiffness_by_step_context"]["GG/CC"]["mean"]
@@ -120,7 +124,10 @@ def main() -> int:
                 "103,964", "44,708",
                 # RNA-only disorder labels; 143,871 was the all-polymer total
                 # and 67.5% of it is protein (defect #11, cycle 2).
-                "46,447", "14.551", "17.579", "115", "1.757"]:
+                "46,447",
+                # held-out, common-subset figures (REV-2); the in-sample
+                # 14.551 / 17.579 pair was not a fair comparison.
+                "15.342", "16.376", "1.0336", "115", "1.757"]:
         missing = [k for k, v in txt.items() if tok not in v]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} "
               f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")

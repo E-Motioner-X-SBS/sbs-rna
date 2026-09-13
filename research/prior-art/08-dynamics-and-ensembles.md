@@ -89,11 +89,29 @@ n >= 200.
 | M_struct structural context only | 17.8470 | 1.88 over global |
 | **M2 sequence x structure** | **14.5510** | **3.03 nats** over sequence alone |
 
-**Structural context adds more than sequence context does** (3.03 vs 2.14), and
-the two are complementary rather than redundant. This independently reproduces
-the literature's conclusion that dinucleotide *sequence* models are insufficient
-— and says what to do instead: condition stiffness on the predicted pair
-representation, not on the k-mer.
+**Sequence and structural context are near-equal and complementary** — not,
+as an earlier version claimed, structure dominating sequence.
+
+| Model | in-sample (published) | **held-out, common subset** |
+|---|---|---|
+| M0 global | 19.7235 | **18.1607** |
+| M1 sequence context | 17.5792 | **16.3760** (gain **1.7847**) |
+| M_struct structure only | 17.8470 | **16.4198** (gain **1.7409**) |
+| M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
+
+> **Corrected in cycle 2 (REV-2).** The published figures fit every group
+> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
+> M2's subset is the better-populated, more regular steps. Rescored on the
+> common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
+> falls from 3.0282 to **1.0336 nats (2.9x)** and **the order inverts**:
+> sequence adds more than structure, not less.
+>
+> **What survives, and it is enough**: structure still adds a real **+1.03 nats
+> beyond sequence**. Sequence-alone (+1.78) and structure-alone (+1.74) are
+> near-identical and complementary — 3.53 nats if independent against 2.82
+> actual. An encoder reading **both** is correct, and a sequence-keyed lookup
+> table still leaves ~1.03 nats unused. Only the superlative is retracted.
 
 ### (c) Disorder labels nobody is using [measured]
 
