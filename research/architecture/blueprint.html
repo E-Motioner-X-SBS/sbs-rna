@@ -1398,10 +1398,10 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <div class="tablewrap" style="border:none">
         <table style="min-width:0">
           <tbody>
-            <tr><td>Structures containing protein</td><td class="num">157/162 = 96.9%</td></tr>
-            <tr><td>Median protein chains when present</td><td class="num">11</td></tr>
-            <tr><td>Structures with &gt;1 RNA chain</td><td class="num">118/162 = 72.8%</td></tr>
-            <tr class="total"><td><b>RNA residues in protein-containing entries</b></td><td class="num"><b>99.70%</b></td></tr>
+            <tr><td>Structures containing protein</td><td class="num">158/179 = 88.3%</td></tr>
+            <tr><td>Median protein chains when present</td><td class="num">10.5</td></tr>
+            <tr><td>Structures with &gt;1 RNA chain</td><td class="num">132/179 = 73.7%</td></tr>
+            <tr class="total"><td><b>RNA residues in protein-containing entries</b></td><td class="num"><b>98.95%</b></td></tr>
           </tbody>
         </table>
       </div>
@@ -1415,9 +1415,9 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
 
     <div class="panel">
       <h3>G3 — the residue statistics are ribosome measurements</h3>
-      <p class="note">60 of 162 ribosome-like entries = 37.0% of structures</p>
-      <p style="font-size:34px;font-family:var(--display);color:var(--burnt);margin:6px 0 2px">93.35%</p>
-      <p style="font-size:13px;color:var(--ink-3);margin:0 0 12px">of all RNA residues (286,458 / 306,857) come from them</p>
+      <p class="note">60 of 179 ribosome-like entries = 33.5% of structures</p>
+      <p style="font-size:34px;font-family:var(--display);color:var(--burnt);margin:6px 0 2px">92.65%</p>
+      <p style="font-size:13px;color:var(--ink-3);margin:0 0 12px">of all RNA residues (286,458 / 309,197) come from them</p>
       <p style="font-size:13.5px;color:var(--ink-2);margin:0">Stiffness, ion coordination, block
       occupancy and the contact-scaling law are therefore predominantly <i>ribosomal</i>.
       <b>Mitigation already present, by luck rather than design</b>: the length-binned tables
@@ -1453,8 +1453,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="panel">
       <h3>G1 · G6 — scope and one undefined behaviour</h3>
       <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>G1 length.</b> Longest
-      chain: median 86.5 nt, max 3,764 — every single chain fits 4096. But <i>total</i> RNA per
-      entry reaches <b>11,478</b>, and 44 of 162 entries exceed the context. lncRNAs (~19 knt)
+      chain: median 70 nt, max 3,764 — every single chain fits 4096. But <i>total</i> RNA per
+      entry reaches <b>11,478</b>, and 44 of 179 entries exceed the context. lncRNAs (~19 knt)
       and viral genomes (~30 knt) are an order of magnitude beyond it.</p>
       <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px"><b>G6 router circularity.</b>
       The router reads pairing probability, rigidity and density — all produced by the pair track,
@@ -1470,48 +1470,63 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   </div>
 
   <div class="panel" style="margin-top:20px;border-left:3px solid var(--warn)">
-    <h3>Re-derived canonically (cycle 6, defects #22 · #23 · #24)</h3>
+    <h3>Re-derived canonically (cycles 6–7, defects #22 · #23 · #24 · #25)</h3>
     <p class="note">every script had its own definition of "an RNA residue" — they disagreed on 72 of 180 structures</p>
     <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 12px">mmCIF <b>declares</b> polymer
     type. A residue is RNA iff its chain's <span class="mono">_entity_poly.type</span> is
     <span class="mono">polyribonucleotide</span> <b>and</b> it occupies a polymer position
     (<span class="mono">label_seq_id</span> assigned — which excludes the water and ions sharing
-    that chain). One shared resolver now.</p>
+    that chain). Hybrid DNA/RNA chains are split per residue by the presence of an
+    <span class="mono">O2'</span> atom — a structural test, not a name list, so it does not
+    reintroduce the problem it is fixing. One shared resolver, 20 tested properties.</p>
     <div class="tablewrap" style="border:none">
       <table style="min-width:0">
-        <thead><tr><th>Finding</th><th class="num">published</th><th class="num">canonical</th><th></th></tr></thead>
+        <thead><tr><th>Finding</th><th class="num">published</th><th class="num">cycle 6</th><th class="num">canonical</th><th></th></tr></thead>
         <tbody>
-          <tr><td>structures with a declared RNA entity</td><td class="num">180</td><td class="num">162</td><td>18 had none</td></tr>
-          <tr><td>RNA residues</td><td class="num">308,370</td><td class="num">306,857</td><td>−0.5%</td></tr>
-          <tr class="total"><td>G2 RNA residues in complexes</td><td class="num">98.96%</td><td class="num">99.70%</td><td style="color:var(--mg)">stronger</td></tr>
-          <tr><td>G3 residues ribosomal</td><td class="num">93.07%</td><td class="num">93.35%</td><td>unchanged</td></tr>
-          <tr class="total"><td>G7 outside A/C/G/U</td><td class="num">8.90%</td><td class="num">1.04%</td><td style="color:var(--warn)"><b>8.6× too high</b></td></tr>
-          <tr><td>G7 distinct modification types</td><td class="num">8</td><td class="num">76</td><td>undercounted</td></tr>
-          <tr><td>G1 longest chain, median / max</td><td class="num">67 / 3,679</td><td class="num">86.5 / 3,764</td><td>short non-RNA chains had dragged the median down</td></tr>
-          <tr><td>G2 structures with &gt;1 RNA chain</td><td class="num">150/180 = 83.3%</td><td class="num">118/162 = 72.8%</td><td>−10.5 pts</td></tr>
-          <tr><td>G3 ribosome-like entries</td><td class="num">61/180 = 33.9%</td><td class="num">60/162 = 37.0%</td><td>+3.1 pts</td></tr>
+          <tr><td>structures with countable RNA</td><td class="num">180</td><td class="num">162</td><td class="num">179</td><td>7PU7 is modelled all-DNA</td></tr>
+          <tr><td>RNA residues</td><td class="num">308,370</td><td class="num">306,857</td><td class="num">309,197</td><td>+0.3%</td></tr>
+          <tr><td>G1 longest chain, median</td><td class="num">67</td><td class="num">86.5</td><td class="num">70</td><td></td></tr>
+          <tr><td>G2 structures with protein</td><td class="num">88.3%</td><td class="num">96.9%</td><td class="num">88.3%</td><td>unchanged</td></tr>
+          <tr><td>G2 structures with &gt;1 RNA chain</td><td class="num">83.3%</td><td class="num">72.8%</td><td class="num">73.7%</td><td>−9.6 pts</td></tr>
+          <tr class="total"><td>G2 RNA residues in complexes</td><td class="num">98.96%</td><td class="num">99.70%</td><td class="num">98.95%</td><td><b>unchanged</b></td></tr>
+          <tr><td>G3 ribosome-like entries</td><td class="num">33.9%</td><td class="num">37.0%</td><td class="num">33.5%</td><td></td></tr>
+          <tr><td>G3 residues ribosomal</td><td class="num">93.07%</td><td class="num">93.35%</td><td class="num">92.65%</td><td>−0.4 pts</td></tr>
+          <tr class="total"><td>G7 outside A/C/G/U</td><td class="num">8.90%</td><td class="num">1.04%</td><td class="num">1.05%</td><td style="color:var(--warn)"><b>8.5× too high</b></td></tr>
+          <tr><td>G7 distinct modification types</td><td class="num">8</td><td class="num">76</td><td class="num">82</td><td>undercounted 10×</td></tr>
         </tbody>
       </table>
     </div>
     <div class="finding" style="margin-top:14px">
       <span class="tag">Net effect</span>
-      <p><b>G2 strengthens and G3 is unchanged.</b> G7's number was wrong — the 8.90% counted
-      DNA from hybrid duplexes (DT 4,608 · DG 4,556 · DA 4,440 · DC 4,135) and UNK records
-      (7,036) not in RNA chains at all: <b>24,775 of the 27,437</b> "modified" instances. But
-      <b>the argument survives on better ground</b>: <b>3,189</b> genuinely-RNA residues are
-      modified — 1.04% — across <b>76 distinct types</b>, led by pseudouridine. Seventy-six chemically distinct
-      modifications is a stronger case for widening the vocabulary than a percentage inflated
-      by DNA ever was.</p>
+      <p><b>G2 and G3 are unchanged from the published figures.</b> G7's number was wrong — the
+      8.90% counted DNA from hybrid duplexes (DT 4,608 · DG 4,556 · DA 4,440 · DC 4,135) and UNK
+      records (7,036) not in RNA chains at all: <b>24,775 of the 27,437</b> "modified" instances,
+      90% contamination. But <b>the argument survives on better ground</b>: <b>3,237</b>
+      genuinely-RNA residues are modified — 1.05% — across <b>82 distinct types</b>, led by
+      pseudouridine (1,003). Eighty-two chemically distinct modifications is a stronger case for
+      widening the vocabulary than a percentage inflated by DNA ever was.</p>
     </div>
     <div class="finding" style="margin-top:12px;border-left-color:var(--warn)">
       <span class="tag" style="color:var(--warn)">Defect #24 — partial propagation</span>
       <p>The first pass at this correction updated <b>four of the eleven affected numbers</b> and
-      stopped. G2's protein row moved to the 162-structure basis while the multi-chain row directly
-      beneath it stayed on 180; G3 carried the canonical <i>ratio</i> 93.35% over a stale
-      numerator and denominator. <b>Three tables were left mixing two denominators inside one
-      row-set</b> — a state no reader could detect and no test caught, because every individual
-      number was defensible in isolation. All eleven are now on the 162 basis, and the denominator
-      is stated in the section preamble rather than implied.</p>
+      stopped, leaving three tables mixing the 180 and 162 denominators inside one row-set; and an
+      unguarded global replace overwrote the <b>published</b> column of this very table, making it
+      read "99.70 → 99.70". Third occurrence of that failure mode. Vigilance was already in place
+      and failed, so the fix is a guard: <b>every correction row must retain both columns</b>, and
+      a stale denominator may appear at most once per document, or the build fails.</p>
+    </div>
+    <div class="finding" style="margin-top:12px;border-left-color:var(--warn)">
+      <span class="tag" style="color:var(--warn)">Defect #25 — half the format was never parsed</span>
+      <p>mmCIF serialises a category two ways: a <span class="mono">loop_</span> form, and a
+      key-value form (<span class="mono">_entity_poly.tag&nbsp;&nbsp;value</span>) used when the
+      category has exactly one row. The resolver handled only the first, so <b>16 of 180
+      structures silently parsed to zero RNA</b>. They are not a random sixteen — one polymer
+      entity means a <i>small isolated RNA</i>, precisely the population G2 makes a claim about —
+      and their absence inflated "RNA residues in complexes" from 98.95% to a spurious
+      <b>99.70%</b>. <b>Cycle 6 reported that inflation as a finding: "G2 strengthens".</b> A
+      defect introduced while auditing a definition produced a false result which the audit then
+      published, and it surfaced only because the next cycle asked why 18 entries in a
+      non-redundant <i>RNA</i> list appeared to contain no RNA.</p>
     </div>
   </div>
 

@@ -1,39 +1,40 @@
-# Plan — Cycle 6: one canonical definition of "an RNA residue"
+# Plan — Cycle 7: audit the cycle-6 audit
 
 ## Why this framing
 
-Cycles 3-5 established that **derived** quantities fail more often than
-measurements, and cycle 5 sharpened it: the newest failures are *absences* —
-a component never specified, a check never run on anything but its first
-subject. Cycle 6 tests the most basic absence available:
+Cycle 6 closed with an open question it judged harmless: 18 of 180 structures in
+a non-redundant *RNA* list appeared to contain no RNA. The reasoning for
+deferring it was "they contribute zero residues under either definition, so no
+published number depends on it".
 
-> **Does the project have a definition of its own unit of measurement?**
+**That reasoning assumes the zero is real.** If the zero is a parse failure, the
+structures are silently absent from every statistic computed over the set — and
+an absence that correlates with a property (here: being a small isolated RNA)
+biases every number conditioned on that property.
 
-Every residue-weighted number in the work — stiffness, ion coordination, block
-occupancy, contact scaling, the G-findings — is a count of RNA residues. If the
-scripts disagree about what one is, every such number inherits the disagreement.
+So cycle 7 asks: **is the audit's own tooling correct?** Cycles 0-6 audited the
+measurements, the derivations, the specification and the propagation. Nothing had
+audited the instrument.
 
 ## Method
 
-1. Quantify the disagreement: run every parser over the same 180 files and diff
-   per structure, in **both** directions.
-2. Derive the authoritative definition from the format itself, not from a
-   curated residue list. mmCIF *declares* polymer type.
-3. Implement it once, in `src/pharos/data/`, and **test it** — a shared
-   definition that is untested only relocates the problem.
-4. Re-derive every affected finding under it.
-5. Propagate to all deliverables. **Audit the propagation**, because cycle 4
-   already showed a repair can introduce its own defect (#18b).
+1. Take the 18 structures and look at the raw file, not the parser output.
+2. Distinguish *absence* from *failure to parse*.
+3. If a failure: characterise what class of file it hits, and whether that class
+   is random with respect to any published claim.
+4. Fix, re-derive, re-propagate — and re-run the guards written in cycle 6,
+   which exist precisely to catch propagation errors of this kind.
+5. Extend the test suite so the failure class is asserted against, not merely
+   fixed.
 
 ## Step-locked order
 
 | Step | Target | Outcome |
 |---|---|---|
-| C1 | Diff the parsers per structure | **defect #22** — disagree on 72/180 |
-| C2 | Build `mmcif_entities.py` from `_entity_poly.type` | first run: 404,205 |
-| C3 | Why is it 24.87% non-ACGU? | **defect #23** — HOH/MG in RNA auth chains |
-| C4 | Add the `label_seq_id` polymer test | 306,857, 1.04%, solvent leakage 0 |
-| C5 | Re-derive G1/G2/G3/G7 canonically | G2 strengthens, G7 was 8.6x too high |
-| C6 | Propagate to ARCHITECTURE / main.tex / blueprint | partial — see C7 |
-| C7 | **Audit the propagation itself** | **defect #24** — 4 of 11 numbers moved |
-| C8 | Test the resolver; wire every suite into the guard | 15 properties, all pass |
+| C15 | Inspect the 18 raw files | 16 return **zero `_entity_poly` rows** — a parse failure |
+| C16 | Identify the class | **defect #25**: mmCIF's key-value serialisation, used for single-row categories |
+| C17 | Is the class random? | **No** — one polymer entity means a small isolated RNA, exactly G2's population |
+| C18 | Handle both serialisations | 162 -> 178 structures, 306,857 -> 309,191 residues |
+| C19 | Resolve hybrid chains per residue by `O2'` | 178 -> **179**; only 7PU7 remains, modelled all-DNA |
+| C20 | Re-derive every G-finding | **G2's "strengthening" retracted**: 99.70% -> 98.95%, i.e. the published 98.96% |
+| C21 | Re-propagate; rebuild; extend guards and tests | 39pp / 0 boxes, blueprint v24, 20 properties, ALL CLAIMS REPRODUCE |

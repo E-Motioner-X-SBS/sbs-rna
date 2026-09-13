@@ -7,36 +7,38 @@ subfolder to avoid collision.
 | Field | Value |
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
-| Cycle | **6** — one canonical definition of "an RNA residue" |
-| Phase | 6 AUDIT (cycle 6) |
+| Cycle | **7** — audit the cycle-6 audit |
+| Phase | 6 AUDIT (cycle 7) |
 | Started | 2026-09-13 (cycle 1) |
-| Open TODO | 0 open, 3 deferred to the 5B checkpoint |
-| Defects to date | **24** |
+| Open TODO | 2 open (C13, C14), 3 deferred |
+| Defects to date | **25** |
 
-## Why cycle 6 exists
+## Why cycle 7 exists
 
-Cycle 5 closed with the observation that the newest defects are **absences
-rather than errors** — components never specified, checks never run. Cycle 6
-started from a two-line discrepancy that had been visible for four cycles and
-never chased:
+Cycle 6 closed with an unexplained residual, logged as OQ-3 rather than waved
+away: **18 of 180 structures in a non-redundant _RNA_ list appeared to contain no
+RNA.** Cycle 6 reasoned that it changed no published number — they contribute
+zero residues either way — and deferred it.
 
-```
-analyze_ions_motifs.py   ->  307,965 RNA residues, 179 structures
-audit_generalization.py  ->  308,370 RNA residues, 180 structures
-```
+That reasoning was wrong, and the error was consequential.
 
-Two scripts reading the same 180 files disagreed. Neither was wrong about its
-own definition, because **there was no definition** — every script had invented
-one. That is defect #22.
+16 of the 18 were a **parser failure**, not an absence. mmCIF serialises a
+category in two forms and the resolver handled only one; the key-value form is
+what the PDB writes when a category has exactly one row — i.e. **a structure
+with a single polymer entity, which means a small isolated RNA**. Their absence
+inflated G2's "RNA residues in complexes" from 98.95% to a spurious 99.70%, and
+**cycle 6 published that inflation as a finding: "G2 strengthens".**
 
-## Scope — cycle 6
+A defect introduced while auditing a definition produced a false result which the
+audit then published, one commit before this cycle caught it.
 
-- The RNA-residue definition used by every analysis script
-- `src/pharos/data/mmcif_entities.py` (new shared resolver) + its tests
-- `scripts/sampling/audit_generalization_canonical.py` (re-derivation)
-- Every G-finding (G1, G2, G3, G7) in ARCHITECTURE.md §10e, main.tex §Generalization,
-  blueprint §16
-- The propagation of the correction itself (this is where #24 lives)
+## Scope — cycle 7
+
+- OQ-3: the 18 structures (-> **defect #25**)
+- `entity_poly_types()`: both mmCIF serialisations
+- Hybrid DNA/RNA chains: resolve per residue instead of excluding wholesale
+- Re-derive every G-finding; re-propagate to all three deliverables
+- Extend the resolver test suite to cover both forms and the hybrid rule
 
 ## Defect base rate
 
@@ -44,11 +46,14 @@ one. That is defect #22.
 |---|---|---|
 | 0 (build) | 5 | implementation bugs producing plausible numbers |
 | 1 (audit) | 4 | overclaims + a physics constant |
-| 2 | 3 | wrong population, unfair in-sample comparison, unimplemented loss |
+| 2 | 3 | wrong population, unfair comparison, unimplemented loss |
 | 3 | 2 | misattributed citation, impossible hardware |
 | 4 | 4 | mixed units, an omitted term in every cost, two unspecified components |
 | 5 | 2 | circularity, copied template without its active capacity |
-| **6** | **3** | **no shared definition; DNA/solvent contamination; partial propagation of the fix** |
+| 6 | 3 | no shared definition; DNA/solvent contamination; partial propagation |
+| **7** | **1** | **the audit's own tooling parsed half the format, and published the artifact as a result** |
 
-**Twenty-four defects. Every one produced a plausible number rather than an
-error.** Defect #24 is the first to be caused by *a previous cycle's repair*.
+**Twenty-five defects.** Defect #24 was caused by a repair; **#25 was caused by
+the audit tool itself and produced a published false finding.** The corrections
+are now a defect source in their own right, which is the whole argument for
+continuing the loop rather than declaring convergence.

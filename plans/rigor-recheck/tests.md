@@ -594,3 +594,120 @@ this sample size, and now documented in the resolver rather than silent.
 | `research/architecture/blueprint.html` | **v23**; tags balanced (section 17/17, div 232/232, table 31/31, p 156/156, tr 163/163, td 496/496) |
 | `research/architecture/ARCHITECTURE.md` | canonical basis stated in §10e preamble |
 | `scripts/sampling/verify_claims.py` | ALL CLAIMS REPRODUCE |
+
+## Cycle 7 — auditing the audit's own instrument
+
+### C15-C17 — the 18 structures were not empty, they were unparsed — **DEFECT #25**
+Cycle 6 deferred OQ-3 on the reasoning that the 18 structures "contribute zero
+residues under either definition, so no published number depends on it". That
+assumes the zero is real. Raw inspection:
+
+```
+7LNE   entity_poly rows=0   types=[]          <- 16 of these
+7PU7   entity_poly rows=3   hybrid + polypeptide
+7S3B   entity_poly rows=2   hybrid + polypeptide
+```
+
+**16 of 18 returned zero `_entity_poly` rows.** The raw file (7LNE):
+
+```
+_entity_poly.entity_id                      1
+_entity_poly.type                           polyribonucleotide
+_entity_poly.pdbx_strand_id                 A,B
+```
+
+mmCIF serialises a category in **two** forms: the `loop_` form (headers then one
+line per row) and a **key-value form** used when the category has exactly one
+row. `entity_poly_types()` handled only the loop form.
+
+**The failure class is not random.** A single polymer entity means one RNA and no
+protein partner — a *small isolated RNA*. That is exactly the population G2
+quantifies. Recovering the 16:
+
+| | cycle 6 | **cycle 7** |
+|---|---|---|
+| structures with countable RNA | 162 | **178** |
+| RNA residues | 306,857 | **309,191** |
+| **G2 RNA residues in complexes** | **99.70%** | **98.95%** |
+
+The published figure was 98.96%. **Cycle 6's headline finding — "G2 strengthens"
+— was entirely the artifact of this bug**, and it was published one commit before
+this cycle caught it.
+
+### C19 — hybrid chains resolved rather than excluded
+Cycle 6 excluded `polydeoxyribonucleotide/polyribonucleotide hybrid` chains and
+measured the loss at 6 residues. Cycle 7 resolves them instead, using a
+*structural* test that does not reintroduce the curated-list problem of defect
+#22: **ribose carries an `O2'` atom, deoxyribose does not.**
+
+| entry | hybrid chain | has O2' | no O2' |
+|---|---|---|---|
+| 7S3B | B | **U 3, C 2, G 1** | DU 1, BRU 1 |
+| 7PU7 | P, T | — | DA 11, DG 8, DC 7, DT 7 |
+| 8DFA | N | — | DC 6, DG 6, DT 3, DA 3 |
+
+BRU (5-bromo-deoxyuridine) is correctly classed as DNA by the atom test though
+its name resembles a uridine. Coverage closes at **179 of 180**; the exception is
+7PU7, whose only nucleic entity is declared hybrid and modelled entirely as
+deoxyribonucleotide — there is no RNA in its coordinates to count.
+
+### C20 — the G-findings, finally
+| Finding | published | cycle 6 | **canonical (cycle 7)** |
+|---|---|---|---|
+| structures with countable RNA | 180 | 162 | **179** |
+| RNA residues | 308,370 | 306,857 | **309,197** |
+| G1 longest chain, median / max | 67 / 3,679 | 86.5 / 3,764 | **70 / 3,764** |
+| G2 structures with protein | 88.3% | 96.9% | **88.3%** |
+| G2 structures with >1 RNA chain | 83.3% | 72.8% | **73.7%** |
+| G2 RNA residues in complexes | 98.96% | 99.70% | **98.95%** |
+| G3 ribosome-like entries | 33.9% | 37.0% | **33.5%** |
+| G3 residues ribosomal | 93.07% | 93.35% | **92.65%** |
+| G7 outside A/C/G/U | 8.90% | 1.04% | **1.05%** |
+| G7 distinct modification types | 8 | 76 | **82** |
+
+**G2 and G3 land back on the published figures.** The only finding that genuinely
+moves is G7, which was **8.5x too high** — 24,775 of its 27,437 "modified"
+instances were DNA and UNK. Its argument is stronger than before: 3,237 modified
+RNA residues across **82 distinct types**, led by pseudouridine (1,003).
+
+New measurement, not present before: **21 of 179 structures contain no protein at
+all, holding 3,257 residues = 1.05% of the corpus.** Isolated RNA is 11.7% of
+structures but 1% of residues, because isolated RNAs are small. Any "train on
+autonomous folds only" mitigation works with ~1% of the supervision.
+
+### C22 — resolver test suite extended to 20 properties — **ALL TESTS PASS**
+Added over the cycle-6 twelve:
+
+| Property | Result |
+|---|---|
+| key-value form parses (7LNE) | 2 RNA chains |
+| key-value form parses (8FEQ) | 1 RNA chain |
+| no structure silently resolves to an empty declaration | 179/180 |
+| 7S3B hybrid contributes its 6 ribonucleotides | C 2, U 3, G 1 |
+| 7S3B hybrid excludes DU and BRU (no O2') | deoxy excluded |
+| 7PU7 hybrid is all-deoxy, contributes nothing | 0 residues |
+| structures with countable RNA | 179 |
+| canonical RNA residues | 309,197 |
+| residues outside A/C/G/U | 3,237 |
+| distinct modification types | 82 |
+| pseudouridine top | PSU = 1,003 |
+
+### C23 — the guard now protects the retraction itself
+`verify_claims.py` — **ALL CLAIMS REPRODUCE**. The correction-table guard gained
+two pairs so the cycle-6 error cannot be quietly erased from the record:
+
+```
+both columns present: cycle-6 vs cycle-7 totals     306,857 -> 309,197
+both columns present: the retracted G2 strengthening  99.70 -> 98.95
+```
+
+A future edit that deletes the wrong cycle-6 numbers — tidying away the mistake —
+now fails the build. The record of a correction is itself a claim under guard.
+
+### C24 — deliverables
+| Artifact | State |
+|---|---|
+| `research/report/main.pdf` | **39 pages, 0 overfull, 0 underfull** |
+| `research/architecture/blueprint.html` | **v24**; tags balanced (div 233/233, table 31/31, p 157/157, tr 164/164, td 510/510, th 111/111) |
+| `research/architecture/ARCHITECTURE.md` | three-column published/cycle-6/canonical table |
+| `scripts/sampling/verify_claims.py` | ALL CLAIMS REPRODUCE |

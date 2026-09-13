@@ -1,35 +1,31 @@
-# Master To-Do — Cycle 6
+# Master To-Do — Cycle 7
 
 Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 
-## Priority 0 — the unit of measurement
-- [x] C1  Diff every RNA-residue parser over the same 180 files, both directions
-- [x] C2  Derive the definition from `_entity_poly.type`, not a curated list
-- [x] C3  Explain the 24.87% non-ACGU on the first canonical run
-- [x] C4  Add the `label_seq_id` polymer test; confirm solvent leakage is zero
-- [x] C5  Re-derive G1/G2/G3/G7 canonically (`audit_generalization_canonical.py`)
-- [x] C6  Propagate to ARCHITECTURE.md, main.tex, blueprint.html
-- [x] C7  **Audit the propagation** — 11 affected numbers, not 4
-- [x] C8  Test the resolver (`test_mmcif_entities.py`, 15 properties)
-- [x] C9  Wire all three suites into `verify_claims.py`
-- [x] C10 Add canonical tokens + two anti-corruption guards to `verify_claims.py`
-- [x] C11 Measure the hybrid-chain exclusion rather than assuming it immaterial
-- [x] C12 Rebuild main.pdf (39pp, 0 over/underfull); republish blueprint (v23)
+## Priority 0 — audit the instrument
+- [x] C15 Inspect the 18 "no RNA" structures in the raw mmCIF, not via the parser
+- [x] C16 Characterise the failure class (mmCIF key-value serialisation)
+- [x] C17 Establish whether the class is random w.r.t. any published claim
+- [x] C18 Handle both mmCIF serialisations in `entity_poly_types()`
+- [x] C19 Resolve hybrid DNA/RNA chains per residue via the `O2'` test
+- [x] C20 Re-derive every G-finding; retract the cycle-6 "G2 strengthens" claim
+- [x] C21 Re-propagate to ARCHITECTURE.md, main.tex, blueprint.html
+- [x] C22 Extend the resolver test suite (20 properties, both forms, hybrids)
+- [x] C23 Update `verify_claims.py` to cycle-7 values; add the cycle-6-vs-7 pair
+      to the correction-table guard so the retraction cannot be silently erased
+- [x] C24 Rebuild main.pdf (39pp, 0 over/underfull); republish blueprint (v24)
 
-## Carried forward
-- [DEFERRED: 5B checkpoint] top_k 4 -> 8 decision (defect #21)
-- [DEFERRED: 5B checkpoint] LR, warmup, loss-weight sweep
-- [DEFERRED: needs external data] RMDB Mg2+ titration acquisition for
-  ion-conditioning supervision (PDB is survivorship-biased to 5-15 mM)
-
-## Opened by cycle 6, for cycle 7
+## Carried forward — still open
 - [ ] C13 Migrate the remaining analysis scripts onto `mmcif_entities.py`.
-      They still carry their own divergent definitions, so defect #22 can
-      recur the moment one of them is re-run. `analyze_ions_motifs.py` and
-      `audit_generalization.py` are the two known-divergent ones; the other
-      13 have not been checked.
+      Raised in cycle 6 and **not done**: 13 scripts still carry their own
+      divergent RNA definitions. Cycle 7 raised its priority — the resolver has
+      now changed twice, so any script that copied an older definition is drifting
+      from the canonical one in a way nothing detects.
 - [ ] C14 Re-derive the residue-weighted measurements (stiffness, ion
       coordination, block occupancy, contact scaling) on the canonical basis.
-      Cycle 6 re-derived only the G-findings. The others were never checked
-      against the canonical count and inherit whichever definition their
-      script invented.
+      Cycles 6-7 re-derived only the G-findings.
+
+## Deferred
+- [DEFERRED: 5B checkpoint] top_k 4 -> 8 decision (defect #21)
+- [DEFERRED: 5B checkpoint] LR, warmup, loss-weight sweep
+- [DEFERRED: needs external data] RMDB Mg2+ titration acquisition

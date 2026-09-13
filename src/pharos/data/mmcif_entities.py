@@ -16,13 +16,22 @@ Neither is authoritative. mmCIF *declares* polymer type in `_entity_poly.type`:
 residue is RNA iff it sits in a chain whose entity is a polyribonucleotide --
 regardless of how exotic its modification is.
 
-Hybrid chains (`polydeoxyribonucleotide/polyribonucleotide hybrid`) are
-excluded, because the declaration does not say which of their residues are the
-RNA ones. That exclusion is a choice, so it was measured rather than assumed:
-across the 180-structure sample only 3 entries carry hybrid chains (7PU7 P/T,
-7S3B B, 8DFA N), holding 59 residues of which **6** are A/C/G/U -- 0.002% of the
-306,857 canonical total. The choice is immaterial at this sample size; if a
-future corpus carries many hybrids, resolve them per-residue instead.
+Hybrid chains (`polydeoxyribonucleotide/polyribonucleotide hybrid`) are resolved
+per residue by the presence of an `O2'` atom -- ribose has a 2'-hydroxyl,
+deoxyribose does not. That is a structural test taken from the coordinates, so it
+settles hybrids without reintroducing the curated-list problem above. Cycle 6
+excluded hybrids wholesale after measuring the loss at 6 residues; cycle 7
+resolves them instead, which closes the sample to **179 of 180** structures. The
+one remaining (7PU7) has a single nucleic entity, declared hybrid and modelled
+entirely as deoxyribonucleotide -- there is no RNA in its coordinates to count.
+
+Defect #25 (cycle 7): mmCIF serialises a category in two forms, and only the
+`loop_` form was handled. The key-value form (`_entity_poly.tag  value`) is what
+the PDB writes when a category has exactly one row -- i.e. a structure with a
+single polymer entity -- so all 16 such structures in the sample silently parsed
+to zero RNA. They are not a random 16: a lone polymer entity means a small
+isolated RNA, which is exactly the population G2 makes a claim about, and their
+absence inflated "RNA residues in complexes" from 98.95% to a spurious 99.70%.
 """
 from __future__ import annotations
 import gzip
@@ -39,46 +48,104 @@ def _open(path: Path):
 def entity_poly_types(path: Path) -> dict[str, str]:
     """auth chain id -> entity_poly.type, from the declaration itself.
 
-    Handles the `;`-delimited multi-line sequence fields that make this loop
-    awkward: tokens are accumulated across physical lines until a row is full.
+    mmCIF serialises a category in TWO forms and both occur in the PDB archive:
+
+      loop form          `loop_` / `_entity_poly.tag` headers / one line per row
+      key-value form     `_entity_poly.tag   value` -- used when the category has
+                         exactly ONE row, i.e. a structure with a single polymer
+                         entity
+
+    Defect #25 (cycle 7): only the loop form was handled, so every
+    single-polymer-entity structure parsed to `{}` and silently reported zero RNA.
+    That hit **16 of 180** sampled structures, and they are not a random 16 --
+    a lone polymer entity means a small isolated RNA, which is exactly the
+    population G2 ("99.7% of RNA residues are in complex") makes a claim about.
+
+    Both forms also allow `;`-delimited multi-line values, which the sequence
+    fields routinely use, so tokens are accumulated until a row is full.
     """
     cols: list[str] = []
     rows: list[list[str]] = []
+    kv: dict[str, str] = {}
     in_hdr = in_loop = False
     buf: list[str] = []
     semi = False
     semi_val: list[str] = []
+    semi_tag: str | None = None
+
+    def toks(s: str) -> list[str]:
+        return re.findall(r"'[^']*'|\"[^\"]*\"|\S+", s)
+
     with _open(path) as fh:
         for line in fh:
             s = line.rstrip("\n")
+
+            # a `;`-block continues until a lone `;` -- in either form
+            if semi:
+                if s.startswith(";"):
+                    semi = False
+                    val = "".join(semi_val)
+                    semi_val = []
+                    if semi_tag is not None:
+                        kv[semi_tag] = val
+                        semi_tag = None
+                    else:
+                        buf.append(val)
+                        while len(buf) >= len(cols) and cols:
+                            rows.append(buf[:len(cols)]); buf = buf[len(cols):]
+                else:
+                    semi_val.append(s)
+                continue
+
             if s.startswith("_entity_poly."):
-                cols.append(s.strip().split(".", 1)[1].split()[0])
+                tag, _, rest = s.strip().partition(" ")
+                tag = tag.split(".", 1)[1]
+                rest = rest.strip()
+                if rest:
+                    # KEY-VALUE form: the value is on this line
+                    kv[tag] = rest.strip("'\"")
+                else:
+                    # loop header, or a key whose value is the next `;` block
+                    cols.append(tag)
                 in_hdr = True
                 continue
-            if in_hdr and not in_loop:
-                if not s.strip() or s.startswith("#"):
-                    continue
-                in_loop = True
-            if in_loop:
-                if s.startswith("#") or (s.startswith("_") and not semi):
-                    break
-                if semi:
-                    if s.startswith(";"):
-                        semi = False
-                        buf.append("".join(semi_val))
-                        semi_val = []
-                    else:
-                        semi_val.append(s)
-                    if not semi and len(buf) >= len(cols):
-                        rows.append(buf[:len(cols)]); buf = buf[len(cols):]
-                    continue
-                if s.startswith(";"):
-                    semi = True
-                    semi_val = [s[1:]]
-                    continue
-                buf.extend(re.findall(r"'[^']*'|\"[^\"]*\"|\S+", s))
-                while len(buf) >= len(cols):
-                    rows.append(buf[:len(cols)]); buf = buf[len(cols):]
+
+            if not in_hdr:
+                continue
+
+            if s.startswith(";"):
+                # a value introduced by the previous bare `_entity_poly.tag`
+                semi = True
+                semi_val = [s[1:]]
+                semi_tag = cols.pop() if (cols and not in_loop and not rows) else None
+                continue
+
+            if s.startswith("#") or s.startswith("loop_"):
+                break
+            if s.startswith("_"):
+                break
+            if not s.strip():
+                continue
+
+            # a data line: we are in the loop form
+            in_loop = True
+            if not cols:
+                break
+            buf.extend(toks(s))
+            while len(buf) >= len(cols):
+                rows.append(buf[:len(cols)]); buf = buf[len(cols):]
+
+    if kv and not rows:
+        # single-row key-value form
+        t = kv.get("type", "").strip("'\"")
+        strand = kv.get("pdbx_strand_id", "").strip("'\"")
+        out: dict[str, str] = {}
+        for ch in strand.split(","):
+            ch = ch.strip()
+            if ch and ch != "?":
+                out[ch] = t
+        return out
+
     if not cols or not rows:
         return {}
     try:
@@ -86,7 +153,7 @@ def entity_poly_types(path: Path) -> dict[str, str]:
         i_strand = cols.index("pdbx_strand_id")
     except ValueError:
         return {}
-    out: dict[str, str] = {}
+    out = {}
     for r in rows:
         t = r[i_type].strip("'\"")
         for ch in r[i_strand].strip("'\"").split(","):
@@ -97,19 +164,35 @@ def entity_poly_types(path: Path) -> dict[str, str]:
 
 
 def rna_residues(path: Path):
-    """Return (rna_chain -> set of residue ids, per-chain composition counter).
+    """Return (rna_chain -> set of residue ids, composition counter, chain types).
 
-    A residue counts iff its AUTH chain is declared `polyribonucleotide`.
+    A residue counts as RNA iff:
+
+      * its AUTH chain is declared `polyribonucleotide`, **or** the chain is
+        declared a DNA/RNA hybrid and the residue carries an `O2'` atom; and
+      * it occupies a polymer position (`label_seq_id` assigned).
+
+    The `O2'` test is structural, not a name list -- ribose has a 2'-hydroxyl and
+    deoxyribose does not -- so it resolves hybrids without reintroducing the
+    curated-list problem that defect #22 was about. Verified on all three hybrid
+    entries in the sample: it splits 7S3B chain B into 6 ribo (U,C,G) and 2 deoxy
+    (DU, BRU -- 5-bromo-deoxyuridine, correctly classed as DNA), and finds 7PU7
+    and 8DFA's hybrid chains to be entirely deoxy in the modelled coordinates.
     """
     from collections import Counter, defaultdict
     types = entity_poly_types(path)
     rna_chains = {c for c, t in types.items() if t == "polyribonucleotide"}
-    if not rna_chains:
+    hyb_chains = {c for c, t in types.items()
+                  if t.startswith("polydeoxyribonucleotide/polyribonucleotide")}
+    if not rna_chains and not hyb_chains:
         return {}, Counter(), types
+    want = rna_chains | hyb_chains
     cols: list[str] = []
     in_loop = header = False
     chains: dict[str, set] = defaultdict(set)
     comp = Counter()
+    hyb_names: dict[tuple, str] = {}
+    hyb_ribo: set = set()
     with _open(path) as fh:
         for line in fh:
             s = line.rstrip("\n")
@@ -128,7 +211,7 @@ def rna_residues(path: Path):
                     continue
                 r = dict(zip(cols, p))
                 ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
-                if ch not in rna_chains:
+                if ch not in want:
                     continue
                 # POLYMER test: mmCIF assigns label_seq_id only to polymer
                 # positions. Water, ions and ligands sitting in the same auth
@@ -138,9 +221,17 @@ def rna_residues(path: Path):
                     continue
                 key = (ch, r.get("auth_seq_id", r.get("label_seq_id", "?")),
                        r.get("pdbx_PDB_ins_code", "?"))
+                if ch in hyb_chains:
+                    hyb_names[key] = r["label_comp_id"].strip('"')
+                    if r.get("label_atom_id", "").strip('"') == "O2'":
+                        hyb_ribo.add(key)
+                    continue
                 if key not in chains[ch]:
                     chains[ch].add(key)
                     comp[r["label_comp_id"].strip('"')] += 1
+    for key in hyb_ribo:
+        chains[key[0]].add(key)
+        comp[hyb_names[key]] += 1
     return chains, comp, types
 
 

@@ -86,17 +86,18 @@ def main() -> int:
     chk("stiffness ratio (stiffest/floppiest twist)", round(fcs[0]/fcs[-1], 1), 115.1, tol=0.01)
 
     gc = load("generalization_canonical.json")["summary"]
-    chk("canonical structures with RNA entity", gc["structures_with_RNA"], 162)
-    chk("canonical RNA residues", gc["G2"]["rna_residues_total"], 306857)
-    chk("G1 longest chain, median", gc["G1"]["longest_chain_median"], 86.5)
+    chk("canonical structures with RNA entity", gc["structures_with_RNA"], 179)
+    chk("canonical RNA residues", gc["G2"]["rna_residues_total"], 309197)
+    chk("G1 longest chain, median", gc["G1"]["longest_chain_median"], 70)
     chk("G1 longest chain, max", gc["G1"]["longest_chain_max"], 3764)
-    chk("G2 frac RNA res in complexes", gc["G2"]["frac_rna_residues_in_complexes"], 0.9970)
-    chk("G2 frac multi-RNA-chain", gc["G2"]["frac_multi_chain"], 0.7284)
+    chk("G2 frac RNA res in complexes", gc["G2"]["frac_rna_residues_in_complexes"], 0.9895)
+    chk("G2 frac multi-RNA-chain", gc["G2"]["frac_multi_chain"], 0.7374)
+    chk("G2 structures with protein", gc["G2"]["structures_with_protein"], 158)
     chk("G3 ribosome-like structures", gc["G3"]["ribosome_like"], 60)
-    chk("G3 frac RNA res ribosomal", gc["G3"]["frac_rna_residues"], 0.9335)
-    chk("G7 modified instances (RNA only)", gc["G7"]["modified_instances"], 3189)
-    chk("G7 frac of RNA residues", gc["G7"]["frac_of_rna_residues"], 0.01039, tol=0.01)
-    chk("G7 distinct modification types", gc["G7"]["distinct_types"], 76)
+    chk("G3 frac RNA res ribosomal", gc["G3"]["frac_rna_residues"], 0.9265)
+    chk("G7 modified instances (RNA only)", gc["G7"]["modified_instances"], 3237)
+    chk("G7 frac of RNA residues", gc["G7"]["frac_of_rna_residues"], 0.01047, tol=0.01)
+    chk("G7 distinct modification types", gc["G7"]["distinct_types"], 82)
     # defect #23: the published G7 counted DNA and UNK. Pin the contamination so
     # the 8.6x correction stays explainable rather than merely asserted.
     ga = load("generalization_audit.json")["summary"]
@@ -163,8 +164,10 @@ def main() -> int:
                 "2.571", "1.500", "115", "1.757",
                 # cycle-6 defects #22/#23/#24: the canonical RNA-residue basis.
                 # Every structure-count denominator is 162, not 180.
-                "306,857", "162", "99.70", "1.04", "86.5", "3,764",
-                "72.8", "37.0", "286,458",
+                # cycle-7 defect #25: both mmCIF serialisations now parse, so
+                # the 16 single-entity isolated RNAs are back. 179, not 162.
+                "309,197", "179", "98.95", "1.05", "3,764",
+                "73.7", "33.5", "286,458", "92.65", "3,237", "82",
                 # defect #24: the PUBLISHED column of the correction table must
                 # survive. An unguarded replace once overwrote it with the
                 # canonical values, making the table read "99.70 -> 99.70".
@@ -177,10 +180,12 @@ def main() -> int:
     arch = txt["ARCH"]
     # In the cycle-6 comparison table every row is "published | canonical". If a
     # global replace ever rewrites the published side again, these pairs vanish.
-    for pub, can, what in [("308,370", "306,857", "RNA residues"),
-                           ("98.96", "99.70", "G2 residues in complexes"),
-                           ("93.07", "93.35", "G3 residues ribosomal"),
-                           ("8.90", "1.04", "G7 outside ACGU")]:
+    for pub, can, what in [("308,370", "309,197", "RNA residues"),
+                           ("98.96", "98.95", "G2 residues in complexes"),
+                           ("93.07", "92.65", "G3 residues ribosomal"),
+                           ("8.90", "1.05", "G7 outside ACGU"),
+                           ("306,857", "309,197", "cycle-6 vs cycle-7 totals"),
+                           ("99.70", "98.95", "the retracted G2 strengthening")]:
         ok = pub in arch and can in arch
         print(f"  {'OK ' if ok else 'FAIL'} both columns present: {what:28s} "
               f"{pub} -> {can}")

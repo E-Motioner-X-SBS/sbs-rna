@@ -224,3 +224,69 @@
   no RNA entity, either the sampler or the parse of `_entity_poly` is wrong for
   those files. Priority MEDIUM — it does not affect any published number
   (they contribute 0 residues either way) but it is an unexplained 10%.
+
+## Cycle 7 decisions
+- D11: **An unexplained residual is not a harmless residual.** Cycle 6 deferred
+  OQ-3 because "those structures contribute zero residues either way". That
+  reasoning silently assumes the zero is *real* rather than a measurement
+  failure. A zero produced by a broken instrument is indistinguishable from a
+  true zero in the output, and differs entirely in the input. New rule: an
+  unexplained count is chased before the cycle closes, not deferred on the
+  grounds that it changes no number — because that is exactly what it would look
+  like if it changed every number.
+- D12: **Hybrid chains resolved structurally, not by name.** `O2'` presence is a
+  property of the coordinates. It classified BRU (5-bromo-deoxyuridine)
+  correctly as DNA, which a name-based rule would likely have got wrong.
+- D13: **The record of a correction is a claim under guard.** The cycle-6 values
+  (306,857 / 99.70%) are pinned in `verify_claims.py` alongside the cycle-7 ones,
+  so a future edit that tidies away the mistake fails the build.
+
+## Cycle 7 reversals
+- REV-9 [MAJOR, retracts a cycle-6 finding]: **"G2 strengthens to 99.70%" is
+  withdrawn.** The true canonical value is **98.95%**, materially identical to the
+  originally published 98.96%. The apparent strengthening was defect #25 dropping
+  16 small isolated RNAs from the denominator. **G2 is unchanged by the canonical
+  re-derivation.**
+- REV-10: G3 residues-ribosomal moves 93.35% -> **92.65%** (published: 93.07%).
+  Also unchanged in substance.
+- REV-11: the canonical structure count is **179**, not 162 (cycle 6) and not 180
+  (published). 7PU7 is the single genuine exception and is explained.
+- REV-12: G7's overstatement is **8.5x**, not 8.6x; 82 distinct modification
+  types, not 76; 3,237 instances, not 3,189. The direction and the argument are
+  unchanged.
+
+## Cycle 7 discoveries
+- DISC-30 [DEFECT #25]: **the audit's own instrument parsed half the format.**
+  mmCIF has a key-value serialisation for single-row categories; the resolver
+  handled only `loop_`. 16 of 180 structures silently became zero.
+- DISC-31 [THE IMPORTANT ONE]: **the defect produced a false finding that the
+  audit published.** Cycle 6 reported "G2 strengthens" as a result. It was an
+  artifact of the bug introduced in the same cycle. Six cycles had audited
+  measurements, derivations, specifications and propagation; **nothing had
+  audited the tooling doing the auditing.** That is now the standing question
+  for every cycle that builds a new instrument.
+- DISC-32 [BIAS SHAPE]: the failure class was not random — it hit exactly the
+  structures with one polymer entity, i.e. small isolated RNAs, i.e. the
+  population the affected claim is about. A parse failure that correlates with
+  the measured property is worse than noise; it is a systematic bias that
+  strengthens the claim being tested.
+- DISC-33 [NEW MEASUREMENT]: 21 of 179 structures contain no protein, holding
+  3,257 residues = **1.05% of the corpus**. Isolated RNA is 11.7% of structures
+  but ~1% of residues. Any "restrict training to autonomous folds" mitigation for
+  G2 operates on roughly one percent of the available supervision — which makes
+  option (c), reporting performance split by complexed vs isolated, the only one
+  of the three that is actually affordable.
+
+## Open Questions
+- OQ-2 [OPEN, priority HIGH -> C14]: do the residue-weighted measurements change
+  under the canonical definition? Still unanswered, and cycle 7 raises the stakes:
+  the resolver has now changed twice, so any script carrying a copied definition
+  is drifting from canonical in a way nothing currently detects.
+- OQ-3 [**ANSWERED — defect #25**]: the 18 structures were 16 parse failures plus
+  2 genuine hybrids. Now 179/180 with the single exception explained.
+- OQ-4 [OPEN, priority MEDIUM]: are there other mmCIF categories the analysis
+  scripts read where the same two-serialisation problem applies? `_exptl`,
+  `_entity_poly_seq`, `_ndb_struct_na_base_pair_step` and `_struct_conn` are all
+  read by loop-oriented parsers. Any of them written in key-value form in a
+  small structure would fail identically and silently. **This is the direct
+  generalisation of #25 and should open cycle 8.**

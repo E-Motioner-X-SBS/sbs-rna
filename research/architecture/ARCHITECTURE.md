@@ -1251,25 +1251,28 @@ properties for RNA in general. `scripts/sampling/audit_generalization.py`
 tests that against the 180 sampled structures instead of asserting it.
 **Four limits are real and three were previously undocumented.**
 
-**Basis (cycle 6, defects #22/#23/#24).** Every table below was re-derived by
+**Basis (cycles 6-7, defects #22-#25).** Every table below was re-derived by
 `audit_generalization_canonical.py` under the single canonical RNA definition
 (§ below): a residue is RNA iff its chain declares
-`_entity_poly.type = polyribonucleotide` *and* it occupies a polymer position.
-**162 of the 180 sampled structures contain an RNA polymer entity**, and all
-structure-count denominators here are therefore 162, not 180. The first pass at
-this correction updated only four of the eleven affected numbers, leaving three
-tables mixing the two denominators — that inconsistency is defect #24.
+`_entity_poly.type = polyribonucleotide` *and* it occupies a polymer position,
+with hybrid DNA/RNA chains split per residue by the presence of an `O2'` atom.
+**179 of the 180 sampled structures carry countable RNA**, so every
+structure-count denominator here is 179. The one exception is 7PU7, whose only
+nucleic entity is declared hybrid and modelled entirely as deoxyribonucleotide.
+Cycle 6 reported 162 — that was defect #25, a parser that handled only one of
+mmCIF's two serialisations and therefore dropped every single-polymer-entity
+structure.
 
 ### G1 — Length: single chains fit, whole entries do not
 
 | Quantity | Value |
 |---|---|
-| Longest RNA chain, median | **86.5 nt** |
+| Longest RNA chain, median | **70 nt** |
 | Longest RNA chain, max | 3,764 nt |
-| Structures whose longest chain > 2048 nt | 56 of 162 |
+| Structures whose longest chain > 2048 nt | 56 of 179 |
 | Structures whose longest chain > 4096 nt | **0** |
 | **Total RNA residues per entry, max** | **11,478** |
-| Entries whose total RNA exceeds 4096 | **44 of 162** |
+| Entries whose total RNA exceeds 4096 | **44 of 179** |
 
 A 4096 context covers every *single chain* we hold. It does **not** cover whole
 entries. Outside this sample the gap is larger still: lncRNAs (XIST ~19 knt) and
@@ -1281,16 +1284,22 @@ up to 4,096 nt. It is not a whole-transcript or whole-ribosome model.**
 
 | Quantity | Value |
 |---|---|
-| Structures containing protein | 157/162 = **96.9%** |
-| Median protein chains when present | **11** |
-| Structures with >1 RNA chain | 118/162 = **72.8%** |
-| **RNA residues in protein-containing entries** | **305,934 / 306,857 = 99.70%** |
+| Structures containing protein | 158/179 = **88.3%** |
+| Median protein chains when present | **10.5** |
+| Structures with >1 RNA chain | 132/179 = **73.7%** |
+| **RNA residues in protein-containing entries** | **305,940 / 309,197 = 98.95%** |
 
 The architecture takes a single RNA sequence and predicts its fold. But
 essentially **all** the 3D supervision comes from RNA whose conformation is
 stabilised by partners the model never sees. Training on isolated chains teaches
 the model to reproduce, from sequence alone, a fold that in reality only exists
 inside a ribonucleoprotein.
+
+Note the asymmetry: **21 of 179 structures contain no protein at all, and they
+hold 3,257 residues — 1.05% of the corpus.** Isolated RNA is not rare as a
+*structure* count (11.7%); it is rare as a *residue* count, because isolated RNAs
+are small. Any "train on isolated folds only" mitigation is therefore working
+with roughly 1% of the available supervision.
 
 This is the **single largest generalization hazard in the design** and was not
 acknowledged anywhere before this audit. It is not fixable by tuning: it is a
@@ -1303,10 +1312,10 @@ performance split by "in complex" vs "isolated". **(c) is mandatory regardless.*
 
 | Quantity | Value |
 |---|---|
-| Ribosome-like entries (>2,000 RNA res + >500 protein res) | 60/162 = 37.0% |
-| **RNA residues they contribute** | **286,458 / 306,857 = 93.35%** |
+| Ribosome-like entries (>2,000 RNA res + >500 protein res) | 60/179 = 33.5% |
+| **RNA residues they contribute** | **286,458 / 309,197 = 92.65%** |
 
-Thirty-seven percent of the structures carry **93% of the residues**. Every residue-weighted
+A third of the structures carry **93% of the residues**. Every residue-weighted
 number in this document — stiffness matrices, ion coordination, block occupancy,
 the contact-scaling law — is therefore predominantly a *ribosomal* measurement.
 
@@ -1317,71 +1326,87 @@ generous at *both* ends and the sparse track is safe. But the headline "1.34%
 occupancy" is a ribosome figure and must be labelled as such, not quoted as
 "RNA".
 
-### G7 — modified nucleotides cannot be tokenised [re-derived cycle 6]
+### G7 — modified nucleotides cannot be tokenised [re-derived cycles 6-7]
 
-Vocabulary is 5 symbols (A, C, G, U, N). Measured canonically, **1.04%** of RNA
-polymer residues fall outside {A,C,G,U} — **3,189 instances across 76 distinct
+Vocabulary is 5 symbols (A, C, G, U, N). Measured canonically, **1.05%** of RNA
+polymer residues fall outside {A,C,G,U} — **3,237 instances across 82 distinct
 modification types**:
 
 | Modification | Count |
 |---|---|
-| PSU (pseudouridine) | 999 |
+| PSU (pseudouridine) | 1,003 |
 | OMG (2'-O-methyl-G) | 373 |
 | A2M | 365 |
-| OMC / OMU | 268 each |
-| 5MC | 124 |
+| OMC | 274 |
+| OMU | 270 |
+| 5MC | 128 |
 | I (inosine) | 80 |
-| ...70 more types | |
+| 2MG | 76 |
+| ...74 more types | |
 
 elDORS is pre-normalised to 5 symbols, which is why vocab-5 looked sufficient for
 *pretraining* — but structures are not normalised. Nature has >170 RNA
-modifications; we observe **76** in 180 structures alone, led by pseudouridine,
+modifications; we observe **82** in 180 structures alone, led by pseudouridine,
 the most abundant modification in cellular RNA. tRNA, the best-characterised
 small RNA, is among the most heavily modified. **A model that cannot represent
 pseudouridine cannot be said to handle "any RNA".**
 
-> **Re-derived canonically in cycle 6 (defects #22, #23, #24).** Every analysis
+> **Re-derived canonically in cycles 6-7 (defects #22-#25).** Every analysis
 > script had rolled its own definition of "an RNA residue" and they disagreed on
 > **72 of 180 structures**. mmCIF *declares* polymer type: a residue is RNA iff
 > its chain's `_entity_poly.type` is `polyribonucleotide` **and** it occupies a
 > polymer position (`label_seq_id` assigned, which excludes the water and ions
-> that share the chain). `src/pharos/data/mmcif_entities.py` is now the single
-> shared resolver.
+> that share the chain). Hybrid DNA/RNA chains are split per residue by the
+> presence of an `O2'` atom. `src/pharos/data/mmcif_entities.py` is the single
+> shared resolver, with a 20-property test suite.
 >
-> | Finding | published | **canonical** | |
-> |---|---|---|---|
-> | structures with a declared RNA entity | 180 | **162** | 18 had none |
-> | RNA residues | 308,370 | **306,857** | −0.5% |
-> | **G1** longest chain, median / max | 67 / 3,679 | **86.5 / 3,764** | non-RNA chains had dragged the median down |
-> | **G2** structures with protein | 159/180 = 88.3% | **157/162 = 96.9%** | **stronger** |
-> | **G2** structures with >1 RNA chain | 150/180 = 83.3% | **118/162 = 72.8%** | −10.5 pts |
-> | **G2** RNA residues in complexes | 98.96% | **99.70%** | **stronger** |
-> | **G3** ribosome-like entries | 61/180 = 33.9% | **60/162 = 37.0%** | +3.1 pts |
-> | **G3** residues ribosomal | 93.07% | **93.35%** | unchanged |
-> | **G7** residues outside A/C/G/U | 8.90% | **1.04%** | **8.6x too high** |
-> | **G7** distinct modification types | 8 | **76** | was undercounted |
+> | Finding | published | cycle 6 | **canonical (cycle 7)** | |
+> |---|---|---|---|---|
+> | structures with countable RNA | 180 | 162 | **179** | 7PU7's only nucleic entity is modelled all-DNA |
+> | RNA residues | 308,370 | 306,857 | **309,197** | +0.3% |
+> | **G1** longest chain, median / max | 67 / 3,679 | 86.5 / 3,764 | **70 / 3,764** | |
+> | **G2** structures with protein | 159/180 = 88.3% | 157/162 = 96.9% | **158/179 = 88.3%** | unchanged |
+> | **G2** structures with >1 RNA chain | 150/180 = 83.3% | 118/162 = 72.8% | **132/179 = 73.7%** | −9.6 pts |
+> | **G2** RNA residues in complexes | 98.96% | 99.70% | **98.95%** | **unchanged** |
+> | **G3** ribosome-like entries | 61/180 = 33.9% | 60/162 = 37.0% | **60/179 = 33.5%** | |
+> | **G3** residues ribosomal | 93.07% | 93.35% | **92.65%** | −0.4 pts |
+> | **G7** residues outside A/C/G/U | 8.90% | 1.04% | **1.05%** | **8.5x too high** |
+> | **G7** distinct modification types | 8 | 76 | **82** | undercounted 10x |
 >
-> **G2 and G3 survive and G2 strengthens**: 99.70% of RNA residues sit in
-> protein-containing entries. **G7's number was wrong** — the published 8.90%
-> counted DNA from hybrid duplexes (DT 4,608; DG 4,556; DA 4,440; DC 4,135) and
-> UNK records (7,036) that are not in RNA chains at all. Those five categories
-> alone are 24,775 of the 27,437 "modified" instances.
->
-> The *argument* for G7 survives on better ground. 1.04% of genuinely-RNA
-> residues are modified — **3,189 instances across 76 distinct types** led by
-> pseudouridine (999), OMG (373), A2M (365), OMC and OMU (268 each) and inosine
-> (80). Seventy-six chemically distinct modifications is a far stronger case for
+> **G7's published number was wrong.** The 8.90% counted DNA from hybrid duplexes
+> (DT 4,608; DG 4,556; DA 4,440; DC 4,135) and UNK records (7,036) that are not in
+> RNA chains at all — **24,775 of the 27,437 "modified" instances**, 90%
+> contamination. The *argument* survives on better ground: 3,237 genuinely-RNA
+> modified residues across **82 distinct types** led by pseudouridine (1,003),
+> OMG (373), A2M (365), OMC (274), OMU (270) and inosine (80). Eighty-two
+> chemically distinct modifications in 180 structures is a far stronger case for
 > "vocab-5 cannot represent real RNA" than a percentage inflated by DNA ever was.
+>
+> **G2 and G3 are unchanged from the published figures.** This retracts a
+> cycle-6 claim: that cycle reported G2 *strengthening* to 99.70%, and it was an
+> artifact of defect #25 — see below.
 >
 > **Defect #24 — partial propagation.** The first pass at this correction updated
 > four of the eleven affected numbers and stopped, and an unguarded global replace
 > of the *canonical* values rewrote the **published** column of this very table,
-> making it read "99.70 → 99.70" and "1.04 → 1.04 (8.6x too high)". Three other
-> tables were left mixing the 180 and 162 denominators inside one row-set. This is
-> the third occurrence of the unguarded-replace failure mode (after #18b), and the
-> first one that corrupted a table whose entire purpose was to record a
-> correction. Every substitution in the repair was made with an exact-match,
-> count-asserted replace instead.
+> making it read "99.70 → 99.70". Three other tables were left mixing the 180 and
+> 162 denominators inside one row-set. Third occurrence of the unguarded-replace
+> failure mode, and the first to corrupt a table whose entire purpose was to
+> record a correction. Every substitution in the repair is now exact-match and
+> count-asserted, and `verify_claims.py` fails the build if a correction row ever
+> loses a column.
+>
+> **Defect #25 — half the format was never parsed.** mmCIF serialises a category
+> in two forms: the `loop_` form, and a key-value form (`_entity_poly.tag value`)
+> used when the category has exactly one row. The resolver handled only the loop
+> form, so **16 of 180 structures silently parsed to zero RNA**. They are not a
+> random 16 — a single polymer entity means a small isolated RNA, precisely the
+> population G2 makes a claim about. Their absence inflated "RNA residues in
+> complexes" from 98.95% to a spurious **99.70%**, and cycle 6 reported that
+> inflation as a *finding* ("G2 strengthens"). **A defect found while auditing a
+> definition produced a false result that the audit then published.** The
+> resolver now parses both forms, and a test asserts that no structure resolves
+> to an empty declaration.
 
 ### G6 — Router circularity at recycle 0 [design gap, unmeasured]
 

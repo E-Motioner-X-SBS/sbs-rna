@@ -1,3 +1,183 @@
+# Final Verification Report — Cycle 7 (auditing the instrument)
+
+| Field | Value |
+|---|---|
+| Cycles | 7 |
+| Defects this cycle | **1** (#25) — plus **#26 identified and measured**, opening cycle 8 |
+| **Total defects** | **25 confirmed, 26th measured** |
+| Macro-audit | **FAIL — 2 open items (C13, C14), by design** |
+| Tests | 3 suites (20 + 6 + N properties) all pass; `verify_claims.py` **ALL CLAIMS REPRODUCE** |
+
+## The question this cycle asked
+
+Cycles 0-6 audited the measurements, the derivations, the specification, and the
+propagation of corrections. **Nothing had audited the instrument.**
+
+Cycle 6 closed with one residual, logged as OQ-3 and deferred: 18 of 180
+structures in a non-redundant *RNA* list appeared to contain no RNA. The stated
+reason for deferring was that they "contribute zero residues under either
+definition, so no published number depends on it."
+
+**That reasoning assumes the zero is real.** A zero produced by a broken
+instrument is indistinguishable from a true zero in the output, and completely
+different in the input. It was not real.
+
+## Defect #25 — half the format was never parsed
+
+16 of the 18 returned **zero `_entity_poly` rows**. The raw file:
+
+```
+_entity_poly.entity_id                      1
+_entity_poly.type                           polyribonucleotide
+_entity_poly.pdbx_strand_id                 A,B
+```
+
+mmCIF serialises a category in **two** forms: the `loop_` form, and a key-value
+form used when the category has exactly one row. The resolver handled only the
+first.
+
+**The failure class is not random.** One polymer entity means one RNA chain set
+and no protein partner — a *small isolated RNA*. That is precisely the population
+G2 quantifies. The bug therefore removed, from the denominator, the very
+structures that would weaken the claim.
+
+| | cycle 6 | **cycle 7** | published |
+|---|---|---|---|
+| structures with countable RNA | 162 | **179** | 180 |
+| RNA residues | 306,857 | **309,197** | 308,370 |
+| **G2 RNA residues in complexes** | **99.70%** | **98.95%** | 98.96% |
+
+## The finding that matters most in seven cycles
+
+**Cycle 6 published a false finding produced by a defect it introduced in the
+same cycle.** Its headline was "G2 strengthens: 98.96% → 99.70%". G2 does not
+strengthen. It is 98.95%, which is the published figure. The apparent
+strengthening was 16 missing isolated RNAs.
+
+That result shipped: committed, written into ARCHITECTURE.md, main.tex, the
+blueprint, and the regression guard, one commit before this cycle caught it. It
+was caught only because cycle 6 *recorded* the anomaly it chose to defer, rather
+than discarding it — which is the single practice that saved the result.
+
+**REV-9**: "G2 strengthens" is withdrawn. **REV-10**: G3 is 92.65%, not 93.35%.
+**REV-11**: the structure count is 179. **REV-12**: G7 is 8.5x, 82 types, 3,237
+instances.
+
+## What genuinely survives the canonical re-derivation
+
+Only **G7** moves. Its published 8.90% counted DNA from hybrid duplexes (DT
+4,608, DG 4,556, DA 4,440, DC 4,135) and UNK records (7,036) — **24,775 of 27,437
+instances, 90% contamination**. The corrected figure is 1.05%, and the argument
+is stronger than the one it replaces: **3,237 modified RNA residues across 82
+chemically distinct types**, led by pseudouridine (1,003), the most abundant
+modification in cellular RNA.
+
+**G2 and G3 are unchanged from the originally published figures.** Two cycles of
+work on the RNA-residue definition confirmed them rather than correcting them.
+That is a real result, and it is worth more than the false improvement it
+replaced.
+
+## New measurement
+
+**21 of 179 structures contain no protein at all, holding 3,257 residues — 1.05%
+of the corpus.** Isolated RNA is 11.7% of *structures* but ~1% of *residues*,
+because isolated RNAs are small. This sharpens G2's mitigation options: of the
+three (restrict to autonomous folds / supply partner context / report split by
+complexed-vs-isolated), the first operates on roughly one percent of the
+available supervision. **Only the third is affordable.**
+
+## Hybrid chains: resolved, not excluded
+
+Cycle 6 excluded hybrid DNA/RNA chains and measured the loss. Cycle 7 resolves
+them with a *structural* test that does not reintroduce defect #22's
+curated-list problem: **ribose has an `O2'` atom, deoxyribose does not.** It
+classifies BRU (5-bromo-deoxyuridine) correctly as DNA despite its uridine-like
+name — which a name list would plausibly have got wrong. Coverage closes at
+**179/180**, and the one exception (7PU7, whose only nucleic entity is modelled
+entirely as DNA) is explained rather than unexplained.
+
+## The guard now protects the retraction
+
+`verify_claims.py` pins the *wrong* cycle-6 values alongside the right ones:
+
+```
+both columns present: cycle-6 vs cycle-7 totals       306,857 -> 309,197
+both columns present: the retracted G2 strengthening    99.70 -> 98.95
+```
+
+A future edit that tidies the mistake out of the record fails the build. **The
+record of a correction is itself a claim under guard.**
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+The level is unchanged but the basis has shifted again. Cycle 6 argued that
+repeated re-derivation partly re-applied the same undefined rule. Cycle 7 shows
+something sharper: **re-derivation through a shared instrument propagates that
+instrument's defects into every result at once**, and does so in a way that looks
+like agreement. The three G-findings that have now survived *two* independent
+definitions of the instrument deserve MEDIUM-HIGH. Nothing that has been through
+the resolver only once does.
+
+## Cycle 8 opens with a measured target — defect #26
+
+OQ-4 asked whether other categories suffer the same two-serialisation problem.
+**They do, and it is measured, not hypothesised.** `loops()` in
+`extract_basepair_geometry.py` — shared by the geometry, stiffness and ionic
+scripts — does `cols.append(tag)` and **discards any value on the same line**, so
+a key-value category yields zero rows exactly as `_entity_poly` did:
+
+| category | files with it | `loop_` | **key-value (lost)** |
+|---|---|---|---|
+| `_exptl_crystal_grow` | 64 | 0 | **64** |
+| `_struct_conn` | 169 | 166 | **3** |
+| `_pdbx_unobs_or_zero_occ_residues` | 165 | 162 | **3** |
+| `_ndb_struct_na_base_pair` | 156 | 155 | **1** |
+| `_ndb_struct_na_base_pair_step` | 155 | 154 | **1** |
+| `_em_buffer_component` | 32 | 31 | **1** |
+| `_entity_poly_seq` | 180 | 180 | 0 |
+| `_atom_site` | 180 | 180 | 0 |
+
+`_exptl_crystal_grow` is key-value in **every one of the 64 files that carry
+it** — it is the crystallisation-condition category, the source for the salt
+concentrations behind the ionic-metadata audit. If that audit reads it through
+`loops()`, it has been reading nothing.
+
+## Defect base rate, seven cycles
+
+| Cycle | Defects | Character |
+|---|---|---|
+| 0 (build) | 5 | silent parser/logic bugs |
+| 1 (audit) | 4 | wrong physics, overclaim, disclosure |
+| pre-2 | 1 | precision/rounding |
+| 2 | 4 | inflated count, unfair comparison, unimplemented code |
+| 3 | 1 | hardware incoherence |
+| 4 | 5 | derived quantities: cost, depth, budget |
+| 5 | 2 | components never specified at all |
+| 6 | 3 | no definition of the unit of measurement; a repair that damaged its own record |
+| **7** | **1** | **the audit's instrument, which published a false finding** |
+
+**Twenty-five defects across seven cycles, and the rate has not fallen.** The
+trajectory of *character* is the actual finding: wrong values (0-2) → wrong
+derivations (3-4) → missing specifications (5) → missing definitions (6) →
+**defective instrumentation (7)**. Each level was invisible from the one below.
+Cycle 7's defect could not have been found by re-checking numbers, because the
+numbers were self-consistent; it took asking why a residual existed at all.
+
+## Known limitations carried forward
+
+- **C13 / OQ-2 still open.** 13 analysis scripts carry their own RNA definitions.
+  The resolver has now changed twice, so any copied definition is drifting from
+  canonical with nothing to detect it.
+- **C14 still open.** Only the G-findings have been re-derived canonically. The
+  103,964 base-pair steps, 44,708 Mg records, block occupancy and contact
+  scaling have not — and defect #26 means at least one structure's steps and
+  three structures' connectivity are missing from them outright.
+- **Defect #26 is measured but not yet fixed.** That is cycle 8.
+
+---
+
 # Final Verification Report — Cycle 6 (the unit of measurement)
 
 | Field | Value |
