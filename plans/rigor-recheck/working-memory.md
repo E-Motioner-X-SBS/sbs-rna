@@ -409,3 +409,48 @@
   still not been migrated onto the shared resolver, and only the G-findings are
   canonical. **These are now the oldest outstanding items by a wide margin and
   should take priority over opening any further instrument audit.**
+
+## Cycle 11 decisions
+- D20: **Corpus statistics and per-example correctness are different standards.**
+  The ACGU filter changes 34% of chains and the worst by +27.9%, yet the corpus
+  medians move ~1% and the c=20 budget is untouched. Both facts are true and they
+  license different actions: the **published statistics stand**, and the
+  **training pipeline must use the canonical loader**. This is the first point in
+  eleven cycles where the two standards diverge, and collapsing them either way
+  would be wrong — re-running every statistic would be churn, and shipping an
+  ACGU filter into the data pipeline would be a defect.
+- D21: **Check the excluded population rather than inheriting the exclusion.**
+  The published block-sparsity analysis caps at `MAX_L=3000`, which drops the 24
+  longest chains — exactly where a per-chain budget is most at risk. Those were
+  run separately (max effective c 18.44, both definitions) instead of being
+  quietly carried over.
+- D22: **An analysis that does not terminate is indistinguishable from one that
+  was never run.** The first sensitivity implementation was O(pairs x atoms^2) in
+  Python and did not finish. Rewritten with a cKDTree; all 179 structures in
+  under two minutes. Logged rather than silently replaced.
+
+## Cycle 11 discoveries
+- DISC-45 [C14, MEASURED]: the ACGU filter changes **34.1% of chains** (31 of 91)
+  and restores **703 residues**. Worst single chain 7VNV, **L 61 -> 78 (+27.9%)**;
+  worst contacts/nt **+46.1%**.
+- DISC-46 [THE DECISION SURVIVES]: max effective c is **19.03 published vs 19.04
+  canonical**, and **no chain breaches the c=20 budget under either definition**
+  — including the 24 longest, where it is 18.44 either way. The sparse-track
+  sizing, which is the only design decision these numbers feed, is unaffected.
+- DISC-47 [THE HEADROOM IS THINNER THAN ASSUMED]: the worst chain sits at 19.04
+  against a budget of 20 — **4.8% headroom**, not the comfortable margin the
+  "mean 17.2 for long chains" figure suggests. A mean was being read as if it
+  bounded the maximum. Worth stating in the spec: c=20 is adequate for this
+  sample and has little room for a corpus with more modified residues.
+- DISC-48 [C13 DONE]: `rna_chain_coords()` / `longest_rna_chain()` added to the
+  shared module as the single entry point for RNA geometry, mirroring
+  `rna_residues()` for counts. Suite now **27 properties**, all pass.
+
+## Open Questions
+- OQ-7 [OPEN, priority MEDIUM]: c=20 has only **4.8% headroom** at the worst
+  chain in this sample (19.04). The sample is 180 BGSU structures; a corpus with
+  more heavily-modified RNA (tRNA-rich, or rRNA from organisms with denser
+  modification) would push individual chains higher. Either widen the budget or
+  measure the distribution on a larger sample before fixing c.
+- OQ-2 / C13 / C14 [**ANSWERED**]: definition sensitivity measured on all 179
+  structures; shared geometry loader added and tested.

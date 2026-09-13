@@ -235,6 +235,95 @@ def rna_residues(path: Path):
     return chains, comp, types
 
 
+def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
+    """Canonical per-chain, per-residue heavy-atom coordinates.
+
+    The single entry point for anything that needs RNA *geometry* rather than
+    counts. Returns `{chain: [(residue_key, comp_id, [(x,y,z), ...]), ...]}`
+    with residues in polymer order.
+
+    C13/C14 (cycle 11): the analysis scripts each selected residues with
+    `label_comp_id in {A,C,G,U}`. That is not merely a narrower label set -- it
+    DELETES modified residues from the middle of a chain, so the residues either
+    side become adjacent and every downstream index shifts: chain length,
+    sequence separation |i-j|, which pairs clear the SEQ_SEP guard, and the block
+    indices i//b that block occupancy is computed from.
+
+    Measured over the sample (`audit_definition_sensitivity.py`): **34.1% of
+    chains change length**, by a median of +0.87% and up to **+27.9%** (7VNV,
+    L 61 -> 78). Corpus medians barely move (contacts/nt +1.37%, effective c
+    +1.19% on the affected chains) and the c=20 sparse-track budget is unaffected
+    -- max effective c is 19.04 canonical against 19.03 published, with no chain
+    in the sample breaching 20 under either definition.
+
+    So the published corpus statistics stand, but a training pipeline must use
+    this function rather than an ACGU filter: a 28% length error on an individual
+    chain is invisible in a median and unacceptable as a model input.
+    """
+    from collections import defaultdict
+    types = entity_poly_types(path)
+    pure = {c for c, t in types.items() if t == "polyribonucleotide"}
+    hyb = {c for c, t in types.items()
+           if t.startswith("polydeoxyribonucleotide/polyribonucleotide")}
+    want = pure | hyb
+    if not want:
+        return {}
+    cols: list[str] = []
+    in_loop = header = False
+    atoms: dict[tuple, list] = defaultdict(list)
+    names: dict[tuple, str] = {}
+    ribo: set = set()
+    with _open(path) as fh:
+        for line in fh:
+            s = line.rstrip("\n")
+            if s.startswith("_atom_site."):
+                if not in_loop:
+                    in_loop, cols = True, []
+                cols.append(s.split(".", 1)[1].strip())
+                header = True
+                continue
+            if header and in_loop:
+                if s.startswith(("#", "_", "loop_")):
+                    in_loop = header = False
+                    continue
+                p = s.split()
+                if len(p) < len(cols):
+                    continue
+                r = dict(zip(cols, p))
+                ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
+                if ch not in want:
+                    continue
+                if r.get("label_seq_id", ".") in (".", "?"):
+                    continue
+                if drop_hydrogens and r.get("type_symbol") == "H":
+                    continue
+                try:
+                    seq = int(r["label_seq_id"])
+                    xyz = (float(r["Cartn_x"]), float(r["Cartn_y"]), float(r["Cartn_z"]))
+                except (KeyError, ValueError):
+                    continue
+                key = (ch, seq, r.get("pdbx_PDB_ins_code", "?"))
+                atoms[key].append(xyz)
+                names[key] = r["label_comp_id"].strip('"')
+                if r.get("label_atom_id", "").strip('"') == "O2'":
+                    ribo.add(key)
+    out: dict[str, list] = defaultdict(list)
+    for key in sorted(atoms, key=lambda k: (k[0], k[1])):
+        if key[0] in hyb and key not in ribo:
+            continue            # deoxyribonucleotide inside a hybrid chain
+        out[key[0]].append((key, names[key], atoms[key]))
+    return dict(out)
+
+
+def longest_rna_chain(path: Path):
+    """The longest canonical RNA chain, as a list of per-residue atom lists."""
+    chains = rna_chain_coords(path)
+    if not chains:
+        return None
+    ch = max(chains, key=lambda c: len(chains[c]))
+    return [a for _, _, a in chains[ch]]
+
+
 if __name__ == "__main__":
     import sys
     from collections import Counter

@@ -143,6 +143,23 @@ def main() -> int:
     chk("published G7 total instances",
         ga["G7_modified_nucleotides"]["modified_residue_instances"], 27437)
 
+    # C13/C14 (cycle 11): sensitivity of the residue-weighted measurements to the
+    # RNA definition. The decision these guard is the c=20 sparse-track budget.
+    ds = load("definition_sensitivity.json")["summary"]
+    chk("definition-sensitivity: chains compared", ds["chains_compared"], 91, tol=0)
+    chk("definition-sensitivity: chains changing length",
+        ds["chains_whose_length_changes"], 31, tol=0)
+    chk("definition-sensitivity: frac changed", ds["frac_changed"], 0.3407)
+    chk("definition-sensitivity: residues restored", ds["residues_added_total"], 703, tol=0)
+    dsl = json.load(open(A / "definition_sensitivity_long.json"))
+    chk("long chains checked (>3000 nt)", len(dsl), 24, tol=0)
+    # the budget claim: no chain breaches c=20 under EITHER definition
+    allc = ([r["published"]["effective_c"] for r in load("definition_sensitivity.json")["rows"]]
+            + [r["canonical"]["effective_c"] for r in load("definition_sensitivity.json")["rows"]]
+            + [r["c_pub"] for r in dsl] + [r["c_can"] for r in dsl])
+    chk("max effective c over ALL chains, both definitions", round(max(allc), 2), 19.04)
+    chk("chains breaching the c=20 budget", sum(1 for c in allc if c > 20), 0, tol=0)
+
     hr = load("stiffness_headroom.json")
     chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.5792)
     chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551)
@@ -232,6 +249,12 @@ def main() -> int:
                 # parse, so every structure-count denominator is 179, not 162.
                 "309,197", "179", "98.95", "1.05", "3,764",
                 "73.7", "33.5", "286,458", "92.65", "3,237", "82",
+                # C13/C14 (cycle 11): definition sensitivity of the
+                # residue-weighted numbers, and the c=20 budget it guards.
+                "34.1", "27.9", "19.04", "18.44", "703",
+                # DISC-47: c=20 has 4.8% headroom at the worst chain, not the
+                # 16% the mean-over-long-chains figure of 17.2 implies.
+                "4.8",
                 # defect #24: the PUBLISHED column of the correction table must
                 # survive. An unguarded replace once overwrote it with the
                 # canonical values, making the table read "99.70 -> 99.70".

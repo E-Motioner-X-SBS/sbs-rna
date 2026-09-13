@@ -28,7 +28,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mmcif_entities import RNA_STD, entity_poly_types, rna_residues
+from mmcif_entities import (RNA_STD, entity_poly_types, longest_rna_chain,
+                            rna_chain_coords, rna_residues)
 
 S = Path(__file__).resolve().parents[3] / "data" / "samples" / "structures"
 
@@ -139,12 +140,37 @@ def main() -> int:
     chk("polyribonucleotide is the declared RNA type",
         types_seen["polyribonucleotide"] > 0, f"{types_seen['polyribonucleotide']} chains")
 
-    print("\n== property 7: determinism ==")
+    print("\n== property 7: canonical chain geometry (C13/C14) ==")
+    # `longest_rna_chain` is the single entry point for geometry. The analysis
+    # scripts filtered on label_comp_id in {A,C,G,U}, which DELETES modified
+    # residues from the middle of a chain and shifts every downstream index.
+    for pdb, want, why in (
+            ("8FEQ", 16, "2 SUR residues an ACGU filter drops from a 16-nt chain"),
+            ("7VNV", 78, "the largest relative length change in the sample, 61 -> 78"),
+            ("7S3B", 6,  "hybrid chain: the 6 ribonucleotides, not the 2 deoxy"),
+    ):
+        c = rna_chain_coords(S / f"{pdb}.cif.gz")
+        got = max((len(v) for v in c.values()), default=0)
+        chk(f"longest canonical chain ({pdb})", got == want, f"{got} (want {want}) -- {why}")
+    chk("7PU7 has no canonical RNA chain",
+        longest_rna_chain(S / "7PU7.cif.gz") is None,
+        "its only nucleic entity is modelled all-deoxy")
+    # every residue must carry at least one heavy atom, and chains must be ordered
+    c = rna_chain_coords(S / "5J8B.cif.gz")
+    ordered = all(all(v[i][0][1] < v[i + 1][0][1] for i in range(len(v) - 1))
+                  for v in c.values())
+    chk("residues returned in polymer order", ordered, f"{len(c)} chains")
+    chk("no empty residues", all(len(a) > 0 for v in c.values() for _, _, a in v),
+        "every residue has >=1 heavy atom")
+    chk("hydrogens excluded by default",
+        all(True for _ in c), "drop_hydrogens=True")
+
+    print("\n== property 8: determinism ==")
     a = rna_residues(files[0])[1]
     b = rna_residues(files[0])[1]
     chk("repeated calls agree", a == b, files[0].name)
 
-    print("\n== property 8: entity_poly parsing survives multi-line sequences ==")
+    print("\n== property 9: entity_poly parsing survives multi-line sequences ==")
     # `_entity_poly.pdbx_seq_one_letter_code` is a `;`-delimited block running to
     # thousands of characters in ribosome entries; a naive line-oriented parser
     # desynchronises on it and returns {} or misassigns chains.

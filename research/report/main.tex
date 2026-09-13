@@ -1738,6 +1738,18 @@ $c=20$ budget is generous at \emph{both} ends and the sparse track is safe. But
 the headline ``$1.34\%$ occupancy'' is a ribosome figure and must be labelled as
 such rather than quoted as ``RNA''.
 
+\paragraph{Headroom warning.} The $17.2$ that sized $c=20$ is a \emph{mean} over
+long chains, and it was being read as though it bounded the maximum. Measured per
+chain across all $179$ structures under both RNA definitions, the worst chain
+reaches an effective $c$ of $\mathbf{19.04}$: the budget has
+\textbf{$4.8\%$ headroom, not $16\%$}. Nothing in the sample breaches it---$0$ of
+$115$ chains checked, including all $24$ with chains over $3{,}000$~nt, where the
+worst is $18.44$---so $c=20$ is adequate \emph{here}. It is adequate by a thin
+margin on a 180-structure sample, and the quantity that pushes a chain upward is
+the one the corpus under-represents: modified residues, which the ACGU filter had
+been deleting. Either widen $c$ or measure the distribution on a larger sample
+before fixing it.
+
 \subsection{G7 --- modified nucleotides cannot be tokenised}
 
 The vocabulary is five symbols. Measured canonically, $\mathbf{1.05\%}$ of RNA
@@ -1857,6 +1869,47 @@ all five fail when the claim is removed. Tightening also exposed two
 \emph{latent} defects---the tokens \texttt{15.342} and \texttt{16.376} were
 written truncated and had only ever matched as prefixes of $15.3424$ and
 $16.3760$, so they had never guarded those values exactly.
+
+\paragraph{C14 --- does the definition change the residue-weighted numbers?}
+Cycles 6--7 fixed the definition and re-derived only the G-findings. Every other
+residue-weighted number still came from a script filtering on
+\texttt{label\_comp\_id} $\in \{A,C,G,U\}$, which does not merely narrow the
+label set---it \emph{deletes} modified residues from the middle of a chain, so
+the neighbours become adjacent and chain length, sequence separation, the
+\textsc{seq\_sep} guard and the block indices $\lfloor i/b \rfloor$ all shift.
+
+\begin{table}[h]
+\centering
+\caption{Sensitivity of the residue-weighted measurements to the RNA definition,
+measured chain-by-chain over all 179 structures. \meas}
+\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Quantity} & \textbf{published (ACGU)} & \textbf{canonical} \\
+\midrule
+Chains whose length changes      & ---      & $31/91 = \mathbf{34.1\%}$ \\
+Residues restored                & ---      & $703$ \\
+Median $L$, affected chains      & ---      & $+0.87\%$ \\
+Median contacts/nt, affected     & ---      & $+1.37\%$ \\
+Median effective $c$, affected   & ---      & $+1.19\%$ \\
+Worst single chain (7VNV)        & $L=61$   & $\mathbf{L=78}$ ($+27.9\%$) \\
+Worst contacts/nt                & ---      & $+46.1\%$ \\
+\textbf{Max effective $c$}       & $19.03$  & $\mathbf{19.04}$ \\
+Chains breaching $c=20$          & $\mathbf{0}$ & $\mathbf{0}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The $24$ entries with chains longer than $3{,}000$~nt were checked separately
+rather than excluded: max effective $c$ is $18.44$ under \emph{both} definitions.
+
+\textbf{The corpus statistics and the $c=20$ sizing decision both survive}---the
+medians move by about one percent and nothing breaches the budget. \textbf{The
+per-chain error does not.} A $27.9\%$ length error is invisible in a median and
+unacceptable as a model input, so the published statistics stand while the
+training pipeline must use the shared canonical loader
+\texttt{mmcif\_entities.longest\_rna\_chain()}. That distinction---corpus
+statistics versus per-example correctness---is the substantive result here.
 
 \subsection{G6 --- router behaviour at recycle 0 is undefined}
 

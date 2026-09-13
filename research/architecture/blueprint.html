@@ -1574,6 +1574,46 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       and had only ever matched as <i>prefixes</i> of 15.3424 and 16.3760, so they had never
       guarded those values exactly.</p>
     </div>
+    <div class="finding" style="margin-top:12px">
+      <span class="tag">C13 · C14 — does the definition change the residue-weighted numbers?</span>
+      <p>Cycles 6–7 re-derived only the <b>G-findings</b>. Contact scaling, block occupancy and
+      contact separation still came from a script filtering on
+      <span class="mono">label_comp_id ∈ {A,C,G,U}</span> — which does not narrow a label set so
+      much as <b>delete modified residues from the middle of a chain</b>, making the neighbours
+      adjacent and shifting chain length, sequence separation, the SEQ_SEP guard and the block
+      indices <span class="mono">i//b</span>. Measured chain-by-chain over all 179 structures:</p>
+      <div class="tablewrap" style="border:none;margin-top:10px">
+        <table style="min-width:0">
+          <thead><tr><th>Quantity</th><th class="num">published (ACGU)</th><th class="num">canonical</th></tr></thead>
+          <tbody>
+            <tr><td>chains whose length changes</td><td class="num">—</td><td class="num"><b>31/91 = 34.1%</b></td></tr>
+            <tr><td>residues restored</td><td class="num">—</td><td class="num">703</td></tr>
+            <tr><td>median L / contacts-per-nt / effective c, affected</td><td class="num">—</td><td class="num">+0.87% / +1.37% / +1.19%</td></tr>
+            <tr><td>worst single chain (7VNV)</td><td class="num">L = 61</td><td class="num"><b>L = 78</b> (+27.9%)</td></tr>
+            <tr><td>worst contacts-per-nt</td><td class="num">—</td><td class="num">+46.1%</td></tr>
+            <tr class="total"><td><b>max effective c, all chains</b></td><td class="num"><b>19.03</b></td><td class="num"><b>19.04</b></td></tr>
+            <tr class="total"><td>chains breaching the c = 20 budget</td><td class="num"><b>0</b></td><td class="num"><b>0</b></td></tr>
+            <tr><td>headroom at the worst chain vs c = 20</td><td class="num">—</td><td class="num" style="color:var(--warn)"><b>4.8%</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:10px">The 24 entries with chains over 3,000 nt were checked separately
+      rather than excluded: max effective c is <b>18.44 under both definitions</b>.
+      <b>The corpus statistics and the c = 20 sizing decision both survive</b> — medians move ~1%
+      and nothing breaches the budget. <b>The per-chain error does not.</b> A 27.9% length error is
+      invisible in a median and unacceptable as a model input, so the published statistics stand
+      while the training pipeline must use the shared canonical loader
+      <span class="mono">longest_rna_chain()</span>. Corpus statistics versus per-example
+      correctness is the substantive result of C13/C14.</p>
+      <p style="margin-top:10px"><b>Headroom warning.</b> The 17.2 that sized c = 20 is a
+      <i>mean</i> over long chains and was being read as if it bounded the maximum. The worst
+      chain reaches <b>19.04</b> — the budget has <b>4.8% headroom, not 16%</b>. Nothing in the
+      sample breaches it (0 of 115 chains, including all 24 over 3,000 nt where the worst is
+      18.44), so c = 20 is adequate <i>here</i> — by a thin margin, on 180 structures, and the
+      quantity that pushes a chain upward is the one the corpus under-represents: modified
+      residues, which the ACGU filter had been deleting. Widen c, or measure the distribution on
+      a larger sample before fixing it.</p>
+    </div>
   </div>
 
   <div class="tablewrap" style="margin-top:20px">

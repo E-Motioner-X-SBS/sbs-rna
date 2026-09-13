@@ -486,6 +486,19 @@ block occupancy measured in §5.2.
 retains every occupied 4x4 block on long chains) and far above the observed
 4.4-4.9 contacts per nucleotide.
 
+> **Headroom warning (cycle 11, C14).** 17.2 is a **mean over long chains**, and
+> it was being read as though it bounded the maximum. Measured per chain across
+> all 179 structures under both RNA definitions, the **worst chain reaches an
+> effective c of 19.04** — `target_c = 20` has **4.8% headroom, not 16%**. No
+> chain in the sample breaches it (0 of 115 checked, including all 24 with chains
+> over 3,000 nt, where the worst is 18.44), so the budget is *adequate here*. But
+> it is adequate by a thin margin on a 180-structure sample, and the quantity
+> that pushes a chain upward is exactly the one the corpus under-represents:
+> modified residues, which an ACGU filter had been deleting. **Either widen
+> `target_c` or measure the distribution on a larger sample before fixing it.**
+> Recorded as an open design question rather than silently resized, because the
+> right value depends on data not yet acquired.
+
 > **Two implementation defects found while building this**, both of a kind that
 > would have silently degraded a trained model rather than crashing:
 > (i) the L3 expansion originally paired block rows with block columns
@@ -1456,6 +1469,40 @@ pseudouridine cannot be said to handle "any RNA".**
 > removed. Tightening also exposed two **latent** defects: the tokens `15.342` and
 > `16.376` were written truncated and had only ever matched as *prefixes* of
 > 15.3424 and 16.3760 — they had never guarded those values exactly at all.
+>
+> **C14 — does the definition change the residue-weighted numbers?** Cycles 6-7
+> fixed the definition and re-derived only the **G-findings**. Every other
+> residue-weighted number — contact scaling, block occupancy, contact separation
+> — still came from a script filtering on `label_comp_id in {A,C,G,U}`. That is
+> not a narrower label set: it **deletes modified residues from the middle of a
+> chain**, so the neighbours become adjacent and every downstream index shifts —
+> chain length, sequence separation |i-j|, which pairs clear the SEQ_SEP guard,
+> and the block indices `i//b` that occupancy is computed from.
+>
+> Measured chain-by-chain under both definitions
+> (`scripts/sampling/audit_definition_sensitivity.py`, all 179 structures):
+>
+> | Quantity | published (ACGU) | canonical |
+> |---|---|---|
+> | chains whose length changes | — | **31 of 91 = 34.1%** |
+> | residues restored | — | 703 |
+> | median L / contacts-per-nt / effective c, affected | — | **+0.87% / +1.37% / +1.19%** |
+> | **worst single chain** (7VNV) | L 61 | **L 78 = +27.9%** |
+> | worst contacts-per-nt | — | **+46.1%** |
+> | **max effective c, all chains** | **19.03** | **19.04** |
+> | chains breaching the `c = 20` budget | **0** | **0** |
+>
+> Long chains were checked separately rather than excluded: over the 24 entries
+> with chains > 3,000 nt, max effective c is **18.44 under both definitions**.
+>
+> **The corpus statistics and the `c = 20` sizing decision both survive** — the
+> medians move by ~1% and no chain breaches the budget under either rule. **But
+> the per-chain error does not survive**: a 27.9% length error is invisible in a
+> median and unacceptable as a model input. So the published statistics stand,
+> and the **training data pipeline must use `mmcif_entities.longest_rna_chain()`**
+> — the shared canonical loader added for exactly this purpose — rather than an
+> ACGU filter. That distinction, corpus statistics versus per-example
+> correctness, is the substantive result of C13/C14.
 
 ### G6 — Router circularity at recycle 0 [design gap, unmeasured]
 

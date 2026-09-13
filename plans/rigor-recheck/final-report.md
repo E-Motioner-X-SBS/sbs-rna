@@ -1,3 +1,144 @@
+# Final Verification Report — Cycle 11 (the oldest outstanding items)
+
+| Field | Value |
+|---|---|
+| Cycles | 11 |
+| **Defects this cycle** | **0 — the first cycle to find none** |
+| Total defects | **28** |
+| Macro-audit | **PASS — 0 open, 4 deferred with reasons** |
+| Tests | 3 suites (27 + 6 + N properties) pass; `verify_claims.py` **ALL CLAIMS REPRODUCE** |
+
+## What was closed
+
+C13 and C14 had been open since cycle 6 — five cycles — while the audit chased
+instrument defects. Cycle 10 concluded the instrument sweep was complete and
+these should take priority. They are now closed.
+
+## C14 — does the RNA definition change the residue-weighted numbers?
+
+Cycles 6-7 fixed the definition and re-derived only the **G-findings**. Contact
+scaling, block occupancy and contact separation still came from scripts filtering
+on `label_comp_id in {A,C,G,U}`.
+
+That is not a narrower label set. It **deletes modified residues from the middle
+of a chain**, so the neighbours become adjacent and every downstream index
+shifts: chain length, sequence separation, the `SEQ_SEP` guard, and the block
+indices `i//b` that occupancy is computed from. The question was never "are a few
+residues missing" but "does deleting 1% of positions from inside chains move the
+numbers the sparse-track budget was sized on".
+
+Measured chain-by-chain, both definitions, all 179 structures:
+
+| Quantity | published (ACGU) | canonical |
+|---|---|---|
+| **chains whose length changes** | — | **31 of 91 = 34.1%** |
+| residues restored | — | 703 |
+| median L / contacts-per-nt / effective c, affected | — | +0.87% / +1.37% / +1.19% |
+| **worst single chain** (7VNV) | L = 61 | **L = 78 (+27.9%)** |
+| worst contacts-per-nt | — | **+46.1%** |
+| **max effective c, all chains** | **19.03** | **19.04** |
+| **chains breaching c = 20** | **0** | **0** |
+
+The 24 entries with chains over 3,000 nt were **checked separately rather than
+inherited from the published `MAX_L=3000` cut** — they are exactly where a
+per-chain budget is most at risk. Max effective c over them: **18.44 under both
+definitions.**
+
+### The verdict, and why it is two-sided
+
+**The corpus statistics and the `c = 20` sizing decision both survive.** Medians
+move about one percent; nothing breaches the budget under either rule.
+
+**The per-chain error does not survive.** A 27.9% length error is invisible in a
+median and unacceptable as a model input.
+
+> **Corpus statistics and per-example correctness are different standards.** The
+> published statistics stand; the training pipeline must use the canonical
+> loader. Eleven cycles in, this is the first place the two diverge, and
+> collapsing them either way would be wrong — re-running every statistic would be
+> churn, and shipping an ACGU filter into the data pipeline would be a defect.
+
+## The finding that changes a design number — OQ-7
+
+`target_c = 20` was justified as "slightly above the measured requirement of
+17.2". **17.2 is a mean over long chains, and it was being read as though it
+bounded the maximum.** Per chain, the worst reaches **19.04**.
+
+**The budget has 4.8% headroom, not 16%.**
+
+Nothing in the sample breaches it — 0 of 115 chains checked — so `c = 20` is
+adequate *here*. It is adequate by a thin margin on 180 structures, and the
+quantity that pushes a chain upward is precisely the one this corpus
+under-represents: modified-residue density, which the ACGU filter had been
+deleting. Recorded in ARCHITECTURE.md §5 and deferred as an open design question
+rather than silently resized, because the right value depends on data not yet
+acquired.
+
+## C13 — one shared loader
+
+`mmcif_entities.rna_chain_coords()` and `longest_rna_chain()` added as the single
+entry point for RNA *geometry*, mirroring `rna_residues()` for counts: solvent
+excluded by the polymer test, hybrid chains resolved per residue by `O2'`,
+residues returned in polymer order. Seven new test properties (suite now **27**),
+all passing — 8FEQ resolves to 16 residues where an ACGU filter gives 14, 7VNV to
+78 where it gives 61.
+
+## A process note
+
+The first implementation of the sensitivity comparison looped over candidate
+residue pairs in Python computing a norm per pair — O(pairs x atoms²) — and did
+not finish on ribosomal chains within 3,000 seconds. Replaced with a single
+`cKDTree.query_pairs` over all atoms, mapping atom pairs to residue pairs
+vectorised; all 179 structures now process in under two minutes.
+
+**An analysis that does not terminate is indistinguishable from one that was
+never run.** Logged rather than silently replaced.
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+Unchanged, and now for a stable reason. Across eleven cycles the measurements
+have survived: a definitional rewrite (cycles 6-7), an instrument sweep that
+found a defect in all four tools (7-10), and a sensitivity analysis against a
+competing definition (11). The derived claims have a worse record — the largest
+defect of the project (#17, refinement loops omitted from every cost) was
+derivation, not measurement.
+
+**LOW on outcomes is not improvable by auditing.** Nothing has been trained.
+Every claim about what PHAROS would *do* remains an argument.
+
+## Macro-audit
+
+```
+[x] Every plans/todo.md item checked, deferred with reason, or blocked
+[x] All plans/tests.md entries pass or are diagnosed
+[x] All HYPOTHESIS/UNKNOWN tags resolved or flagged
+[x] Every plans/doubts.md entry has a Resolution (15 of 15)
+[x] plans/index.md current
+[x] Final output matches the original task
+[x] All reversals reflected in the plan and output (REV-1 .. REV-12)
+[x] No rule in the rigor spec violated
+```
+
+**PASS.** First passing macro-audit since cycle 5.
+
+## What remains, honestly
+
+Four deferred items, none closable by further auditing:
+
+| Item | Blocked on |
+|---|---|
+| **OQ-7** — widen `target_c` or measure its distribution | a larger, more modification-rich sample |
+| top-k 4 -> 8 (defect #21) | the 5B-token checkpoint |
+| LR / warmup / loss-weight sweep | the 5B-token checkpoint |
+| RMDB Mg²⁺ titrations for ion conditioning | external data acquisition |
+
+The audit has reached the point where the remaining questions are answered by
+**running the model**, not by reading it more carefully.
+
+---
+
 # Final Verification Report — Cycle 10 (the last unaudited instrument)
 
 | Field | Value |

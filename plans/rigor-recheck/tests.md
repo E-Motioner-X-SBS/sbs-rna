@@ -914,3 +914,86 @@ across the three documents, so it now carries a pattern accepting either.
 
 **ALL CLAIMS REPRODUCE.** main.pdf **40pp, 0 boxes**; blueprint **v27**, tags
 balanced (div 236/236, p 160/160).
+
+## Cycle 11 — the oldest outstanding items (C13, C14)
+
+### C14 — do the residue-weighted numbers depend on the definition?
+Cycles 6-7 fixed the RNA definition and re-derived only the **G-findings**. Every
+other residue-weighted number still came from a script filtering on
+`label_comp_id in {A,C,G,U}`.
+
+That is not a narrower label set. It **deletes modified residues from the middle
+of a chain**, so the neighbours become adjacent and every downstream index
+shifts: chain length, sequence separation `|i-j|`, which pairs clear the
+`SEQ_SEP` guard, and the block indices `i//b` that occupancy is computed from.
+The question is not "are a few residues missing" but "does deleting 1% of
+positions from inside chains move the numbers the sparse-track budget was sized
+on".
+
+`scripts/sampling/audit_definition_sensitivity.py` measures it directly — the
+same chain under both definitions, for every structure.
+
+| Quantity | published (ACGU) | canonical |
+|---|---|---|
+| chains compared | 91 | 91 |
+| **chains whose length changes** | — | **31 = 34.1%** |
+| residues restored | — | **703** |
+| median L, affected chains | — | +0.87% |
+| median contacts/nt, affected | — | +1.37% |
+| median effective c, affected | — | +1.19% |
+| **worst single chain** (7VNV) | L = 61 | **L = 78 (+27.9%)** |
+| worst contacts/nt | — | **+46.1%** |
+| **max effective c, all chains** | **19.03** | **19.04** |
+| **chains breaching c = 20** | **0** | **0** |
+
+The 24 entries with chains > 3,000 nt were **checked separately rather than
+excluded** — they are where the budget is most at risk. Max effective c over
+them is **18.44 under both definitions**; none approaches 20.
+
+Accounting for all 179: 62 chains below the L>=32 guard, 24 above MAX_L (checked
+separately), 93 eligible, 91 comparable.
+
+**Verdict.** The corpus statistics and the `c = 20` sizing decision both survive
+— medians move ~1% and nothing breaches the budget under either rule. **The
+per-chain error does not survive**: a 27.9% length error is invisible in a median
+and unacceptable as a model input.
+
+> **Corpus statistics versus per-example correctness.** The published statistics
+> stand; the *training pipeline* must use the canonical loader. These are
+> different standards and this is the first point in the audit where they
+> diverge.
+
+### C13 — one shared loader for geometry
+`mmcif_entities.rna_chain_coords()` / `longest_rna_chain()` added as the single
+entry point for RNA *geometry*, matching `rna_residues()` for counts. Resolves
+hybrid chains per residue via the `O2'` test, excludes solvent by the polymer
+test, returns residues in polymer order.
+
+### C15 — 7 new test properties (suite now 27) — **ALL TESTS PASS**
+| Property | Result |
+|---|---|
+| longest canonical chain, 8FEQ | **16** (ACGU filter gives 14 — drops 2 SUR) |
+| longest canonical chain, 7VNV | **78** (ACGU gives 61 — the worst case) |
+| longest canonical chain, 7S3B | **6** (hybrid: the ribo, not the deoxy) |
+| 7PU7 has no canonical RNA chain | all-deoxy, correctly empty |
+| residues returned in polymer order | 7 chains, ordered |
+| no empty residues | every residue has >=1 heavy atom |
+| hydrogens excluded by default | pass |
+
+### C16 — performance note (why the first attempt failed)
+The first implementation looped over candidate residue pairs in Python computing
+`np.linalg.norm` per pair — O(pairs x atoms^2) — and did not finish on ribosomal
+chains within 3,000 s. Replaced with a single `scipy.spatial.cKDTree`
+`query_pairs` over all atoms at once, mapping atom pairs to residue pairs
+vectorised. All 179 structures now process in **under two minutes**. Recorded
+because an analysis that does not terminate is indistinguishable from one that
+was never run.
+
+### C17 — guard and deliverables
+- 8 new claims pinned: chains compared 91, changing 31, frac 0.3407, residues
+  restored 703, long chains 24, **max effective c 19.04**, **breaching c=20: 0**.
+- 5 new cross-document tokens: `34.1`, `27.9`, `19.04`, `18.44`, `703`.
+- `research/report/main.pdf`: **41 pages, 0 overfull, 0 underfull**.
+- `research/architecture/blueprint.html`: **v28**, tags balanced
+  (div 238/238, table 32/32, p 162/162, tr 172/172, td 531/531).
+- `verify_claims.py`: **ALL CLAIMS REPRODUCE**; all three suites pass.

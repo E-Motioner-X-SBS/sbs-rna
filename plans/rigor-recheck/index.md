@@ -7,10 +7,10 @@ subfolder to avoid collision.
 | Field | Value |
 |---|---|
 | Task | Recheck every empirical claim in the PHAROS architecture work |
-| Cycle | **10** — the last unaudited instrument |
+| Cycle | **11** — the oldest outstanding items (C13, C14) |
 | Phase | 6 AUDIT (cycle 9) |
 | Started | 2026-09-13 (cycle 1) |
-| Open TODO | 2 open (C13, C14), 3 deferred |
+| Open TODO | 0 open, 4 deferred (3 need training/data, 1 is OQ-7) |
 | Defects to date | **28** |
 
 ## The arc of cycles 7-10
@@ -56,8 +56,19 @@ replaced.
 | 9 | 1 | the guard's tolerances — 45 of 54 claims under-checked |
 | **10** | **1** | **the guard's token check — 3 of 5 tested guards vacuous** |
 
-**Twenty-eight defects.** The rate has not fallen, but the *location* has moved
-decisively: the last four are all in the verification apparatus rather than in
-the architecture or its measurements. **The oldest outstanding work items (C13,
-C14) are now four cycles old and should take priority over opening any further
-instrument audit.**
+| 11 | 0 defects | **C13/C14 closed** — definition sensitivity measured, shared geometry loader added |
+
+**Twenty-eight defects across eleven cycles.** The location moved decisively over
+cycles 7-10 — four consecutive defects in the verification apparatus rather than
+in the architecture. **Cycle 11 found no defect**, the first such cycle, and
+closed the two oldest outstanding items instead.
+
+## Where it stands
+
+Every to-do is closed, deferred with a reason, or waiting on data that does not
+exist yet. The architecture's one decision that these measurements feed — the
+`c = 20` sparse-track budget — **survives**, but with **4.8% headroom at the worst
+chain rather than the 16% a mean-over-long-chains figure implied** (OQ-7).
+
+What cannot be closed by auditing: **nothing has been trained**, so every claim
+about model behaviour remains an argument rather than a result.

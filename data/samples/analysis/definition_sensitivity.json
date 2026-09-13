@@ -1,0 +1,1853 @@
+{
+  "summary": {
+    "chains_compared": 91,
+    "chains_whose_length_changes": 31,
+    "frac_changed": 0.3407,
+    "residues_added_total": 703,
+    "median": {
+      "L": {
+        "published": 534.0,
+        "canonical": 534.0
+      },
+      "contacts_per_nt": {
+        "published": 3.5616,
+        "canonical": 3.5616
+      },
+      "block_occ": {
+        "published": 0.0316,
+        "canonical": 0.0315
+      },
+      "effective_c": {
+        "published": 11.8893,
+        "canonical": 11.8893
+      },
+      "mean_sep": {
+        "published": 68.6246,
+        "canonical": 68.6246
+      }
+    },
+    "worst_by_length_delta": [
+      {
+        "pdb": "8AUV",
+        "L_pub": 1545,
+        "L_can": 1626,
+        "occ_pub": 0.02011,
+        "occ_can": 0.01969,
+        "c_pub": 15.64,
+        "c_can": 16.09
+      },
+      {
+        "pdb": "7ZHG",
+        "L_pub": 1429,
+        "L_can": 1497,
+        "occ_pub": 0.02119,
+        "occ_can": 0.02096,
+        "c_pub": 15.25,
+        "c_can": 15.8
+      },
+      {
+        "pdb": "7UQB",
+        "L_pub": 2936,
+        "L_can": 2991,
+        "occ_pub": 0.01036,
+        "occ_can": 0.01031,
+        "c_pub": 15.23,
+        "c_can": 15.45
+      },
+      {
+        "pdb": "9FXO",
+        "L_pub": 1798,
+        "L_can": 1852,
+        "occ_pub": 0.01686,
+        "occ_can": 0.01695,
+        "c_pub": 15.23,
+        "c_can": 15.73
+      },
+      {
+        "pdb": "8A3W",
+        "L_pub": 1624,
+        "L_can": 1663,
+        "occ_pub": 0.01849,
+        "occ_can": 0.01808,
+        "c_pub": 15.05,
+        "c_can": 15.09
+      },
+      {
+        "pdb": "9FHL",
+        "L_pub": 1397,
+        "L_can": 1430,
+        "occ_pub": 0.02374,
+        "occ_can": 0.02314,
+        "c_pub": 16.7,
+        "c_can": 16.64
+      },
+      {
+        "pdb": "7PWG",
+        "L_pub": 2426,
+        "L_can": 2450,
+        "occ_pub": 0.01369,
+        "occ_can": 0.01368,
+        "c_pub": 16.66,
+        "c_can": 16.81
+      },
+      {
+        "pdb": "7Y7G",
+        "L_pub": 2729,
+        "L_can": 2753,
+        "occ_pub": 0.01314,
+        "occ_can": 0.01326,
+        "c_pub": 17.99,
+        "c_can": 18.31
+      },
+      {
+        "pdb": "7ZTA",
+        "L_pub": 2879,
+        "L_can": 2903,
+        "occ_pub": 0.01224,
+        "occ_can": 0.01247,
+        "c_pub": 17.66,
+        "c_can": 18.14
+      },
+      {
+        "pdb": "8R6C",
+        "L_pub": 2729,
+        "L_can": 2753,
+        "occ_pub": 0.01371,
+        "occ_can": 0.01378,
+        "c_pub": 18.78,
+        "c_can": 19.04
+      }
+    ]
+  },
+  "rows": [
+    {
+      "pdb": "5J8B",
+      "published": {
+        "L": 2874,
+        "contacts": 15781,
+        "contacts_per_nt": 5.4909533750869866,
+        "block_occ": 0.013205068768351105,
+        "effective_c": 19.028531663187195,
+        "mean_sep": 317.63373677206766
+      },
+      "canonical": {
+        "L": 2874,
+        "contacts": 15781,
+        "contacts_per_nt": 5.4909533750869866,
+        "block_occ": 0.013205068768351105,
+        "effective_c": 19.028531663187195,
+        "mean_sep": 317.63373677206766
+      }
+    },
+    {
+      "pdb": "7MLX",
+      "published": {
+        "L": 65,
+        "contacts": 184,
+        "contacts_per_nt": 2.830769230769231,
+        "block_occ": 0.20915032679738563,
+        "effective_c": 7.876923076923077,
+        "mean_sep": 25.804347826086957
+      },
+      "canonical": {
+        "L": 65,
+        "contacts": 184,
+        "contacts_per_nt": 2.830769230769231,
+        "block_occ": 0.20915032679738563,
+        "effective_c": 7.876923076923077,
+        "mean_sep": 25.804347826086957
+      }
+    },
+    {
+      "pdb": "7N2V",
+      "published": {
+        "L": 2881,
+        "contacts": 15038,
+        "contacts_per_nt": 5.219715376605345,
+        "block_occ": 0.012559502998682193,
+        "effective_c": 18.154807358556056,
+        "mean_sep": 325.08152679877645
+      },
+      "canonical": {
+        "L": 2904,
+        "contacts": 15381,
+        "contacts_per_nt": 5.296487603305785,
+        "block_occ": 0.012750993743866072,
+        "effective_c": 18.53994490358127,
+        "mean_sep": 333.7563227358429
+      }
+    },
+    {
+      "pdb": "7NHN",
+      "published": {
+        "L": 2908,
+        "contacts": 15712,
+        "contacts_per_nt": 5.40302613480055,
+        "block_occ": 0.01262904908021827,
+        "effective_c": 18.3878954607978,
+        "mean_sep": 326.4278258655805
+      },
+      "canonical": {
+        "L": 2908,
+        "contacts": 15712,
+        "contacts_per_nt": 5.40302613480055,
+        "block_occ": 0.01262904908021827,
+        "effective_c": 18.3878954607978,
+        "mean_sep": 326.4278258655805
+      }
+    },
+    {
+      "pdb": "7O1C",
+      "published": {
+        "L": 2874,
+        "contacts": 14592,
+        "contacts_per_nt": 5.077244258872652,
+        "block_occ": 0.012219904187915314,
+        "effective_c": 17.608907446068198,
+        "mean_sep": 322.4153645833333
+      },
+      "canonical": {
+        "L": 2897,
+        "contacts": 14901,
+        "contacts_per_nt": 5.143596824301001,
+        "block_occ": 0.012246603970741902,
+        "effective_c": 17.80048325854332,
+        "mean_sep": 330.49889269176566
+      }
+    },
+    {
+      "pdb": "7OAX",
+      "published": {
+        "L": 51,
+        "contacts": 160,
+        "contacts_per_nt": 3.1372549019607843,
+        "block_occ": 0.3626373626373626,
+        "effective_c": 10.352941176470589,
+        "mean_sep": 23.01875
+      },
+      "canonical": {
+        "L": 51,
+        "contacts": 160,
+        "contacts_per_nt": 3.1372549019607843,
+        "block_occ": 0.3626373626373626,
+        "effective_c": 10.352941176470589,
+        "mean_sep": 23.01875
+      }
+    },
+    {
+      "pdb": "7OIF",
+      "published": {
+        "L": 2881,
+        "contacts": 15121,
+        "contacts_per_nt": 5.2485248177716075,
+        "block_occ": 0.012494188972687212,
+        "effective_c": 18.06039569593891,
+        "mean_sep": 318.7200581972092
+      },
+      "canonical": {
+        "L": 2903,
+        "contacts": 15429,
+        "contacts_per_nt": 5.31484671029969,
+        "block_occ": 0.012713100746113126,
+        "effective_c": 18.49121598346538,
+        "mean_sep": 326.9487977185819
+      }
+    },
+    {
+      "pdb": "7OIZ",
+      "published": {
+        "L": 2730,
+        "contacts": 14284,
+        "contacts_per_nt": 5.232234432234432,
+        "block_occ": 0.013395494592997869,
+        "effective_c": 18.338461538461537,
+        "mean_sep": 310.60669280313635
+      },
+      "canonical": {
+        "L": 2753,
+        "contacts": 14602,
+        "contacts_per_nt": 5.30403196512895,
+        "block_occ": 0.0134326160577186,
+        "effective_c": 18.55721031601889,
+        "mean_sep": 318.34111765511574
+      }
+    },
+    {
+      "pdb": "7ONU",
+      "published": {
+        "L": 66,
+        "contacts": 146,
+        "contacts_per_nt": 2.212121212121212,
+        "block_occ": 0.20261437908496732,
+        "effective_c": 7.515151515151516,
+        "mean_sep": 26.424657534246574
+      },
+      "canonical": {
+        "L": 66,
+        "contacts": 146,
+        "contacts_per_nt": 2.212121212121212,
+        "block_occ": 0.20261437908496732,
+        "effective_c": 7.515151515151516,
+        "mean_sep": 26.424657534246574
+      }
+    },
+    {
+      "pdb": "7OZQ",
+      "published": {
+        "L": 32,
+        "contacts": 72,
+        "contacts_per_nt": 2.25,
+        "block_occ": 0.3333333333333333,
+        "effective_c": 6.0,
+        "mean_sep": 16.23611111111111
+      },
+      "canonical": {
+        "L": 32,
+        "contacts": 72,
+        "contacts_per_nt": 2.25,
+        "block_occ": 0.3333333333333333,
+        "effective_c": 6.0,
+        "mean_sep": 16.23611111111111
+      }
+    },
+    {
+      "pdb": "7P7T",
+      "published": {
+        "L": 2901,
+        "contacts": 15638,
+        "contacts_per_nt": 5.390554981041021,
+        "block_occ": 0.012622157551506058,
+        "effective_c": 18.371596001378833,
+        "mean_sep": 326.9206420258345
+      },
+      "canonical": {
+        "L": 2901,
+        "contacts": 15638,
+        "contacts_per_nt": 5.390554981041021,
+        "block_occ": 0.012622157551506058,
+        "effective_c": 18.371596001378833,
+        "mean_sep": 326.9206420258345
+      }
+    },
+    {
+      "pdb": "7PKT",
+      "published": {
+        "L": 578,
+        "contacts": 1925,
+        "contacts_per_nt": 3.330449826989619,
+        "block_occ": 0.038356164383561646,
+        "effective_c": 11.238754325259515,
+        "mean_sep": 66.10233766233766
+      },
+      "canonical": {
+        "L": 578,
+        "contacts": 1925,
+        "contacts_per_nt": 3.330449826989619,
+        "block_occ": 0.038356164383561646,
+        "effective_c": 11.238754325259515,
+        "mean_sep": 66.10233766233766
+      }
+    },
+    {
+      "pdb": "7PMM",
+      "published": {
+        "L": 44,
+        "contacts": 89,
+        "contacts_per_nt": 2.022727272727273,
+        "block_occ": 0.22727272727272727,
+        "effective_c": 5.454545454545454,
+        "mean_sep": 23.98876404494382
+      },
+      "canonical": {
+        "L": 44,
+        "contacts": 89,
+        "contacts_per_nt": 2.022727272727273,
+        "block_occ": 0.22727272727272727,
+        "effective_c": 5.454545454545454,
+        "mean_sep": 23.98876404494382
+      }
+    },
+    {
+      "pdb": "7PWG",
+      "published": {
+        "L": 2426,
+        "contacts": 11440,
+        "contacts_per_nt": 4.71558120362737,
+        "block_occ": 0.01368897945027313,
+        "effective_c": 16.65952184666117,
+        "mean_sep": 267.4418706293706
+      },
+      "canonical": {
+        "L": 2450,
+        "contacts": 11790,
+        "contacts_per_nt": 4.812244897959184,
+        "block_occ": 0.01367759350872252,
+        "effective_c": 16.809795918367346,
+        "mean_sep": 274.9050042408821
+      }
+    },
+    {
+      "pdb": "7QCA",
+      "published": {
+        "L": 2499,
+        "contacts": 11774,
+        "contacts_per_nt": 4.711484593837535,
+        "block_occ": 0.013285623003194889,
+        "effective_c": 16.640256102440976,
+        "mean_sep": 271.2660947851198
+      },
+      "canonical": {
+        "L": 2499,
+        "contacts": 11774,
+        "contacts_per_nt": 4.711484593837535,
+        "block_occ": 0.013285623003194889,
+        "effective_c": 16.640256102440976,
+        "mean_sep": 271.2660947851198
+      }
+    },
+    {
+      "pdb": "7QEP",
+      "published": {
+        "L": 2319,
+        "contacts": 10713,
+        "contacts_per_nt": 4.619663648124192,
+        "block_occ": 0.014042376402160366,
+        "effective_c": 16.32427770590772,
+        "mean_sep": 255.52188929338186
+      },
+      "canonical": {
+        "L": 2319,
+        "contacts": 10713,
+        "contacts_per_nt": 4.619663648124192,
+        "block_occ": 0.014042376402160366,
+        "effective_c": 16.32427770590772,
+        "mean_sep": 255.52188929338186
+      }
+    },
+    {
+      "pdb": "7QH7",
+      "published": {
+        "L": 1256,
+        "contacts": 5693,
+        "contacts_per_nt": 4.532643312101911,
+        "block_occ": 0.02570013143261551,
+        "effective_c": 16.191082802547772,
+        "mean_sep": 169.80256455295978
+      },
+      "canonical": {
+        "L": 1256,
+        "contacts": 5693,
+        "contacts_per_nt": 4.532643312101911,
+        "block_occ": 0.02570013143261551,
+        "effective_c": 16.191082802547772,
+        "mean_sep": 169.80256455295978
+      }
+    },
+    {
+      "pdb": "7QI4",
+      "published": {
+        "L": 1553,
+        "contacts": 7464,
+        "contacts_per_nt": 4.806181584030908,
+        "block_occ": 0.02214751829147716,
+        "effective_c": 17.308435286542178,
+        "mean_sep": 211.65996784565917
+      },
+      "canonical": {
+        "L": 1558,
+        "contacts": 7542,
+        "contacts_per_nt": 4.840821566110398,
+        "block_occ": 0.022388353334644895,
+        "effective_c": 17.530166880616175,
+        "mean_sep": 212.73601166799259
+      }
+    },
+    {
+      "pdb": "7QQP",
+      "published": {
+        "L": 84,
+        "contacts": 116,
+        "contacts_per_nt": 1.380952380952381,
+        "block_occ": 0.1038961038961039,
+        "effective_c": 4.571428571428571,
+        "mean_sep": 17.5
+      },
+      "canonical": {
+        "L": 84,
+        "contacts": 116,
+        "contacts_per_nt": 1.380952380952381,
+        "block_occ": 0.1038961038961039,
+        "effective_c": 4.571428571428571,
+        "mean_sep": 17.5
+      }
+    },
+    {
+      "pdb": "7QR8",
+      "published": {
+        "L": 85,
+        "contacts": 118,
+        "contacts_per_nt": 1.388235294117647,
+        "block_occ": 0.09486166007905138,
+        "effective_c": 4.517647058823529,
+        "mean_sep": 17.296610169491526
+      },
+      "canonical": {
+        "L": 85,
+        "contacts": 118,
+        "contacts_per_nt": 1.388235294117647,
+        "block_occ": 0.09486166007905138,
+        "effective_c": 4.517647058823529,
+        "mean_sep": 17.296610169491526
+      }
+    },
+    {
+      "pdb": "7R6Q",
+      "published": {
+        "L": 295,
+        "contacts": 924,
+        "contacts_per_nt": 3.1322033898305084,
+        "block_occ": 0.07243243243243243,
+        "effective_c": 10.901694915254238,
+        "mean_sep": 41.384199134199136
+      },
+      "canonical": {
+        "L": 295,
+        "contacts": 924,
+        "contacts_per_nt": 3.1322033898305084,
+        "block_occ": 0.07243243243243243,
+        "effective_c": 10.901694915254238,
+        "mean_sep": 41.384199134199136
+      }
+    },
+    {
+      "pdb": "7REX",
+      "published": {
+        "L": 34,
+        "contacts": 119,
+        "contacts_per_nt": 3.5,
+        "block_occ": 0.4666666666666667,
+        "effective_c": 9.882352941176471,
+        "mean_sep": 16.478991596638654
+      },
+      "canonical": {
+        "L": 34,
+        "contacts": 119,
+        "contacts_per_nt": 3.5,
+        "block_occ": 0.4666666666666667,
+        "effective_c": 9.882352941176471,
+        "mean_sep": 16.478991596638654
+      }
+    },
+    {
+      "pdb": "7RQB",
+      "published": {
+        "L": 2861,
+        "contacts": 15638,
+        "contacts_per_nt": 5.465921006641034,
+        "block_occ": 0.013008111077347421,
+        "effective_c": 18.673191191890947,
+        "mean_sep": 314.57577695357463
+      },
+      "canonical": {
+        "L": 2872,
+        "contacts": 15747,
+        "contacts_per_nt": 5.482938718662953,
+        "block_occ": 0.012951290286338577,
+        "effective_c": 18.623955431754876,
+        "mean_sep": 315.71753349844414
+      }
+    },
+    {
+      "pdb": "7RQE",
+      "published": {
+        "L": 2861,
+        "contacts": 15516,
+        "contacts_per_nt": 5.423278573925201,
+        "block_occ": 0.012926299057993034,
+        "effective_c": 18.555749737853898,
+        "mean_sep": 313.9900747615365
+      },
+      "canonical": {
+        "L": 2872,
+        "contacts": 15625,
+        "contacts_per_nt": 5.4404596100278555,
+        "block_occ": 0.012869933093394183,
+        "effective_c": 18.506963788300837,
+        "mean_sep": 315.13184
+      }
+    },
+    {
+      "pdb": "7RYF",
+      "published": {
+        "L": 2673,
+        "contacts": 13242,
+        "contacts_per_nt": 4.9539842873176205,
+        "block_occ": 0.01320304308056132,
+        "effective_c": 17.7119341563786,
+        "mean_sep": 301.9514423803051
+      },
+      "canonical": {
+        "L": 2685,
+        "contacts": 13437,
+        "contacts_per_nt": 5.004469273743017,
+        "block_occ": 0.013041286351093187,
+        "effective_c": 17.573184357541898,
+        "mean_sep": 306.72553397335713
+      }
+    },
+    {
+      "pdb": "7SBA",
+      "published": {
+        "L": 43,
+        "contacts": 2,
+        "contacts_per_nt": 0.046511627906976744,
+        "block_occ": 0.015151515151515152,
+        "effective_c": 0.37209302325581395,
+        "mean_sep": 4.0
+      },
+      "canonical": {
+        "L": 43,
+        "contacts": 2,
+        "contacts_per_nt": 0.046511627906976744,
+        "block_occ": 0.015151515151515152,
+        "effective_c": 0.37209302325581395,
+        "mean_sep": 4.0
+      }
+    },
+    {
+      "pdb": "7UQB",
+      "published": {
+        "L": 2936,
+        "contacts": 12510,
+        "contacts_per_nt": 4.260899182561308,
+        "block_occ": 0.010357930638195333,
+        "effective_c": 15.226158038147139,
+        "mean_sep": 269.97777777777776
+      },
+      "canonical": {
+        "L": 2991,
+        "contacts": 13038,
+        "contacts_per_nt": 4.359077231695085,
+        "block_occ": 0.010309646373417676,
+        "effective_c": 15.449013707790037,
+        "mean_sep": 281.0166436570026
+      }
+    },
+    {
+      "pdb": "7UR5",
+      "published": {
+        "L": 90,
+        "contacts": 260,
+        "contacts_per_nt": 2.888888888888889,
+        "block_occ": 0.18115942028985507,
+        "effective_c": 8.88888888888889,
+        "mean_sep": 31.096153846153847
+      },
+      "canonical": {
+        "L": 90,
+        "contacts": 260,
+        "contacts_per_nt": 2.888888888888889,
+        "block_occ": 0.18115942028985507,
+        "effective_c": 8.88888888888889,
+        "mean_sep": 31.096153846153847
+      }
+    },
+    {
+      "pdb": "7VNV",
+      "published": {
+        "L": 61,
+        "contacts": 144,
+        "contacts_per_nt": 2.360655737704918,
+        "block_occ": 0.2426470588235294,
+        "effective_c": 8.655737704918034,
+        "mean_sep": 22.805555555555557
+      },
+      "canonical": {
+        "L": 78,
+        "contacts": 269,
+        "contacts_per_nt": 3.448717948717949,
+        "block_occ": 0.22857142857142856,
+        "effective_c": 9.846153846153847,
+        "mean_sep": 27.297397769516728
+      }
+    },
+    {
+      "pdb": "7VTN",
+      "published": {
+        "L": 56,
+        "contacts": 97,
+        "contacts_per_nt": 1.7321428571428572,
+        "block_occ": 0.17142857142857143,
+        "effective_c": 5.142857142857143,
+        "mean_sep": 19.22680412371134
+      },
+      "canonical": {
+        "L": 56,
+        "contacts": 97,
+        "contacts_per_nt": 1.7321428571428572,
+        "block_occ": 0.17142857142857143,
+        "effective_c": 5.142857142857143,
+        "mean_sep": 19.22680412371134
+      }
+    },
+    {
+      "pdb": "7WAY",
+      "published": {
+        "L": 115,
+        "contacts": 286,
+        "contacts_per_nt": 2.4869565217391303,
+        "block_occ": 0.12873563218390804,
+        "effective_c": 7.791304347826087,
+        "mean_sep": 30.234265734265733
+      },
+      "canonical": {
+        "L": 115,
+        "contacts": 286,
+        "contacts_per_nt": 2.4869565217391303,
+        "block_occ": 0.12873563218390804,
+        "effective_c": 7.791304347826087,
+        "mean_sep": 30.234265734265733
+      }
+    },
+    {
+      "pdb": "7WJU",
+      "published": {
+        "L": 133,
+        "contacts": 384,
+        "contacts_per_nt": 2.887218045112782,
+        "block_occ": 0.13109243697478992,
+        "effective_c": 9.38345864661654,
+        "mean_sep": 29.84375
+      },
+      "canonical": {
+        "L": 133,
+        "contacts": 384,
+        "contacts_per_nt": 2.887218045112782,
+        "block_occ": 0.13109243697478992,
+        "effective_c": 9.38345864661654,
+        "mean_sep": 29.84375
+      }
+    },
+    {
+      "pdb": "7XSP",
+      "published": {
+        "L": 35,
+        "contacts": 3,
+        "contacts_per_nt": 0.08571428571428572,
+        "block_occ": 0.06666666666666667,
+        "effective_c": 1.3714285714285714,
+        "mean_sep": 4.333333333333333
+      },
+      "canonical": {
+        "L": 35,
+        "contacts": 3,
+        "contacts_per_nt": 0.08571428571428572,
+        "block_occ": 0.06666666666666667,
+        "effective_c": 1.3714285714285714,
+        "mean_sep": 4.333333333333333
+      }
+    },
+    {
+      "pdb": "7Y7G",
+      "published": {
+        "L": 2729,
+        "contacts": 14092,
+        "contacts_per_nt": 5.163796262367168,
+        "block_occ": 0.013138629883640287,
+        "effective_c": 17.993404177354343,
+        "mean_sep": 310.45706783990914
+      },
+      "canonical": {
+        "L": 2753,
+        "contacts": 14420,
+        "contacts_per_nt": 5.237922266618234,
+        "block_occ": 0.013255926463473634,
+        "effective_c": 18.313112967671632,
+        "mean_sep": 318.30651872399443
+      }
+    },
+    {
+      "pdb": "7Y82",
+      "published": {
+        "L": 41,
+        "contacts": 6,
+        "contacts_per_nt": 0.14634146341463414,
+        "block_occ": 0.045454545454545456,
+        "effective_c": 1.170731707317073,
+        "mean_sep": 4.166666666666667
+      },
+      "canonical": {
+        "L": 41,
+        "contacts": 6,
+        "contacts_per_nt": 0.14634146341463414,
+        "block_occ": 0.045454545454545456,
+        "effective_c": 1.170731707317073,
+        "mean_sep": 4.166666666666667
+      }
+    },
+    {
+      "pdb": "7YGB",
+      "published": {
+        "L": 393,
+        "contacts": 1692,
+        "contacts_per_nt": 4.305343511450381,
+        "block_occ": 0.06747474747474748,
+        "effective_c": 13.597964376590332,
+        "mean_sep": 70.75650118203309
+      },
+      "canonical": {
+        "L": 393,
+        "contacts": 1692,
+        "contacts_per_nt": 4.305343511450381,
+        "block_occ": 0.06747474747474748,
+        "effective_c": 13.597964376590332,
+        "mean_sep": 70.75650118203309
+      }
+    },
+    {
+      "pdb": "7YGC",
+      "published": {
+        "L": 393,
+        "contacts": 1657,
+        "contacts_per_nt": 4.216284987277354,
+        "block_occ": 0.06606060606060606,
+        "effective_c": 13.312977099236642,
+        "mean_sep": 68.6246228123114
+      },
+      "canonical": {
+        "L": 393,
+        "contacts": 1657,
+        "contacts_per_nt": 4.216284987277354,
+        "block_occ": 0.06606060606060606,
+        "effective_c": 13.312977099236642,
+        "mean_sep": 68.6246228123114
+      }
+    },
+    {
+      "pdb": "7ZHG",
+      "published": {
+        "L": 1429,
+        "contacts": 6342,
+        "contacts_per_nt": 4.438068579426172,
+        "block_occ": 0.02119481489550427,
+        "effective_c": 15.249825052484255,
+        "mean_sep": 158.86754966887418
+      },
+      "canonical": {
+        "L": 1497,
+        "contacts": 7023,
+        "contacts_per_nt": 4.6913827655310625,
+        "block_occ": 0.0209645390070922,
+        "effective_c": 15.79692718770875,
+        "mean_sep": 164.08671507902605
+      }
+    },
+    {
+      "pdb": "7ZTA",
+      "published": {
+        "L": 2879,
+        "contacts": 14643,
+        "contacts_per_nt": 5.086141021187912,
+        "block_occ": 0.012243797195253507,
+        "effective_c": 17.66168808614102,
+        "mean_sep": 320.07689681076283
+      },
+      "canonical": {
+        "L": 2903,
+        "contacts": 14964,
+        "contacts_per_nt": 5.1546675852566315,
+        "block_occ": 0.012470585560494277,
+        "effective_c": 18.138477437134,
+        "mean_sep": 328.7460572039562
+      }
+    },
+    {
+      "pdb": "8A22",
+      "published": {
+        "L": 534,
+        "contacts": 1752,
+        "contacts_per_nt": 3.2808988764044944,
+        "block_occ": 0.04068546158098397,
+        "effective_c": 11.02621722846442,
+        "mean_sep": 61.88070776255708
+      },
+      "canonical": {
+        "L": 534,
+        "contacts": 1752,
+        "contacts_per_nt": 3.2808988764044944,
+        "block_occ": 0.04068546158098397,
+        "effective_c": 11.02621722846442,
+        "mean_sep": 61.88070776255708
+      }
+    },
+    {
+      "pdb": "8A3W",
+      "published": {
+        "L": 1624,
+        "contacts": 6961,
+        "contacts_per_nt": 4.286330049261084,
+        "block_occ": 0.0184940874596047,
+        "effective_c": 15.054187192118226,
+        "mean_sep": 169.74730642149117
+      },
+      "canonical": {
+        "L": 1663,
+        "contacts": 7359,
+        "contacts_per_nt": 4.42513529765484,
+        "block_occ": 0.018077845415974913,
+        "effective_c": 15.085989176187613,
+        "mean_sep": 176.57901888843594
+      }
+    },
+    {
+      "pdb": "8A5I",
+      "published": {
+        "L": 2908,
+        "contacts": 15766,
+        "contacts_per_nt": 5.421595598349381,
+        "block_occ": 0.012693290203606572,
+        "effective_c": 18.481430536451168,
+        "mean_sep": 323.077571990359
+      },
+      "canonical": {
+        "L": 2908,
+        "contacts": 15766,
+        "contacts_per_nt": 5.421595598349381,
+        "block_occ": 0.012693290203606572,
+        "effective_c": 18.481430536451168,
+        "mean_sep": 323.077571990359
+      }
+    },
+    {
+      "pdb": "8AUV",
+      "published": {
+        "L": 1545,
+        "contacts": 6842,
+        "contacts_per_nt": 4.428478964401294,
+        "block_occ": 0.02011241642025627,
+        "effective_c": 15.637540453074434,
+        "mean_sep": 166.6885413621748
+      },
+      "canonical": {
+        "L": 1626,
+        "contacts": 7715,
+        "contacts_per_nt": 4.744772447724477,
+        "block_occ": 0.019692152045093222,
+        "effective_c": 16.088560885608857,
+        "mean_sep": 176.18263123784834
+      }
+    },
+    {
+      "pdb": "8BF9",
+      "published": {
+        "L": 1766,
+        "contacts": 8487,
+        "contacts_per_nt": 4.805775764439411,
+        "block_occ": 0.018977967988723532,
+        "effective_c": 16.83352208380521,
+        "mean_sep": 231.066336750324
+      },
+      "canonical": {
+        "L": 1766,
+        "contacts": 8487,
+        "contacts_per_nt": 4.805775764439411,
+        "block_occ": 0.018977967988723532,
+        "effective_c": 16.83352208380521,
+        "mean_sep": 231.066336750324
+      }
+    },
+    {
+      "pdb": "8BHN",
+      "published": {
+        "L": 2758,
+        "contacts": 13041,
+        "contacts_per_nt": 4.728426395939087,
+        "block_occ": 0.012366031166761047,
+        "effective_c": 17.102248005801304,
+        "mean_sep": 312.9130434782609
+      },
+      "canonical": {
+        "L": 2758,
+        "contacts": 13041,
+        "contacts_per_nt": 4.728426395939087,
+        "block_occ": 0.012366031166761047,
+        "effective_c": 17.102248005801304,
+        "mean_sep": 312.9130434782609
+      }
+    },
+    {
+      "pdb": "8BUU",
+      "published": {
+        "L": 2850,
+        "contacts": 15352,
+        "contacts_per_nt": 5.386666666666667,
+        "block_occ": 0.012862367948581957,
+        "effective_c": 18.38035087719298,
+        "mean_sep": 319.6931344450235
+      },
+      "canonical": {
+        "L": 2852,
+        "contacts": 15381,
+        "contacts_per_nt": 5.393057503506311,
+        "block_occ": 0.012999870354874068,
+        "effective_c": 18.56381486676017,
+        "mean_sep": 319.777582731942
+      }
+    },
+    {
+      "pdb": "8CBK",
+      "published": {
+        "L": 93,
+        "contacts": 191,
+        "contacts_per_nt": 2.053763440860215,
+        "block_occ": 0.11666666666666667,
+        "effective_c": 6.021505376344086,
+        "mean_sep": 21.968586387434556
+      },
+      "canonical": {
+        "L": 93,
+        "contacts": 191,
+        "contacts_per_nt": 2.053763440860215,
+        "block_occ": 0.11666666666666667,
+        "effective_c": 6.021505376344086,
+        "mean_sep": 21.968586387434556
+      }
+    },
+    {
+      "pdb": "8CWO",
+      "published": {
+        "L": 1024,
+        "contacts": 5100,
+        "contacts_per_nt": 4.98046875,
+        "block_occ": 0.03164518482490272,
+        "effective_c": 16.265625,
+        "mean_sep": 137.35901960784312
+      },
+      "canonical": {
+        "L": 1034,
+        "contacts": 5202,
+        "contacts_per_nt": 5.0309477756286265,
+        "block_occ": 0.031482031482031485,
+        "effective_c": 16.402321083172147,
+        "mean_sep": 137.41214917339485
+      }
+    },
+    {
+      "pdb": "8D29",
+      "published": {
+        "L": 34,
+        "contacts": 68,
+        "contacts_per_nt": 2.0,
+        "block_occ": 0.2222222222222222,
+        "effective_c": 4.705882352941177,
+        "mean_sep": 18.264705882352942
+      },
+      "canonical": {
+        "L": 34,
+        "contacts": 68,
+        "contacts_per_nt": 2.0,
+        "block_occ": 0.2222222222222222,
+        "effective_c": 4.705882352941177,
+        "mean_sep": 18.264705882352942
+      }
+    },
+    {
+      "pdb": "8D4A",
+      "published": {
+        "L": 41,
+        "contacts": 50,
+        "contacts_per_nt": 1.2195121951219512,
+        "block_occ": 0.12121212121212122,
+        "effective_c": 3.1219512195121952,
+        "mean_sep": 9.74
+      },
+      "canonical": {
+        "L": 41,
+        "contacts": 50,
+        "contacts_per_nt": 1.2195121951219512,
+        "block_occ": 0.12121212121212122,
+        "effective_c": 3.1219512195121952,
+        "mean_sep": 9.74
+      }
+    },
+    {
+      "pdb": "8DFA",
+      "published": {
+        "L": 46,
+        "contacts": 2,
+        "contacts_per_nt": 0.043478260869565216,
+        "block_occ": 0.01282051282051282,
+        "effective_c": 0.34782608695652173,
+        "mean_sep": 4.0
+      },
+      "canonical": {
+        "L": 46,
+        "contacts": 2,
+        "contacts_per_nt": 0.043478260869565216,
+        "block_occ": 0.01282051282051282,
+        "effective_c": 0.34782608695652173,
+        "mean_sep": 4.0
+      }
+    },
+    {
+      "pdb": "8DFS",
+      "published": {
+        "L": 48,
+        "contacts": 3,
+        "contacts_per_nt": 0.0625,
+        "block_occ": 0.02564102564102564,
+        "effective_c": 0.6666666666666666,
+        "mean_sep": 4.0
+      },
+      "canonical": {
+        "L": 48,
+        "contacts": 3,
+        "contacts_per_nt": 0.0625,
+        "block_occ": 0.02564102564102564,
+        "effective_c": 0.6666666666666666,
+        "mean_sep": 4.0
+      }
+    },
+    {
+      "pdb": "8DZJ",
+      "published": {
+        "L": 153,
+        "contacts": 433,
+        "contacts_per_nt": 2.8300653594771243,
+        "block_occ": 0.10256410256410256,
+        "effective_c": 8.366013071895425,
+        "mean_sep": 32.17551963048499
+      },
+      "canonical": {
+        "L": 153,
+        "contacts": 433,
+        "contacts_per_nt": 2.8300653594771243,
+        "block_occ": 0.10256410256410256,
+        "effective_c": 8.366013071895425,
+        "mean_sep": 32.17551963048499
+      }
+    },
+    {
+      "pdb": "8E74",
+      "published": {
+        "L": 32,
+        "contacts": 42,
+        "contacts_per_nt": 1.3125,
+        "block_occ": 0.1388888888888889,
+        "effective_c": 2.5,
+        "mean_sep": 12.047619047619047
+      },
+      "canonical": {
+        "L": 32,
+        "contacts": 42,
+        "contacts_per_nt": 1.3125,
+        "block_occ": 0.1388888888888889,
+        "effective_c": 2.5,
+        "mean_sep": 12.047619047619047
+      }
+    },
+    {
+      "pdb": "8ESQ",
+      "published": {
+        "L": 2230,
+        "contacts": 9088,
+        "contacts_per_nt": 4.075336322869955,
+        "block_occ": 0.012381300453318457,
+        "effective_c": 13.854708520179372,
+        "mean_sep": 167.8997579225352
+      },
+      "canonical": {
+        "L": 2230,
+        "contacts": 9088,
+        "contacts_per_nt": 4.075336322869955,
+        "block_occ": 0.012381300453318457,
+        "effective_c": 13.854708520179372,
+        "mean_sep": 167.8997579225352
+      }
+    },
+    {
+      "pdb": "8EUG",
+      "published": {
+        "L": 2869,
+        "contacts": 14438,
+        "contacts_per_nt": 5.032415475775531,
+        "block_occ": 0.012083480228265038,
+        "effective_c": 17.39421401185082,
+        "mean_sep": 295.1588170106663
+      },
+      "canonical": {
+        "L": 2869,
+        "contacts": 14438,
+        "contacts_per_nt": 5.032415475775531,
+        "block_occ": 0.012083480228265038,
+        "effective_c": 17.39421401185082,
+        "mean_sep": 295.1588170106663
+      }
+    },
+    {
+      "pdb": "8EWG",
+      "published": {
+        "L": 56,
+        "contacts": 67,
+        "contacts_per_nt": 1.1964285714285714,
+        "block_occ": 0.14285714285714285,
+        "effective_c": 4.285714285714286,
+        "mean_sep": 10.388059701492537
+      },
+      "canonical": {
+        "L": 56,
+        "contacts": 67,
+        "contacts_per_nt": 1.1964285714285714,
+        "block_occ": 0.14285714285714285,
+        "effective_c": 4.285714285714286,
+        "mean_sep": 10.388059701492537
+      }
+    },
+    {
+      "pdb": "8EX9",
+      "published": {
+        "L": 102,
+        "contacts": 302,
+        "contacts_per_nt": 2.9607843137254903,
+        "block_occ": 0.1737891737891738,
+        "effective_c": 9.568627450980392,
+        "mean_sep": 26.781456953642383
+      },
+      "canonical": {
+        "L": 102,
+        "contacts": 302,
+        "contacts_per_nt": 2.9607843137254903,
+        "block_occ": 0.1737891737891738,
+        "effective_c": 9.568627450980392,
+        "mean_sep": 26.781456953642383
+      }
+    },
+    {
+      "pdb": "8EYU",
+      "published": {
+        "L": 49,
+        "contacts": 159,
+        "contacts_per_nt": 3.2448979591836733,
+        "block_occ": 0.32967032967032966,
+        "effective_c": 9.795918367346939,
+        "mean_sep": 19.050314465408807
+      },
+      "canonical": {
+        "L": 49,
+        "contacts": 159,
+        "contacts_per_nt": 3.2448979591836733,
+        "block_occ": 0.32967032967032966,
+        "effective_c": 9.795918367346939,
+        "mean_sep": 19.050314465408807
+      }
+    },
+    {
+      "pdb": "8FKW",
+      "published": {
+        "L": 2277,
+        "contacts": 7997,
+        "contacts_per_nt": 3.5120772946859904,
+        "block_occ": 0.01039727163793898,
+        "effective_c": 11.889328063241107,
+        "mean_sep": 151.3331249218457
+      },
+      "canonical": {
+        "L": 2277,
+        "contacts": 7997,
+        "contacts_per_nt": 3.5120772946859904,
+        "block_occ": 0.01039727163793898,
+        "effective_c": 11.889328063241107,
+        "mean_sep": 151.3331249218457
+      }
+    },
+    {
+      "pdb": "8FMW",
+      "published": {
+        "L": 2929,
+        "contacts": 15557,
+        "contacts_per_nt": 5.311369067941277,
+        "block_occ": 0.012456739687224687,
+        "effective_c": 18.305223625810857,
+        "mean_sep": 320.24284887831845
+      },
+      "canonical": {
+        "L": 2929,
+        "contacts": 15557,
+        "contacts_per_nt": 5.311369067941277,
+        "block_occ": 0.012456739687224687,
+        "effective_c": 18.305223625810857,
+        "mean_sep": 320.24284887831845
+      }
+    },
+    {
+      "pdb": "8FRU",
+      "published": {
+        "L": 2551,
+        "contacts": 12022,
+        "contacts_per_nt": 4.7126617012936105,
+        "block_occ": 0.013152408004277845,
+        "effective_c": 16.815366522932184,
+        "mean_sep": 282.20246215272
+      },
+      "canonical": {
+        "L": 2551,
+        "contacts": 12022,
+        "contacts_per_nt": 4.7126617012936105,
+        "block_occ": 0.013152408004277845,
+        "effective_c": 16.815366522932184,
+        "mean_sep": 282.20246215272
+      }
+    },
+    {
+      "pdb": "8FVY",
+      "published": {
+        "L": 1441,
+        "contacts": 6567,
+        "contacts_per_nt": 4.557251908396947,
+        "block_occ": 0.021364839840222832,
+        "effective_c": 15.500346981263013,
+        "mean_sep": 156.8468098066088
+      },
+      "canonical": {
+        "L": 1441,
+        "contacts": 6567,
+        "contacts_per_nt": 4.557251908396947,
+        "block_occ": 0.021364839840222832,
+        "effective_c": 15.500346981263013,
+        "mean_sep": 156.8468098066088
+      }
+    },
+    {
+      "pdb": "8GKH",
+      "published": {
+        "L": 76,
+        "contacts": 126,
+        "contacts_per_nt": 1.6578947368421053,
+        "block_occ": 0.15263157894736842,
+        "effective_c": 6.105263157894737,
+        "mean_sep": 18.00793650793651
+      },
+      "canonical": {
+        "L": 76,
+        "contacts": 126,
+        "contacts_per_nt": 1.6578947368421053,
+        "block_occ": 0.15263157894736842,
+        "effective_c": 6.105263157894737,
+        "mean_sep": 18.00793650793651
+      }
+    },
+    {
+      "pdb": "8GS2",
+      "published": {
+        "L": 38,
+        "contacts": 3,
+        "contacts_per_nt": 0.07894736842105263,
+        "block_occ": 0.03636363636363636,
+        "effective_c": 0.8421052631578947,
+        "mean_sep": 4.333333333333333
+      },
+      "canonical": {
+        "L": 38,
+        "contacts": 3,
+        "contacts_per_nt": 0.07894736842105263,
+        "block_occ": 0.03636363636363636,
+        "effective_c": 0.8421052631578947,
+        "mean_sep": 4.333333333333333
+      }
+    },
+    {
+      "pdb": "8HHL",
+      "published": {
+        "L": 49,
+        "contacts": 90,
+        "contacts_per_nt": 1.836734693877551,
+        "block_occ": 0.16483516483516483,
+        "effective_c": 4.8979591836734695,
+        "mean_sep": 13.1
+      },
+      "canonical": {
+        "L": 49,
+        "contacts": 90,
+        "contacts_per_nt": 1.836734693877551,
+        "block_occ": 0.16483516483516483,
+        "effective_c": 4.8979591836734695,
+        "mean_sep": 13.1
+      }
+    },
+    {
+      "pdb": "8HKU",
+      "published": {
+        "L": 2995,
+        "contacts": 15210,
+        "contacts_per_nt": 5.078464106844741,
+        "block_occ": 0.01193413440142412,
+        "effective_c": 17.907178631051753,
+        "mean_sep": 308.4201840894149
+      },
+      "canonical": {
+        "L": 2995,
+        "contacts": 15210,
+        "contacts_per_nt": 5.078464106844741,
+        "block_occ": 0.01193413440142412,
+        "effective_c": 17.907178631051753,
+        "mean_sep": 308.4201840894149
+      }
+    },
+    {
+      "pdb": "8HMY",
+      "published": {
+        "L": 90,
+        "contacts": 279,
+        "contacts_per_nt": 3.1,
+        "block_occ": 0.18115942028985507,
+        "effective_c": 8.88888888888889,
+        "mean_sep": 34.09318996415771
+      },
+      "canonical": {
+        "L": 90,
+        "contacts": 279,
+        "contacts_per_nt": 3.1,
+        "block_occ": 0.18115942028985507,
+        "effective_c": 8.88888888888889,
+        "mean_sep": 34.09318996415771
+      }
+    },
+    {
+      "pdb": "8HMZ",
+      "published": {
+        "L": 44,
+        "contacts": 62,
+        "contacts_per_nt": 1.4090909090909092,
+        "block_occ": 0.18181818181818182,
+        "effective_c": 4.363636363636363,
+        "mean_sep": 9.435483870967742
+      },
+      "canonical": {
+        "L": 45,
+        "contacts": 62,
+        "contacts_per_nt": 1.3777777777777778,
+        "block_occ": 0.15384615384615385,
+        "effective_c": 4.266666666666667,
+        "mean_sep": 9.435483870967742
+      }
+    },
+    {
+      "pdb": "8IAZ",
+      "published": {
+        "L": 163,
+        "contacts": 468,
+        "contacts_per_nt": 2.871165644171779,
+        "block_occ": 0.12311265969802555,
+        "effective_c": 10.404907975460123,
+        "mean_sep": 38.1474358974359
+      },
+      "canonical": {
+        "L": 163,
+        "contacts": 468,
+        "contacts_per_nt": 2.871165644171779,
+        "block_occ": 0.12311265969802555,
+        "effective_c": 10.404907975460123,
+        "mean_sep": 38.1474358974359
+      }
+    },
+    {
+      "pdb": "8IYQ",
+      "published": {
+        "L": 109,
+        "contacts": 200,
+        "contacts_per_nt": 1.834862385321101,
+        "block_occ": 0.08620689655172414,
+        "effective_c": 5.137614678899083,
+        "mean_sep": 20.745
+      },
+      "canonical": {
+        "L": 109,
+        "contacts": 200,
+        "contacts_per_nt": 1.834862385321101,
+        "block_occ": 0.08620689655172414,
+        "effective_c": 5.137614678899083,
+        "mean_sep": 20.745
+      }
+    },
+    {
+      "pdb": "8JOZ",
+      "published": {
+        "L": 79,
+        "contacts": 242,
+        "contacts_per_nt": 3.0632911392405062,
+        "block_occ": 0.21428571428571427,
+        "effective_c": 9.113924050632912,
+        "mean_sep": 26.09504132231405
+      },
+      "canonical": {
+        "L": 88,
+        "contacts": 296,
+        "contacts_per_nt": 3.3636363636363638,
+        "block_occ": 0.23715415019762845,
+        "effective_c": 10.909090909090908,
+        "mean_sep": 29.58783783783784
+      }
+    },
+    {
+      "pdb": "8JY0",
+      "published": {
+        "L": 64,
+        "contacts": 163,
+        "contacts_per_nt": 2.546875,
+        "block_occ": 0.2647058823529412,
+        "effective_c": 9.0,
+        "mean_sep": 23.742331288343557
+      },
+      "canonical": {
+        "L": 64,
+        "contacts": 163,
+        "contacts_per_nt": 2.546875,
+        "block_occ": 0.2647058823529412,
+        "effective_c": 9.0,
+        "mean_sep": 23.742331288343557
+      }
+    },
+    {
+      "pdb": "8K0P",
+      "published": {
+        "L": 542,
+        "contacts": 2263,
+        "contacts_per_nt": 4.175276752767528,
+        "block_occ": 0.05077286389008158,
+        "effective_c": 13.96309963099631,
+        "mean_sep": 109.974370304905
+      },
+      "canonical": {
+        "L": 542,
+        "contacts": 2263,
+        "contacts_per_nt": 4.175276752767528,
+        "block_occ": 0.05077286389008158,
+        "effective_c": 13.96309963099631,
+        "mean_sep": 109.974370304905
+      }
+    },
+    {
+      "pdb": "8K1E",
+      "published": {
+        "L": 57,
+        "contacts": 194,
+        "contacts_per_nt": 3.4035087719298245,
+        "block_occ": 0.325,
+        "effective_c": 10.947368421052632,
+        "mean_sep": 24.195876288659793
+      },
+      "canonical": {
+        "L": 57,
+        "contacts": 194,
+        "contacts_per_nt": 3.4035087719298245,
+        "block_occ": 0.325,
+        "effective_c": 10.947368421052632,
+        "mean_sep": 24.195876288659793
+      }
+    },
+    {
+      "pdb": "8KD9",
+      "published": {
+        "L": 73,
+        "contacts": 260,
+        "contacts_per_nt": 3.5616438356164384,
+        "block_occ": 0.2578947368421053,
+        "effective_c": 10.73972602739726,
+        "mean_sep": 24.8
+      },
+      "canonical": {
+        "L": 73,
+        "contacts": 260,
+        "contacts_per_nt": 3.5616438356164384,
+        "block_occ": 0.2578947368421053,
+        "effective_c": 10.73972602739726,
+        "mean_sep": 24.8
+      }
+    },
+    {
+      "pdb": "8OP2",
+      "published": {
+        "L": 70,
+        "contacts": 3,
+        "contacts_per_nt": 0.04285714285714286,
+        "block_occ": 0.005847953216374269,
+        "effective_c": 0.22857142857142856,
+        "mean_sep": 68.33333333333333
+      },
+      "canonical": {
+        "L": 70,
+        "contacts": 3,
+        "contacts_per_nt": 0.04285714285714286,
+        "block_occ": 0.005847953216374269,
+        "effective_c": 0.22857142857142856,
+        "mean_sep": 68.33333333333333
+      }
+    },
+    {
+      "pdb": "8P8B",
+      "published": {
+        "L": 2890,
+        "contacts": 14989,
+        "contacts_per_nt": 5.1865051903114185,
+        "block_occ": 0.01239464172455163,
+        "effective_c": 17.959861591695503,
+        "mean_sep": 316.8713723397158
+      },
+      "canonical": {
+        "L": 2893,
+        "contacts": 15036,
+        "contacts_per_nt": 5.1973729692360875,
+        "block_occ": 0.01248237759573252,
+        "effective_c": 18.11821638437608,
+        "mean_sep": 317.7834530460229
+      }
+    },
+    {
+      "pdb": "8R6C",
+      "published": {
+        "L": 2729,
+        "contacts": 14801,
+        "contacts_per_nt": 5.423598387687798,
+        "block_occ": 0.013712294401205551,
+        "effective_c": 18.779039941370467,
+        "mean_sep": 313.4898317681238
+      },
+      "canonical": {
+        "L": 2753,
+        "contacts": 15151,
+        "contacts_per_nt": 5.503450780966219,
+        "block_occ": 0.013781788351107466,
+        "effective_c": 19.03959317108609,
+        "mean_sep": 321.3413636063626
+      }
+    },
+    {
+      "pdb": "8V1I",
+      "published": {
+        "L": 56,
+        "contacts": 168,
+        "contacts_per_nt": 3.0,
+        "block_occ": 0.29523809523809524,
+        "effective_c": 8.857142857142858,
+        "mean_sep": 22.672619047619047
+      },
+      "canonical": {
+        "L": 57,
+        "contacts": 174,
+        "contacts_per_nt": 3.0526315789473686,
+        "block_occ": 0.3,
+        "effective_c": 10.105263157894736,
+        "mean_sep": 23.7183908045977
+      }
+    },
+    {
+      "pdb": "8WRP",
+      "published": {
+        "L": 39,
+        "contacts": 32,
+        "contacts_per_nt": 0.8205128205128205,
+        "block_occ": 0.12727272727272726,
+        "effective_c": 2.871794871794872,
+        "mean_sep": 11.125
+      },
+      "canonical": {
+        "L": 39,
+        "contacts": 32,
+        "contacts_per_nt": 0.8205128205128205,
+        "block_occ": 0.12727272727272726,
+        "effective_c": 2.871794871794872,
+        "mean_sep": 11.125
+      }
+    },
+    {
+      "pdb": "9EY2",
+      "published": {
+        "L": 68,
+        "contacts": 163,
+        "contacts_per_nt": 2.3970588235294117,
+        "block_occ": 0.21568627450980393,
+        "effective_c": 7.764705882352941,
+        "mean_sep": 24.460122699386503
+      },
+      "canonical": {
+        "L": 68,
+        "contacts": 163,
+        "contacts_per_nt": 2.3970588235294117,
+        "block_occ": 0.21568627450980393,
+        "effective_c": 7.764705882352941,
+        "mean_sep": 24.460122699386503
+      }
+    },
+    {
+      "pdb": "9FCO",
+      "published": {
+        "L": 1038,
+        "contacts": 5290,
+        "contacts_per_nt": 5.096339113680155,
+        "block_occ": 0.03218390804597701,
+        "effective_c": 16.832369942196532,
+        "mean_sep": 139.01928166351607
+      },
+      "canonical": {
+        "L": 1046,
+        "contacts": 5385,
+        "contacts_per_nt": 5.148183556405353,
+        "block_occ": 0.03166632804109947,
+        "effective_c": 16.688336520076483,
+        "mean_sep": 138.97957288765087
+      }
+    },
+    {
+      "pdb": "9FHL",
+      "published": {
+        "L": 1397,
+        "contacts": 6898,
+        "contacts_per_nt": 4.937723693629206,
+        "block_occ": 0.023736263736263738,
+        "effective_c": 16.69863994273443,
+        "mean_sep": 148.12554363583646
+      },
+      "canonical": {
+        "L": 1430,
+        "contacts": 7302,
+        "contacts_per_nt": 5.106293706293706,
+        "block_occ": 0.023140007158307527,
+        "effective_c": 16.63776223776224,
+        "mean_sep": 151.85305395781978
+      }
+    },
+    {
+      "pdb": "9FXO",
+      "published": {
+        "L": 1798,
+        "contacts": 7851,
+        "contacts_per_nt": 4.366518353726363,
+        "block_occ": 0.01686129588568613,
+        "effective_c": 15.225806451612904,
+        "mean_sep": 186.2924468220609
+      },
+      "canonical": {
+        "L": 1852,
+        "contacts": 8488,
+        "contacts_per_nt": 4.583153347732181,
+        "block_occ": 0.016952781708497802,
+        "effective_c": 15.732181425485962,
+        "mean_sep": 195.08235155513665
+      }
+    },
+    {
+      "pdb": "9GHE",
+      "published": {
+        "L": 2758,
+        "contacts": 14845,
+        "contacts_per_nt": 5.382523567802756,
+        "block_occ": 0.013410516160154366,
+        "effective_c": 18.546773023930385,
+        "mean_sep": 314.594274166386
+      },
+      "canonical": {
+        "L": 2782,
+        "contacts": 15191,
+        "contacts_per_nt": 5.460460100647016,
+        "block_occ": 0.013646333217896073,
+        "effective_c": 19.03666427030913,
+        "mean_sep": 322.72483707458366
+      }
+    },
+    {
+      "pdb": "9GYT",
+      "published": {
+        "L": 2910,
+        "contacts": 13791,
+        "contacts_per_nt": 4.739175257731959,
+        "block_occ": 0.011132214835918539,
+        "effective_c": 16.24192439862543,
+        "mean_sep": 308.69436589079834
+      },
+      "canonical": {
+        "L": 2922,
+        "contacts": 13982,
+        "contacts_per_nt": 4.7850787132101305,
+        "block_occ": 0.011164435274681738,
+        "effective_c": 16.355920602327174,
+        "mean_sep": 312.6601344585896
+      }
+    },
+    {
+      "pdb": "9JPP",
+      "published": {
+        "L": 2737,
+        "contacts": 14202,
+        "contacts_per_nt": 5.188892948483741,
+        "block_occ": 0.013164222936306952,
+        "effective_c": 18.081110705151627,
+        "mean_sep": 312.31453316434306
+      },
+      "canonical": {
+        "L": 2761,
+        "contacts": 14538,
+        "contacts_per_nt": 5.2654835204636,
+        "block_occ": 0.013246279581405854,
+        "effective_c": 18.352770735240856,
+        "mean_sep": 320.3565827486587
+      }
+    },
+    {
+      "pdb": "9N3Y",
+      "published": {
+        "L": 61,
+        "contacts": 30,
+        "contacts_per_nt": 0.4918032786885246,
+        "block_occ": 0.03676470588235294,
+        "effective_c": 1.3114754098360655,
+        "mean_sep": 9.233333333333333
+      },
+      "canonical": {
+        "L": 61,
+        "contacts": 30,
+        "contacts_per_nt": 0.4918032786885246,
+        "block_occ": 0.03676470588235294,
+        "effective_c": 1.3114754098360655,
+        "mean_sep": 9.233333333333333
+      }
+    },
+    {
+      "pdb": "9PJ7",
+      "published": {
+        "L": 2885,
+        "contacts": 15006,
+        "contacts_per_nt": 5.201386481802427,
+        "block_occ": 0.012574568108412548,
+        "effective_c": 18.201733102253034,
+        "mean_sep": 321.5839664134346
+      },
+      "canonical": {
+        "L": 2903,
+        "contacts": 15244,
+        "contacts_per_nt": 5.251119531519119,
+        "block_occ": 0.01255773945532605,
+        "effective_c": 18.26524285222184,
+        "mean_sep": 325.16563893991076
+      }
+    },
+    {
+      "pdb": "9PJ9",
+      "published": {
+        "L": 2885,
+        "contacts": 15051,
+        "contacts_per_nt": 5.2169844020797225,
+        "block_occ": 0.01257839948199829,
+        "effective_c": 18.20727902946274,
+        "mean_sep": 321.6955019600027
+      },
+      "canonical": {
+        "L": 2903,
+        "contacts": 15293,
+        "contacts_per_nt": 5.267998622115053,
+        "block_occ": 0.012584264553753112,
+        "effective_c": 18.303823630726836,
+        "mean_sep": 325.42823514026026
+      }
+    }
+  ]
+}
