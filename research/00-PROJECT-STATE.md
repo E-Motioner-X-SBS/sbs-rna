@@ -114,6 +114,36 @@ the session: a load-bearing design decision was falsified by its own validation.
 - `research/architecture/blueprint.html` — published Artifact (v2):
   https://claude.ai/code/artifact/1756a459-45c7-4908-9cef-bcde72aab33e
 
+### Session 2 (2026-09-13) — rigor recheck of every empirical claim
+
+State in `plans/rigor-recheck/`. Every headline number was re-derived by an
+**independent reimplementation** rather than by re-running the original script
+(which would reproduce its own bugs). Verifier: `scripts/sampling/verify_claims.py`.
+
+**Defects found in session-1 work:**
+
+| ID | Defect | Direction |
+|---|---|---|
+| T16 | **PHYSICS WRONG.** Manning's `b` is the *axial projection*, not the P-P contour distance. Stated b ~ 5.9-7.0 A was wrong and inconsistent with the stated theta. Correct A-RNA: **b = 1.40 A, xi = 5.11, theta = 0.804**. theta ~ 0.76 is the **B-DNA** figure. | claim was wrong |
+| T8d | **OVERCLAIM.** The coevolution depth split cannot carry the weight placed on it: exact permutation p = 0.0455 on a *post-hoc* threshold, **Spearman only +0.224** (n=12), deep arm **n=2**, and a *shallow* family (THF, Neff/L=0.279) reaches precision 1.000. "The decisive pattern" / "strongest argument for MoE" **retracted**. | claim overstated |
+| T8a/b | `ss_pairs()` omits WUSS pseudoknot brackets (Aa/Bb/Cc/Dd) — **53 of 537 pairs, 9.87%** of ground truth. Deflates precision, so **0.670 is a lower bound**. | conservative |
+| DISC-3 | All three deliverables said "X-ray only (31 structures)" and attributed the exclusion to cryo-EM ADP comparability alone. A **>=30-RNA-residue guard** was also applied and went unstated. | under-disclosed |
+| DISC-6 | The Mg gradient is measured over **15** X-ray structures (the Mg-containing subset), not 31. 24,623 nt is correct for the 15. | mis-stated sample |
+
+**Claims that strengthened:**
+- Mg/rigidity confound **controlled**: partial corr(z_B, Mg dist | density) = **+0.372**
+  vs +0.420 raw. The signal is largely *independent* of packing — it does not merely
+  restate that folded cores are ordered. Within-structure effect **+1.514 sigma**,
+  positive in **4/4** structures, bootstrap 95% CI [+1.256, +1.661].
+- 30 A centroid prefilter **provably safe**: bound 22.20 A, observed max 18.59 A,
+  **zero** contacts missed.
+- `effective_c` naive accounting is **2.9% conservative** (17.61 vs 17.12 strict).
+- All parameter/attention/memory arithmetic reproduces **exactly** (910.5M / 382.0M).
+
+**Result**: 1.76 sigma gradient reproduces to 3 dp; report now 22pp, zero
+over/underfull boxes; `verify_claims.py` reports ALL CLAIMS REPRODUCE across
+ARCHITECTURE.md / main.tex / blueprint.html.
+
 ## Next actions (session 2+)
 
 Highest value first:
@@ -124,6 +154,11 @@ Highest value first:
       **not runnable** at L=2048 (12.9 GB predicted) or L=4096 (51.5 GB) on this 14 GB
       machine, while HPT does L=4096 in 0.45 s at 0.96% of dense. Two silent indexing/
       budget bugs found and fixed (see ARCHITECTURE.md §5.4).
+- [ ] **OPEN (OQ-1): does the >=30-residue exclusion bias the Mg-rigidity gradient?**
+      Small RNAs are exactly where the inner-sphere Mg fraction was lowest (0.296 vs
+      0.511 overall). Excluding them could inflate the gradient. Direction unknown.
+- [ ] Remaining rigor TODOs: T2 (ion inventory re-derivation), T4b, T6, T9, T12,
+      T17 (verify cited literature numbers), T19. See `plans/rigor-recheck/todo.md`.
 - [ ] **STILL OPEN (R1): train the block-detection scorer** and measure block recall with
       learned weights. The reference impl. proves the *cost and structure*; it does not
       prove a model can find the occupied blocks. This needs the probing/3D data pipeline.
@@ -140,15 +175,21 @@ Highest value first:
       the titration ladders in RMDB do.
 - [ ] **Acquire chemical probing data** (Ribonanza 2.1M DMS/SHAPE). ~315x more supervised
       examples than the 6,661 unique 3D sequences; the single largest missing asset.
-- [x] ~~Write `research/prior-art/06-coevolution.md`~~ **DONE, with measurements.**
-      APC-corrected MI on the 12 Rfam seeds recovers curated base pairs at mean
-      prec@L/5 = 0.670 / rec@L = 0.768; tRNA is perfect (1.000/1.000). The depth split
-      (Neff/L >= 1 -> 0.975 vs < 1 -> 0.609) is now the **strongest argument for MoE in
-      the design**: the right expert depends on an observable, pre-computable property of
-      the input. `Neff/L` added as a router feature; coevolution expert gated on it.
-      *Caution recorded*: the first run reported 0.039 precision due to a broadcast bug
-      in the MI outer product ((C,q,1) instead of (C,q,q)) plus missing sequence
-      reweighting. Fixing it moved the number 17x. Verify before believing weak results.
+- [x] ~~Write `research/prior-art/06-coevolution.md`~~ **DONE, then CORRECTED by the
+      rigor recheck (see `plans/rigor-recheck/`).** APC-corrected MI on the 12 Rfam seeds
+      recovers curated base pairs at mean prec@L/5 = 0.670 / rec@L = 0.768; tRNA is
+      perfect (1.000/1.000). **The depth split was OVERCLAIMED and has been walked back**:
+      exact permutation p = 0.0455 on a *post-hoc* threshold, Spearman only +0.224 over
+      n=12, deep arm n=2, and a *shallow* family (THF, Neff/L = 0.279) reaches 1.000.
+      The architectural case for depth-gated routing now rests on the literature and on
+      between-family variance (0.333-1.000), **not** on this split. `Neff/L` remains a
+      defensible router feature; the language calling it "the decisive pattern" / "the
+      strongest argument for MoE" was unsupported and is removed.
+      *Two cautions recorded*: (a) the first run reported 0.039 precision due to a
+      broadcast bug in the MI outer product ((C,q,1) instead of (C,q,q)) plus missing
+      sequence reweighting - fixing it moved the number 17x; (b) `ss_pairs()` does not
+      parse WUSS pseudoknot brackets (Aa/Bb/Cc/Dd), omitting 53 of 537 ground-truth pairs
+      (9.87%), which DEFLATES precision - so 0.670 is a lower bound.
 - [ ] Extract Mg²⁺-site and B-factor labels at scale from the server's 27,452 chains to
       size the two "free" supervision channels properly (180 structures is a pilot).
 - [ ] Fix the four repo issues listed above (MANIFEST caps, `total_sequences()`,

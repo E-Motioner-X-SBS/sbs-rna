@@ -39,10 +39,23 @@ it matters: a flat top-K proposal was measured and fails on long chains (§5.1);
 contacts must be selected as **blocks**, not pairs (§5.2).
 
 **Fact 3 — Ion coordination and local rigidity are the same phenomenon.** **[measured]**
-Normalised B-factor vs distance to nearest Mg²⁺, 24,623 nt in 31 X-ray structures:
+Normalised B-factor vs distance to nearest Mg²⁺, 24,623 nt in the **15** X-ray
+structures that contain Mg²⁺ (of 63 X-ray in the sample; 31 survive a >=30-RNA-
+residue guard, and 15 of those contain Mg²⁺):
 -0.883 (0-4 A) -> -0.673 -> -0.415 -> +0.004 -> +0.756 -> +0.877 (>20 A).
 A monotonic **1.76 sigma** gradient. Meanwhile 83% of inner-sphere Mg²⁺
 coordination is to phosphate OP1/OP2, and Mg²⁺ outnumbers all other cations 9:1.
+
+**The obvious confound was tested.** Mg²⁺ proximity and dense packing both mark
+folded cores, so the gradient might merely restate that cores are ordered.
+Controlling for local density reduces the association only from **+0.420** to
+**+0.372** (partial correlation), so the signal is largely *independent* of
+packing. A within-structure estimate — comparing nucleotides within 4 A against
+those beyond 12 A *inside the same structure*, removing all between-structure
+heterogeneity — gives **+1.514 sigma**, positive in **4/4** structures holding
+both groups, bootstrap 95% CI [+1.256, +1.661]. Caveats remain: B-factor absorbs
+resolution and refinement choices, the closest bin holds 319 nucleotides, and the
+within-structure estimate rests on 4 structures.
 => *Ions and rigidity must share one expert, and ionic condition must be a
 model **input**, which no current predictor accepts.*
 
@@ -59,13 +72,23 @@ signal is gated by depth:
 
 | Alignment depth | n families | mean precision@L/5 |
 |---|---|---|
-| Neff/L >= 1 | 2 | **0.975** |
+| Neff/L >= 1 | **2** | 0.975 |
 | Neff/L < 1 | 10 | 0.609 |
 
-Only 2 of 12 curated *seed* alignments clear Neff/L >= 1.
-=> *The correct expert genuinely depends on an observable, cheaply computed
-property of the input (`Neff/L`). That is precisely what a mixture of experts is
-for, and it makes routing a principled choice rather than a capacity trick.*
+The ground truth is also **incomplete**: the parser handles only the nested WUSS
+brackets and ignores the alphabetic pseudoknot brackets, which account for
+**53 of 537 pairs (9.87%)**, so a correctly-ranked pseudoknot pair is scored as a
+false positive. That bias pushes precision *down*, making 0.670 a lower bound.
+
+**This split is weak evidence and must not be leaned on.** Exact permutation
+p = 0.0455 on a *post-hoc* threshold; **Spearman(Neff/L, precision) = +0.224**
+over n=12; the deep arm has n=2; and a *shallow* family (THF riboswitch,
+Neff/L = 0.279) reaches precision 1.000. What the data does show robustly is that
+**precision varies enormously between families (0.333 to 1.000)**.
+=> *Coevolution strength is highly input-dependent, so a fixed-weight blend is
+wrong. `Neff/L` is a defensible router feature on theoretical and literature
+grounds (shallow RNA MSAs are known to degrade coupling analysis), but our own
+measurement supports it only weakly.*
 
 ---
 
@@ -156,8 +179,13 @@ known-good prior and improve from there.
 **B_elec — screened electrostatics (the novel term).**
 Bjerrum length `l_B = e²/(4 pi eps_0 eps_r k_B T)` ~= 7.1 A in water at 298 K.
 Manning parameter `xi = l_B/b` with `b` the axial charge spacing. Condensed
-fraction `theta = 1 - 1/(z xi)` (~0.76 for monovalent RNA), giving renormalised
-phosphate charge `q_eff = -(1-theta)`. Debye screening
+fraction `theta = 1 - 1/(z xi)`, giving renormalised phosphate charge
+`q_eff = -(1-theta)`. **`b` is the axial charge spacing** (charges projected onto
+the helix axis), *not* the P-P contour distance: for A-form RNA, 2.8 A per base
+pair carrying 2 charges gives **b = 1.40 A**, hence **xi = 5.11** and
+**theta = 0.804** for monovalent counterions (`q_eff = -0.196`). The commonly
+quoted 0.76 is the **B-DNA** figure (b = 1.70 A, xi = 4.21); A-form RNA condenses
+more strongly. For Mg²⁺ (z=2), theta = 0.902. Debye screening
 `kappa = sqrt(2 N_A e² I / (eps eps_0 k_B T))` from ionic strength `I`. Then
 
 ```
@@ -200,9 +228,10 @@ equalises utilisation without adding a competing gradient.
 state *concatenated with* the current local structural estimate (pairing
 probability, predicted rigidity, local density) **and the alignment depth
 `Neff/L`**. The depth feature is what lets the router gate the coevolution
-expert: Fact 4 shows coevolution is near-sufficient at Neff/L >= 1
-(precision 0.975) and materially weaker below it (0.609), so the model should
-trust it conditionally rather than blending it in at fixed weight. This is also
+expert. Fact 4 shows coevolution precision varies from 0.333 to 1.000 across
+families, so the model should trust it conditionally rather than blending it in
+at fixed weight. **The specific `Neff/L` gate is motivated by the literature
+rather than established by our n=12 measurement** (Spearman +0.224). This is also
 why RhoFold+ pairs a language model *with* MSA features — the two have
 complementary failure modes; PHAROS makes that complementarity routed and
 explicit instead of concatenated. This is a direct consequence of
@@ -584,7 +613,7 @@ sequence-identity-based dedup is mandatory or the numbers will be meaningless.
 | 4 | **Frozen motif KV bank** as retrieval-based geometry prior | Motif Atlas is published but wired into no large model |
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
-| 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature), justified by measured 0.975 vs 0.609 precision split | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth |
+| 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature) | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth. *Motivated by the literature and by measured between-family variance (0.333-1.000); our own depth split is weak evidence (Spearman +0.224, n=12)* |
 
 ## 12. Risks and open questions
 

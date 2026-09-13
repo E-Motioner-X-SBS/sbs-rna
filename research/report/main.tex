@@ -99,7 +99,8 @@ as of November 2025.
 
 \begin{table}[h]
 \centering
-\caption{Current state of the art in RNA 3D structure prediction.}
+\caption{Current state of the art in RNA 3D structure prediction, on a
+non-redundant set of 52 RNA monomers (Briefings in Bioinformatics, Nov 2025).}
 \label{tab:sota}
 \begin{tabular}{lcl}
 \toprule
@@ -244,14 +245,20 @@ selected as \emph{blocks}. Section~\ref{sec:hpt} reports both measurements.
 \subsection{Ion coordination and local rigidity are one phenomenon}
 
 We z-normalise crystallographic B-factors within each structure so that
-refinement protocols are comparable, and restrict this analysis to the 31 X-ray
-structures among the sample; cryo-EM atomic displacement parameters are not
-comparable and were excluded. Lower $z_B$ indicates greater rigidity.
+refinement protocols are comparable. Lower $z_B$ indicates greater rigidity.
+
+\paragraph{Sample definition.} Of the 180 sampled structures, 63 are X-ray and
+117 cryo-EM; cryo-EM atomic displacement parameters are not comparable and are
+excluded. A further guard requires at least 30 RNA residues with a resolved
+C1$'$, removing 32 small X-ray entries (2--28 residues). That leaves \textbf{31
+X-ray structures} for the packing-density and sequence-context analyses, and the
+\textbf{15 of those containing $\mathrm{Mg}^{2+}$} for the ion-distance analysis
+below.
 
 \begin{table}[h]
 \centering
 \caption{Normalised B-factor versus distance to the nearest $\mathrm{Mg}^{2+}$,
-over $24{,}623$ nucleotides. \meas}
+over $24{,}623$ nucleotides in 15 X-ray structures. \meas}
 \label{tab:mgrigid}
 \begin{tabular}{lcc}
 \toprule
@@ -270,6 +277,34 @@ $> 20$~\AA{}      & 3{,}174 & $\mathbf{+0.877}$ \\
 The gradient is monotonic and spans $1.76$ standard deviations. Local packing
 density independently correlates with rigidity at Pearson $r = -0.294$.
 
+\paragraph{The obvious confound, tested.} $\mathrm{Mg}^{2+}$ proximity and dense
+packing both mark folded cores, so the gradient might merely restate that cores
+are ordered. An independent re-derivation tested this directly:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+\textbf{Quantity} & \textbf{Value} \\
+\midrule
+Pearson$(z_B,\ d_{\mathrm{Mg}})$ & $+0.4197$ \\
+Spearman$(z_B,\ d_{\mathrm{Mg}})$ & $+0.5082$ \\
+Pearson$(d_{\mathrm{Mg}},\ \text{density})$ --- the confound & $-0.2513$ \\
+\textbf{Partial} corr$(z_B,\ d_{\mathrm{Mg}} \mid \text{density})$ & $\mathbf{+0.3722}$ \\
+Partial corr$(z_B,\ \text{density} \mid d_{\mathrm{Mg}})$ & $-0.2273$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Controlling for packing density reduces the $\mathrm{Mg}^{2+}$ association only
+from $0.420$ to $0.372$, so the signal is largely \emph{independent} of packing.
+A within-structure estimate---comparing nucleotides within 4~\AA{} against those
+beyond 12~\AA{} inside the same structure, which removes all between-structure
+heterogeneity---gives $+1.514\sigma$, positive in $4/4$ structures that contain
+both groups, bootstrap 95\% CI $[+1.256, +1.661]$. The gradient is not an
+artefact of pooling, though $n=4$ makes this supportive rather than decisive.
+
 \begin{quote}
 \textbf{Architectural consequence.} Ion effects and motif rigidity, which the
 project brief treats as two separate physical ingredients, are strongly coupled.
@@ -279,12 +314,11 @@ free and vice versa. That mutual information justifies routing them into a
 \end{quote}
 
 \paragraph{Caveats.} B-factor also absorbs resolution, occupancy and refinement
-choices. $\mathrm{Mg}^{2+}$ proximity and dense packing are themselves
-correlated, since both mark folded cores, so this is association rather than
-isolated causation; the gradient partly restates that structured cores both bind
-ions and are ordered. The closest bin contains only $319$ nucleotides. This is
-strong evidence for \emph{using} the coupling as a prior, not a proof of
-mechanism.
+choices. The closest distance bin contains only $319$ nucleotides, and the
+within-structure estimate rests on 4 structures. The partial correlation above
+substantially weakens the packing-confound objection but does not eliminate it:
+this remains association rather than demonstrated causation, and is evidence for
+\emph{using} the coupling as a prior rather than a proof of mechanism.
 
 \subsection{Ion inventory and coordination chemistry}
 
@@ -366,27 +400,52 @@ FMN riboswitch (RF00050)    & 146 & $21.2$  & 139 & $0.333$ & $0.536$ \\
 \end{tabular}
 \end{table}
 
-The decisive pattern is the depth dependence. Splitting on $N_{\text{eff}}/L$:
-families at $N_{\text{eff}}/L \geq 1$ ($n=2$) reach mean precision@$L/5$ of
-$\mathbf{0.975}$, while those below ($n=10$) reach $0.609$. tRNA, at
-$N_{\text{eff}}/L = 3.5$, is perfect on both precision and recall.
+Splitting on $N_{\text{eff}}/L$, families at $N_{\text{eff}}/L \geq 1$ ($n=2$)
+reach mean precision@$L/5$ of $0.975$ while those below ($n=10$) reach $0.609$.
+\textbf{This split is weak evidence and should not be leaned on.} Tested properly:
 
-Note how \emph{few} families are deep: only 2 of 12, and these are hand-curated
-Rfam seed alignments, among the best-conditioned RNA alignments in existence.
-Automatic homology search on an arbitrary sequence will generally do worse.
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Test} & \textbf{Result} \\
+\midrule
+Exact permutation test over all 66 splits & $p = 0.0455$ \\
+Pearson$(N_{\text{eff}}/L,\ \text{precision})$, $n=12$ & $+0.498$ \\
+\textbf{Spearman}$(N_{\text{eff}}/L,\ \text{precision})$, $n=12$ & $\mathbf{+0.224}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three reasons for caution: the ``deep'' arm has $n=2$; the
+$N_{\text{eff}}/L = 1$ threshold was chosen \emph{post hoc}, so $p = 0.0455$ is
+optimistic; and a \emph{shallow} family---THF riboswitch at
+$N_{\text{eff}}/L = 0.279$---attains precision $1.000$, so depth is plainly not
+necessary for a strong signal. The rank correlation of $+0.224$ is the most
+honest single summary: a weak positive tendency, not a gate.
+
+What the data \emph{does} show robustly is that precision varies enormously
+between families, from $0.333$ to $1.000$. Separately, note how few families are
+deep: only 2 of 12, and these are hand-curated Rfam seed alignments, among the
+best-conditioned RNA alignments in existence. Automatic homology search on an
+arbitrary sequence will generally do worse.
 
 \begin{quote}
-\textbf{Architectural consequence, and the strongest argument for MoE in this
-design.} Coevolution is not a weak feature to be blended in at fixed weight---where
-the alignment is deep it is very nearly sufficient on its own. But its
-availability is conditional, and the condition $N_{\text{eff}}/L$ is
-\emph{cheaply computable before the model runs}. The correct expert therefore
-depends on an observable property of the input, which is exactly what a mixture
-of experts is for. $N_{\text{eff}}/L$ becomes an explicit router feature, and
-the coevolution expert is gated on it. This also explains why RhoFold+ pairs a
-language model \emph{with} MSA features rather than choosing between them: the
-two have complementary failure modes. PHAROS makes that complementarity routed
-and explicit instead of concatenated.
+\textbf{Architectural consequence.} Coevolution is not a weak feature to be
+blended in at fixed weight---for some families it is very nearly sufficient on
+its own, for others close to useless, and that spread ($0.333$ to $1.000$) is
+itself the argument for conditional rather than fixed-weight use.
+$N_{\text{eff}}/L$ is a defensible router feature: it is cheaply computable
+before the model runs, and the published literature is unambiguous that shallow
+RNA MSAs degrade coupling analysis---this is the stated motivation for rMSA,
+RNAcmap3 and RNA-MSM. \emph{Our own $n=12$ measurement supports that gate only
+weakly}, so the architectural case rests on the literature and on the observed
+between-family variance, not on our depth split. Settling it would require
+measuring precision against depth across hundreds of families with the threshold
+fixed in advance. This also explains why RhoFold+ pairs a language model
+\emph{with} MSA features rather than choosing between them: the two have
+complementary failure modes.
 \end{quote}
 
 \paragraph{An implementation note worth recording.} A first version of this
@@ -400,9 +459,13 @@ weak result was a silent bug.
 \paragraph{Caveats.} The ground truth here is Rfam's consensus \emph{secondary}
 structure, not 3D contacts, so this measures recovery of curated pairing rather
 than direct tertiary contact accuracy. Twelve curated seed families is a small
-and favourable sample. APC-corrected MI is also a simplification of full DCA;
-pseudo-likelihood DCA would do better, so these values are a reasonable lower
-bound on the available signal.
+and favourable sample, and the depth split has $n=2$ in one arm.
+APC-corrected MI is a simplification of full DCA; pseudo-likelihood DCA would do
+better. The ground truth is also \emph{incomplete}: our parser handles only the
+nested WUSS brackets and ignores the alphabetic pseudoknot brackets, which
+account for $53$ of $537$ pairs ($9.87\%$), so a correctly-ranked pseudoknot pair
+is scored as a false positive. All of these biases push measured precision
+\emph{down}, so $0.670$ is a conservative lower bound.
 
 \subsection{A negative result that constrains the design}
 
@@ -491,7 +554,9 @@ sequence. RNA has exactly the structure this exploits: long stretches of regular
 A-form helix that are locally periodic and low-information, punctuated by rare
 junctions, pseudoknots and kissing loops that require global mixing. At
 $L=4096$, an all-dense 32-block trunk would perform $537$M pair evaluations;
-PHAROS performs $67$M, an $8\times$ reduction.
+PHAROS performs $67$M in its four full-attention blocks, an $8\times$ reduction
+on the quadratic term. Counting the sliding-window blocks as well
+($8 \times L \times 128$), the honest overall ratio is $7.53\times$.
 
 \subsubsection{Physics-biased attention}
 
@@ -525,8 +590,16 @@ B_{\mathrm{elec}}(i,j) = -\lambda\, q_{\text{eff}}^{2}\, \ell_B\,
 \frac{\exp(-\kappa d_{ij})}{d_{ij}}.
 \label{eq:belec}
 \end{equation}
-For monovalent RNA $\theta \approx 0.76$, so roughly three quarters of backbone
-charge is screened before any structure-specific electrostatics is considered.
+Here $b$ is the \textbf{axial} charge spacing---charges projected onto the helix
+axis---not the through-backbone P--P contour distance of $\sim$5.9--7.0~\AA{},
+which is a common source of error. For A-form RNA, a rise of $2.8$~\AA{} per base
+pair carrying two phosphate charges gives $b = 1.40$~\AA{}, hence $\xi = 5.11$
+and $\theta = 0.804$ for monovalent counterions, i.e.\ $q_{\text{eff}} = -0.196$
+per phosphate. Roughly \emph{four fifths} of backbone charge is screened before
+any structure-specific electrostatics is considered. The frequently quoted
+$\theta \approx 0.76$ is the \textbf{B-DNA} value ($b = 1.70$~\AA{},
+$\xi = 4.21$); A-form RNA has a shorter axial charge spacing and therefore
+condenses more strongly. For $\mathrm{Mg}^{2+}$ ($z=2$), $\theta = 0.902$.
 Only $\lambda$ is learned; $q_{\text{eff}}$, $\kappa$ and $\ell_B$ follow in
 closed form from $c_{\text{ion}}$ and temperature. Equation~\eqref{eq:belec} is
 the mechanism by which salt concentration changes the prediction.
@@ -979,7 +1052,13 @@ published but wired into no large model. \\
 $\mathrm{Mg}^{2+}$ sites and B-factor rigidity as free auxiliary supervision &
 Present in mmCIF; used by no structure predictor. \\
 Coupled ion--rigidity expert justified by a measured $1.76\sigma$ gradient &
-Treated separately or not at all elsewhere. \\
+Treated separately or not at all elsewhere. Partial correlation controlling for
+packing density is $+0.372$ vs $+0.420$ raw. \\
+Depth-gated coevolution routing, with $N_{\text{eff}}/L$ as a router feature &
+RhoFold+ concatenates language-model and MSA features at fixed weight; no method
+routes on measured alignment depth. Motivated by the literature and by measured
+between-family variance ($0.333$--$1.000$); our own depth split is weak evidence
+(Spearman $+0.224$, $n=12$). \\
 \bottomrule
 \end{tabular}
 \end{table}

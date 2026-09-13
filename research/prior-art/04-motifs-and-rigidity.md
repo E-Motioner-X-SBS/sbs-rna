@@ -57,8 +57,12 @@ sequence-to-structure model.**
 `scripts/sampling/analyze_rigidity.py` on the 180 sampled BGSU NR structures.
 Rigidity proxy = crystallographic B-factor, **z-normalised within each structure**
 (so refinement protocols are comparable). Lower z_B = more rigid.
-**X-ray only (31 structures)** — cryo-EM ADPs are not comparable, so the other
-106 parsed structures are excluded from this analysis.
+**Sample definition (stated precisely).** Of the 180 sampled structures, 63 are
+X-ray and 117 cryo-EM; cryo-EM ADPs are not comparable and are excluded. A further
+guard requires **>= 30 RNA residues with a resolved C1'**, which removes 32 small
+X-ray entries (2-28 residues). That leaves **31 X-ray structures** for the
+density and sequence-context analyses, and the **15 of those that contain Mg²⁺**
+for the ion-distance analysis below.
 
 ### Result 1 — packing density predicts rigidity
 
@@ -73,7 +77,7 @@ moderately strong for a single crude descriptor.
 
 ### Result 2 — Mg²⁺ proximity is a strong, monotonic rigidity signal
 
-Over **24,623 nucleotides** in X-ray structures containing Mg²⁺:
+Over **24,623 nucleotides** in the **15 X-ray structures containing Mg²⁺**:
 
 | Distance to nearest Mg²⁺ | n | mean z_B |
 |---|---|---|

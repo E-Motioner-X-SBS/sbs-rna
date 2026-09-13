@@ -63,40 +63,60 @@ structure (`#=GC SS_cons`), restricted to `|i-j| >= 4`.
 | FMN riboswitch (RF00050) | 146 | 21.2 | 139 | 0.333 | 0.536 |
 | **mean** | | | | **0.670** | **0.768** |
 
-### The decisive pattern: depth gates the signal
+### Depth and signal: a suggestive but statistically weak association
+
+> **Revised after audit.** An earlier version of this document called the depth
+> split "the decisive pattern". That was an overclaim; the corrected assessment
+> follows.
 
 | Alignment depth | n families | mean precision@L/5 |
 |---|---|---|
-| Neff/L >= 1 (deep) | 2 | **0.975** |
+| Neff/L >= 1 (deep) | **2** | 0.975 |
 | Neff/L < 1 (shallow) | 10 | 0.609 |
 
-tRNA, with Neff = 245.9 over 71 columns (Neff/L = 3.5), reaches **perfect**
-precision and recall. Families with Neff/L well below 1 degrade substantially.
+The mean difference is +0.366. Tested properly, it is weak evidence:
 
-**Note how few families are deep.** Only 2 of 12 clear Neff/L >= 1, and these
-are hand-curated Rfam *seed* alignments — among the best-conditioned RNA
-alignments that exist. Raw homology search on an arbitrary sequence will
-usually do worse.
+| Test | Result |
+|---|---|
+| Exact permutation test (all 66 splits) | **p = 0.0455** |
+| Pearson(Neff/L, precision), n=12 | +0.498 |
+| **Spearman(Neff/L, precision), n=12** | **+0.224** |
+
+Three reasons not to lean on this:
+1. The "deep" arm has **n = 2**.
+2. The Neff/L = 1 threshold was chosen **post hoc**, so p = 0.0455 is optimistic.
+3. A *shallow* family — THF riboswitch, Neff/L = 0.279 — attains precision
+   **1.000**, so depth is plainly not necessary for a strong signal.
+
+The rank correlation of **+0.224** is the most honest single summary: a weak
+positive tendency, not a gate. tRNA (Neff/L = 3.5) does reach perfect precision,
+but n=12 cannot separate that from family-specific effects.
+
+**Note how few families are deep.** Only 2 of 12 clear Neff/L >= 1, and these are
+hand-curated Rfam *seed* alignments — among the best-conditioned RNA alignments
+that exist. Raw homology search on an arbitrary sequence will usually do worse.
+That observation stands on its own and does not depend on the split above.
 
 ## 6.4 Architectural consequences
 
-1. **Coevolution is a strong signal — when it is available.** At mean
-   precision@L/5 = 0.670 across families and 1.000 for tRNA, this is not a weak
-   feature to be blended in; where the alignment is deep it is nearly
-   sufficient on its own.
-2. **It is conditionally available**, and the condition (`Neff/L`) is
-   **cheaply computable before running the model**.
-3. **This is the cleanest possible justification for MoE routing.** The router
-   should gate the coevolution expert on measured alignment depth, and fall
-   back to the language-model pathway when the MSA is shallow. That is not a
-   heuristic bolted on — it is a case where the correct expert genuinely
-   depends on an observable property of the input, which is exactly what a
-   mixture of experts is for.
-4. **`Neff/L` should be an explicit input feature to the router**, alongside the
-   structural-regime features from §4.3 of the architecture.
-5. It also explains why RhoFold+ pairs a language model *with* MSA features
+1. **Coevolution is a strong signal.** Mean precision@L/5 = 0.670 across 12
+   families, and 1.000 for tRNA. This is not a weak feature to be blended in at
+   low weight — for some families it is very nearly sufficient on its own.
+2. **Its strength varies enormously between families** (0.333 to 1.000). Whatever
+   drives that variation, a model that applies coevolution at a *fixed* weight
+   is leaving accuracy on the table for both the strong and the weak cases.
+3. **`Neff/L` is a reasonable router feature, on theoretical grounds.** It is
+   cheaply computable before the model runs, and the published literature is
+   unambiguous that shallow RNA MSAs degrade coupling analysis (this is the
+   stated motivation for rMSA, RNAcmap3 and RNA-MSM). **Our own n=12 measurement
+   supports this only weakly** (Spearman +0.224; see the revised section above),
+   so the architectural case rests on the literature and on the observed
+   between-family variance, *not* on our depth split.
+4. It also explains why RhoFold+ pairs a language model *with* MSA features
    rather than choosing one: the two have complementary failure modes. PHAROS
    makes that complementarity explicit and routed rather than concatenated.
+5. **What would settle it**: measuring precision against alignment depth across
+   hundreds of families, not twelve, with the threshold fixed in advance.
 
 ## 6.5 Caveats
 
@@ -107,6 +127,12 @@ usually do worse.
   favourable). Numbers on automatically-generated alignments would be lower.
 - APC-corrected MI is a *simplification* of full DCA; plmDCA would do better.
   These values are therefore a reasonable lower bound for the signal available.
+- **The ground truth is incomplete.** `ss_pairs()` parses only the nested WUSS
+  brackets `()<>[]{}` and ignores the alphabetic pseudoknot brackets (Aa, Bb, Cc,
+  Dd), which account for **53 of 537 pairs (9.87%)** across these alignments. A
+  correctly-ranked pseudoknot pair is therefore scored as a false positive, so
+  the reported precision is **deflated**. Direction of the bias is conservative.
+- Only 12 families, all curated seeds, and the depth split has n=2 in one arm.
 
 ## Sources
 - Direct-Coupling Analysis of nucleotide coevolution facilitates RNA secondary and tertiary structure prediction https://pmc.ncbi.nlm.nih.gov/articles/PMC4666395/

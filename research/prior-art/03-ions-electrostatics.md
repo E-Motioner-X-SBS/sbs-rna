@@ -6,9 +6,11 @@
 
 ## 3.1 The physics
 
-RNA is a **polyanion**: one formal -1 charge per phosphate, spaced b ~ 5.9-7.0 A
-along the backbone (A-form helix rise ~2.8 A/nt, but the *charge* spacing along
-the contour is what matters). Folding a polyanion means bringing like charges
+RNA is a **polyanion**: one formal -1 charge per phosphate. Manning's `b` is the
+**axial** charge spacing — charges projected onto the helix axis — *not* the
+through-backbone P-P contour distance (~5.9-7.0 A), which is a much larger number
+and a common source of error. For A-form RNA the rise is ~2.8 A per base pair
+carrying 2 phosphate charges, so **b ~ 1.40 A**. Folding a polyanion means bringing like charges
 together, which costs enormous electrostatic energy. That cost is paid by
 counterions. **No ions, no tertiary structure** — this is not a correction term,
 it is a leading-order term.
@@ -31,10 +33,23 @@ theta = 1 - 1/(z * xi)        (fraction of charge neutralised)
 q_eff = -(1 - theta) per phosphate
 ```
 
-For monovalent ions and RNA, `theta ~ 0.76` — i.e. **~76% of the backbone charge
-is screened by condensed counterions before any structure-specific electrostatics
-is considered.** For divalent Mg²⁺ (z=2) condensation is stronger and the
-residual repulsion is lower still, which is why Mg²⁺ is the folding switch.
+Worked values [DERIVED, and cross-checked against the literature]:
+
+| Form | rise | b (axial) | xi = l_B/b | theta (z=1) | theta (z=2) |
+|---|---|---|---|---|---|
+| B-DNA | 3.4 A/bp | 1.70 A | 4.21 | **0.762** | 0.881 |
+| **A-form RNA** | 2.8 A/bp | **1.40 A** | **5.11** | **0.804** | 0.902 |
+
+So for **RNA** roughly **80%** of the backbone charge is screened by condensed
+counterions before any structure-specific electrostatics is considered, giving
+`q_eff = -0.196` per phosphate. The frequently quoted `theta ~ 0.76` is the
+**B-DNA** value; A-form RNA has a shorter axial charge spacing, hence a higher
+Manning parameter and stronger condensation. For divalent Mg²⁺ (z=2) condensation
+is stronger still (theta ~ 0.90), which is why Mg²⁺ is the folding switch.
+
+Literature check: B-DNA `xi = 4.2`, `theta = 1 - 1/xi = 0.76`; A-form RNA ion
+atmosphere reported to neutralise **~0.8** of the phosphate charge (0.7-0.8
+monovalent cations bound per phosphate). Both match the derivation above.
 
 The classical result: the melting temperature of a nucleic-acid helix is linear
 in `log[salt]`, a direct consequence of condensation theory.

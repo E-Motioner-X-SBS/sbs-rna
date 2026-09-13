@@ -295,7 +295,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   <!-- Finding 2 -->
   <div class="panel" style="margin-bottom:20px">
     <h3>Finding 2 — Ion coordination and rigidity are one phenomenon</h3>
-    <p class="note">24,623 nucleotides · 31 X-ray structures · B-factor z-normalised within each structure</p>
+    <p class="note">24,623 nucleotides · <b>15</b> X-ray structures containing Mg²⁺ · B-factor z-normalised within each structure · cryo-EM excluded (ADPs not comparable) and a ≥30-RNA-residue guard applied</p>
     <figure style="margin:0">
       <svg viewBox="0 0 560 262" role="img" aria-label="Normalised B-factor rises monotonically with distance from the nearest magnesium ion, spanning 1.76 sigma">
         <line x1="310" y1="24" x2="310" y2="232" stroke="var(--rule)" stroke-width="1.5"/>
@@ -328,9 +328,17 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <span class="tag">Forces</span>
       <p>Ion effects and motif rigidity are <b>not independent features</b>. Predicting Mg²⁺
       sites yields a rigidity map nearly for free and vice versa, so they share one physics
-      expert rather than two disconnected heads. <span style="color:var(--ink-3)">Caveat: Mg²⁺
-      proximity and packing density both track folded cores — this is association, not
-      isolated causation, and the closest bin holds only 319 nucleotides.</span></p>
+      expert rather than two disconnected heads.</p>
+      <p style="margin-top:10px"><b>The obvious confound, tested.</b> Mg²⁺ proximity and dense
+      packing both mark folded cores, so the gradient might merely restate that cores are
+      ordered. Controlling for density reduces the association only from
+      <span class="mono">+0.420</span> to <span class="mono">+0.372</span> (partial
+      correlation) — the signal is largely <i>independent</i> of packing. A within-structure
+      estimate gives <span class="mono">+1.514 σ</span>, positive in 4/4 structures holding
+      both groups, bootstrap 95% CI [+1.256, +1.661].
+      <span style="color:var(--ink-3)">Remaining caveats: B-factor absorbs resolution and
+      refinement choices; the closest bin holds 319 nucleotides; the within-structure
+      estimate rests on 4 structures. Association, not demonstrated causation.</span></p>
     </div>
   </div>
 
@@ -431,7 +439,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
             <text x="155" y="229" fill="var(--ink-3)">10 families</text><text x="310" y="229" fill="var(--ink-3)">2 families</text>
           </g>
         </svg>
-        <figcaption>precision@L/5 by depth regime</figcaption>
+        <figcaption>precision@L/5 by depth regime — n=2 vs n=10, Spearman only +0.224</figcaption>
       </figure>
       <div>
         <div class="tablewrap" style="border:none">
@@ -453,16 +461,22 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     </div>
     <div class="finding" style="margin-top:16px">
       <span class="tag">Forces</span>
-      <p><b>This is the strongest argument for MoE in the whole design.</b> Coevolution is not
-      a weak feature to blend in at fixed weight — where the alignment is deep it is very
-      nearly sufficient alone. But availability is conditional, and the condition
-      <span class="mono">Neff/L</span> is computable <i>before the model runs</i>. The correct
-      expert therefore depends on an observable property of the input, which is precisely
-      what a mixture of experts is for. <span class="mono">Neff/L</span> becomes a router
-      feature and the coevolution expert is gated on it.
-      <span style="color:var(--ink-3)">Caveat: ground truth is Rfam consensus <i>secondary</i>
-      structure, not 3D contacts; 12 curated seed families is a small, favourable sample; and
-      APC-MI is a simplification of full DCA, so these are a lower bound.</span></p>
+      <p>Coevolution is not a weak feature to blend in at fixed weight — for some families it
+      is very nearly sufficient alone, for others close to useless. <b>That spread (0.333 to
+      1.000) is itself the argument for conditional rather than fixed-weight use.</b>
+      <span class="mono">Neff/L</span> is a defensible router feature: computable before the
+      model runs, and the literature is unambiguous that shallow RNA MSAs degrade coupling
+      analysis (the stated motivation for rMSA, RNAcmap3, RNA-MSM).</p>
+      <p style="margin-top:10px"><b>But our own depth split is weak evidence, and the earlier
+      version of this page overstated it.</b> Exact permutation p = 0.0455 on a <i>post-hoc</i>
+      threshold; <b>Spearman(Neff/L, precision) = +0.224</b> over n=12; the deep arm has
+      <b>n=2</b>; and a <i>shallow</i> family (THF riboswitch, Neff/L = 0.279) reaches
+      precision 1.000. The architectural case rests on the literature and on the
+      between-family variance, not on this split.
+      <span style="color:var(--ink-3)">Further caveats: ground truth is Rfam consensus
+      <i>secondary</i> structure, not 3D contacts; the parser omits WUSS pseudoknot brackets
+      (53 of 537 pairs, 9.87%), which deflates precision; APC-MI is a simplification of full
+      DCA. All biases push the number down, so 0.670 is a lower bound.</span></p>
     </div>
   </div>
 </section>
@@ -512,10 +526,13 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p class="mono" style="font-size:12.5px;background:var(--sunk);padding:10px;border-radius:2px;margin-bottom:8px">
         A<sub>ij</sub> = Q<sub>i</sub>K<sub>j</sub>ᵀ/√d + B<sub>wc</sub> + B<sub>elec</sub>(c<sub>ion</sub>) + B<sub>motif</sub> + A<sup>(l−1)</sup></p>
         <p>B<sub>elec</sub> = −λ q²<sub>eff</sub> ℓ<sub>B</sub> exp(−κd<sub>ij</sub>)/d<sub>ij</sub>, with Manning
-        condensed fraction θ = 1 − 1/(zξ) ≈ 0.76 and Debye κ from ionic strength. Only λ is
-        learned. <b>This is how salt reaches the logits.</b></p>
+        condensed fraction θ = 1 − 1/(zξ) and Debye κ from ionic strength. Only λ is learned.
+        <b>b is the axial charge spacing, not the P–P contour distance</b> — for A-form RNA,
+        2.8 Å per base pair carrying 2 charges gives b = 1.40 Å, ξ = 5.11 and
+        <b>θ = 0.804</b> (q<sub>eff</sub> = −0.196). The often-quoted 0.76 is the B-DNA
+        figure. <b>This is how salt reaches the logits.</b></p>
       </div>
-      <div class="cost"><b>closed form</b>ℓ<sub>B</sub> ≈ 7.1 Å @ 298 K<br>θ ≈ 0.76 monovalent</div>
+      <div class="cost"><b>closed form</b>ℓ<sub>B</sub> = 7.15 Å @ 298 K<br>A-RNA θ = 0.804</div>
     </div>
     <div class="connector"></div>
 
@@ -639,8 +656,8 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Hierarchical coarse-to-fine pair track selecting blocks rather than pairs, justified by measured 1.34% block occupancy</div><div class="status">AlphaFold3 and Rhoformer are dense O(L²); flat top-K sparsification is measured here to fail at ~20% recall on long chains.</div></div>
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
-    <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere.</div></div>
-    <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature, justified by a measured 0.975 vs 0.609 precision split</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth.</div></div>
+    <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
+    <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth. Motivated by the literature and by measured between-family variance (0.333–1.000); our own depth split is weak evidence (Spearman +0.224, n=12).</div></div>
   </div>
 </section>
 
@@ -650,7 +667,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   <div class="risks">
     <div class="risk"><span class="n">R1</span><p><b>Block-detection recall.</b> Superseded but not eliminated — the flat design was measured at ~20% recall and replaced (§07). The hierarchical track has a 100% recall <i>ceiling</i> by construction, but whether a trained model attains it is unproven. Recall must be reported per length bin <i>and per level</i>.</p></div>
     <div class="risk"><span class="n">R2</span><p><b>Ionic metadata — audited, partially confirmed (§08).</b> ~36% of structures yield a recoverable ionic condition. Worse, recorded Mg²⁺ spans only 5–15 mM because the PDB is survivorship-biased. The learned ionic response must come from RMDB titration series, not the PDB. The closed-form physics term and the Mg²⁺ site head are unaffected.</p></div>
-    <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~76% of backbone charge is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
+    <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~80% of backbone charge (A-form RNA, θ = 0.804) is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
     <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs left only 31 of 137 parsed structures usable.</p></div>
     <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
     <div class="risk"><span class="n">R6</span><p><b>Evaluation honesty.</b> Any improvement claim must be made on blind sets (CASP15/16, RNA-Puzzles), never on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.</p></div>
