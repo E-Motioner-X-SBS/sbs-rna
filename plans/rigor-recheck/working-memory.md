@@ -290,3 +290,84 @@
   read by loop-oriented parsers. Any of them written in key-value form in a
   small structure would fail identically and silently. **This is the direct
   generalisation of #25 and should open cycle 8.**
+
+## Cycle 8 decisions
+- D14: **Fix a defect whose measured impact is negligible, and say so plainly.**
+  #26 moves one number by +1 in 103,965. The case for fixing it is not the
+  magnitude here but that the sample is 180 files and the corpus is not — and the
+  *identical* bug in `_entity_poly` moved a published finding by 0.75 points. The
+  report states the negligible impact rather than dressing the fix up as material.
+- D15: **Integer-count claims are pinned at `tol=0`.** The guard's default 0.5%
+  tolerance let `103,965` pass against an expected `103,964` — it reported OK for
+  a value it should have rejected. A count is exact or it is wrong.
+
+## Cycle 8 discoveries
+- DISC-34 [DEFECT #26]: `loops()` had the same two-serialisation bug as
+  `entity_poly_types()`. Found by generalising #25 rather than by any symptom —
+  nothing was visibly wrong. **9 rows across 9 structures**; every headline
+  unchanged.
+- DISC-35 [THE GUARD WAS LYING]: the regression guard *passed* on the corrected
+  data while its expected value was stale, because `chk()` defaults to a 0.5%
+  tolerance and the change was 1 part in 103,964. A guard with a tolerance wider
+  than the effect it is meant to detect is not a guard. Four count claims moved to
+  `tol=0` and a fifth was added.
+- DISC-36 [THE SCARY HYPOTHESIS WAS WRONG]: `_exptl_crystal_grow` is key-value in
+  all 64 files carrying it and feeds the ionic audit — which looked like a large
+  exposure. It is not: that audit uses a key-value-aware reader. **The alarming
+  reading of the evidence was the false one**, and only checking distinguished
+  them. Worth recording because the cycle-6 failure was the opposite error —
+  assuming a residual was harmless — and the discipline that catches both is the
+  same one: measure, don't reason about it.
+
+## Open Questions
+- OQ-4 [**ANSWERED — defect #26**]: nine rows, nine structures, every headline
+  unchanged. The two categories with the largest key-value footprint (`_exptl`
+  180 files, `_exptl_crystal_grow` 64) are read by a key-value-aware parser and
+  were never affected.
+- OQ-5 [OPEN -> cycle 9, priority HIGH]: **are there other guards whose tolerance
+  exceeds the effect they check?** DISC-35 found one by accident. `verify_claims.py`
+  has ~40 `chk()` calls and most inherit the 0.5% default, including ratios and
+  percentages where 0.5% is larger than several of the corrections this audit has
+  made. This is the direct generalisation of #26's discovery and should open
+  cycle 9.
+
+## Cycle 9 decisions
+- D16: **A tolerance is a claim about precision and must be justified like one.**
+  The default is now derived from how the value is written rather than chosen: an
+  integer matches exactly, a decimal to half a unit in its last quoted place. A
+  looser window requires an explicit `abs_tol` and a reason in the comment.
+- D17: **A guard is verified by making it fail.** Passing a correct value proves
+  nothing about a guard. Cycle 9 injects the two specific wrong values that
+  previously slipped through and asserts exit 1, then restores. Any future guard
+  gets the same treatment.
+
+## Cycle 9 discoveries
+- DISC-37 [DEFECT #27]: **45 of 54 numeric claims had a tolerance wider than the
+  precision they quote.** `G7 frac of RNA residues` was checked as 0.01047 ± 0.01
+  — accepting 0.0005 to 0.0205 — a vacuous guard on the single figure this audit
+  corrected by 8.5x.
+- DISC-38 [NEAR MISS, quantified]: `G2 frac RNA res in complexes` allowed ±0.005.
+  The cycle-6 value that cycle 7 retracted differs by 0.0075. **The largest
+  retraction of the project came within a factor of 1.5 of passing its own
+  regression guard undetected.** Defect #25 would then have been invisible to
+  every automated check, and the false "G2 strengthens" finding would have stood.
+- DISC-39 [THE GOOD NEWS]: tightening every tolerance to exact quoted precision,
+  **all 54 claims still pass**. The numbers were accurate to their stated digits
+  through nine cycles; only the *proof* was weak. "ALL CLAIMS REPRODUCE" now
+  carries substantially more information than it did.
+- DISC-40 [PATTERN, cycles 7-9]: three consecutive defects in the *verification
+  apparatus* rather than in the work — the resolver (#25), the shared mmCIF
+  parser (#26), the regression guard (#27). Cycles 0-6 audited the work; cycles
+  7-9 audited the instruments and found one defect in each. **The tooling had
+  never been audited at all**, and it had a 100% defect rate when it finally was.
+
+## Open Questions
+- OQ-5 [**ANSWERED — defect #27**]: 45 of 54; fixed; adversarially verified.
+- OQ-6 [OPEN -> cycle 10, priority HIGH]: the guard checks *cross-document token
+  presence* with `tok in text`. That proves a string appears somewhere, not that
+  it appears in the right claim — "179" would be satisfied by any stray 179 in
+  the document. Given DISC-40's pattern, the token check is the remaining
+  unaudited instrument and is weaker than it looks by construction.
+- OQ-2 / C13 / C14 [STILL OPEN]: 13 analysis scripts still carry their own RNA
+  definitions, and only the G-findings have been re-derived canonically. Three
+  cycles have now passed with these open; they are the oldest outstanding items.

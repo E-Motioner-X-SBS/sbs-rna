@@ -685,7 +685,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
     <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
-    <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 46,447 RNA unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
+    <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 46,448 RNA unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
     <div class="claim"><div class="what">Structure-conditioned stiffness field feeding a harmonic ensemble</div><div class="status">Justified by a measured 3.03-nat gain of structural over sequence context. Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds those insufficient (pentameric couplings).</div></div>
     <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth. Motivated by the literature and by measured between-family variance (0.333–1.000); our own depth split is weak evidence (Spearman +0.224, n=12).</div></div>
   </div>
@@ -971,10 +971,10 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <table>
       <thead><tr><th>mmCIF category</th><th>What it provides</th><th class="num">Volume</th></tr></thead>
       <tbody>
-        <tr class="total"><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair_step</td><td>6 step deformation coordinates</td><td class="num">103,964 steps</td></tr>
+        <tr class="total"><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair_step</td><td>6 step deformation coordinates</td><td class="num">103,965 steps</td></tr>
         <tr><td class="mono" style="font-size:12px">_ndb_struct_na_base_pair</td><td>pair graph + Saenger / Leontis–Westhof class</td><td class="num">29 classes</td></tr>
         <tr><td class="mono" style="font-size:12px">_struct_conn (metalc)</td><td>curated metal coordination</td><td class="num">44,708 Mg²⁺</td></tr>
-        <tr><td class="mono" style="font-size:12px">_pdbx_unobs_or_zero_occ_residues</td><td>unmodelled residues → flexibility labels</td><td class="num">46,447 RNA</td></tr>
+        <tr><td class="mono" style="font-size:12px">_pdbx_unobs_or_zero_occ_residues</td><td>unmodelled residues → flexibility labels</td><td class="num">46,448 RNA</td></tr>
       </tbody>
     </table>
   </div>
@@ -1005,7 +1005,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
 
     <div class="panel">
       <h3>Why this must be learned, not tabulated</h3>
-      <p class="note">Gaussian NLL per step over all 103,964 steps — lower is better</p>
+      <p class="note">Gaussian NLL per step over all 103,965 steps — lower is better</p>
       <figure style="margin:0">
         <svg viewBox="0 0 440 210" role="img" aria-label="Sequence and structural context lower NLL by near-equal amounts and combine">
           <line x1="56" y1="170" x2="424" y2="170" stroke="var(--rule)"/>
@@ -1039,7 +1039,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p style="margin-top:10px"><b>Corrected in cycle 2 (REV-2).</b> An earlier version of this
         page claimed structure contributes <i>more</i> than sequence (+3.028 vs +2.144). That was
         an artefact: each model was fitted in-sample and scored on its <i>own</i> covered subset
-        (103,964 / 90,098 / 78,076 steps), and finer partitioning lowers in-sample NLL
+        (103,965 / 90,098 / 78,076 steps), and finer partitioning lowers in-sample NLL
         mechanically. Rescored fairly, the gain shrinks <b>2.9×</b> and <b>the order inverts</b>.
         The learned-encoder decision stands; the superlative does not.</p>
       </div>
@@ -1354,7 +1354,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           <tbody>
             <tr><td>per-step 6×6 stiffness</td><td>measured F, 76 contexts</td></tr>
             <tr><td>per-nt fluctuation amplitude</td><td>B-factors / RMSF</td></tr>
-            <tr class="total"><td><b>per-residue disorder</b></td><td><b>46,447 RNA unobserved-residue records</b></td></tr>
+            <tr class="total"><td><b>per-residue disorder</b></td><td><b>46,448 RNA unobserved-residue records</b></td></tr>
             <tr><td>K = 3 states + weights</td><td>CASP16 alt-conformations</td></tr>
           </tbody>
         </table>
@@ -1364,7 +1364,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p>A residue in <span class="mono">_pdbx_unobs_or_zero_occ_residues</span> is one too
         mobile or disordered to model — <b>a direct per-residue flexibility label</b>. It sits in
         every deposited structure, is used by <b>no</b> RNA structure predictor, and we already
-        extracted 46,447 RNA ones (the raw category total of 143,871 is 67.5% protein) at zero acquisition cost.</p>
+        extracted 46,448 RNA ones (the raw category total of 143,874 is 67.5% protein) at zero acquisition cost.</p>
       </div>
     </div>
   </div>
@@ -1527,6 +1527,36 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       defect introduced while auditing a definition produced a false result which the audit then
       published, and it surfaced only because the next cycle asked why 18 entries in a
       non-redundant <i>RNA</i> list appeared to contain no RNA.</p>
+    </div>
+    <div class="finding" style="margin-top:12px;border-left-color:var(--warn)">
+      <span class="tag" style="color:var(--warn)">Defect #26 — the same bug, in the other parser</span>
+      <p>With #25 fixed in the RNA resolver, the next question is whether any <i>other</i> parser
+      shares it. <span class="mono">loops()</span> — used by the geometry, stiffness and ionic
+      scripts — kept only the tag from each <span class="mono">_category.tag</span> line and threw
+      away a value on the same line, so a key-value category yielded zero rows, silently, exactly
+      as before. Measured: <b>9 rows across 9 structures</b>. Impact on published numbers:
+      <b>+1 base-pair step</b> (103,964 → 103,965), <b>+1 RNA disorder record</b> (46,447 →
+      46,448), one more structure with annotations (155 → 156). The 115.1× stiffness ratio, the
+      A-form validation geometry and the 76 stiffness contexts are <b>unchanged</b>. Negligible in
+      180 files — but the corpus is not 180 files, and the identical bug in
+      <span class="mono">_entity_poly</span> moved a headline finding by 0.75 points.
+      <span class="mono">_exptl</span> and <span class="mono">_exptl_crystal_grow</span> are
+      key-value in <i>every</i> file carrying them and are read by a separate, key-value-aware
+      parser — checked, not assumed.</p>
+    </div>
+    <div class="finding" style="margin-top:12px;border-left-color:var(--warn)">
+      <span class="tag" style="color:var(--warn)">Defect #27 — the guard was looser than the effects it guards</span>
+      <p>#26 was nearly missed because the regression guard reported <b>OK</b> for
+      <i>annotated base-pair steps = 103,965</i> against an expected <i>103,964</i>: every claim
+      defaulted to a <b>0.5% relative</b> tolerance, and one part in 103,964 is far inside it.
+      Across all 54 numeric claims, <b>45 had a tolerance wider than the precision they quote</b>.
+      The worst: <i>G7 frac of RNA residues</i>, checked as <b>0.01047 ± 0.01</b> — it would have
+      accepted anything from 0.0005 to 0.0205, a vacuous guard on the single figure this audit
+      corrected by 8.5×. The default is now derived from how the value is written: an integer must
+      match exactly, a decimal to half a unit in its last quoted place. <b>All 54 still pass</b> —
+      the claims were accurate to their stated digits; the guard was not proving it. Verified
+      adversarially: injecting the retracted cycle-6 value (0.9970) and a +1 count drift both now
+      <b>fail the build</b>, and both passed before.</p>
     </div>
   </div>
 

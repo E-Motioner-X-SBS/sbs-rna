@@ -92,8 +92,8 @@ without costing accuracy.
 
 ### (c) **Measured base-pair-step stiffness — our own contribution**
 This is the term the literature does *not* already provide in usable form.
-From `_ndb_struct_na_base_pair_step` across 155 structures we extracted
-**103,964 annotated steps** and derived covariance-based stiffness matrices
+From `_ndb_struct_na_base_pair_step` across 156 structures we extracted
+**103,965 annotated steps** and derived covariance-based stiffness matrices
 `F = kT C^-1` for **76 dinucleotide contexts** with n >= 200.
 
 Validation — the Watson-Crick means reproduce canonical A-form RNA:
@@ -122,7 +122,7 @@ The obvious implementation is a 76-entry table keyed on dinucleotide context.
 **That is the same mistake the GNRA result already disproved**: sequence context
 alone is a weak predictor of rigidity. We measured the headroom directly by
 fitting Gaussians over the 6 step coordinates and comparing mean negative
-log-likelihood per step (`measure_stiffness_headroom.py`, 103,964 steps):
+log-likelihood per step (`measure_stiffness_headroom.py`, 103,965 steps):
 
 | Model | conditioning | NLL (nats/step) | gain |
 |---|---|---|---|
@@ -145,7 +145,7 @@ correction table below.)
 | M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
 
 > **Corrected in cycle 2 (REV-2).** The published figures fit every group
-> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> in-sample and scored each model on its *own* covered subset (103,965 / 90,098
 > / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
 > M2's subset is the better-populated, more regular steps. Rescored on the
 > common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
@@ -160,7 +160,7 @@ correction table below.)
 > unused. Only the comparative superlative is retracted.
 
 The table also has a coverage hole: only 76 contexts reach n >= 200, covering
-90,098 of 103,964 steps (**86.7%**). The remaining 13,866 steps — the unusual,
+90,098 of 103,965 steps (**86.7%**). The remaining 13,866 steps — the unusual,
 most structurally interesting ones — get no entry at all. An encoder generalises
 to them; a table cannot.
 
@@ -194,7 +194,7 @@ than a lookup table and the design should be abandoned.
 - **Saenger 28-class / Leontis-Westhof 12-class** base-pair annotations:
   **29 Saenger classes present**, giving a ready-made non-canonical interaction
   vocabulary for the motif machinery.
-- **`_pdbx_unobs_or_zero_occ_residues`**: **46,447 RNA records** of unmodelled
+- **`_pdbx_unobs_or_zero_occ_residues`**: **46,448 RNA records** of unmodelled
   residues — regions too disordered to resolve, i.e. a free maximal-flexibility
   label complementary to B-factors.
 

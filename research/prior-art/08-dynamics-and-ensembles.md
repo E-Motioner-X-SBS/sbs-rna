@@ -64,8 +64,8 @@ were not framed as such.
 
 ### (a) Step stiffness, measured [measured]
 
-`extract_basepair_geometry.py` recovered **103,964 annotated base-pair steps**
-across 155/180 structures and derived `F = kT C^-1` for **76 step contexts** with
+`extract_basepair_geometry.py` recovered **103,965 annotated base-pair steps**
+across 156/180 structures and derived `F = kT C^-1` for **76 step contexts** with
 n >= 200.
 
 - Twist force constants span **115x**, from UG/UG (1.343e-2, stiffest) to
@@ -100,7 +100,7 @@ as an earlier version claimed, structure dominating sequence.
 | M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
 
 > **Corrected in cycle 2 (REV-2).** The published figures fit every group
-> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> in-sample and scored each model on its *own* covered subset (103,965 / 90,098
 > / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
 > M2's subset is the better-populated, more regular steps. Rescored on the
 > common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
@@ -115,7 +115,7 @@ as an earlier version claimed, structure dominating sequence.
 
 ### (c) Disorder labels nobody is using [measured]
 
-`_pdbx_unobs_or_zero_occ_residues` yielded **46,447 RNA unobserved-residue records**. A residue that could not be modelled is a residue too mobile or too
+`_pdbx_unobs_or_zero_occ_residues` yielded **46,448 RNA unobserved-residue records**. A residue that could not be modelled is a residue too mobile or too
 poorly ordered to resolve — a **direct, free, per-residue disorder label**,
 present in every deposited structure and used by no RNA structure predictor.
 Together with B-factors (the 1.76 sigma Mg gradient) this is a second
@@ -132,7 +132,7 @@ flexibility channel at zero acquisition cost.
    slide-rise, twist-roll and twist-slide matter, and that couplings extend to
    the pentameric scale — so a learned encoder over a structural neighbourhood,
    not a 16-entry dinucleotide lookup table.
-4. **Add unobserved-residue disorder as an auxiliary head.** 46,447 RNA free labels.
+4. **Add unobserved-residue disorder as an auxiliary head.** 46,448 RNA free labels.
 5. **Emit K states, not one.** gRNAde's evidence is that **3 states** is the
    sweet spot; RNAnneal uses 10. Start at 3.
 6. **Be honest about kinetics.** Cotranscriptional pathway prediction needs

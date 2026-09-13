@@ -1,13 +1,13 @@
 {
   "structures_scanned": 180,
-  "structures_with_base_pair_annotations": 155,
-  "total_annotated_steps": 103964,
+  "structures_with_base_pair_annotations": 156,
+  "total_annotated_steps": 103965,
   "distinct_step_contexts": 954,
   "connectivity_records": {
     "hydrog": 299134,
     "metalc": 53721,
-    "covale": 6189,
-    "disulf": 95
+    "covale": 6191,
+    "disulf": 96
   },
   "metal_coordination_by_ion": {
     "MG": 44708,
@@ -30,15 +30,15 @@
     "O3'": 664,
     "N7": 403
   },
-  "unobserved_residue_records_ALL_POLYMERS": 143871,
-  "unobserved_residue_records_RNA": 46447,
+  "unobserved_residue_records_ALL_POLYMERS": 143874,
+  "unobserved_residue_records_RNA": 46448,
   "unobserved_residue_records_DNA": 293,
-  "unobserved_residue_records_protein_other": 97131,
+  "unobserved_residue_records_protein_other": 97133,
   "saenger_classes_present": 29,
   "top_saenger": {
     "19": 52543,
     "20": 22098,
-    "?": 14442,
+    "?": 14443,
     "28": 9317,
     "11": 5499,
     "24": 3168,
@@ -52,7 +52,7 @@
     "10": 3960,
     "2": 2445,
     "6": 1991,
-    "9": 1843,
+    "9": 1844,
     "3": 1604
   },
   "stiffness_by_step_context": {
@@ -645,30 +645,30 @@
       "condition_number": 4834.0
     },
     "CG/AG": {
-      "n": 1320,
+      "n": 1321,
       "mean": {
-        "shift": -1.329,
-        "slide": -1.038,
+        "shift": -1.33,
+        "slide": -1.037,
         "rise": 3.232,
-        "tilt": 0.77,
-        "roll": 5.877,
+        "tilt": 0.769,
+        "roll": 5.875,
         "twist": 52.682
       },
       "sd": {
         "shift": 1.777,
         "slide": 0.874,
-        "rise": 1.112,
-        "tilt": 14.366,
-        "roll": 26.041,
-        "twist": 29.813
+        "rise": 1.111,
+        "tilt": 14.361,
+        "roll": 26.031,
+        "twist": 29.801
       },
       "force_constants_diag": {
-        "shift": 0.33984,
-        "slide": 1.51934,
-        "rise": 1.32023,
-        "tilt": 0.0055954,
-        "roll": 0.0026317,
-        "twist": 0.00201739
+        "shift": 0.34004,
+        "slide": 1.52016,
+        "rise": 1.3209,
+        "tilt": 0.00559934,
+        "roll": 0.0026337,
+        "twist": 0.00201887
       },
       "condition_number": 1932.0
     },

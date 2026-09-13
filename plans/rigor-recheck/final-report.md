@@ -1,3 +1,148 @@
+# Final Verification Report — Cycles 8-9 (auditing the verification apparatus)
+
+| Field | Value |
+|---|---|
+| Cycles | 9 |
+| Defects these cycles | **2** (#26, #27) |
+| **Total defects** | **27** |
+| Macro-audit | **FAIL — 3 open items (C13, C14, C32), by design** |
+| Tests | 3 suites pass; `verify_claims.py` **ALL CLAIMS REPRODUCE at exact quoted precision**; guard verified adversarially |
+
+## The question these cycles asked
+
+Cycle 7 found that the RNA resolver — an instrument built *by this audit, for
+this audit* — parsed only half of mmCIF's serialisation grammar, and that the
+resulting artifact was published as a finding. So:
+
+> **Who checks the checkers?**
+
+Cycles 0-6 treated the tooling as given and audited its outputs. If the tooling
+is defective its outputs agree with each other perfectly and are wrong together,
+which reads exactly like confirmation. **Every instrument examined in cycles 7-9
+turned out to have a defect.**
+
+## Defect #26 — the same bug, in the other parser
+
+`loops()` in `extract_basepair_geometry.py` — shared by the geometry, stiffness
+and ionic scripts — kept only the tag from each `_category.tag` line and
+discarded a same-line value, so key-value categories yielded zero rows, exactly
+as `_entity_poly` had. Found by generalising #25, not by any symptom.
+
+Measured exposure: **9 rows across 9 structures** — a key-value block holds
+exactly one row, which is what bounds the damage.
+
+| Quantity | before | after |
+|---|---|---|
+| annotated base-pair steps | 103,964 | **103,965** |
+| structures with base-pair annotations | 155 | **156** |
+| unobserved residue records, RNA | 46,447 | **46,448** |
+| stiffness ratio · A-form geometry · 76 contexts · 44,708 Mg | — | **all unchanged** |
+
+**Every headline survives.** Stated plainly: the defect is real, its consequence
+in this sample is negligible, and the reason to fix it is that the sample is 180
+files while the corpus is not — the identical bug in `_entity_poly` moved a
+published finding by 0.75 points.
+
+One hypothesis was checked and proved **false**, which is why it was checked:
+`_exptl_crystal_grow` is key-value in **all 64** files carrying it and feeds the
+ionic audit, so it looked like a large exposure. It is not — that audit uses a
+key-value-aware reader. The alarming reading of the evidence was the wrong one.
+
+## Defect #27 — the guard was looser than the effects it guards
+
+#26's propagation was nearly missed because the guard printed **OK** for
+`annotated base-pair steps  got=103965  want=103964`. Every claim inherited a
+0.5% *relative* default. Audit of all 54 numeric claims:
+
+**45 of 54 carried a tolerance wider than the precision the claim is quoted to.**
+
+| claim | want | slack allowed | half-ulp |
+|---|---|---|---|
+| G7 frac of RNA residues | 0.01047 | **±0.01** | 5e-06 |
+| canonical RNA residues | 309,197 | ±1,546 | 0.5 |
+| Mg2+ total | 17,428 | ±87 | 0.5 |
+| GG/CC twist (A-form check) | 29.98 | ±0.60 | 0.005 |
+| G2 frac RNA res in complexes | 0.9895 | ±0.005 | 5e-05 |
+
+The worst is not the largest. **`G7 frac of RNA residues` was checked as
+0.01047 ± 0.01** — accepting anything from 0.0005 to 0.0205. A vacuous guard on
+the one figure this entire audit corrected by 8.5x.
+
+### The near miss, quantified
+
+`G2 frac RNA res in complexes` allowed ±0.005. The cycle-6 value that cycle 7
+retracted differs from the truth by 0.0075. **The largest retraction of the
+project came within a factor of 1.5 of passing its own regression guard.** Had it
+passed, defect #25 would have been invisible to every automated check and the
+false "G2 strengthens" finding would still stand.
+
+### The fix, and the reassuring half
+
+`chk()` now derives its default from how the value is written: **an integer must
+match exactly; a decimal to half a unit in its last quoted place.** Eleven
+explicit tolerances were tightened besides.
+
+**All 54 claims still pass.** The numbers were accurate to their stated digits
+through nine cycles — only the proof was weak. "ALL CLAIMS REPRODUCE" now carries
+considerably more information than it did.
+
+### Verified by making it fail
+
+A guard that has never rejected anything has not been tested. Both values that
+previously slipped through were injected:
+
+```
+injected 0.9970 (the retracted cycle-6 G2 value)
+  FAIL G2 frac RNA res in complexes   got=0.997   want=0.9895    exit 1
+injected 309198 (a +1 count drift)
+  FAIL canonical RNA residues         got=309198  want=309197    exit 1
+```
+
+Both now fail. Both passed before. Source restored, suite re-run clean.
+
+## The finding of this stretch
+
+**Cycles 7, 8 and 9 each audited one instrument and each found a defect in it.**
+
+| Cycle | Instrument | Defect | Consequence |
+|---|---|---|---|
+| 7 | the RNA resolver | #25 | **published a false finding** |
+| 8 | the shared mmCIF parser | #26 | 9 rows; all headlines unchanged |
+| 9 | the regression guard | #27 | the #25 retraction nearly went undetected |
+
+**A 100% defect rate on first inspection.** Nine cycles of re-deriving numbers
+*through* a shared instrument does not test that instrument, and agreement
+between results that share a tool is not independent evidence — it is the same
+computation run twice. That is the durable methodological lesson here, and it
+generalises well beyond this project.
+
+## Confidence
+
+**MEDIUM-HIGH measurements · MEDIUM-LOW derived claims · LOW outcomes.**
+
+The level holds, and for the first time the *evidence for the first term has
+actually strengthened* rather than merely survived: all 54 claims now reproduce
+at exact quoted precision rather than within a window wide enough to hide most of
+the corrections this audit has made, and the guard is adversarially verified.
+What keeps it from HIGH is unchanged — nothing has been trained, so every claim
+about model behaviour remains an argument, not a result.
+
+## Known limitations carried forward
+
+- **C13 / OQ-2 — three cycles open.** 13 analysis scripts carry their own RNA
+  definitions. The resolver has changed twice since; any copied definition is
+  drifting with nothing to detect it. **This is the oldest outstanding item and
+  should be the next cycle's target.**
+- **C14 — only the G-findings are canonical.** The base-pair steps, Mg records,
+  block occupancy and contact scaling have not been re-derived on the canonical
+  basis.
+- **C32 / OQ-6 — the token check is the last unaudited instrument.** It uses
+  `tok in text`, proving a string appears *somewhere* rather than in the right
+  claim. Given cycles 7-9's record, it is weak by construction rather than by
+  accident, and should be assumed defective until examined.
+
+---
+
 # Final Verification Report — Cycle 7 (auditing the instrument)
 
 | Field | Value |

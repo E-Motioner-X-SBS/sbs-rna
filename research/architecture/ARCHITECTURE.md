@@ -707,7 +707,7 @@ supply them, and the measurement settles it.
 ### The data
 `_ndb_struct_na_base_pair_step` gives the 6 deformation coordinates (shift,
 slide, rise, tilt, roll, twist) for every annotated step. We extracted
-**103,964 steps across 155 structures** and derived covariance-based stiffness
+**103,965 steps across 156 structures** and derived covariance-based stiffness
 matrices `F = kT C^-1` for 76 dinucleotide contexts (n >= 200).
 
 Validation: Watson-Crick means reproduce canonical A-form RNA (GG/CC rise 3.14 A
@@ -746,11 +746,11 @@ because it is the obvious line of attack on the architecture.
 | Component | Supervision available | Decision |
 |---|---|---|
 | Motif geometry | **6,661** unique sequences with 3D | **tabulate** (frozen bank) |
-| Step stiffness | **103,964** annotated step geometries | **learn** (encoder) |
+| Step stiffness | **103,965** annotated step geometries | **learn** (encoder) |
 
 A **15.6x** difference. With 6,661 examples a model cannot reliably learn what a
 kink-turn looks like, so we hand it the geometry and let it learn only *where*
-motifs occur — the easier problem. With 103,964 deformation observations there is
+motifs occur — the easier problem. With 103,965 deformation observations there is
 ample signal to learn a context-conditioned distribution, and the measurement in
 this section shows doing so beats a sequence-only table by **1.0336 nats/step held-out** (the in-sample 3.028 was inflated — REV-2).
 
@@ -815,14 +815,14 @@ Concretely PHAROS emits, alongside coordinates:
 |---|---|---|
 | per-step 6x6 stiffness | stiffness encoder (§7c) | measured `F` over 76 contexts |
 | per-nucleotide fluctuation amplitude | assembled `F` -> normal modes | B-factors / RMSF |
-| **per-residue disorder probability** | dedicated head | **46,447 RNA unobserved-residue records** |
+| **per-residue disorder probability** | dedicated head | **46,448 RNA unobserved-residue records** |
 | K alternative states | K decoder samples, ranked | CASP16 / riboswitch apo-holo pairs |
 
 **The disorder head is the cheapest addition in the whole design.** A residue
 recorded in `_pdbx_unobs_or_zero_occ_residues` is one too mobile or disordered to
 model. That is a direct per-residue flexibility label, present in every deposited
 structure, **used by no RNA structure predictor**, and we already extracted
-46,447 RNA ones (of 143,871 rows across all polymers). It costs nothing and supervises exactly the quantity a dynamics
+46,448 RNA ones (of 143,874 rows across all polymers). It costs nothing and supervises exactly the quantity a dynamics
 output needs.
 
 ### How many states
@@ -859,7 +859,7 @@ Our own headroom measurement reaches the same conclusion independently
 | M2 sequence x structure | 14.5510 | **15.3424** (gain over sequence **1.0336**) |
 
 > **Corrected in cycle 2 (REV-2).** The published figures fit every group
-> in-sample and scored each model on its *own* covered subset (103,964 / 90,098
+> in-sample and scored each model on its *own* covered subset (103,965 / 90,098
 > / 78,076 steps). Finer partitioning lowers in-sample NLL mechanically, and
 > M2's subset is the better-populated, more regular steps. Rescored on the
 > common 78,076 steps with 2-fold held-out evaluation, structure-over-sequence
@@ -905,8 +905,8 @@ ensemble output reported separately and descriptively.
 | Distance map | binned distances | same | same |
 | **Mg²⁺ sites** | density + inner/outer | **extracted from mmCIF ourselves** | **17,428 from 180 structures alone** |
 | **Rigidity** | per-nt z_B / RMSF | B-factors from mmCIF | every X-ray structure |
-| **Per-step stiffness** | 6x6 `F` matrix | `_ndb_struct_na_base_pair_step` | **103,964 steps, 76 contexts** |
-| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues`, RNA rows only | **46,447 RNA** (143,871 all-polymer) |
+| **Per-step stiffness** | 6x6 `F` matrix | `_ndb_struct_na_base_pair_step` | **103,965 steps, 76 contexts** |
+| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues`, RNA rows only | **46,448 RNA** (143,874 all-polymer) |
 | **Ensemble** | K=3 states + weights | CASP16 alt-conformations, apo/holo pairs | small; see R7 |
 | Reactivity | per-nt SHAPE/DMS | **not yet acquired** (§9) | — |
 | 3D coordinates | frames -> all-atom | RNA3DB | 6,661 unique seqs |
@@ -1067,9 +1067,9 @@ improve structural quality without costing accuracy.
 
 | Term | Source | Volume (180 structures) |
 |---|---|---|
-| `L_stiff` | `_ndb_struct_na_base_pair_step` | **103,964 annotated steps** |
+| `L_stiff` | `_ndb_struct_na_base_pair_step` | **103,965 annotated steps** |
 | `L_Mg` | `_struct_conn` `metalc` | **44,708 Mg²⁺ coordination records** |
-| `L_flex` | B-factors + `_pdbx_unobs_or_zero_occ_residues` | **46,447 RNA unobserved-residue records** |
+| `L_flex` | B-factors + `_pdbx_unobs_or_zero_occ_residues` | **46,448 RNA unobserved-residue records** |
 | motif vocabulary | Saenger `hbond_type_28` / LW `hbond_type_12` | **29 Saenger classes** |
 | `L_elec` | closed form from `c_ion` | no labels needed |
 
@@ -1406,7 +1406,39 @@ pseudouridine cannot be said to handle "any RNA".**
 > inflation as a *finding* ("G2 strengthens"). **A defect found while auditing a
 > definition produced a false result that the audit then published.** The
 > resolver now parses both forms, and a test asserts that no structure resolves
-> to an empty declaration.
+> to an empty declaration.>
+> **Defect #26 — the same bug, in the other parser.** #25 was fixed in the RNA
+> resolver, so the obvious next question is whether any *other* parser has it.
+> `loops()` in `extract_basepair_geometry.py` — shared by the geometry, stiffness
+> and ionic scripts — kept only the tag from each `_category.tag` line and threw
+> away a value on the same line, so a key-value category yielded **zero rows**,
+> silently, exactly as `_entity_poly` had. Measured across the sample: **9 rows
+> in 9 structures** (`_ndb_struct_na_base_pair_step` 8B6Z;
+> `_ndb_struct_na_base_pair` 7OEA; `_struct_conn` 7VKI, 8G90, 8OIV;
+> `_pdbx_unobs_or_zero_occ_residues` 8FMW, 8JY0, 8V1I; `_em_buffer_component`
+> 8IYQ). The measured impact on published numbers is **+1 base-pair step
+> (103,964 → 103,965), +1 RNA disorder record (46,447 → 46,448), +1 structure
+> with base-pair annotations (155 → 156)**; the stiffness ratio (115.1x), the
+> A-form validation geometry and the 76 stiffness contexts are **unchanged**.
+> Negligible here — but the sample is 180 files and the corpus is not, and the
+> same bug in `_entity_poly` moved a headline finding by 0.75 points. `_exptl` and
+> `_exptl_crystal_grow` are key-value in **all** the files that carry them, and
+> are read by a different, key-value-aware parser — checked, not assumed.
+>
+> **Defect #27 — the guard's tolerance was wider than the effects it guards.**
+> #26 was nearly missed because `verify_claims.py` reported **OK** for
+> `annotated base-pair steps = 103,965` against an expected `103,964`: every
+> claim defaulted to a **0.5% relative** tolerance, and one part in 103,964 is
+> far inside it. Auditing all 54 numeric claims, **45 had a tolerance wider than
+> the precision they quote.** The worst was `G7 frac of RNA residues`, checked as
+> `0.01047 ± 0.01` — it would have accepted anything from 0.0005 to 0.0205, a
+> vacuous guard on the very figure this audit corrected by 8.5x. The default is
+> now derived from how the value is written: **an integer must match exactly, a
+> decimal to half a unit in its last quoted place.** All 54 still pass, which is
+> the reassuring half — the claims were accurate to their stated digits; the
+> guard simply was not proving it. Verified adversarially: injecting the retracted
+> cycle-6 value (0.9970) and a +1 count drift both now **fail** the build, and
+> both passed before.
 
 ### G6 — Router circularity at recycle 0 [design gap, unmeasured]
 
@@ -1573,9 +1605,9 @@ checkpoint.
 | 5 | **Mg²⁺ sites + B-factor rigidity as free auxiliary supervision** | Extracted from mmCIF; currently unused by structure predictors |
 | 6 | **Coupled ion-rigidity expert**, justified by a measured 1.76 sigma gradient | Treated separately or not at all elsewhere |
 | 8 | **Learned stiffness encoder** emitting a per-step 6x6 precision matrix trained by Gaussian NLL, replacing a tabulated force field | Nucleic-acid elasticity uses fixed per-context stiffness tables; measured here to capture <half the signal (14.551 vs 17.579 nats/step) |
-| 9 | **Physics labels mined from unused mmCIF categories** — 103,964 step geometries, 44,708 curated Mg²⁺ coordinations, 46,447 RNA disorder records | These categories ship with every RNA structure and are used by no structure predictor |
+| 9 | **Physics labels mined from unused mmCIF categories** — 103,965 step geometries, 44,708 curated Mg²⁺ coordinations, 46,448 RNA disorder records | These categories ship with every RNA structure and are used by no structure predictor |
 | 7 | **Depth-gated coevolution routing** (`Neff/L` as a router feature) | RhoFold+ concatenates LM and MSA features at fixed weight; none route on measured depth. *Motivated by the literature and by measured between-family variance (0.333-1.000); our own depth split is weak evidence (Spearman +0.224, n=12)* |
-| 8 | **Per-residue disorder as a supervised head**, from 46,447 RNA `_pdbx_unobs_or_zero_occ_residues` records | Present in every deposited structure; used by no RNA structure predictor |
+| 8 | **Per-residue disorder as a supervised head**, from 46,448 RNA `_pdbx_unobs_or_zero_occ_residues` records | Present in every deposited structure; used by no RNA structure predictor |
 | 9 | **Structure-conditioned stiffness field** feeding a harmonic ensemble, justified by a measured +1.03-nat held-out gain of structure *beyond* sequence, the two being near-equal on their own | Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds dinucleotide models insufficient (pentameric couplings) |
 
 ## 12. Risks and open questions

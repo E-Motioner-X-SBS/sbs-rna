@@ -20,8 +20,40 @@ def load(n): return json.load(open(A / n))
 
 def main() -> int:
     fails = []
-    def chk(name, got, want, tol=0.005):
-        ok = abs(float(got) - float(want)) <= tol * max(abs(float(want)), 1)
+
+    def chk(name, got, want, tol=None, abs_tol=None):
+        """Compare at the precision the claim is actually quoted to.
+
+        Defect #27 (cycle 9): every claim defaulted to a 0.5% RELATIVE tolerance,
+        which is wider than the precision of almost every value it guards. Two
+        consequences, both real:
+
+          * `annotated base-pair steps` passed at 103,965 against an expected
+            103,964 -- it reported OK for a value it should have rejected, which
+            is how defect #26's propagation nearly went unnoticed.
+          * `G7 frac of RNA residues` was checked as 0.01047 +/- 0.01, i.e. it
+            would have accepted anything from 0.0005 to 0.0205. The guard on a
+            figure this audit corrected by 8.5x was vacuous.
+
+        The default is now derived from how `want` is written: an integer must
+        match exactly, and a decimal must match to half a unit in its last quoted
+        place. `abs_tol` states an absolute slack where the recomputation
+        genuinely rounds differently; `tol` keeps the old relative form for the
+        few claims that want it.
+        """
+        w = float(want)
+        if abs_tol is not None:
+            slack = abs_tol
+        elif tol is not None:
+            slack = tol * max(abs(w), 1)
+        else:
+            r = repr(float(want))
+            dec = len(r.split(".")[1]) if "." in r and "e" not in r else 0
+            if isinstance(want, int) or (dec == 1 and r.endswith(".0")):
+                slack = 0.0
+            else:
+                slack = 0.5 * 10 ** (-dec)
+        ok = abs(float(got) - w) <= slack
         print(f"  {'OK ' if ok else 'FAIL'} {name:38s} got={got}  want={want}")
         if not ok: fails.append(name)
 
@@ -31,7 +63,7 @@ def main() -> int:
     chk("K+ total", ion["total_ions_by_type"]["K"], 1868)
     inner = ion["top_inner_sphere_partners"]
     frac_phos = (inner["OP1"] + inner["OP2"]) / sum(inner.values())
-    chk("inner-sphere phosphate fraction", round(frac_phos, 3), 0.83, tol=0.02)
+    chk("inner-sphere phosphate fraction", round(frac_phos, 3), 0.83, abs_tol=0.005)
 
     rig = load("rigidity_summary.json")
     mg = rig["rigidity_by_mg_distance"]
@@ -61,29 +93,33 @@ def main() -> int:
     chk("HPT L=4096 effective c", round(r["effective_c"], 1), 19.6)
 
     bp = load("basepair_geometry.json")
-    chk("annotated base-pair steps", bp["total_annotated_steps"], 103964)
+    chk("annotated base-pair steps", bp["total_annotated_steps"], 103965, tol=0)
     chk("stiffness contexts (n>=200)", len(bp["stiffness_by_step_context"]), 76)
-    chk("curated Mg coordination records", bp["metal_coordination_by_ion"]["MG"], 44708)
+    chk("curated Mg coordination records", bp["metal_coordination_by_ion"]["MG"], 44708, tol=0)
+    # defect #26: structures whose base-pair category parses. 155 before the
+    # key-value fix, 156 after -- 8B6Z writes the category in key-value form.
+    chk("structures with base-pair annotations",
+        bp["structures_with_base_pair_annotations"], 156, tol=0)
     cl = json.load(open(A / "cost_with_loops.json"))
     chk("effective compute, Small (active x loops)",
         next(r["effective_compute_M"] for r in cl["ladder_with_loops"] if r["model"] == "PHAROS-Small"), 488)
     chk("Small vs Base-v2 by effective compute", cl["small_vs_base_by_effective_compute"], 1.65)
-    chk("corrected A100-h @25B", cl["corrected_a100h_25B"], 78, tol=0.05)
+    chk("corrected A100-h @25B", cl["corrected_a100h_25B"], 78, abs_tol=1.0)
     ho = json.load(open(A / "stiffness_headroom_heldout.json"))
     chk("held-out M2 (common subset)", ho["B_held_out_2fold"]["M2"], 15.3424)
     chk("held-out structure-beyond-sequence", ho["gains_held_out"]["structure_over_sequence"], 1.0336)
     chk("held-out sequence-over-global", ho["gains_held_out"]["sequence_over_global"], 1.7847)
-    chk("unobs residues, RNA only", bp["unobserved_residue_records_RNA"], 46447)
-    chk("unobs residues, all polymers", bp["unobserved_residue_records_ALL_POLYMERS"], 143871)
+    chk("unobs residues, RNA only", bp["unobserved_residue_records_RNA"], 46448, tol=0)
+    chk("unobs residues, all polymers", bp["unobserved_residue_records_ALL_POLYMERS"], 143874, tol=0)
     gg = bp["stiffness_by_step_context"]["GG/CC"]["mean"]
-    chk("GG/CC rise (A-form check)", gg["rise"], 3.14, tol=0.02)
-    chk("GG/CC twist (A-form check)", gg["twist"], 29.98, tol=0.02)
+    chk("GG/CC rise (A-form check)", gg["rise"], 3.14, abs_tol=0.005)
+    chk("GG/CC twist (A-form check)", gg["twist"], 29.98, abs_tol=0.005)
 
     # derive the stiffness ratio from UNROUNDED values -- quoting it from the
     # 4-dp rounded display once produced a spurious 134x instead of 115x
     fcs = sorted((v["force_constants_diag"]["twist"]
                   for v in bp["stiffness_by_step_context"].values()), reverse=True)
-    chk("stiffness ratio (stiffest/floppiest twist)", round(fcs[0]/fcs[-1], 1), 115.1, tol=0.01)
+    chk("stiffness ratio (stiffest/floppiest twist)", round(fcs[0]/fcs[-1], 1), 115.1)
 
     gc = load("generalization_canonical.json")["summary"]
     chk("canonical structures with RNA entity", gc["structures_with_RNA"], 179)
@@ -96,7 +132,7 @@ def main() -> int:
     chk("G3 ribosome-like structures", gc["G3"]["ribosome_like"], 60)
     chk("G3 frac RNA res ribosomal", gc["G3"]["frac_rna_residues"], 0.9265)
     chk("G7 modified instances (RNA only)", gc["G7"]["modified_instances"], 3237)
-    chk("G7 frac of RNA residues", gc["G7"]["frac_of_rna_residues"], 0.01047, tol=0.01)
+    chk("G7 frac of RNA residues", gc["G7"]["frac_of_rna_residues"], 0.01047)
     chk("G7 distinct modification types", gc["G7"]["distinct_types"], 82)
     # defect #23: the published G7 counted DNA and UNK. Pin the contamination so
     # the 8.6x correction stays explainable rather than merely asserted.
@@ -108,9 +144,9 @@ def main() -> int:
         ga["G7_modified_nucleotides"]["modified_residue_instances"], 27437)
 
     hr = load("stiffness_headroom.json")
-    chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.579, tol=0.001)
-    chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551, tol=0.001)
-    chk("structure gain over sequence", hr["gain_structure_over_sequence"], 3.028, tol=0.002)
+    chk("M1 sequence-table NLL", hr["M1_sequence_context_nll"], 17.5792)
+    chk("M2 sequence x structure NLL", hr["M2_sequence_x_structure_nll"], 14.551)
+    chk("structure gain over sequence", hr["gain_structure_over_sequence"], 3.0282)
 
     print("\n== derived arithmetic ==")
     # PHAROS-Small (default): d=512, 16 blocks, all-MoE, d_ff=128, 32+2 experts, top-4
@@ -118,8 +154,8 @@ def main() -> int:
     attn = nb * 4 * d * d
     moe_t = nb * 34 * 3 * d * dff_moe
     moe_a = nb * 6 * 3 * d * dff_moe
-    chk("PHAROS-Small total params (M)", round((attn + moe_t + 25e6) / 1e6), 149, tol=0.01)
-    chk("PHAROS-Small active params (M)", round((attn + moe_a + 25e6) / 1e6), 61, tol=0.02)
+    chk("PHAROS-Small total params (M)", round((attn + moe_t + 25e6) / 1e6), 149)
+    chk("PHAROS-Small active params (M)", round((attn + moe_a + 25e6) / 1e6), 61)
     chk("effective layers (16 blocks x 8 loops)", nb * 8, 128)
     L = 2048
     chk("dense activations at L=2048 (GB)", round(L*L*128*2*48*6/1e9, 1), 309.2)
@@ -148,10 +184,10 @@ def main() -> int:
                 # PHAROS-Small is the current headline config; 910M/382M survives
                 # only as the superseded Base row in the progression tables.
                 "149", "61",
-                "103,964", "44,708",
-                # RNA-only disorder labels; 143,871 was the all-polymer total
+                "103,965", "44,708",
+                # RNA-only disorder labels; 143,874 was the all-polymer total
                 # and 67.5% of it is protein (defect #11, cycle 2).
-                "46,447",
+                "46,448",
                 # held-out, common-subset figures (REV-2); the in-sample
                 # 14.551 / 17.579 pair was not a fair comparison.
                 "15.342", "16.376", "1.0336",

@@ -711,3 +711,143 @@ now fails the build. The record of a correction is itself a claim under guard.
 | `research/architecture/blueprint.html` | **v24**; tags balanced (div 233/233, table 31/31, p 157/157, tr 164/164, td 510/510, th 111/111) |
 | `research/architecture/ARCHITECTURE.md` | three-column published/cycle-6/canonical table |
 | `scripts/sampling/verify_claims.py` | ALL CLAIMS REPRODUCE |
+
+## Cycle 8 — the same bug, in the other parser
+
+### C25 — generalise defect #25 — **DEFECT #26**
+Cycle 7 fixed the two-serialisation bug in the RNA resolver and logged OQ-4: does
+any *other* parser have it? Measured rather than assumed, over all 180 files:
+
+| category | files with it | `loop_` | **key-value** |
+|---|---|---|---|
+| `_exptl_crystal_grow` | 64 | 0 | **64** |
+| `_struct_conn` | 169 | 166 | **3** |
+| `_pdbx_unobs_or_zero_occ_residues` | 165 | 162 | **3** |
+| `_ndb_struct_na_base_pair` | 156 | 155 | **1** |
+| `_ndb_struct_na_base_pair_step` | 155 | 154 | **1** |
+| `_em_buffer_component` | 32 | 31 | **1** |
+| `_exptl` | 180 | 0 | **180** |
+| `_entity_poly_seq` | 180 | 180 | 0 |
+| `_atom_site` | 180 | 180 | 0 |
+
+`loops()` did `cols.append(tag)` and **discarded any value on the same line**, so
+every key-value category yielded zero rows exactly as `_entity_poly` had.
+
+**The `_exptl_crystal_grow` hypothesis was wrong and was checked rather than
+asserted.** 64 files, all key-value, and it is the source of the salt
+concentrations behind the ionic-metadata audit — an apparently large exposure.
+But `audit_ionic_metadata.py` does not use `loops()`; it uses `header_fields()`,
+which reads `t[0] in TAGS` and takes `t[1]` when present, i.e. **it handles the
+key-value form natively**. Same for `_exptl` (180 files). Neither is affected.
+
+Confirmed exposure, per structure:
+
+```
+_ndb_struct_na_base_pair_step     8B6Z
+_ndb_struct_na_base_pair          7OEA
+_struct_conn                      7VKI  8G90  8OIV
+_pdbx_unobs_or_zero_occ_residues  8FMW  8JY0  8V1I
+_em_buffer_component              8IYQ
+```
+
+**9 rows across 9 structures** — a key-value block holds exactly one row by
+definition, which is what bounds the damage.
+
+### C26 — fix and measured impact
+`loops()` now emits a one-row table from a key-value block, handles `;`-delimited
+values in both forms, and is unchanged on the loop form (5J8B: 1,630 steps before
+and after).
+
+| Quantity | before | after |
+|---|---|---|
+| annotated base-pair steps | 103,964 | **103,965** |
+| structures with base-pair annotations | 155 | **156** |
+| unobserved residue records, RNA | 46,447 | **46,448** |
+| unobserved residue records, all polymers | 143,871 | **143,874** |
+| Mg coordination records | 44,708 | **44,708** (unchanged) |
+| stiffness contexts (n>=200) | 76 | **76** (unchanged) |
+| stiffness ratio, stiffest/floppiest twist | 115.1x | **115.1x** (unchanged) |
+| GG/CC rise / twist (A-form validation) | 3.137 / 29.975 | **unchanged** |
+| headroom M1 / M2 NLL | 17.5792 / 14.551 | **unchanged to 4 dp** |
+| held-out structure-over-sequence | 1.0336 | **unchanged** |
+
+**Every headline survives.** The measured impact is +1 step in 103,965. That is
+the honest result: the defect is real, its consequence *in this sample* is
+negligible, and the reason to fix it is that the sample is 180 files while the
+corpus is not — the identical bug in `_entity_poly` moved a published finding by
+0.75 points.
+
+### C27 — propagation and guards
+- 56 exact-match replacements across 8 files (3 deliverables, 2 prior-art docs,
+  2 diagram sources, the guard); both changed diagrams re-rendered.
+- The guard's expected counts were being compared at the default **0.5%
+  tolerance**, so `103,965` vs `103,964` *passed while wrong*. All four
+  integer-count claims now pin `tol=0`, and a new claim pins
+  `structures_with_base_pair_annotations = 156`.
+- `research/report/main.pdf`: **40 pages, 0 overfull, 0 underfull**.
+- `research/architecture/blueprint.html`: **v25**, tags balanced
+  (div 234/234, p 158/158, tr 164/164, td 510/510, th 111/111).
+- `verify_claims.py`: **ALL CLAIMS REPRODUCE**; all three suites pass.
+
+## Cycle 9 — the guard was looser than the effects it guards
+
+### C28 — generalise DISC-35 — **DEFECT #27**
+Defect #26's propagation was nearly missed because `verify_claims.py` printed
+**OK** for `annotated base-pair steps  got=103965  want=103964`. Every claim
+inherited `tol=0.005`, a **relative** tolerance, and one part in 103,964 is far
+inside it. Audit of all 54 numeric claims:
+
+**45 of 54 have a tolerance wider than the precision the claim is quoted to.**
+
+| claim | want | slack allowed | half-ulp of quoted value |
+|---|---|---|---|
+| G7 frac of RNA residues | 0.01047 | **±0.01** | 5e-06 |
+| canonical RNA residues | 309,197 | ±1,546 | 0.5 |
+| published G7 total instances | 27,437 | ±137 | 0.5 |
+| Mg analysis nucleotides | 24,623 | ±123 | 0.5 |
+| Mg2+ total | 17,428 | ±87 | 0.5 |
+| GG/CC twist (A-form check) | 29.98 | ±0.60 | 0.005 |
+| held-out M2 | 15.3424 | ±0.077 | 5e-05 |
+| G2 frac RNA res in complexes | 0.9895 | ±0.005 | 5e-05 |
+
+The worst is not the largest: **`G7 frac of RNA residues` was checked as
+0.01047 ± 0.01**, so it would have accepted any value from 0.0005 to 0.0205. That
+is a **vacuous guard on the one figure this audit corrected by 8.5x**.
+
+And `G2 frac RNA res in complexes` had ±0.005 — the retracted cycle-6 value
+0.9970 differs from 0.9895 by 0.0075, so it failed by only 1.5x the slack. **The
+0.75-point error that cycle 7 retracted was within a factor of two of passing its
+own regression guard.**
+
+### C29 — fix: tolerance derived from quoted precision
+`chk()` now derives the default from how `want` is written — an integer must
+match **exactly**, a decimal to **half a unit in its last quoted place**.
+`abs_tol` states an absolute window where a recomputation genuinely rounds
+differently; `tol` keeps the relative form for claims that want it. Eleven
+explicit tolerances were tightened besides.
+
+**All 54 claims still pass.** That is the reassuring half of the finding: the
+claims were accurate to their stated digits all along; the guard simply was not
+proving it. "ALL CLAIMS REPRODUCE" now means something considerably stronger than
+it did for the previous eight cycles.
+
+### C30 — adversarial verification (the test that matters)
+A guard is only as good as its response to a wrong value, so both failures that
+previously slipped through were injected:
+
+```
+injected 0.9970 (the retracted cycle-6 G2 value):
+  FAIL G2 frac RNA res in complexes   got=0.997  want=0.9895     exit 1
+injected 309198 (a +1 count drift):
+  FAIL canonical RNA residues         got=309198  want=309197    exit 1
+```
+
+Both now **fail the build**. Both **passed** before. Source file restored and the
+suite re-run clean afterwards.
+
+### C31 — deliverables
+| Artifact | State |
+|---|---|
+| `research/report/main.pdf` | **40 pages, 0 overfull, 0 underfull** |
+| `research/architecture/blueprint.html` | **v26**; tags balanced (div 235/235, p 159/159, td 510/510) |
+| `scripts/sampling/verify_claims.py` | **ALL CLAIMS REPRODUCE** at exact quoted precision |

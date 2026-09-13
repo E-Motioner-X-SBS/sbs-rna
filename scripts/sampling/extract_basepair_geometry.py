@@ -54,54 +54,93 @@ def _tokens(line: str):
 
 
 def loops(path: Path, wanted: set[str]):
-    """Yield (category, cols, rows) for each requested mmCIF loop category.
+    """Yield (category, cols, rows) for each requested mmCIF category.
 
     mmCIF WRAPS long rows across several physical lines, so tokens are
     accumulated until a full row's worth is available rather than assuming one
     row per line. Getting this wrong silently yields ZERO rows for any category
     with many columns -- which is exactly what happened on the first attempt.
+
+    Defect #26 (cycle 8): mmCIF also has TWO serialisations, and this handled
+    only one. The `loop_` form puts tags in a header and data on following
+    lines; the KEY-VALUE form (`_cat.tag  value`, used when a category has
+    exactly one row) puts the value on the tag's own line. This function split
+    on whitespace and kept only the tag, discarding the value -- so a key-value
+    category yielded zero rows, silently, exactly as `_entity_poly` did in
+    defect #25. Measured over the 180-file sample: 9 rows across 9 structures
+    (`_ndb_struct_na_base_pair_step` 8B6Z, `_ndb_struct_na_base_pair` 7OEA,
+    `_struct_conn` 7VKI/8G90/8OIV, `_pdbx_unobs_or_zero_occ_residues`
+    8FMW/8JY0/8V1I, `_em_buffer_component` 8IYQ). Negligible against 103,965
+    steps here; unbounded on a corpus we have not sampled.
     """
     op = gzip.open if path.suffix == ".gz" else open
     cur, cols, rows, buf = None, [], [], []
+    kv, kv_pending = {}, None
 
-    def flush():
-        nonlocal cur, cols, rows, buf
-        if cur and rows:
-            yield_val = (cur, cols, rows)
-        else:
-            yield_val = None
+    def emit():
+        """Close the current category, converting a key-value block to one row."""
+        nonlocal cur, cols, rows, buf, kv, kv_pending
+        out = None
+        if cur:
+            if not rows and kv:
+                out = (cur, list(kv.keys()), [dict(kv)])
+            elif rows:
+                out = (cur, cols, rows)
         cur, cols, rows, buf = None, [], [], []
-        return yield_val
+        kv, kv_pending = {}, None
+        return out
 
     with op(path, "rt", errors="ignore") as fh:
         for line in fh:
             t = line.strip()
+            # a `;`-delimited value belonging to a bare key-value tag
+            if kv_pending is not None:
+                if t.startswith(";"):
+                    kv[kv_pending] = t[1:].strip()
+                else:
+                    kv[kv_pending] = t.strip("'\"")
+                kv_pending = None
+                continue
             if t.startswith("_"):
                 cat = t.split(".", 1)[0]
                 if cat in wanted:
                     if cur != cat:
-                        if cur and rows:
-                            yield cur, cols, rows
-                        cur, cols, rows, buf = cat, [], [], []
-                    cols.append(t.split(".", 1)[1].split()[0])
+                        got = emit()
+                        if got:
+                            yield got
+                        cur = cat
+                    tag, _, rest = t.split(".", 1)[1].partition(" ")
+                    rest = rest.strip()
+                    if rest:
+                        kv[tag] = rest.strip("'\"")     # KEY-VALUE form
+                    else:
+                        cols.append(tag)                # loop header, or `;` next
+                        if kv or not cols[:-1]:
+                            kv_pending = None
                     continue
-                if cur:
-                    if rows:
-                        yield cur, cols, rows
-                    cur, cols, rows, buf = None, [], [], []
+                got = emit()
+                if got:
+                    yield got
                 continue
             if cur:
+                if t.startswith(";") and not rows and cols:
+                    # value for the last bare tag, in key-value form
+                    kv_pending = cols.pop()
+                    kv[kv_pending] = t[1:].strip()
+                    kv_pending = None
+                    continue
                 if not t or t.startswith(("#", "loop_", ";")):
-                    if rows:
-                        yield cur, cols, rows
-                    cur, cols, rows, buf = None, [], [], []
+                    got = emit()
+                    if got:
+                        yield got
                     continue
                 buf.extend(_tokens(t))
-                while len(buf) >= len(cols):          # rows may span lines
+                while cols and len(buf) >= len(cols):  # rows may span lines
                     rows.append(dict(zip(cols, buf[:len(cols)])))
                     buf = buf[len(cols):]
-    if cur and rows:
-        yield cur, cols, rows
+    got = emit()
+    if got:
+        yield got
 
 
 def fnum(v):
