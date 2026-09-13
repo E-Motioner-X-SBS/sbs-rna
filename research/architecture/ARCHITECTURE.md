@@ -284,11 +284,31 @@ corpus than families are.
 | Component | Total params | Active params |
 |---|---|---|
 | Embeddings (vocab 5) | ~0.005M | 0.005M |
-| Attention (16 blocks, d=512) | 16.8M | 16.8M |
+| Attention (16 blocks, d=512, **8 heads x 64**) | 16.8M | 16.8M |
 | MoE FFN (16 blocks x 34 experts x 0.197M) | 107.0M | 18.9M |
 | Hierarchical pair track + triangle | ~15M | 15M |
-| Motif bank + heads + decoder | ~10M | 10M |
-| **PHAROS-Small (default)** | **~149M** | **~61M** |
+| Motif bank (667 x 2 x 128, frozen) | 0.17M | 0.17M |
+| Prediction heads (9) | 1.65M | 1.65M |
+| Frame-diffusion decoder (4 IPA-style blocks) | 12.59M | 12.59M |
+| **PHAROS-Small (default)** | **~153M** | **~65M** |
+
+> **Corrected in cycle 4 (defects #18, #19)** — two spec gaps closed.
+>
+> **#18: the attention head count was never specified anywhere.** `d = 512` with
+> no stated head count. Fixed at **8 heads x 64 dims**. It does not change the
+> parameter count, but it was genuinely absent from every document and config.
+>
+> **#19: "Motif bank + heads + decoder ~10M" was a placeholder** that was never
+> derived, and the **decoder was never specified at all**, so the line could not
+> be checked. Itemised: 9 heads cost **1.65M** — the three added in cycle 3
+> (per-step stiffness, disorder, ensemble weights) are only **0.80M** between
+> them — the frozen motif bank **0.17M**, and a plausible 4-block
+> frame-diffusion decoder **12.59M**. *The decoder alone exceeds the whole line.*
+> Totals rise 149M/61M -> **~153M/~65M** (+3% / +7%), and effective compute
+> 488M -> **521M**.
+>
+> **Heads are cheap; the decoder is not. An unspecified component is not a
+> small one.**
 
 Sizes, with depth supplied by refinement loops rather than block count:
 
@@ -780,7 +800,7 @@ Concretely PHAROS emits, alongside coordinates:
 recorded in `_pdbx_unobs_or_zero_occ_residues` is one too mobile or disordered to
 model. That is a direct per-residue flexibility label, present in every deposited
 structure, **used by no RNA structure predictor**, and we already extracted
-46,447 RNA ones (of 46,447 RNA rows across all polymers). It costs nothing and supervises exactly the quantity a dynamics
+46,447 RNA ones (of 143,871 rows across all polymers). It costs nothing and supervises exactly the quantity a dynamics
 output needs.
 
 ### How many states
@@ -864,7 +884,7 @@ ensemble output reported separately and descriptively.
 | **Mg²⁺ sites** | density + inner/outer | **extracted from mmCIF ourselves** | **17,428 from 180 structures alone** |
 | **Rigidity** | per-nt z_B / RMSF | B-factors from mmCIF | every X-ray structure |
 | **Per-step stiffness** | 6x6 `F` matrix | `_ndb_struct_na_base_pair_step` | **103,964 steps, 76 contexts** |
-| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues`, RNA rows only | **46,447 RNA** (46,447 RNA all-polymer) |
+| **Disorder** | per-residue P(unresolved) | `_pdbx_unobs_or_zero_occ_residues`, RNA rows only | **46,447 RNA** (143,871 all-polymer) |
 | **Ensemble** | K=3 states + weights | CASP16 alt-conformations, apo/holo pairs | small; see R7 |
 | Reactivity | per-nt SHAPE/DMS | **not yet acquired** (§9) | — |
 | 3D coordinates | frames -> all-atom | RNA3DB | 6,661 unique seqs |

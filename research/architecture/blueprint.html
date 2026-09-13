@@ -652,8 +652,11 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <tr><td>Attention — 16 blocks, d=512</td><td class="num">16.8M</td><td class="num">16.8M</td></tr>
         <tr><td>MoE FFN — 16 blocks × 34 experts</td><td class="num">107.0M</td><td class="num">18.9M</td></tr>
         <tr><td>Hierarchical pair track + triangle updates</td><td class="num">15M</td><td class="num">15M</td></tr>
-        <tr><td>Motif bank, heads, decoder</td><td class="num">10M</td><td class="num">10M</td></tr>
-        <tr class="total"><td><b>PHAROS-Small</b> (default)</td><td class="num">~149M</td><td class="num">~61M</td></tr>
+        <tr><td>Motif bank + heads + decoder (see §16)</td><td class="num">10M</td><td class="num">10M</td></tr>
+        <tr><td>Motif bank (667 × 2 × 128, frozen)</td><td class="num">0.17M</td><td class="num">0.17M</td></tr>
+        <tr><td>Prediction heads (9)</td><td class="num">1.65M</td><td class="num">1.65M</td></tr>
+        <tr><td>Frame-diffusion decoder (4 IPA blocks)</td><td class="num">12.59M</td><td class="num">12.59M</td></tr>
+        <tr class="total"><td><b>PHAROS-Small</b> (default)</td><td class="num">~153M</td><td class="num">~65M</td></tr>
         <tr><td style="color:var(--ink-3)">Base-v2 (scale-up path, §11)</td><td class="num" style="color:var(--ink-3)">~1,401M</td><td class="num" style="color:var(--ink-3)">~269M</td></tr>
         <tr><td>NucleicBERT (dense, all active)</td><td class="num">404M</td><td class="num">404M</td></tr>
         <tr class="total"><td>vs NucleicBERT</td><td class="num"><span class="delta">0.37× params</span></td><td class="num"><span class="delta">6.6× fewer active</span></td></tr>
@@ -661,6 +664,16 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     </table>
   </div>
 </section>
+
+  <div class="risk" style="margin-top:18px">
+    <span class="n">SPEC</span>
+    <p><b>Two gaps closed in cycle 4.</b> The attention <b>head count was never specified
+    anywhere</b> (d=512, heads unstated) — now 8 heads × 64. And "Motif bank + heads + decoder
+    ~10M" was a placeholder whose <b>decoder was never specified at all</b>, so it could not be
+    checked. Itemised: 9 heads 1.65M (the three dynamics heads only 0.80M), motif bank 0.17M,
+    4-block frame decoder <b>12.59M</b> — the decoder alone exceeds the line. Totals
+    149M/61M → <b>~153M/~65M</b>. <b>Heads are cheap; the decoder is not.</b></p>
+  </div>
 
 <!-- ================= 5. CLAIMS ================= -->
 <section>
@@ -1351,7 +1364,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         <p>A residue in <span class="mono">_pdbx_unobs_or_zero_occ_residues</span> is one too
         mobile or disordered to model — <b>a direct per-residue flexibility label</b>. It sits in
         every deposited structure, is used by <b>no</b> RNA structure predictor, and we already
-        extracted 46,447 RNA ones (the raw category total of 46,447 RNA is 67.5% protein) at zero acquisition cost.</p>
+        extracted 46,447 RNA ones (the raw category total of 143,871 is 67.5% protein) at zero acquisition cost.</p>
       </div>
     </div>
   </div>

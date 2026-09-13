@@ -1,3 +1,67 @@
+# Final Verification Report — Cycle 4
+
+## Summary
+
+| Field | Value |
+|---|---|
+| Cycles used | 4 |
+| **Defects found (cycle 4)** | **4** (#16-#19) |
+| Total defects, all cycles | **19** |
+| Macro-audit | **6/6 YES** |
+| Open to-dos | 0 (3 deferred: need hardware or training) |
+
+Cycle 4 asked a question no earlier cycle had: after ~20 individually-correct
+corrections, **does the specification still cohere as a whole?** It did not.
+
+## Defects
+
+| # | Defect | Impact |
+|---|---|---|
+| **16** | The ladder's `loops` column mixed **train-time** (Small: 8) with **serve-time** (Base-v2: 3) | At matched serve-3, Small is **48** effective layers vs Base-v2's **96** — the depth claim **reverses at inference** |
+| **17** | **Refinement loops were never in the FLOP budget.** `6*N_active*T` costs one pass; Small runs 8 loops with deep supervision at each | Every cost understated by its loop count. **"4.4x smaller" is really 1.65x**; lever chain **24x -> 5.6x**; cost **78 A100-h** at 25B |
+| **18** | Attention **head count never specified anywhere** | Spec gap; fixed at 8 x 64 |
+| **18b** | **My own cycle-2 global replace** corrupted 5 parentheticals into "46,447 RNA all-polymer" | Repaired; the exact failure mode cycle 1 warned about, reintroduced while fixing a different defect |
+| **19** | "Motif bank + heads + decoder ~10M" was a placeholder; the **decoder was never specified at all** | Itemised: heads 1.65M, bank 0.17M, decoder **12.59M** — the decoder alone exceeds the line. Totals **149M/61M -> ~153M/~65M** |
+
+## The most consequential finding
+
+Defect #17. The design stated that loops "cost compute but no additional
+activation memory" — and then **omitted the compute**. The memory half was
+right; the compute half was simply missing from every calculation.
+
+| Model | loops | published h | real h |
+|---|---|---|---|
+| Micro | 16 | 61 | 976 |
+| Mini | 12 | 148 | 1,776 |
+| **Small** | **8** | **299** | **2,392** |
+| Base-v2 | 3 | 1,325 | 3,975 |
+
+Verified by **two independently written cost paths** agreeing at 78 A100-h for
+the decided 25B budget.
+
+Note what survives: the cycle-3 token cut (12.9x) was large enough that the
+corrected absolute cost is still modest — **78 A100-h bf16, 12 H100-h fp8**.
+The *claims* were wrong; the *plan* remains affordable.
+
+## Confidence
+
+**MEDIUM-HIGH on measurements; MEDIUM-LOW on derived claims; LOW on outcomes.**
+
+Derived claims drop a notch: four of the last five defects were in *derived*
+quantities (cost, depth, budget) rather than measurements. The measurements have
+held up under independent re-derivation; the arithmetic built on top of them has
+repeatedly not.
+
+## Defect base rate
+
+Cycle 0: 5 · cycle 1: 4 · pre-2: 1 · cycle 2: 4 · cycle 3: 1 · **cycle 4: 5**.
+**Nineteen defects. The rate has not fallen.** Two were caused by formatting,
+two by unfair statistical comparison, one by code that did not exist, and now
+two by quantities that were never specified at all. The newest category is the
+most concerning: **unspecified components silently assumed to be small.**
+
+---
+
 # Final Verification Report — Cycle 2
 
 > Cycle 1's report follows below, unchanged. This covers the 6,259 lines added

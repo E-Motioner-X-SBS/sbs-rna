@@ -401,3 +401,26 @@ at 78 h. Guard now re-derives effective compute, the 1.65x ratio and the 78 h.
 
 > Activation *memory* genuinely does not scale with loops -- the detach buys
 > that -- so that half of the claim survives. Only the compute half was wrong.
+
+### C3/C4 — two spec gaps — **DEFECTS #18, #19**
+- **#18** the attention head count was never specified anywhere (`d=512`, heads=?).
+  Fixed at 8 x 64. No parameter change, but genuinely absent.
+- **#19** "Motif bank + heads + decoder ~10M" was a placeholder, and the decoder
+  was never specified at all, so the line was unverifiable. Itemised:
+
+| Component | params |
+|---|---|
+| 9 prediction heads | 1.65M (cycle-3 additions only 0.80M) |
+| motif bank, frozen | 0.17M |
+| frame-diffusion decoder, 4 blocks | **12.59M** |
+| total | **14.41M** vs a 10M line |
+
+Totals 149M/61M -> **~153M/~65M** (+3% / +7%). Heads are cheap; the decoder is
+not. An unspecified component is not a small one.
+
+### C5 — self-inflicted edit corruption — **DEFECT #18b**
+My own cycle-2 global `replace("143,871", "46,447 RNA")` rewrote the number
+inside parentheticals that were *describing the all-polymer total*, producing
+"46,447 RNA all-polymer" in 5 places across 4 files. Repaired; both diagrams
+re-rendered. Exactly the unguarded-replace failure mode cycle 1 flagged -- and I
+reintroduced it while fixing a different defect.
