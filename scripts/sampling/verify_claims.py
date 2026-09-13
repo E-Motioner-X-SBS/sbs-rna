@@ -81,13 +81,14 @@ def main() -> int:
     chk("structure gain over sequence", hr["gain_structure_over_sequence"], 3.028, tol=0.002)
 
     print("\n== derived arithmetic ==")
-    d, dff_moe, dff_dense = 768, 512, 3072
-    attn = 32 * 4 * d * d
-    moe_t = 16 * 34 * 3 * d * dff_moe
-    moe_a = 16 * 6 * 3 * d * dff_moe
-    dense = 16 * 3 * d * dff_dense
-    chk("total params (M)", round((attn + moe_t + dense + 80e6) / 1e6), 911, tol=0.01)
-    chk("active params (M)", round((attn + moe_a + dense + 80e6) / 1e6), 382, tol=0.01)
+    # PHAROS-Small (default): d=512, 16 blocks, all-MoE, d_ff=128, 32+2 experts, top-4
+    d, dff_moe, nb = 512, 128, 16
+    attn = nb * 4 * d * d
+    moe_t = nb * 34 * 3 * d * dff_moe
+    moe_a = nb * 6 * 3 * d * dff_moe
+    chk("PHAROS-Small total params (M)", round((attn + moe_t + 25e6) / 1e6), 149, tol=0.01)
+    chk("PHAROS-Small active params (M)", round((attn + moe_a + 25e6) / 1e6), 61, tol=0.02)
+    chk("effective layers (16 blocks x 8 loops)", nb * 8, 128)
     L = 2048
     chk("dense activations at L=2048 (GB)", round(L*L*128*2*48*6/1e9, 1), 309.2)
 

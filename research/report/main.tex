@@ -829,12 +829,12 @@ $d_{\text{pair}}=128$, $b_1=16$, $b_2=4$ and budget $c=20$.
 \toprule
 \textbf{$L$} & \textbf{HPT time} & \textbf{HPT pairs} & \textbf{\% of dense} & \textbf{eff.\ $c$} & \textbf{Dense time} & \textbf{Dense peak RSS} \\
 \midrule
-128  & 0.01 s & 750    & $9.23\%$  & 5.9  & 0.07 s & 0.10 GB \\
-256  & 0.01 s & 3{,}506  & $10.74\%$ & 13.7 & 0.28 s & 0.33 GB \\
-512  & 0.05 s & 10{,}054 & $7.69\%$  & 19.6 & 1.22 s & 1.30 GB \\
-1024 & $\mathbf{0.10}$ s & 20{,}102 & $3.84\%$ & 19.6 & $\mathbf{8.26}$ s & $\mathbf{5.15}$ GB \\
-2048 & 0.33 s & 40{,}198 & $1.92\%$  & 19.6 & \emph{not runnable} & predicted 12.9 GB \\
-4096 & $\mathbf{0.45}$ s & 80{,}390 & $\mathbf{0.96\%}$ & 19.6 & \emph{not runnable} & predicted 51.5 GB \\
+128  & 0.01 s & 750    & $9.23\%$  & 5.9  & 0.06 s & 0.08 GB \\
+256  & 0.01 s & 3{,}506  & $10.74\%$ & 13.7 & 0.26 s & 0.23 GB \\
+512  & 0.04 s & 10{,}054 & $7.69\%$  & 19.6 & 1.03 s & 0.91 GB \\
+1024 & $\mathbf{0.08}$ s & 20{,}102 & $3.84\%$ & 19.6 & $\mathbf{8.05}$ s & $\mathbf{3.55}$ GB \\
+2048 & 0.15 s & 40{,}198 & $1.92\%$  & 19.6 & \emph{not runnable} & predicted 12.9 GB \\
+4096 & $\mathbf{0.36}$ s & 80{,}390 & $\mathbf{0.96\%}$ & 19.6 & \emph{not runnable} & predicted 51.5 GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -843,8 +843,8 @@ Two things are established that arithmetic alone could not. First, the dense
 baseline genuinely does not run: it needs a predicted 12.9~GB of activations at
 $L=2048$ and 51.5~GB at $L=4096$ on a 14~GB machine, so the infeasibility claim
 is not rhetorical. Second, at the largest length both can run, the hierarchical
-track is roughly $83\times$ faster (0.10~s versus 8.26~s) with peak resident
-memory below measurement noise against the baseline's 5.15~GB.
+track is roughly $100\times$ faster (0.08~s versus 8.05~s) with peak resident
+memory below measurement noise against the baseline's 3.55~GB.
 
 The cost fraction falls monotonically with length, from $9.2\%$ to $0.96\%$,
 because the budget grows as $cL$ while the dense map grows as $L^2$. The
@@ -879,7 +879,7 @@ Two mechanisms fix it, both now implemented.
 \textbf{Score gating.} Each retained pair feature is multiplied by
 $\sigma(s_{b_2} + s_{b_1})$, the scores of the blocks that selected it, so
 gradient from the contact loss reaches the selectors. Measured cost: none.
-$L=4096$ remains at $0.47$~s and $0.959\%$ of dense with identical pair counts.
+$L=4096$ remains at $0.36$~s and $0.959\%$ of dense with identical pair counts.
 
 \textbf{An auxiliary block-occupancy loss}, which is the primary signal. The
 selectors are supervised directly with binary labels---does this block contain at

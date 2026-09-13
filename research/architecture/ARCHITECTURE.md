@@ -399,21 +399,21 @@ d_model 768, d_pair 128, b1=16, b2=4, budget `target_c = 20`:
 
 | L | HPT time | HPT pairs | % of dense | effective c | Dense time | Dense peak RSS |
 |---|---|---|---|---|---|---|
-| 128 | 0.01 s | 750 | 9.23% | 5.9 | 0.07 s | 0.10 GB |
-| 256 | 0.01 s | 3,506 | 10.74% | 13.7 | 0.28 s | 0.33 GB |
-| 512 | 0.05 s | 10,054 | 7.69% | 19.6 | 1.22 s | 1.30 GB |
-| 1024 | **0.10 s** | 20,102 | 3.84% | 19.6 | **8.26 s** | **5.15 GB** |
-| 2048 | 0.33 s | 40,198 | 1.92% | 19.6 | *not runnable* | predicted 12.9 GB |
-| 4096 | **0.45 s** | 80,390 | **0.96%** | 19.6 | *not runnable* | predicted 51.5 GB |
+| 128 | 0.01 s | 750 | 9.23% | 5.9 | 0.06 s | 0.08 GB |
+| 256 | 0.01 s | 3,506 | 10.74% | 13.7 | 0.26 s | 0.23 GB |
+| 512 | 0.04 s | 10,054 | 7.69% | 19.6 | 1.03 s | 0.91 GB |
+| 1024 | **0.08 s** | 20,102 | 3.84% | 19.6 | **8.05 s** | **3.55 GB** |
+| 2048 | 0.15 s | 40,198 | 1.92% | 19.6 | *not runnable* | predicted 12.9 GB |
+| 4096 | **0.36 s** | 80,390 | **0.96%** | 19.6 | *not runnable* | predicted 51.5 GB |
 
 Two things are established here that arithmetic alone could not:
 
 1. **The dense baseline genuinely does not run.** At L=2048 it needs a predicted
    12.9 GB of activations and at L=4096 some 51.5 GB, on a machine with 14 GB.
    The infeasibility claim in §1 (Fact 2) is not a rhetorical flourish.
-2. **At the largest length both can run (L=1024), HPT is ~83x faster**
-   (0.10 s vs 8.26 s) and its peak RSS is below measurement noise against the
-   dense baseline's 5.15 GB.
+2. **At the largest length both can run (L=1024), HPT is ~100x faster**
+   (0.08 s vs 8.05 s) and its peak RSS is below measurement noise against the
+   dense baseline's 3.55 GB.
 
 The cost fraction falls monotonically with length (9.2% -> 0.96%) because the
 pair budget is `K = c*L` while the dense map grows as `L²` — the mechanism gets
@@ -456,7 +456,7 @@ Two mechanisms fix it, and both are now in the reference implementation:
    `sigmoid(s_b2 + s_b1)`, the scores of the b2 and b1 blocks that selected it.
    Gradient from the downstream contact loss now reaches the selectors, keeping
    them calibrated against the task they serve. Measured cost: none —
-   L=4096 stays at 0.47 s and 0.959% of dense, with identical pair counts.
+   L=4096 stays at 0.36 s and 0.959% of dense, with identical pair counts.
 
 2. **An auxiliary block-occupancy loss — the primary signal.** The selectors are
    supervised *directly* with binary labels: does this block contain at least one
