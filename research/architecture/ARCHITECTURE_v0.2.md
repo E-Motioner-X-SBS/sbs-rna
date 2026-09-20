@@ -75,7 +75,7 @@ must come from 3D supervision is capped at 673 clean examples. Therefore:
 
 | Channel | Volume | Growable? | Information |
 |---|---|---|---|
-| Sequence (elDORS + RNAcentral) | **1,369,926,204** | yes | ~80 GB |
+| Sequence (elDORS + RNAcentral) | **1,369,926,204** | yes, but not usefully | ~80 GB |
 | Chemical probing (Ribonanza) | **335,616 acquired** of 2.1M | yes | large |
 | Fitness (NABench + RNAGym) | 620,372 records | yes | moderate |
 | Splicing (147 species) | 8.6 GB | yes | moderate |
@@ -85,6 +85,16 @@ must come from 3D supervision is capped at 673 clean examples. Therefore:
 
 The last row is 2.8 MB against a model capacity of 37 MB at 2 bits/parameter.
 **The 3D task is data-limited by a factor of ~13, and cannot be un-limited.**
+
+**Nor is the sequence channel worth growing.** MARS, the 1.7-billion-sequence
+corpus NucleicBERT pretrains on, was assessed and rejected: a 40 MB range-probe
+of its first tarball shows 41.4% coding mRNA and only 10.9% ncRNA-like, of which
+**94.6% is rRNA or tRNA** gene and amplicon records. Projected yield of
+genuinely diverse structured ncRNA is ~3M sequences, for 413 GB of download
+against 290 GB of free disk — and it would deepen the ribosome skew that G3
+already measures at 92.65% of structural residues. We hold 46.2M curated
+RNAcentral ncRNA, more than the 30M NucleicBERT extracted from MARS. See
+`plans/14-mars-acquisition-assessment.md`.
 
 ### 1.3 What each corpus actually contains **[v0.2]**
 
