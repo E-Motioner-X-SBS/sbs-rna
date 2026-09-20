@@ -34,6 +34,25 @@ Across 117 chains, contacts per nucleotide *saturates* while density collapses:
 Median 4.40 contacts/nt, p95 5.42, max 5.50 — bounded by RNA's coordination
 geometry, independent of length. A dense L×L pair track spends >99% of its
 compute on empty space, and at L=2048 would need **309 GB** of activations.
+
+> **The stated bound is wrong — corrected on 20,266 chains.** Re-measured on the
+> full corpus: median **3.55**, p95 **5.44**, p99 5.51, p99.9 5.69, **max 7.66**
+> — 39% above the quoted maximum, with **280 chains (1.38%)** exceeding 5.50.
+> The three worst are *short*: 8G9Z_1_E (L=70, 7.66), 7MDL_1_E (L=67, 7.51),
+> 3HL2_1_E (L=67, 7.36), so "independent of length" is also the wrong shape —
+> small compact RNAs reach far higher contact density than the length-binned
+> means suggest.
+>
+> What survives is the part the design rests on: contacts/nt **saturates** with
+> length while map density collapses (0.069 at 64-200 nt to 0.0050 at
+> 1500-3000), so the track is still O(L)-sparse and a dense pair map is still
+> untenable. Only the numeric ceiling was wrong. Any per-nucleotide budget must
+> be sized against **7.66**, not 5.50 — and against short chains, not long ones.
+>
+> This is the **fourth** tail claim from the 180-structure sample to fail while
+> its neighbouring mean reproduced (after `target_c`, the 4096 context, and the
+> longest-chain maximum). Four of four. Treat every remaining max/min in this
+> document as unmeasured.
 => *Sparsity is the ground truth, not an approximation.* But **how** you exploit
 it matters: a flat top-K proposal was measured and fails on long chains (§5.1);
 contacts must be selected as **blocks**, not pairs (§5.2).

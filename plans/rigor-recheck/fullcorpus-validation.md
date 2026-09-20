@@ -24,9 +24,14 @@ wrong on 29,807 — in each case the mean they sat next to was fine.
 | mean effective c, long chains | 17.2 | **17.14** | reproduces |
 | b=4 occupancy, long chains | 1.34% | 1.67% | same order |
 | sequence entropy | 2.0167 bits/nt | **2.0165** | reproduces to 4 dp |
+| contact separation, band 512 (1500-3000) | 0.812 | 0.8545 | reproduces |
+| median contact separation, long chains | 78 nt | 62-65 nt | same order |
 | **Tail** | | | |
 | max effective c | 19.04 | **21.14** | **breaches `target_c = 20`** |
 | chains over 4096 nt | **0** | **8** (max 4,450) | **falsifies "covers every chain"** |
+| max contacts/nt | **5.50** | **7.66** | **+39%; 280 chains (1.38%) over** |
+
+**Four of four tail claims tested have failed. Every central claim has held.**
 
 ---
 
