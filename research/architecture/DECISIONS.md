@@ -244,3 +244,52 @@ RCSB returns **10,399** entries containing an RNA polymer entity; pdb_hunter
 held 10,424. **The 3D corpus is saturated** — 673 unique sequences at <= 2.5 A
 is the world supply and no acquisition will grow it. Every other component
 exists to move learning off a channel that cannot grow.
+
+## D16 — Weight 3D examples by structure quality **[new]**
+
+The 3D corpus is saturated (D15), so examples cannot be added. They can be
+weighted. `pdb_hunter` supplies **10,073 MolProbity clashscores**, median 7.52,
+p90 24.76:
+
+| clashscore | entries | weight |
+|---|---|---|
+| 0–10 | 6,365 | 1.00 |
+| 10–20 | 2,304 | 0.80 |
+| 20–40 | 902 | 0.55 |
+| > 40 | 490 | 0.30 |
+
+Fitting on 673 clean sequences and treating a clashscore-60 structure like a
+clashscore-2 one wastes the little supervision there is. Weights are a stated
+starting point, not a measured optimum; unscored entries take 0.80.
+
+## D17 — Splits are family-disjoint, not random **[new]**
+
+The corpus is rRNA-dominated: G3 puts 92.65% of residues in ribosomes, and the
+five commonest Rfam families in the pdb_hunter index are LSU/SSU rRNA
+(bacteria and eukarya) and tRNA. A random split therefore places close
+homologues of the test set in training, and reports a meaningless number.
+
+**6,316 entries carry an Rfam family across 585 families**, which makes a
+family-disjoint split constructible for the first time. Protocol: hold out whole
+families; report isolated vs in-complex separately (§11.2); report the blind
+sets separately again.
+
+## D18 — MARS is not acquired **[new, measured]**
+
+NucleicBERT's pretraining corpus, 1.73B sequences / 1,571 GB / 413 GB to
+download. A 40 MB HTTP range-probe of its first tarball shows 41.4% coding
+mRNA, 16.9% genomic DNA, 10.9% ncRNA-like -- and of that ncRNA, **94.6% is rRNA
+or tRNA** gene and amplicon records. Projected diverse structured ncRNA: ~3M, a
+0.17% yield, for 413 GB against 290 GB of free disk. We already hold 46.2M
+curated RNAcentral ncRNA, more than the 30M NucleicBERT extracted from MARS.
+
+It would also deepen the ribosome skew D17 exists to control. MARS is the right
+corpus for homology search, which is what it was built for; it is the wrong one
+for a structure model. `plans/14-mars-acquisition-assessment.md`.
+
+## D19 — pdb_hunter is referenced, not copied **[new]**
+
+`pdb_hunter/RNA_Database` is 154 GB and already organised per entry.
+`scripts/integrate_pdb_hunter.py` indexes it into
+`data/catalog/pdb_hunter_index.json` with paths into that tree. Copying would
+duplicate 154 GB on a volume with 290 GB free, for no gain.

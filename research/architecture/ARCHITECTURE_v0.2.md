@@ -106,7 +106,21 @@ A trap that cost this project real time: the two derivative corpora are
 | RNA3DB | 15,441 chains | **none** | **zeroed** | 0.025% |
 | RNASolo/gRNAde | 14,366 chains | **none** | real | 0.025% |
 | **Raw PDB** (acquired for v0.2) | **8,041 entries, 13.9 GB** | **yes** | real | **1.005%** |
-| pdb_hunter RNA_Database | 10,424 entries | yes | real | — |
+| pdb_hunter RNA_Database | 10,424 entries, 154 GB | yes | real | — |
+
+`pdb_hunter` additionally carries a **derived annotation layer** that nothing in
+v0.1 accounted for, indexed by `scripts/integrate_pdb_hunter.py` into
+`data/catalog/pdb_hunter_index.json` (files referenced in place, not copied):
+
+| Annotation | Entries |
+|---|---|
+| dot-bracket 2D (`.dbn`) + base pairs (`.bpseq`) | **9,347** |
+| backbone coordinates (`.xyz`) | 10,280 |
+| **MolProbity clashscore** | **10,073** |
+| **Rfam family** | **6,316** across **585 families** |
+| resolution | 5,169 |
+
+Three of these change the design rather than adding rows — see §12.3 and §12.4.
 
 Modified residues are **40× more frequent** in raw PDB than in the derivatives.
 Any statistic about ions, rigidity, modified residues or whole-entry context
@@ -533,7 +547,41 @@ redundant rather than rich. 25B gives 410 tok/param ≈ 20× Chinchilla.
 "~79 A100-hours" mixed an Ampere baseline with a Hopper-only lever. Honest
 figures: **~78 h on A100 bf16, ~12 h on H100 fp8**.
 
-### 12.3 Optimiser
+### 12.3 Quality weighting — the corpus is saturated, so weight what you have
+
+3D examples cannot be added (§1.1). They can be **weighted**. 10,073 entries
+carry a MolProbity clashscore, median **7.52**, p90 **24.76**:
+
+| clashscore | entries | training weight |
+|---|---|---|
+| 0–10 (good at any resolution) | **6,365** | 1.00 |
+| 10–20 | 2,304 | 0.80 |
+| 20–40 | 902 | 0.55 |
+| > 40 (poor) | **490** | 0.30 |
+
+A model fit on 673 clean sequences should not treat a clashscore-60 structure
+the same as a clashscore-2 one. The weights are a stated starting point, not a
+measured optimum. Unscored entries take the 0.80 band.
+
+### 12.4 Splits must be family-disjoint, and now can be
+
+A random split leaks. The corpus is rRNA-dominated — G3 measures **92.65%** of
+residues as ribosomal, and the five most common Rfam families in the
+pdb_hunter index are `LSU_rRNA_bacteria`, `SSU_rRNA_bacteria`,
+`LSU_rRNA_eukarya`, `SSU_rRNA_eukarya`, `tRNA` — so a random split puts close
+homologues of the test set into training and reports a number that means
+nothing.
+
+**6,316 entries carry an Rfam family label across 585 families**, which makes a
+family-disjoint split constructible for the first time. Combined with the
+mandatory isolated-vs-in-complex stratification (§11.2) and the blind sets
+(CASP15/16, RNA-Puzzles, never trained on), this is the evaluation protocol:
+
+1. hold out whole **Rfam families**, never individual chains;
+2. report **isolated vs in-complex** separately;
+3. report blind-set performance separately again.
+
+### 12.5 Optimiser
 
 Muon (2× lever). Keep embeddings, norms, router and attention softmax in higher
 precision regardless — this is what DeepSeek's own FP8 recipe does.
