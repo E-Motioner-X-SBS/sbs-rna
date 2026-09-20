@@ -9,7 +9,7 @@
 >
 > **What makes v0.2 different.** v0.1 was designed against **180** structures
 > fetched onto a laptop. v0.2 is validated against the corpus: **29,807 chains**,
-> **8,041 raw PDB entries** (13.9 GB, acquired for this revision), **10,424
+> **10,527 raw PDB entries** (15 GB, acquired for this revision), **10,424
 > pdb_hunter entries** with secondary structure and Rfam mapping, and **238M nt**
 > of sequence. Every number below is tagged **[v0.2]** if it was re-derived at
 > that scale, **[v0.1]** if it still rests on the 180-structure sample, or
@@ -60,7 +60,15 @@ essentially total; **98** entries are missing and were acquired for this
 revision.
 
 **There is no more experimental RNA 3D structure to obtain.** Not from better
-tooling, not from more bandwidth. 10.4k entries, collapsing to **6,661 unique
+tooling, not from more bandwidth. The raw store now holds **10,527 of 10,528**
+entries in the union of RCSB's RNA query, RNA3DB, RNASolo and pdb_hunter.
+
+The single exclusion is instructive: **9A0D** is an integrative/hybrid model —
+an in-cell expressome from *M. pneumoniae* solved from cross-links plus 3DEM —
+whose coordinates are `_ihm_sphere_obj_site` coarse-grained spheres with no
+`_atom_site` at all. It is correctly excluded, because an atomic-coordinate
+model cannot train on spheres, and the acquirer now reports such entries as
+`excluded_ihm` rather than as download failures. 10.4k entries, collapsing to **6,661 unique
 sequences** and **673 unique sequences at ≤ 2.5 Å**, is the entire world supply.
 
 This single fact determines the architecture. A model whose structural knowledge
@@ -105,7 +113,7 @@ A trap that cost this project real time: the two derivative corpora are
 |---|---|---|---|---|
 | RNA3DB | 15,441 chains | **none** | **zeroed** | 0.025% |
 | RNASolo/gRNAde | 14,366 chains | **none** | real | 0.025% |
-| **Raw PDB** (acquired for v0.2) | **8,041 entries, 13.9 GB** | **yes** | real | **1.005%** |
+| **Raw PDB** (acquired for v0.2) | **10,527 entries, 15 GB** | **yes** | real | **1.005%** |
 | pdb_hunter RNA_Database | 10,424 entries, 154 GB | yes | real | — |
 
 `pdb_hunter` additionally carries a **derived annotation layer** that nothing in

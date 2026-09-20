@@ -104,7 +104,23 @@ def fetch(pdb: str, retries: int = 3) -> Dict:
             if valid(tmp):
                 tmp.rename(dest)
                 return {"pdb": pdb, "status": "ok", "bytes": len(body)}
+            # Distinguish "broken download" from "valid file we cannot use".
+            # Integrative/hybrid models (IHM) store coordinates as
+            # `_ihm_sphere_obj_site` coarse-grained spheres and carry no
+            # `_atom_site` at all -- e.g. 9A0D, an in-cell expressome solved
+            # from cross-links plus 3DEM. Those are correctly excluded, since
+            # an atomic-coordinate model cannot train on spheres, but calling
+            # them failures hides a real property of the corpus.
+            try:
+                with gzip.open(tmp, "rt", errors="ignore") as fh:
+                    head = fh.read(2_000_000)
+                is_ihm = "_ihm_sphere_obj_site" in head or "_ihm_model_list" in head
+            except OSError:
+                is_ihm = False
             tmp.unlink(missing_ok=True)
+            if is_ihm:
+                return {"pdb": pdb, "status": "excluded_ihm",
+                        "note": "integrative model: coarse-grained spheres, no _atom_site"}
             last = f"invalid body ({len(body)} B)"
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code}"
@@ -144,17 +160,23 @@ def main() -> None:
                       flush=True)
 
     ok = [r for r in rows if r["status"] in ("ok", "cached")]
+    excluded = [r for r in rows if r["status"] == "excluded_ihm"]
     failed = [r for r in rows if r["status"] == "failed"]
     manifest = {
         "n_requested": len(entries),
         "n_ok": len(ok),
         "n_failed": len(failed),
+        "n_excluded_integrative": len(excluded),
+        "excluded_integrative": [r["pdb"] for r in excluded],
         "total_bytes": sum(r.get("bytes", 0) for r in ok),
         "wall_seconds": round(time.time() - t0, 1),
         "source": URL,
         "failed": failed[:200],
     }
     MANIFEST.write_text(json.dumps(manifest, indent=1))
+    if excluded:
+        print(f"[raw] excluded {len(excluded)} integrative model(s) "
+              f"(no atomic coordinates): {[r['pdb'] for r in excluded]}")
     print(f"[raw] done: {len(ok):,} ok, {len(failed)} failed, "
           f"{manifest['total_bytes']/1e9:.1f} GB in "
           f"{manifest['wall_seconds']/60:.0f} min -> {MANIFEST}")
