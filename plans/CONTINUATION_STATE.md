@@ -3,13 +3,13 @@
 ## Session Summary
 | Field | Value |
 |-------|-------|
-| Phase | DATA COMPLETE → ready for model design |
+| Phase | **ARCHITECTURE v0.2 COMPLETE** — validated at corpus scale; ready for implementation |
 | What I did | Collected, verified, organized, and catalogued 256.6 GB of RNA data (25 sources); built exploration reports; created this repo |
 | What worked | elDORS S3 anonymous download (SHA256 verified); HF/GitHub direct fetches; catalog + loader API; parquet ETL; exploration pipeline |
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
 | Next priorities | 1) Curation decision on the ~151nt read population; 2) model design (vocab 5, context 2048); 3) optional pseudo-label generation via teacher models; 4) optional full-corpus parquet conversion |
 | Blockers | none |
-| Audit status | NOT_STARTED (data verification PASSED: catalog/VERIFICATION.md) |
+| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 8,041 raw entries |
 
 ## State of the data (all verified)
 - Sequences: 1,369,926,204 (elDORS 1,323,715,880 SHA256-verified + RNAcentral 46,210,324)

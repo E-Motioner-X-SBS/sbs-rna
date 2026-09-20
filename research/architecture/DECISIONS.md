@@ -164,3 +164,83 @@ are redundant rather than informative.
 | REV-3 | 323B tokens, over-training is standard | **25B staged, stop on plateau** | argued at 269M; at 61M it is 265× Chinchilla and the QiD worst case |
 | REV-4 | FP8 1.60× lever on "A100-hours" | **hardware-explicit; A100 has no FP8** | defect #15 — not a real unit |
 | REV-5 | 4-bit as a goal (NVFP4/NF4) | **BF16 → FP8; no 4-bit at this size** | NF4 cannot train from scratch; NVFP4 validated at 125 tok/param, we are at 5,295 |
+
+---
+
+# v0.2 decisions (Sep 20, 2026) — set against the corpus, not a 180-structure sample
+
+> Context: ten v0.1 claims were re-derived on 29,807 chains, 8,041 raw PDB
+> entries, 10,424 pdb_hunter entries and 238M nt. Every central estimate held;
+> every extreme quantile failed. Full comparison in
+> `plans/rigor-recheck/fullcorpus-validation.md`; specification in
+> `research/architecture/ARCHITECTURE_v0.2.md`.
+
+## D8 — Parameters may not be set from small-sample maxima **[new, process]**
+
+Four of four extreme quantiles measured on n=180 failed at scale, while six of
+six means held. `target_c` and the context window had both been set from
+maxima.
+
+**Rule:** no parameter is set from an extreme quantile measured on fewer than
+10³ structures. Where the corpus cannot supply that, set it from a mean plus an
+explicit safety factor and state the factor.
+
+**Enforcement suggestion:** `verify_claims.py` guards 155 *values*; it does not
+guard *provenance*. A guard recording "this number is a maximum from n=180"
+would have caught all four before a human did.
+
+## D9 — `target_c`: **20 → 24** [REVERSED]
+
+Measured maximum on 20,266 chains is **21.14**, breaching 20 by 5.7%. 24 clears
+it by 12% and costs proportionally more only in L3 refinement.
+
+Interim, not final: the measurement used derivatives carrying 0.025% modified
+residues against raw PDB's 1.005%, a 40x under-representation of the quantity
+that drives the tail. The pair track must also **handle overflow** rather than
+assume the budget suffices.
+
+## D10 — Context window: coverage restated, not silently raised
+
+8 chain files / 5 unique structures exceed 4,096 (6HRM 4,450; 7UPH; 4V6X; 8TOC;
+7LHD — all large ribosomal rRNA). v0.1's table read 0.
+
+**Decision:** keep 4,096 and state coverage as **99.97%**, or raise to 4,608 if
+whole-ribosome chains matter. Do not claim 100%.
+
+## D11 — `N` is two tokens [changed]
+
+`N_seq` (ambiguous base call, 0.203% of nt, no geometry) and `N_struct`
+(identity unassigned, 0.025% of residues, **full ribose modelled**). The second
+trains geometry heads normally and makes base-identity recovery a free
+auxiliary task. One token discards that.
+
+## D12 — Rigidity head trains on X-ray B-factors only **[new, measured]**
+
+The Mg-rigidity gradient is **1.523 sigma, monotonic, 1,535 X-ray structures**.
+On 1,885 cryo-EM structures it is **0.934 sigma and non-monotonic**. v0.1
+excluded cryo-EM on an assumption; it is now a measurement, and pooling would
+dilute the signal by a third.
+
+## D13 — Chemistry enters as a 24-dim per-residue vector **[new]**
+
+H-bond capacity per edge, pKa, sugar-pucker propensity, stacking priors,
+backbone charge state, modification class, local GC. Through **one projection**,
+not a wider `d_model`: a nucleotide carries 58.9 bits against a 512-dim bf16
+token's 8,192, so width is compute, not storage, and FFN cost is quadratic in d.
+
+Structural observables (Saenger/LW class, B-factor, Mg distance, reactivity)
+remain **targets, never inputs**.
+
+## D14 — Four heads added: fitness, splicing, base-identity, and probing at scale
+
+All sit on data already on disk and unused by v0.1: fitness 620,372 records,
+splicing 8.6 GB across 147 species, base-identity free from `N_struct`, and
+**335,616 Ribonanza reactivity profiles acquired for v0.2** — 499x the 673 clean
+3D sequences.
+
+## D15 — 3D is the smallest channel, by design [reframing]
+
+RCSB returns **10,399** entries containing an RNA polymer entity; pdb_hunter
+held 10,424. **The 3D corpus is saturated** — 673 unique sequences at <= 2.5 A
+is the world supply and no acquisition will grow it. Every other component
+exists to move learning off a channel that cannot grow.

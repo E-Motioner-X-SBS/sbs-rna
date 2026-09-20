@@ -9,7 +9,7 @@
 >
 > **What makes v0.2 different.** v0.1 was designed against **180** structures
 > fetched onto a laptop. v0.2 is validated against the corpus: **29,807 chains**,
-> **7,943 raw PDB entries** (13.7 GB, acquired for this revision), **10,424
+> **8,041 raw PDB entries** (13.9 GB, acquired for this revision), **10,424
 > pdb_hunter entries** with secondary structure and Rfam mapping, and **238M nt**
 > of sequence. Every number below is tagged **[v0.2]** if it was re-derived at
 > that scale, **[v0.1]** if it still rests on the 180-structure sample, or
@@ -324,7 +324,7 @@ The Mg-centric design is better supported than its own evidence claimed.
 |---|---|---|
 | Manning θ, κ, q_eff | closed form | **no data needed** |
 | Debye pair bias | closed form | **no data needed** |
-| Mg²⁺ site head | ion coordinates | **available** (raw PDB, 816k Mg sites) |
+| Mg²⁺ site head | ion coordinates | **available** (raw PDB, 816,270 Mg sites) |
 | Rigidity head | X-ray B-factors | **available** (3.86M nt) |
 | **[Mg²⁺] → structure *response*** | titration series | **NOT available** |
 
