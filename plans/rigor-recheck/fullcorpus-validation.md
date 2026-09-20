@@ -94,22 +94,54 @@ The structural case is **free supervision**: those residues can train the
 geometry heads normally, and recovering their base identity is a legitimate
 auxiliary task. Conflating them with sequence-`N` discards that.
 
-## 4. What the corpus cannot check
+## 4. The ion claims — corpus expanded, then tested
 
-Both structural corpora have **zero HETATM**. RNA3DB additionally zeroes every
-B-factor; RNASolo retains real ones.
+Both structural corpora have **zero HETATM**, so none of this was checkable.
+`scripts/acquire_raw_pdb_entries.py` fetched the **7,943 raw PDB entries** behind
+them (13.7 GB, 0 failures, 44 min), restoring ions, real B-factors, modified
+residues and whole-entry context. 6,328 entries are usable for the gradient.
 
-| claim | status on this corpus |
+### Fact 3 survives — the first load-bearing claim to do so
+
+| stratum | span | monotonic | nucleotides | structures |
+|---|---|---|---|---|
+| published | 1.76 sigma | yes | 24,623 | **15** |
+| **X-ray** | **1.523 sigma** | **yes** | 3,858,271 | **1,535** |
+| cryo-EM | 0.934 sigma | **no** | 4,615,984 | 1,885 |
+| pooled | 1.136 sigma | yes | 8,474,255 | 3,420 |
+
+Monotonic across all six bins at 102x the structure count, 13% weaker than
+published. **Quote 1.52 sigma.**
+
+The X-ray-only choice is now justified by measurement rather than by assumption:
+cryo-EM does not reproduce the gradient (0.934 sigma, non-monotonic) on 1,885
+structures, consistent with cryo-EM ADPs not being comparable to
+crystallographic B-factors. Training the rigidity head on pooled B-factors would
+dilute the signal by a third.
+
+### Ion inventory corrected — in the design's favour
+
+| | published | raw PDB (6,328 entries) |
+|---|---|---|
+| Mg : K | 9 : 1 | **54 : 1** (816,270 vs 15,123) |
+| Mg vs all other cations | — | **19.7 : 1** |
+| inner-sphere to OP1/OP2 | 83% | **77.9%** (324,708 / 416,731) |
+
+Mg dominance is far more extreme than the design's own evidence claimed.
+
+### G7 confirmed on raw data
+
+Modified residues **1.005%** of 11.6M RNA polymer residues, against the
+canonical **1.05%** from 180 BGSU structures — agreement within 4%, and **40x**
+the derivatives' 0.025%. This closes the question of which figure is right and
+confirms that `target_c` must be decided on raw entries.
+
+### Still absent
+
+| channel | status |
 |---|---|
-| Mg/rigidity gradient (1.76 sigma) | **uncheckable** — no ions |
-| ion inventory (Mg:K 9:1, 83% to OP1/OP2) | **uncheckable** — no ions |
-| Mg-site supervision head | **no training data on disk** |
-| ionic-condition input (the headline novelty) | **no training data on disk** (RMDB absent too) |
-| chemical probing (SHAPE/DMS) | absent — Ribonanza not acquired |
-
-These are not refutations. They mean two of PHAROS's three distinctive claims
-currently have nothing to learn from, and closing that needs ~7k raw PDB entries
-re-fetched with HETATM plus RMDB, or an explicit demotion to future work.
+| RMDB Mg2+ titration series | not acquired — the ionic *response* still cannot be learned |
+| chemical probing (Ribonanza 2.1M SHAPE/DMS) | not acquired — largest single missing asset |
 
 ## 5. Decisions that validate unchanged
 

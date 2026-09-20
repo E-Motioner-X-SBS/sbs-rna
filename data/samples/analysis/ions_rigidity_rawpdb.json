@@ -1,0 +1,114 @@
+{
+ "n_entries_usable": 6328,
+ "n_xray": 2802,
+ "n_cryoem": 3523,
+ "published": {
+  "bin_means": [
+   -0.883,
+   -0.673,
+   -0.415,
+   0.004,
+   0.756,
+   0.877
+  ],
+  "span_sigma": 1.76,
+  "n_nt": 24623,
+  "n_structures": 15,
+  "mg_vs_k_ratio": 9.0,
+  "mg_count": 17428,
+  "k_count": 1868,
+  "inner_sphere_phosphate_frac": 0.83
+ },
+ "cation_inventory": {
+  "MG": 816270,
+  "K": 15123,
+  "ZN": 11807,
+  "NA": 6608,
+  "SR": 3715,
+  "MN": 2348,
+  "CA": 932,
+  "BA": 577,
+  "CS": 159,
+  "CO": 72,
+  "NI": 28,
+  "FE": 6
+ },
+ "mg_vs_all_other_cations": 19.73,
+ "mg_vs_k": 53.98,
+ "inner_sphere": {
+  "phosphate_OP1_OP2": 324708,
+  "other_oxygen": 92023,
+  "phosphate_frac": 0.7792
+ },
+ "gradient_xray": {
+  "bin_means": [
+   -0.6572,
+   -0.466,
+   -0.1964,
+   0.1084,
+   0.3723,
+   0.8656
+  ],
+  "bin_n": [
+   25977,
+   1119178,
+   1203656,
+   526839,
+   268910,
+   713711
+  ],
+  "span_sigma": 1.5228,
+  "monotonic": true,
+  "n_nt": 3858271,
+  "n_structures": 1535
+ },
+ "gradient_cryoem": {
+  "bin_means": [
+   -0.4587,
+   -0.5314,
+   -0.4372,
+   -0.3077,
+   -0.1273,
+   0.4028
+  ],
+  "bin_n": [
+   5842,
+   572700,
+   834414,
+   591568,
+   380990,
+   2230470
+  ],
+  "span_sigma": 0.9342,
+  "monotonic": false,
+  "n_nt": 4615984,
+  "n_structures": 1885
+ },
+ "gradient_all": {
+  "bin_means": [
+   -0.6207,
+   -0.4881,
+   -0.295,
+   -0.1117,
+   0.0794,
+   0.515
+  ],
+  "bin_n": [
+   31819,
+   1691878,
+   2038070,
+   1118407,
+   649900,
+   2944181
+  ],
+  "span_sigma": 1.1357,
+  "monotonic": true,
+  "n_nt": 8474255,
+  "n_structures": 3420
+ },
+ "modified_residues": {
+  "total_residues": 11581890,
+  "modified": 116421,
+  "frac": 0.01005
+ }
+}

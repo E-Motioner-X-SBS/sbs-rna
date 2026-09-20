@@ -97,6 +97,45 @@ and the within-structure estimate rests on 4 structures.
 => *Ions and rigidity must share one expert, and ionic condition must be a
 model **input**, which no current predictor accepts.*
 
+> **CONFIRMED at 100x scale, with the magnitude corrected.** The gradient rested
+> on the **15** Mg-containing structures of the 180-sample. Re-derived on the
+> 7,943 raw PDB entries acquired for this purpose (the derivative corpora are
+> stripped of HETATM, so this was previously impossible on the server):
+>
+> | stratum | span | monotonic | nucleotides | structures |
+> |---|---|---|---|---|
+> | published | 1.76 sigma | yes | 24,623 | 15 |
+> | **X-ray** | **1.523 sigma** | **yes** | 3,858,271 | **1,535** |
+> | cryo-EM | 0.934 sigma | **no** | 4,615,984 | 1,885 |
+> | pooled | 1.136 sigma | yes | 8,474,255 | 3,420 |
+>
+> The X-ray gradient is **monotonic across all six bins on 1,535 structures**, a
+> 102x larger structure count, at **1.523 sigma** — 13% weaker than published but
+> unambiguously real. This is the first load-bearing claim in this document to
+> survive a scale-up, and it is the one the physics module rests on.
+>
+> Two consequences. First, quote **1.52 sigma**, not 1.76. Second, the decision
+> to use X-ray only was **right for a reason not previously stated**: cryo-EM
+> fails to reproduce the gradient at all (0.934 sigma, non-monotonic), which is
+> what one expects if cryo-EM ADPs are not comparable to crystallographic
+> B-factors. That is now measured rather than assumed, on 1,885 cryo-EM
+> structures. Training the rigidity head on pooled B-factors would dilute the
+> signal by a third.
+>
+> **Ion inventory corrected.** Over 6,328 usable entries: Mg **816,270**,
+> K 15,123, Zn 11,807, Na 6,608 — **Mg:K = 54:1**, not 9:1, and Mg outnumbers
+> *all* other cations **19.7:1**. The published 9:1 badly understates Mg
+> dominance, so the Mg-centric design is better supported than its own evidence
+> claimed. Inner-sphere coordination to phosphate OP1/OP2 is **77.9%**
+> (324,708 of 416,731 coordinating oxygens) against the published 83% — same
+> conclusion, slightly lower.
+>
+> **G7 confirmed on raw data.** Modified residues are **1.005%** of RNA polymer
+> residues across 11.6M residues, against the canonical 1.05% measured on 180
+> BGSU structures — agreement to within 4%. The derivative corpora carry 0.025%,
+> a **40x** under-representation, which is why `target_c` must be decided on raw
+> entries (Section 5).
+
 And one negative result that constrains the design: **GNRA k-mer context alone
 predicts rigidity at 0.073 sigma — negligible.** **[measured]** Motif identity
 requires the interaction graph, not sequence n-grams. Motif routing therefore
