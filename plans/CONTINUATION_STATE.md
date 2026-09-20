@@ -7,7 +7,7 @@
 | What I did | Collected, verified, organized, and catalogued 256.6 GB of RNA data (25 sources); built exploration reports; created this repo |
 | What worked | elDORS S3 anonymous download (SHA256 verified); HF/GitHub direct fetches; catalog + loader API; parquet ETL; exploration pipeline |
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
-| Next priorities | 1) Curation decision on the ~151nt read population; 2) model design (vocab 5, context 2048); 3) optional pseudo-label generation via teacher models; 4) optional full-corpus parquet conversion |
+| Next priorities | 1) Re-derive target_c on raw PDB (D9 is interim); 2) acquire RMDB titrations (gates the learned ionic response); 3) complete Ribonanza beyond the 335,616 acquired; 4) train the block-detection scorer -- the largest unvalidated assumption; 5) re-measure G2/G3 on raw whole entries |
 | Blockers | none |
 | Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 8,041 raw entries |
 

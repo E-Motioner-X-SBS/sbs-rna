@@ -11,7 +11,9 @@ src/pharos/
 │   ├── pair_track.py       hierarchical L1->L2->L3  (reference impl. exists)
 │   ├── motif_bank.py       frozen 667-class KV bank
 │   ├── stiffness.py        per-step 6x6 F encoder (Cholesky-parameterised)
-│   ├── heads.py            2D / contact / Mg / rigidity / disorder / reactivity
+│   ├── heads.py            10 heads: contact / distance / 3D / 2D / Mg /
+│   │                       rigidity (X-RAY ONLY, v0.2 D12) / reactivity /
+│   │                       fitness / splicing / base-identity
 │   └── decoder.py          frame diffusion, K=3 states
 ├── physics/        closed-form, no learned parameters
 │   ├── manning.py          xi, theta, kappa, q_eff from c_ion  (A-RNA theta=0.804)
@@ -19,7 +21,9 @@ src/pharos/
 │   └── energy.py           E_stack + E_pair + E_elec + E_Mg + E_excl + E_rigid
 ├── data/           the dataset side
 │   ├── catalog.py          thin wrapper over data/catalog/catalog.sqlite
-│   ├── tokenizer.py        vocab: see model/VOCAB.md -- NOT plain 5 symbols
+│   ├── tokenizer.py        vocab: see VOCAB.md; N_seq and N_struct are
+│   │                       DIFFERENT tokens (v0.2 D11)
+│   ├── chemistry.py        24-dim per-residue chemistry (see CHEMISTRY.md)
 │   ├── attributes.py       per-nucleotide feature vector (see ATTRIBUTES.md)
 │   ├── chunk_weights.py    per-chunk corpus weighting (151-nt read down-weight)
 │   └── splits.py           md5(header)%100 split; identity-dedup for 3D
@@ -44,5 +48,10 @@ src/pharos/
 | Coevolution gated on Neff/L | `model/trunk.py` router input |
 | Stiffness: sequence and structure near-equal | `model/stiffness.py` |
 | **G2: 98.96% of RNA is in complex** | `eval/stratified.py` — mandatory split |
-| **G7: 8.9% of residues outside ACGU** | `data/tokenizer.py` — vocab is NOT 5 |
+| **G7: 1.005% outside ACGU on raw PDB, 0.025% on derivatives** | `data/tokenizer.py` — vocab depends on SOURCE (v0.2 D6) |
 | Token over-provisioned 139x | `data/attributes.py`, `train/precision.py` |
+| **Mg-rigidity 1.523 sigma, X-ray only** | `model/heads.py` rigidity head (v0.2 D12) |
+| **Mg:K = 54:1, inner-sphere 77.9% to OP1/OP2** | `physics/energy.py` E_Mg |
+| **target_c = 24, with overflow handling** | `model/pair_track.py` (v0.2 D9) |
+| **3D corpus saturated at 10,399 entries** | `train/schedule.py` — 3D is the smallest stage |
+| Chemistry: H-bond edges, pKa, pucker, stacking | `data/chemistry.py` (v0.2 D13) |
