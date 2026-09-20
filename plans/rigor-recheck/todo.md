@@ -26,11 +26,16 @@ Legend: [ ] open · [x] done+tested · [BLOCKED: r] · [DEFERRED: r]
 - [x] C35 Boundary matching + context patterns; print which mode each check used
 
 ## Deferred
-- [DEFERRED: needs a larger sample] **OQ-7** — `target_c = 20` has only **4.8%
-  headroom** at the worst chain (19.04). Adequate on these 180 structures; the
-  quantity that pushes a chain up is modified-residue density, which this corpus
-  under-represents. Widen c or measure the distribution on more data before
-  fixing it. Recorded in ARCHITECTURE.md §5 rather than silently resized.
+- [x] **OQ-7 CLOSED — NEGATIVE. `target_c = 20` is breached.** Measured on
+  **20,266 chains** (RNA3DB + RNASolo, the server corpus) instead of 180:
+  worst chain **effective c = 21.14** (`7PAS_1_3`), 5.7% over budget; 1 chain
+  in 20,266; p99 19.13, p99.9 19.52. Bin means reproduce (17.14 vs published
+  17.2) — only the tail was wrong, which n=180 could not have estimated.
+  Caveat: this corpus carries **0.025%** non-ACGU residues vs 1.05% in raw-PDB
+  BGSU, a 42x under-representation of the driver, so the true tail is likely
+  worse. `target_c` must be raised (24 clears the observed max by 12%) or the
+  track must handle overflow. `scripts/sampling/recheck_block_sparsity_fullcorpus.py`,
+  `data/samples/analysis/block_sparsity_fullcorpus.json`.
 - [DEFERRED: 5B checkpoint] top_k 4 -> 8 decision (defect #21)
 - [DEFERRED: 5B checkpoint] LR, warmup, loss-weight sweep
 - [DEFERRED: needs external data] RMDB Mg2+ titration acquisition

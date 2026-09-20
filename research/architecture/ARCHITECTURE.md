@@ -499,6 +499,33 @@ retains every occupied 4x4 block on long chains) and far above the observed
 > Recorded as an open design question rather than silently resized, because the
 > right value depends on data not yet acquired.
 
+> **OQ-7 RESOLVED — `target_c = 20` IS BREACHED.** The larger sample was run:
+> **20,266 chains** from the server corpus (RNA3DB 15,441 per-chain mmCIFs +
+> RNASolo 14,366 PDBs), same contact definition, both residue rules
+> (`recheck_block_sparsity_fullcorpus.py`). The worst chain reaches
+> **effective c = 21.14** (`7PAS_1_3`, 1500-3000 nt bin) — **5.7% over budget**,
+> against the 19.04 that 180 structures suggested. One chain in 20,266 breaches
+> (0.005%); p99 = 19.13, p99.9 = 19.52.
+>
+> The *central* estimates reproduce well, which is why the error was invisible:
+> mean effective c on long chains is **17.14** against the published 17.2, and
+> b=4 occupancy **1.67%** against 1.34%. It is only the **tail** that was
+> mis-estimated — precisely the failure mode C14 named, a mean being read as if
+> it bounded the maximum, now shown to matter at n=180 where a p99.9 cannot be
+> estimated at all.
+>
+> **The true tail is probably worse than 21.14.** RNA3DB and RNASolo are
+> pre-normalised: measured over 1,800 sampled structures they carry **0.025%**
+> non-ACGU residues against the 1.05% of the raw-PDB BGSU sample, a 42x
+> under-representation of exactly the quantity this warning identified as the
+> driver. The two residue rules give identical maxima here (21.14 both) for the
+> same reason — there are almost no modified residues left to disagree about.
+>
+> **Action: `target_c` must be raised, or the track must handle overflow.** A
+> value of 24 clears the observed maximum by 12% and costs proportionally more
+> in the L3 refinement only. Deciding it on raw PDB entries rather than on
+> normalised derivatives would be better still.
+
 > **Two implementation defects found while building this**, both of a kind that
 > would have silently degraded a trained model rather than crashing:
 > (i) the L3 expansion originally paired block rows with block columns
