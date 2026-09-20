@@ -1,9 +1,9 @@
 graph TB
     subgraph INPUTS["INPUTS"]
-        SEQ["RNA sequence<br/>L nt, vocab 5 A C G U N<br/>L up to 4096"]
+        SEQ["RNA sequence<br/>vocab: 5 + DNA + I + UNK + MOD (raw PDB)<br/>N_seq and N_struct are DIFFERENT tokens<br/>L up to 4096 = 99.97 pct of chains"]
         ION["Ionic condition c_ion<br/>Mg2+, K+, Na+, T, pH<br/>NOVEL: no predictor accepts this"]
         MSA["MSA / Rfam alignment<br/>optional, 4227 families"]
-        CHEM["Chemical probing<br/>optional, SHAPE/DMS<br/>NOT YET ACQUIRED"]
+        PROBE["Chemical probing<br/>optional, SHAPE/DMS<br/>335616 Ribonanza profiles ACQUIRED"]
     end
 
     subgraph TRUNK["A. TOKEN TRUNK - 32 hybrid blocks, d=768"]
@@ -16,7 +16,7 @@ graph TB
     subgraph PAIR["B+C. HIERARCHICAL PAIR TRACK - coarse to fine"]
         PROP["L1: DENSE block map at b=16<br/>0.396 pct of dense, 65k entries at L=4096<br/>genuinely dense = no recall loss here"]
         SEL["L2: refine occupied b=16 blocks to b=4<br/>0.460 pct of dense"]
-        TRI["L3: refine occupied b=4 blocks to pairs<br/>1.346 pct - effective c = 17.2<br/>selects BLOCKS, never ranks pairs"]
+        TRI["L3: refine occupied b=4 blocks to pairs<br/>1.346 pct - mean c 17.14, MAX 21.14<br/>target_c = 24 + overflow handling<br/>selects BLOCKS, never ranks pairs"]
         PROP --> SEL --> TRI
     end
 
@@ -24,21 +24,28 @@ graph TB
 
     PHYS["E. PHYSICS / HAMILTONIAN<br/>E_stack + E_pair + E_elec_implicit<br/>+ E_Mg_explicit + E_excl + E_rigid<br/>Manning implicit K+, explicit Mg2+"]
 
-    subgraph HEADS["F. PREDICTION HEADS"]
-        H2D["Secondary structure"]
+    subgraph HEADS["F. PREDICTION HEADS - 10"]
+        H2D["Secondary structure<br/>bpRNA + 9347 pdb_hunter dot-bracket"]
         HC["Contact / distance map"]
-        HMG["Mg2+ sites + inner/outer class<br/>FREE LABELS from mmCIF"]
-        HR["Per-nt rigidity z_B / RMSF<br/>FREE LABELS from B-factors"]
-        HRX["SHAPE / DMS reactivity"]
+        H3D["3D coordinates, K=3 states<br/>673 clean sequences - SMALLEST channel"]
+        HMG["Mg2+ sites + inner/outer class<br/>816270 sites, FREE from mmCIF"]
+        HR["Per-nt rigidity z_B<br/>X-RAY B-factors ONLY - 3.86M nt"]
+        HRX["SHAPE / DMS reactivity<br/>335616 Ribonanza profiles"]
+        HFIT["Fitness / mutation effect<br/>620372 records - NEW in v0.2"]
+        HSPL["Splicing site + outcome<br/>147 species - NEW in v0.2"]
+        HBID["Base identity of N_struct<br/>FREE - geometry known, base is not"]
     end
 
     DEC["G. STRUCTURE DECODER<br/>frame diffusion to all-atom 3D"]
 
+    CHEMV["CHEMISTRY VECTOR - 24 dim per residue<br/>H-bond donors/acceptors per edge (WC, Hoogsteen, sugar)<br/>pKa + shifted-pKa flag | C3-endo/C2-endo pucker<br/>stacking prior G>A>C>U | phosphate charge | 2-OH<br/>modification class | local GC<br/>ONE projection - never widens d_model"]
+
     SEQ --> TRUNK
+    CHEMV --> TRUNK
     ION --> BIAS
     ION --> PHYS
     MSA --> PAIR
-    CHEM --> HRX
+    PROBE --> HRX
     TRUNK --> PAIR
     MOTIF <-.->|cross-attention| TRI
     TRI --> PHYS
@@ -50,5 +57,5 @@ graph TB
     classDef std fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#fff
     classDef frozen fill:#365314,stroke:#a3e635,stroke-width:2px,color:#fff
     class ION,PHYS,HMG,HR,SEL novel
-    class SEQ,MSA,HYB,MOE,TRI,H2D,HC,DEC,PROP,BIAS,HRX,CHEM std
+    class SEQ,MSA,HYB,MOE,TRI,H2D,HC,DEC,PROP,BIAS,HRX,PROBE,CHEMV std
     class MOTIF frozen

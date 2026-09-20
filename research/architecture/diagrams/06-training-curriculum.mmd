@@ -8,7 +8,7 @@ graph TB
 
     S1 --> S2 --> S3 --> S4 --> S5 --> S6
 
-    GAP["CRITICAL DATA GAP<br/>Chemical probing NOT in catalog.<br/>Ribonanza = 2.1M sequences with DMS+SHAPE<br/>= 315x more supervised examples than the<br/>6661 unique sequences with 3D.<br/>HIGHEST-PRIORITY ACQUISITION."]
+    GAP["PROBING - 335616 profiles ACQUIRED<br/>Ribonanza 2A3_MaP + DMS_MaP, 206 positions<br/>= 499x the 673 clean 3D sequences.<br/><br/>STILL MISSING: rest of the 2.1M (Kaggle),<br/>and RMDB titrations, which gate the<br/>LEARNED ionic response."]
     GAP -.->|"would slot between stages 2 and 4"| S2
 
     EVAL["EVALUATION - BLIND ONLY<br/>CASP15 (15), CASP16 (10), RNA-Puzzles<br/>held out entirely.<br/>Sequence-identity dedup MANDATORY:<br/>5S rRNA alone is 5976 of the BGSU clusters,<br/>so a random split is meaningless.<br/>Field ceiling is TM ~0.55 (trRosettaRNA 0.548)."]

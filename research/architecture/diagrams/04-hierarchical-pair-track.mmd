@@ -17,7 +17,7 @@ graph TB
 
     subgraph FIX["THE FIX - CONTACTS ARE CLUSTERED, NOT LOCAL"]
         C1["Helical stems are contiguous anti-diagonal runs,<br/>so contacts occupy very FEW BLOCKS<br/>even when spread along the sequence."]
-        C2["block occupancy at b=4, measured:<br/>L 64-200: 16.34 pct | L 200-500: 6.87 pct<br/>L 500-1500: 3.17 pct | L 1500-3000: 1.34 pct"]
+        C2["block occupancy at b=4, 20266 chains:<br/>L 64-200: 18.92 pct | L 200-500: 6.78 pct<br/>L 500-1500: 2.52 pct | L 1500-3000: 1.67 pct"]
         C3["OCCUPANCY FALLS AS CHAINS GET LONGER<br/>=> the mechanism gets MORE effective exactly<br/>where the flat design failed"]
         C1 --> C2 --> C3
     end
@@ -25,11 +25,11 @@ graph TB
     subgraph HPT["HIERARCHICAL PAIR TRACK - 3 LEVELS"]
         L1["LEVEL 1 - DENSE coarse map at b=16<br/>0.396 pct of dense cost<br/>at L=4096 this is only 65k entries<br/>NO recall loss: it is genuinely dense"]
         L2["LEVEL 2 - refine occupied b=16 blocks to b=4<br/>0.460 pct of dense cost"]
-        L3["LEVEL 3 - refine occupied b=4 blocks to pairs<br/>1.346 pct of dense cost<br/>effective c = 17.2, BELOW the old flat budget of 32"]
+        L3["LEVEL 3 - refine occupied b=4 blocks to pairs<br/>1.346 pct of dense cost<br/>mean c 17.14 | p99 19.13 | MAX 21.14<br/>target_c = 24 (20 was BREACHED)"]
         L1 --> L2 --> L3
     end
 
-    TOTAL["TOTAL 2.202 pct of dense<br/><br/>vs flat top-K: 1.118 pct of dense<br/>but only ~20 pct recall.<br/><br/>~2x the cost buys a 100 pct recall CEILING<br/>instead of a hard 20 pct floor."]
+    TOTAL["TOTAL 2.202 pct of dense<br/><br/>vs flat top-K: 1.118 pct of dense<br/>but only ~20 pct recall.<br/><br/>~2x the cost buys a 100 pct recall CEILING<br/>instead of a hard 20 pct floor.<br/><br/>NOTE: max c measured on derivatives that<br/>under-represent modified residues 40x.<br/>24 is interim; re-derive on raw PDB."]
 
     EASY["WHY IT IS EASIER TO LEARN<br/>Deciding whether a 16x16 block contains ANY contact<br/>aggregates 256 pair-decisions into one.<br/>The model ranks 32k blocks, not 4.1M pairs."]
 

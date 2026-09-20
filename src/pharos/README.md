@@ -42,12 +42,12 @@ src/pharos/
 
 | Finding | Lands in |
 |---|---|
-| O(L) contact scaling; 1.34% block occupancy | `model/pair_track.py` |
-| Mg/rigidity coupling 1.76 sigma | `physics/energy.py` (E_rigid), `model/heads.py` |
+| O(L) contact scaling; 1.67% block occupancy; max contacts/nt **7.66** | `model/pair_track.py` |
+| Mg/rigidity coupling **1.523 sigma** (X-ray, 1535 structures) | `physics/energy.py` (E_rigid), `model/heads.py` |
 | A-RNA theta = 0.804 (not the B-DNA 0.76) | `physics/manning.py` |
 | Coevolution gated on Neff/L | `model/trunk.py` router input |
 | Stiffness: sequence and structure near-equal | `model/stiffness.py` |
-| **G2: 98.96% of RNA is in complex** | `eval/stratified.py` — mandatory split |
+| **G2: 98.95% of RNA is in complex** (unmeasured at scale) | `eval/stratified.py` — mandatory split |
 | **G7: 1.005% outside ACGU on raw PDB, 0.025% on derivatives** | `data/tokenizer.py` — vocab depends on SOURCE (v0.2 D6) |
 | Token over-provisioned 139x | `data/attributes.py`, `train/precision.py` |
 | **Mg-rigidity 1.523 sigma, X-ray only** | `model/heads.py` rigidity head (v0.2 D12) |

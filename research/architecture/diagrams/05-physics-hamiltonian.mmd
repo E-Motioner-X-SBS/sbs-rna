@@ -19,10 +19,10 @@ graph TB
     end
 
     subgraph EVID["MEASURED EVIDENCE - 180 structures"]
-        V1["Mg2+ 17428 vs K+ 1868 = 9:1<br/>=> Mg2+ is the ion that matters"]
-        V2["83 pct of inner-sphere coordination<br/>is to phosphate OP1/OP2"]
+        V1["Mg2+ 816270 vs K+ 15123 = 54:1<br/>vs ALL other cations = 19.7:1<br/>6328 raw PDB entries<br/>=> Mg2+ is the ion that matters"]
+        V2["77.9 pct of inner-sphere coordination<br/>is to phosphate OP1/OP2<br/>324708 of 416731 coordinating O"]
         V3["0.77 inner vs 7.00 outer contacts per Mg2+<br/>inner fraction 0.511 overall<br/>but 0.296 for chains under 500 nt<br/>=> inner/outer ratio reads out compactness"]
-        V4["B-factor vs Mg2+ distance, 24623 nt:<br/>-0.883 at 0-4 A ... +0.877 beyond 20 A<br/>= MONOTONIC 1.76 SIGMA GRADIENT"]
+        V4["B-factor vs Mg2+ distance, X-RAY ONLY<br/>3.86M nt across 1535 structures:<br/>-0.657 at 0-4 A ... +0.866 beyond 20 A<br/>= MONOTONIC 1.523 SIGMA GRADIENT<br/><br/>cryo-EM: 0.934 sigma, NON-monotonic<br/>=> rigidity head trains on X-ray only"]
     end
 
     ION --> BJ
