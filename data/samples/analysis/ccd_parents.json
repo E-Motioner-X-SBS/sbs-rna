@@ -1,0 +1,2633 @@
+{
+ "n_species": 370,
+ "n_species_in_ccd": 370,
+ "n_modified_residues": 75434,
+ "residues_with_parent": 66811,
+ "frac_residues_with_parent": 0.8857,
+ "species_without_parent": [
+  "N",
+  "Y5P",
+  "CFZ",
+  "UFT",
+  "I",
+  "LCC",
+  "UNK",
+  "0G",
+  "0C",
+  "B8N",
+  "LCG",
+  "UY1",
+  "0U",
+  "CM0",
+  "CBR",
+  "TLN",
+  "M7G",
+  "ATP",
+  "AF2",
+  "2PR"
+ ],
+ "by_class_residues": {
+  "other": 14421,
+  "methylation": 42555,
+  "pseudouridine": 18458
+ },
+ "by_parent_residues": {
+  "?": 8623,
+  "C": 13111,
+  "A": 11623,
+  "G": 12608,
+  "U": 29469
+ },
+ "components": {
+  "0A": {
+   "parent": "?",
+   "name": "L-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "L-RNA LINKING",
+   "class": "other",
+   "count": 25
+  },
+  "0C": {
+   "parent": "?",
+   "name": "L-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "L-RNA LINKING",
+   "class": "other",
+   "count": 220
+  },
+  "0G": {
+   "parent": "?",
+   "name": "L-GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "L-RNA LINKING",
+   "class": "other",
+   "count": 310
+  },
+  "0U": {
+   "parent": "?",
+   "name": "L-URIDINE-5'-MONOPHOSPHATE",
+   "type": "L-RNA LINKING",
+   "class": "other",
+   "count": 89
+  },
+  "0U1": {
+   "parent": "?",
+   "name": "2'-METHYLSELENYL-2'-DEOXY-L-URIDINE-5'-MONOPHOSPHATE",
+   "type": "L-RNA LINKING",
+   "class": "methylation",
+   "count": 1
+  },
+  "10C": {
+   "parent": "C",
+   "name": "4-AMINO-1-{2,5-ANHYDRO-4-[(PHOSPHONOOXY)METHYL]-ALPHA-L-LYXOFURANOSYL}PYRIMIDIN-2(1H)-ONE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 2
+  },
+  "12A": {
+   "parent": "A",
+   "name": "2-METHYLTHIO-N6-(AMINOCARBONYL-L-THREONYL)-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 20
+  },
+  "16B": {
+   "parent": "C",
+   "name": "N-hydroxycytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "1DP": {
+   "parent": "?",
+   "name": "N1-deaza-adenosine-5'-monophosphate",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "1MA": {
+   "parent": "A",
+   "name": "6-HYDRO-1-METHYLADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 510
+  },
+  "1MG": {
+   "parent": "G",
+   "name": "1N-METHYLGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 444
+  },
+  "1RN": {
+   "parent": "U",
+   "name": "(E)-N-{[4-oxo-1-(5-O-phosphono-beta-D-arabinofuranosyl)-2-thioxo-1,2,3,4-tetrahydropyrimidin-5-yl]methylidene}glycine",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1
+  },
+  "1SC": {
+   "parent": "C",
+   "name": "5'-O-THIOPHOSPHONOCYTIDINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "1W5": {
+   "parent": "?",
+   "name": "(1R)-1-(6-amino-2-hydroxy-5-nitropyridin-3-yl)-1,4-anhydro-2-deoxy-5-O-phosphono-D-erythro-pentitol",
+   "type": "DNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "23G": {
+   "parent": "G",
+   "name": "GUANOSINE-5'-PHOSPHATE-2',3'-CYCLIC PHOSPHATE",
+   "type": "RNA OH 3 prime terminus",
+   "class": "other",
+   "count": 27
+  },
+  "2AD": {
+   "parent": "?",
+   "name": "2'-AMINO-2'-DEOXYADENOSINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "2AU": {
+   "parent": "U",
+   "name": "2'-AMINOURIDINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "2DT": {
+   "parent": "?",
+   "name": "3'-DEOXYTHYMIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "2IA": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-iodoadenosine 5'-(dihydrogen phosphate)",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "2MA": {
+   "parent": "A",
+   "name": "2-METHYLADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 643
+  },
+  "2MG": {
+   "parent": "G",
+   "name": "2N-METHYLGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 2293
+  },
+  "2MU": {
+   "parent": "U",
+   "name": "2',5-DIMETHYLURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 122
+  },
+  "2OP": {
+   "parent": "?",
+   "name": "(2S)-2-HYDROXYPROPANOIC ACID",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "2PR": {
+   "parent": "?",
+   "name": "2-AMINO-9-[2-DEOXYRIBOFURANOSYL]-9H-PURINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 30
+  },
+  "2SG": {
+   "parent": "G",
+   "name": "guanosine phosphorodithioate",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "31H": {
+   "parent": "A",
+   "name": "3'-deoxy-3'-[(N-formyl-L-methionyl)amino]adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 49
+  },
+  "31M": {
+   "parent": "A",
+   "name": "3'-deoxy-3'-[(L-methionyl-L-phenylalanyl)amino]adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "365": {
+   "parent": "?",
+   "name": "[(1S,5R,6R,7'S,8R)-7'-(aminomethyl)-6-(6-aminopurin-9-yl)-2'-(3-oxidanylpropoxy)spiro[2,4,7-trioxa-3-boranuidabicyclo[3.3.0]octane-3,9'-8-oxa-9-boranuidabicyclo[4.3.0]nona-1(6),2,4-triene]-8-yl]methyl dihydrogen phosphate",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 1
+  },
+  "3AU": {
+   "parent": "U",
+   "name": "3-[(3S)-3-amino-3-carboxypropyl]uridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 64
+  },
+  "3DA": {
+   "parent": "?",
+   "name": "3'-DEOXYADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 6
+  },
+  "3DR": {
+   "parent": "?",
+   "name": "1',2'-DIDEOXYRIBOFURANOSE-5'-PHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "3PO": {
+   "parent": "?",
+   "name": "TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "3TD": {
+   "parent": "U",
+   "name": "(1S)-1,4-anhydro-1-(3-methyl-2,4-dioxo-1,2,3,4-tetrahydropyrimidin-5-yl)-5-O-phosphono-D-ribitol",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 319
+  },
+  "45A": {
+   "parent": "A",
+   "name": "5'-O-[(S)-hydroxy(methyl)phosphoryl]adenosine",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1
+  },
+  "4AC": {
+   "parent": "C",
+   "name": "N(4)-ACETYLCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1740
+  },
+  "4DU": {
+   "parent": "?",
+   "name": "1-(2-deoxy-5-O-phosphono-beta-D-erythro-pentofuranosyl)-1H-imidazo[4,5-c]pyridin-4-amine",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "4OC": {
+   "parent": "C",
+   "name": "4N,O2'-METHYLCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 778
+  },
+  "4PC": {
+   "parent": "?",
+   "name": "3-(2'-DEOXY-5-O-PHOSPHONO-BETA-D-ERYTHRO-PENTOFURANOSYL)-6-METHYL-3,7-DIHYDRO-2H-PYRROLO[2,3-D]PYRIMIDIN-2-ONE",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 10
+  },
+  "4SU": {
+   "parent": "U",
+   "name": "4-THIOURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 939
+  },
+  "50L": {
+   "parent": "?",
+   "name": "(5S)-2-amino-8-(5-O-phosphono-beta-D-ribofuranosyl)imidazo[1,2-a][1,3,5]triazin-4(8H)-one",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "50N": {
+   "parent": "?",
+   "name": "(1S)-1-(6-amino-2-hydroxy-5-nitropyridin-3-yl)-1,4-anhydro-5-O-phosphono-D-ribitol",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "56B": {
+   "parent": "?",
+   "name": "2-amino-5-({[(1S,4S,5R)-4,5-dihydroxycyclopent-2-en-1-yl]amino}methyl)-7-(5-O-phosphono-beta-D-ribofuranosyl)-3,7-dihydro-4H-pyrrolo[2,3-d]pyrimidin-4-one",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 13
+  },
+  "574": {
+   "parent": "?",
+   "name": "[(3aS,4R,6R,6aR)-2-{2-[(1S)-2-amino-1-hydroxyethyl]phenyl}-6-(6-amino-9H-purin-9-yl)tetrahydrofuro[3,4-d][1,3,2]dioxaborol-4-yl]methyl dihydrogen phosphite",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1
+  },
+  "5AA": {
+   "parent": "?",
+   "name": "N6-DIMETHYL-3'-AMINO-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 5
+  },
+  "5BU": {
+   "parent": "U",
+   "name": "5-BROMO-URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 176
+  },
+  "5CF": {
+   "parent": "?",
+   "name": "5-fluorocytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "5CG": {
+   "parent": "?",
+   "name": "5'-CHLORO-5'-DEOXY-GUANOSINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "5CY": {
+   "parent": "?",
+   "name": "1-(3-hydroxypropyl)-2-{(1E,3E,5E)-5-[1-(3-hydroxypropyl)-3,3-dimethyl-1,3-dihydro-2H-indol-2-ylidene]penta-1,3-dien-1-y l}-3,3-dimethyl-3H-indolium",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 2
+  },
+  "5FU": {
+   "parent": "U",
+   "name": "5-FLUORO-URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "5GP": {
+   "parent": "?",
+   "name": "GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "5HM": {
+   "parent": "C",
+   "name": "5-(hydroxymethyl)cytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "5IC": {
+   "parent": "C",
+   "name": "5-IODO-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "5MC": {
+   "parent": "C",
+   "name": "5-METHYLCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 5241
+  },
+  "5MU": {
+   "parent": "U",
+   "name": "5-METHYLURIDINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 2535
+  },
+  "5OC": {
+   "parent": "?",
+   "name": "2'-deoxy-5-hydroxycytidine 5'-(dihydrogen phosphate)",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "5UD": {
+   "parent": "?",
+   "name": "5-FLUOROURIDINE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "6F7": {
+   "parent": "?",
+   "name": "3'-deoxy-5-methyluridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "6FC": {
+   "parent": "?",
+   "name": "2'-trifluoromethylthio-2'-deoxycytidine",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "6FU": {
+   "parent": "?",
+   "name": "2'-trifluoromethylthio-2'-deoxyuridine",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "6IA": {
+   "parent": "A",
+   "name": "N6-ISOPENTENYL-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 14
+  },
+  "6MA": {
+   "parent": "A",
+   "name": "N6-METHYL-DEOXY-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 4
+  },
+  "6MD": {
+   "parent": "?",
+   "name": "N-methyladenosine",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 5
+  },
+  "6MZ": {
+   "parent": "A",
+   "name": "N6-METHYLADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1045
+  },
+  "6NW": {
+   "parent": "A",
+   "name": "2'-O-methyl-5'-O-thiophosphonoadenosine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "6OO": {
+   "parent": "C",
+   "name": "2'-O-methyl-5'-O-thiophosphonocytidine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 4
+  },
+  "6OP": {
+   "parent": "?",
+   "name": "1-[(5E)-5,6-dideoxy-2-O-(2-methoxyethyl)-6-phosphono-beta-D-ribo-hex-5-enofuranosyl]-5-methylpyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "6U0": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{S})-3,4-bis(oxidanyl)-5-[1-[(2-phenyl-1~{H}-imidazol-5-yl)methyl]-1,2,3-triazol-4-yl]oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 1
+  },
+  "70U": {
+   "parent": "U",
+   "name": "5-(O-METHYLACETO)-2-THIO-2-DEOXY-URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 17
+  },
+  "73W": {
+   "parent": "C",
+   "name": "5'-O-[(dithiophosphono)]cytidine",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 4
+  },
+  "75B": {
+   "parent": "U",
+   "name": "5-selenophen-2-yluridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "7AT": {
+   "parent": "A",
+   "name": "1-(5-O-phosphono-beta-D-ribofuranosyl)-3-(1H-1,2,3-triazol-5-yl)-1H-pyrazolo[3,4-d]pyrimidin-4-amine",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "7MG": {
+   "parent": "G",
+   "name": "7N-METHYL-8-HYDROGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 729
+  },
+  "7OK": {
+   "parent": "C",
+   "name": "N-hydroxycytidine 5'-(dihydrogen phosphate) tautomer",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "7S3": {
+   "parent": "G",
+   "name": "[(2R,3S,4R,5R)-5-(1-methyl-6-oxidanylidene-purin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 5
+  },
+  "7SN": {
+   "parent": "G",
+   "name": "[(2R,3S,4R,5R)-5-(2-azanyl-5-carbamimidoyl-4-oxidanylidene-3H-pyrrolo[2,3-d]pyrimidin-7-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 5
+  },
+  "8AH": {
+   "parent": "A",
+   "name": "5'-O-(dihydroxyphosphanyl)-2,8-dimethyladenosine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 12
+  },
+  "8AN": {
+   "parent": "A",
+   "name": "3'-amino-3'-deoxyadenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 88
+  },
+  "8AZ": {
+   "parent": "?",
+   "name": "8-aza-nebularine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 17
+  },
+  "8GM": {
+   "parent": "?",
+   "name": "[(2R,3S,4R,5R)-5-[2-azanyl-6,8-bis(oxidanylidene)-1,7-dihydropurin-9-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 11
+  },
+  "8OS": {
+   "parent": "G",
+   "name": "5'-O-[(S)-hydroxy(4-methyl-1H-imidazol-5-yl)phosphoryl]guanosine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 4
+  },
+  "8RJ": {
+   "parent": "?",
+   "name": "(R)-1'-(2',3'-DIHYDROXYPROPYL)-THYMINE",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "8XA": {
+   "parent": "?",
+   "name": "9-(5-O-phosphono-beta-D-xylofuranosyl)-9H-purin-6-amine",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "8XC": {
+   "parent": "?",
+   "name": "4-amino-1-(5-O-phosphono-beta-D-xylofuranosyl)pyrimidin-2(1H)-one",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "8XG": {
+   "parent": "?",
+   "name": "2-amino-9-(5-O-phosphono-beta-D-xylofuranosyl)-1,9-dihydro-6H-purin-6-one",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "8XU": {
+   "parent": "?",
+   "name": "1-(5-O-phosphono-beta-D-xylofuranosyl)pyrimidine-2,4(1H,3H)-dione",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "9QV": {
+   "parent": "U",
+   "name": "uridine 2',5'-bis(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 3
+  },
+  "9SI": {
+   "parent": "A",
+   "name": "[(2R,3S,4R,5R)-5-[1-[[4-(aminomethyl)phenyl]methyl]-6-azanyl-purin-1-ium-9-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "9SY": {
+   "parent": "A",
+   "name": "[(2R,3S,4R,5R)-5-[6-azanyl-1-(phenylmethyl)purin-1-ium-9-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1B8A": {
+   "parent": "?",
+   "name": "3'-deoxy-3'-(L-lysylamino)adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 8
+  },
+  "A1CAK": {
+   "parent": "G",
+   "name": "2-amino-9-(2-deoxy-2-fluoro-5-O-thiophosphono-alpha-D-arabinofuranosyl)-1,9-dihydro-6H-purin-6-one",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "A1CAL": {
+   "parent": "U",
+   "name": "1-(5-O-{(R)-hydroxy[(3-phenylprop-2-yn-1-yl)oxy]phosphoryl}-2-O-methyl-beta-L-arabinofuranosyl)pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1CAM": {
+   "parent": "U",
+   "name": "1-{5-O-[(R)-hydroxy(3-phenylpropoxy)phosphoryl]-2-O-methyl-beta-L-arabinofuranosyl}pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1CNL": {
+   "parent": "?",
+   "name": "9-{(4xi)-5-deoxy-4-[(phosphonooxy)methyl]-alpha-L-lyxofuranosyl}-9H-purin-6-amine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 6
+  },
+  "A1CNM": {
+   "parent": "?",
+   "name": "1-{(4xi)-5-deoxy-4-[(phosphonooxy)methyl]-alpha-L-lyxofuranosyl}pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 3
+  },
+  "A1CNT": {
+   "parent": "?",
+   "name": "[(3R,4R,5R)-4-hydroxy-5-(5-methyl-2,4-dioxo-3,4-dihydropyrimidin-1(2H)-yl)oxolan-3-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 14
+  },
+  "A1CNX": {
+   "parent": "?",
+   "name": "3'-O-glycyladenosine 5'-(dihydrogen phosphate)",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 1
+  },
+  "A1CU1": {
+   "parent": "A",
+   "name": "(2~{R},3~{R},4~{S},5~{R})-2-(6-azanyl-2-fluoranyl-purin-9-yl)-5-[[oxidanyl-bis(oxidanylidene)-$l^{6}-phosphanyl]oxymethyl]oxolane-3,4-diol",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 3
+  },
+  "A1CZ2": {
+   "parent": "C",
+   "name": "5-methyl-5,6-dihydrocytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 5
+  },
+  "A1ELZ": {
+   "parent": "?",
+   "name": "[(2R,3R,4R,5R)-5-[2-azanyl-6-(methylamino)purin-9-yl]-4-fluoranyl-4-(fluoranylmethyl)-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1I59": {
+   "parent": "C",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[4-azanyl-5-[(1~{S})-1-azanyl-3,3-bis(oxidanyl)propyl]-2-oxidanylidene-pyrimidin-1-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "A1I5K": {
+   "parent": "?",
+   "name": "[5-(4-amino-1,2,3-triazatricyclo[1.1.0.02,4]butan-1-yl)-3-(2-aminopropanoylamino)-4-hydroxy-2,3-dihydrofuran-2,4-diylium-2-yl]methoxy-hydroxy-keto-phosphonium",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 2
+  },
+  "A1I9V": {
+   "parent": "U",
+   "name": "5-METHYL-2-THIO-URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 3
+  },
+  "A1IC0": {
+   "parent": "A",
+   "name": "(2~{R},3~{R},4~{R},5~{R})-5-[6-(dimethylamino)purin-9-yl]-2-(hydroxymethyl)-4-methoxy-oxolan-3-ol",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1IC1": {
+   "parent": "U",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-4-methoxy-5-[3-methyl-2,4-bis(oxidanylidene)pyrimidin-1-yl]-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphite",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1ID5": {
+   "parent": "A",
+   "name": "N3-propargyl adenosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "A1IEA": {
+   "parent": "A",
+   "name": "N3-methyl adenosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "A1IF9": {
+   "parent": "?",
+   "name": "[[(2~{R},3~{S},4~{R},5~{R})-5-(6-aminopurin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methoxy-oxidanyl-phosphoryl] [[[(2~{R},3~{S},4~{R},5~{R})-5-(2-azanyl-6-oxidanylidene-1~{H}-purin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methoxy-oxidanyl-phosphoryl]oxy-oxidanyl-phosphoryl] hydrogen phosphate",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 1
+  },
+  "A1JD2": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{S})-5-[2,4-bis(azanyl)pyrimidin-5-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methoxyphosphinic acid",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 1
+  },
+  "A1L3O": {
+   "parent": "?",
+   "name": "5-Hydroxyuridine 5'-phosphate",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 4
+  },
+  "A1L3P": {
+   "parent": "?",
+   "name": "5-Carboxymethylaminomethyluridine",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 1
+  },
+  "A1L4U": {
+   "parent": "U",
+   "name": "methyl 2-[1-[(2~{R},3~{R},4~{S},5~{R})-3,4-bis(oxidanyl)-5-(phosphonooxymethyl)oxolan-2-yl]-4-oxidanylidene-pyrimidin-5-yl]ethanoate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "A1L89": {
+   "parent": "?",
+   "name": "P1-(5'-Adenosyl) P4-(5'-uridyl) tetraphosphate",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 4
+  },
+  "A1LXS": {
+   "parent": "?",
+   "name": "[(2~{R},3~{R},4~{S},5~{R})-4-fluoranyl-5-(5-iodanyl-4-methyl-pyrrolo[2,3-d]pyrimidin-7-yl)-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 1
+  },
+  "A1LZ3": {
+   "parent": "U",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[4-azanyl-2-[(5-azanyl-5-oxidanylidene-pentyl)amino]pyrimidin-1-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphite",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 6
+  },
+  "A1MC2": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[[(3~{R},5~{S},9~{S},10~{S},13~{R},14~{S},17~{R})-10,13-dimethyl-17-[(2~{R})-6-methylheptan-2-yl]-2,3,4,5,8,9,11,12,14,15,16,17-dodecahydro-1~{H}-cyclopenta[a]phenanthren-3-yl]oxy]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphite",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 6
+  },
+  "A1MGB": {
+   "parent": "?",
+   "name": "3-CN-3-deazaguanosine",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "A23": {
+   "parent": "A",
+   "name": "ADENOSINE-5'-PHOSPHATE-2',3'-CYCLIC PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 94
+  },
+  "A2L": {
+   "parent": "A",
+   "name": "3'-O-METHYOXYETHYL-ADENOSINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "A2M": {
+   "parent": "A",
+   "name": "2'-O-methyladenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 5563
+  },
+  "A2P": {
+   "parent": "?",
+   "name": "ADENOSINE-2'-5'-DIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 5
+  },
+  "A3P": {
+   "parent": "A",
+   "name": "ADENOSINE-3'-5'-DIPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 10
+  },
+  "A44": {
+   "parent": "A",
+   "name": "2'-O-METHYOXYETHYL-ADENOSINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 20
+  },
+  "A5M": {
+   "parent": "C",
+   "name": "2'-AMINE-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 8
+  },
+  "A5O": {
+   "parent": "A",
+   "name": "ADENINE ARABINOSE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "A7C": {
+   "parent": "?",
+   "name": "3-[1-(4-bromophenyl)-1H-1,2,3-triazol-4-yl]-1-[5-O-(trihydroxy-lambda~5~-phosphanyl)-beta-D-ribofuranosyl]-1H-pyrazolo[3,4-d]pyrimidin-4-amine",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 3
+  },
+  "A7E": {
+   "parent": "A",
+   "name": "3-ethynyl-1-(5-O-phosphono-beta-D-ribofuranosyl)-1H-pyrazolo[3,4-d]pyrimidin-4-amine",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "A9Z": {
+   "parent": "A",
+   "name": "2'-deoxy-2'-(4-ethyl-1H-1,2,3-triazol-1-yl)adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "ACA": {
+   "parent": "?",
+   "name": "6-AMINOHEXANOIC ACID",
+   "type": "PEPTIDE LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "ACE": {
+   "parent": "?",
+   "name": "ACETYL GROUP",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "ADN": {
+   "parent": "?",
+   "name": "ADENOSINE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "ADP": {
+   "parent": "A",
+   "name": "ADENOSINE-5'-DIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "ADS": {
+   "parent": "?",
+   "name": "ADENOSINE-5'-(DITHIO)PHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "AET": {
+   "parent": "A",
+   "name": "N-[N-(9-B-D-RIBOFURANOSYLPURIN-6-YL)METHYLCARBAMOYL]THREONINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 5
+  },
+  "AF2": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-fluoroadenosine 5'-(dihydrogen phosphate)",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 36
+  },
+  "AG9": {
+   "parent": "?",
+   "name": "AGMATIDINE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "AI5": {
+   "parent": "C",
+   "name": "(2~{S})-4-[2-[(2~{R},3~{S},4~{R},5~{R})-5-(6-aminopurin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]ethyl-[2-[(2~{R},3~{R},4~{R},5~{R})-2-(4-azanyl-2-oxidanylidene-pyrimidin-1-yl)-5-[bis(oxidanyl)phosphanyloxymethyl]-4-oxidanyl-oxolan-3-yl]oxyethyl]amino]-2-azanyl-butanoic acid",
+   "type": "non-polymer",
+   "class": "other",
+   "count": 1
+  },
+  "ALA": {
+   "parent": "?",
+   "name": "ALANINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "AMP": {
+   "parent": "?",
+   "name": "ADENOSINE MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "ANZ": {
+   "parent": "?",
+   "name": "[(6-AMINO-9H-PURIN-9-YL)-[5-FLUORO-1,3-DIHYDRO-1-HYDROXY-2,1-BENZOXABOROLE]-4'YL]METHYL DIHYDROGEN PHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 2
+  },
+  "AP7": {
+   "parent": "A",
+   "name": "N1-PROTONATED ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 8
+  },
+  "APC": {
+   "parent": "?",
+   "name": "DIPHOSPHOMETHYLPHOSPHONIC ACID ADENOSYL ESTER",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "AS": {
+   "parent": "?",
+   "name": "2'-deoxyadenosine-5'-thio-monophosphate",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "AT7": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-triaza-1,2-dien-2-ium-1-yl-adenine-5'-monophosphate",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "ATD": {
+   "parent": "?",
+   "name": "THYMIDINE-3'-PHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "ATP": {
+   "parent": "?",
+   "name": "ADENOSINE-5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 39
+  },
+  "B4P": {
+   "parent": "?",
+   "name": "BIS(ADENOSINE)-5'-TETRAPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "B8H": {
+   "parent": "U",
+   "name": "[(2~{R},3~{S},4~{R},5~{S})-5-[1-methyl-2,4-bis(oxidanylidene)pyrimidin-5-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 978
+  },
+  "B8K": {
+   "parent": "G",
+   "name": "7-acetyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 52
+  },
+  "B8N": {
+   "parent": "?",
+   "name": "(2~{R})-2-azanyl-4-[5-[(2~{S},3~{R},4~{S},5~{R})-3,4-bis(oxidanyl)-5-(phosphonooxymethyl)oxolan-2-yl]-3-methyl-2,6-bis(oxidanylidene)pyrimidin-1-yl]butanoic acid",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 169
+  },
+  "B8Q": {
+   "parent": "C",
+   "name": "3-methyl, cytidine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 37
+  },
+  "B8T": {
+   "parent": "C",
+   "name": "4-methyl, cytidine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 141
+  },
+  "B8W": {
+   "parent": "G",
+   "name": "6-methyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 113
+  },
+  "B9B": {
+   "parent": "G",
+   "name": "6-propyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 78
+  },
+  "B9H": {
+   "parent": "C",
+   "name": "2'-methyl, 3-propyl, cytidine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 26
+  },
+  "BGH": {
+   "parent": "G",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-5-(2-azanyl-7-ethanoyl-6-oxidanylidene-1,8-dihydropurin-9-yl)-4-methoxy-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 26
+  },
+  "BGM": {
+   "parent": "?",
+   "name": "8-BROMO-2'-DEOXYGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 9
+  },
+  "BRU": {
+   "parent": "?",
+   "name": "5-BROMO-2'-DEOXYURIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 10
+  },
+  "BTN": {
+   "parent": "?",
+   "name": "BIOTIN",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "C2L": {
+   "parent": "C",
+   "name": "5-METHYL-3'-O-METHOXYETHYL CYTIDINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 4
+  },
+  "C43": {
+   "parent": "C",
+   "name": "2'-O-METHYOXYETHYL-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 32
+  },
+  "C4J": {
+   "parent": "?",
+   "name": "(5S)-5-{3-[(3S)-3-amino-3-carboxypropyl]-1-methyl-2,4-dioxo-1,2,3,4-tetrahydropyrimidin-5-yl}-2,5-anhydro-1-O-phosphono-L-arabinitol",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 27
+  },
+  "C5L": {
+   "parent": "C",
+   "name": "2'-O-(2-methoxyethyl)-5-methylcytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 9
+  },
+  "C5P": {
+   "parent": "?",
+   "name": "CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "CAR": {
+   "parent": "?",
+   "name": "CYTOSINE ARABINOSE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "CBR": {
+   "parent": "?",
+   "name": "5-BROMO-2'-DEOXY-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 45
+  },
+  "CBV": {
+   "parent": "C",
+   "name": "5-BROMOCYTIDINE 5'-(DIHYDROGEN PHOSPHATE)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 147
+  },
+  "CCC": {
+   "parent": "C",
+   "name": "CYTIDINE-5'-PHOSPHATE-2',3'-CYCLIC PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 120
+  },
+  "CFL": {
+   "parent": "?",
+   "name": "4-amino-1-(2-deoxy-2-fluoro-5-O-phosphono-beta-D-arabinofuranosyl)pyrimidin-2(1H)-one",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 30
+  },
+  "CFZ": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-fluorocytidine 5'-(dihydrogen phosphate)",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 852
+  },
+  "CG1": {
+   "parent": "G",
+   "name": "5'-O-[(R)-hydroxy(methoxy)phosphoryl]guanosine",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "CH": {
+   "parent": "C",
+   "name": "N3-PROTONATED CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 20
+  },
+  "CM0": {
+   "parent": "?",
+   "name": "5-(CARBOXYMETHOXY) URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 49
+  },
+  "CSL": {
+   "parent": "?",
+   "name": "(D)-2'-METHYLSELENYL-2'-DEOXYCYTIDINE-5'-PHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 8
+  },
+  "CTP": {
+   "parent": "?",
+   "name": "CYTIDINE-5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "CYS": {
+   "parent": "?",
+   "name": "CYSTEINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "D5D": {
+   "parent": "?",
+   "name": "[(1S)-1-[(2S,3S,4R,5R)-5-[2,4-bis(oxidanylidene)-1,3-diazinan-1-yl]-3,4-bis(oxidanyl)oxolan-2-yl]ethyl] dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "D5M": {
+   "parent": "?",
+   "name": "2'-DEOXYADENOSINE-5'-MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "DA": {
+   "parent": "?",
+   "name": "2'-DEOXYADENOSINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 14
+  },
+  "DC": {
+   "parent": "?",
+   "name": "2'-DEOXYCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 21
+  },
+  "DCZ": {
+   "parent": "?",
+   "name": "2'-DEOXYCYTIDINE",
+   "type": "DNA OH 5 prime terminus",
+   "class": "other",
+   "count": 2
+  },
+  "DG": {
+   "parent": "?",
+   "name": "2'-DEOXYGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 24
+  },
+  "DJF": {
+   "parent": "?",
+   "name": "[(1S,5R,6R,8R)-6-(6-aminopurin-9-yl)-2'-(3-oxidanylpropoxy)spiro[2,4,7-trioxa-3-boranuidabicyclo[3.3.0]octane-3,9'-8-oxa-9-boranuidabicyclo[4.3.0]nona-1(6),2,4-triene]-8-yl]methyl dihydrogen phosphate",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1
+  },
+  "DOC": {
+   "parent": "?",
+   "name": "2',3'-DIDEOXYCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 9
+  },
+  "DT": {
+   "parent": "?",
+   "name": "THYMIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 8
+  },
+  "DU": {
+   "parent": "?",
+   "name": "2'-DEOXYURIDINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 20
+  },
+  "E3C": {
+   "parent": "C",
+   "name": "3-ethyl, cytidine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 10
+  },
+  "E6G": {
+   "parent": "G",
+   "name": "6-ethyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 21
+  },
+  "E7G": {
+   "parent": "G",
+   "name": "7-ethyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 49
+  },
+  "EQ0": {
+   "parent": "G",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-(5-azanyl-7-oxidanyl-imidazo[4,5-b]pyridin-3-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "F2T": {
+   "parent": "U",
+   "name": "2'-deoxy-2'-fluoro-5'-O-thiophosphonouridine",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 3
+  },
+  "F3N": {
+   "parent": "A",
+   "name": "3'-deoxy-3'-(L-phenylalanylamino)adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 30
+  },
+  "F86": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-(4-azanylpyrrolo[2,1-f][1,2,4]triazin-7-yl)-5-cyano-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 15
+  },
+  "FHU": {
+   "parent": "U",
+   "name": "(5S,6R)-5-FLUORO-6-HYDROXY-PSEUDOURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "pseudouridine",
+   "count": 14
+  },
+  "FME": {
+   "parent": "?",
+   "name": "N-FORMYLMETHIONINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "FMU": {
+   "parent": "?",
+   "name": "5-FLUORO-5-METHYLURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 2
+  },
+  "G2L": {
+   "parent": "G",
+   "name": "3'-O-METHYOXYETHYL-GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 20
+  },
+  "G3A": {
+   "parent": "?",
+   "name": "GUANOSINE-P3-ADENOSINE-5',5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "G46": {
+   "parent": "G",
+   "name": "GUANOSINE-5'-MONOTHIOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 30
+  },
+  "G48": {
+   "parent": "G",
+   "name": "2'-O-METHYOXYETHYL-GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 38
+  },
+  "G5J": {
+   "parent": "?",
+   "name": "5'-O-[(S)-hydroxy{[(R)-hydroxy{[(S)-hydroxy(methoxy)phosphoryl]oxy}phosphoryl]oxy}phosphoryl]guanosine",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 5
+  },
+  "G7M": {
+   "parent": "G",
+   "name": "N7-METHYL-GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1180
+  },
+  "GAO": {
+   "parent": "G",
+   "name": "GUANINE ARABINOSE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "GCP": {
+   "parent": "?",
+   "name": "PHOSPHOMETHYLPHOSPHONIC ACID GUANYLATE ESTER",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "GDO": {
+   "parent": "G",
+   "name": "3'-deoxy-guanosine 5'-monophosphate",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "GDP": {
+   "parent": "G",
+   "name": "GUANOSINE-5'-DIPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 62
+  },
+  "GF2": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-fluoroguanosine 5'-(dihydrogen phosphate)",
+   "type": "DNA linking",
+   "class": "other",
+   "count": 26
+  },
+  "GFL": {
+   "parent": "?",
+   "name": "2-AMINO-9-(2-DEOXY-2-FLUORO-5-O-PHOSPHONO-BETA-D-ARABINOFURANOSYL)-1,9-DIHYDRO-6H-PURIN-6-ONE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "GMP": {
+   "parent": "?",
+   "name": "GUANOSINE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 15
+  },
+  "GMX": {
+   "parent": "?",
+   "name": "2-amino-9-(6-deoxy-5-O-phosphono-beta-D-allofuranosyl)-3,9-dihydro-6H-purin-6-one",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "GP3": {
+   "parent": "?",
+   "name": "DIGUANOSINE-5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 3
+  },
+  "GRB": {
+   "parent": "G",
+   "name": "8-bromoguanosine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "GTA": {
+   "parent": "?",
+   "name": "P1-7-METHYLGUANOSINE-P3-ADENOSINE-5',5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 18
+  },
+  "GTG": {
+   "parent": "?",
+   "name": "7-METHYL-GUANOSINE-5'-TRIPHOSPHATE-5'-GUANOSINE",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 6
+  },
+  "GTP": {
+   "parent": "G",
+   "name": "GUANOSINE-5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 383
+  },
+  "H2U": {
+   "parent": "U",
+   "name": "5,6-DIHYDROURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 995
+  },
+  "HFA": {
+   "parent": "?",
+   "name": "ALPHA-HYDROXY-BETA-PHENYL-PROPIONIC ACID",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "HHU": {
+   "parent": "?",
+   "name": "[(2R,3S,4R,5R)-5-[2,4-bis(oxidanylidene)pyrimidin-1-yl]-4-formamido-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "HHX": {
+   "parent": "?",
+   "name": "[(2R,3S,4R,5R)-5-[2,4-bis(oxidanylidene)pyrimidin-1-yl]-4-[methanoyl(methyl)amino]-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "HSX": {
+   "parent": "?",
+   "name": "5-O-phosphono-alpha-D-ribofuranose",
+   "type": "D-saccharide, alpha linking",
+   "class": "other",
+   "count": 3
+  },
+  "HYJ": {
+   "parent": "G",
+   "name": "9-[(2~{R},3~{R},4~{S},5~{R})-3,4-bis(oxidanyl)-5-[[tris(oxidanyl)-$l^{5}-phosphanyl]oxymethyl]oxolan-2-yl]-2-oxidanyl-1~{H}-purin-6-one",
+   "type": "L-RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "I": {
+   "parent": "?",
+   "name": "INOSINIC ACID",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 404
+  },
+  "I2T": {
+   "parent": "?",
+   "name": "(2~{S})-2-azanyl-4-[5-[(2~{S},3~{R},4~{S},5~{R})-3,4-bis(oxidanyl)-5-(phosphonooxymethyl)oxolan-2-yl]-3-methyl-2,6-bis(oxidanylidene)pyrimidin-1-yl]butanoic acid",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 8
+  },
+  "I4U": {
+   "parent": "U",
+   "name": "4-isopropyl, uridine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 44
+  },
+  "IC": {
+   "parent": "C",
+   "name": "ISOCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 6
+  },
+  "IG": {
+   "parent": "G",
+   "name": "ISOGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 6
+  },
+  "IKS": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-(4-azanyl-2-oxidanylidene-pyrimidin-1-yl)-3,4-bis(oxidanyl)selenolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 4
+  },
+  "ILK": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[2,4-bis(oxidanylidene)pyrimidin-1-yl]-3,4-bis(oxidanyl)selenolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "IMP": {
+   "parent": "G",
+   "name": "INOSINIC ACID",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "IU": {
+   "parent": "U",
+   "name": "5-IODOURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 21
+  },
+  "JMC": {
+   "parent": "?",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-5-(4-azanyl-3-methyl-2-oxidanylidene-4~{H}-pyrimidin-1-yl)-4-methoxy-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 1
+  },
+  "JMH": {
+   "parent": "C",
+   "name": "3-Methylcytidine- 5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 31
+  },
+  "K1F": {
+   "parent": "?",
+   "name": "[(2R,3S,4R,5R)-5-(3-aminocarbonyl-2-oxidanylidene-pyrazin-1-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 9
+  },
+  "KAK": {
+   "parent": "G",
+   "name": "3'-deoxy-guanosine-5'-monophosphate",
+   "type": "RNA OH 3 prime terminus",
+   "class": "other",
+   "count": 1
+  },
+  "KGV": {
+   "parent": "?",
+   "name": "3'-deoxy-3'-(D-phenylalanylamino)adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "L3X": {
+   "parent": "?",
+   "name": "3'-deoxy-3'-(glycylamino)adenosine 5'-(dihydrogen phosphate)",
+   "type": "DNA OH 3 prime terminus",
+   "class": "other",
+   "count": 7
+  },
+  "LCA": {
+   "parent": "A",
+   "name": "[(1R,3R,4R,7S)-7-HYDROXY-3-(ADENIN-9-YL)-2,5-DIOXABICYCLO[2.2.1]HEPT-1-YL]METHYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 21
+  },
+  "LCC": {
+   "parent": "?",
+   "name": "[(1R,3R,4R,7S)-7-HYDROXY-3-(5-METHYLCYTOSIN-1-YL)-2,5-DIOXABICYCLO[2.2.1]HEPT-1-YL]METHYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 324
+  },
+  "LCG": {
+   "parent": "?",
+   "name": "[(1R,3R,4R,7S)-7-HYDROXY-3-(GUANIN-9-YL)-2,5-DIOXABICYCLO[2.2.1]HEPT-1-YL]METHYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 143
+  },
+  "LHH": {
+   "parent": "C",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-5-(4-acetamido-2-oxidanylidene-pyrimidin-1-yl)-4-methoxy-3-oxidanyl-oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 55
+  },
+  "LKC": {
+   "parent": "?",
+   "name": "4-AMINO-1-[(1S,3R,4R,7S)-7-HYDROXY-1-(HYDROXYMETHYL)-2,5-DIOXABICYCLO[2.2.1]HEPT-3-YL]-5-METHYLPYRIMIDIN-2(1H)-ONE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 25
+  },
+  "LV2": {
+   "parent": "C",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[4-(dimethylamino)-2-oxidanylidene-pyrimidin-1-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 10
+  },
+  "M1Y": {
+   "parent": "?",
+   "name": "(1S)-1,4-anhydro-1-(1-methyl-2,4-dioxo-1,2,3,4-tetrahydropyrimidin-5-yl)-5-O-phosphono-D-xylitol",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "M2G": {
+   "parent": "G",
+   "name": "N2-DIMETHYLGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 411
+  },
+  "M3O": {
+   "parent": "?",
+   "name": "3'-O-(N-formyl-L-methionyl)adenosine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "M3X": {
+   "parent": "C",
+   "name": "(2~{S})-2-azanyl-6-[[4-azanyl-1-[(2~{R},3~{R},4~{S},5~{R})-3,4-bis(oxidanyl)-5-(phosphonooxymethyl)oxolan-2-yl]pyrimidin-1-ium-2-yl]amino]hexanoic acid",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 10
+  },
+  "M5M": {
+   "parent": "C",
+   "name": "2'-(N-ACETAMIDE)-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "M5Q": {
+   "parent": "?",
+   "name": "[(1S)-1-[(2S,3R,4R,5R)-5-(4-azanyl-2-oxidanylidene-pyrimidin-1-yl)-4-methoxy-3-oxidanyl-oxolan-2-yl]ethyl] dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "M7A": {
+   "parent": "A",
+   "name": "7-methyl, adenosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 44
+  },
+  "M7G": {
+   "parent": "?",
+   "name": "7N-METHYL-8-HYDROGUANOSINE-5'-DIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 40
+  },
+  "M7M": {
+   "parent": "?",
+   "name": "N,N,7-trimethylguanosine 5'-(trihydrogen diphosphate)",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 5
+  },
+  "MA6": {
+   "parent": "A",
+   "name": "6N-DIMETHYLADENOSINE-5'-MONOPHOSHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 1915
+  },
+  "MA7": {
+   "parent": "?",
+   "name": "1N-METHYLADENOSINE-5'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 2
+  },
+  "MGT": {
+   "parent": "G",
+   "name": "7N-METHYL-8-HYDROGUANOSINE-5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 2
+  },
+  "MHG": {
+   "parent": "G",
+   "name": "2-methyl, 7-(3-methyl-pentane), guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 20
+  },
+  "MIA": {
+   "parent": "A",
+   "name": "2-METHYLTHIO-N6-ISOPENTENYL-ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 425
+  },
+  "MKX": {
+   "parent": "A",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-3,4-bis(oxidanyl)-5-[6-[(4~{S})-4-[(1~{R})-1-oxidanylethyl]-2,5-bis(oxidanylidene)imidazolidin-1-yl]purin-9-yl]oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 3
+  },
+  "MMX": {
+   "parent": "C",
+   "name": "3-ethyl-3,4,5,6-tetrahydrocytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 3
+  },
+  "MNU": {
+   "parent": "U",
+   "name": "(2R,4S)-1-[(4R)-3,4-DIHYDROXYTETRAHYDROFURAN-2-YL]-5-[(METHYLAMINO)METHYL]-1,2,3,4-TETRAHYDROPYRIMIDINE-2,4-DIOL-5'-MON OPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 5
+  },
+  "MTU": {
+   "parent": "A",
+   "name": "9-BETA-D-RIBOFURANOSYL-9H-PURIN-2-AMINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "MUM": {
+   "parent": "?",
+   "name": "5'-O-(dihydroxyphosphanyl)-5-methyl-5,6-dihydrouridine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 9
+  },
+  "N": {
+   "parent": "?",
+   "name": "ANY 5'-MONOPHOSPHATE NUCLEOTIDE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2655
+  },
+  "N5M": {
+   "parent": "C",
+   "name": "5-nitrocytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "N6G": {
+   "parent": "G",
+   "name": "((2R,3S,4R,5S)-5-(2,6-DIAMINO-9H-PURIN-9-YL)-3,4-DIHYDROXY-TETRAHYDROFURAN-2-YL)METHYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 8
+  },
+  "N79": {
+   "parent": "A",
+   "name": "[(1S,5R,6R,8R)-6-(6-aminopurin-9-yl)spiro[2,4,7-trioxa-3-boranuidabicyclo[3.3.0]octane-3,9'-8-oxa-9-boranuidabicyclo[4.3.0]nona-1(6),2,4-triene]-8-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 2
+  },
+  "N7X": {
+   "parent": "C",
+   "name": "5'-O-[(R)-hydroxy(sulfanylidene)-lambda~5~-phosphanyl]-2'-O-(2-methoxyethyl)-5-methylcytidine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "NF2": {
+   "parent": "?",
+   "name": "(1S)-1,4-ANHYDRO-1-(2,4-DIFLUORO-5-METHYLPHENYL)-5-O-PHOSPHONO-D-RIBITOL",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 6
+  },
+  "O2C": {
+   "parent": "?",
+   "name": "3'-DEOXY-CYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "O2Z": {
+   "parent": "A",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-(2-azanyl-6-diazanyl-purin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methoxyphosphinic acid",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "OBX": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-[4-azanyl-2-(4-carbamimidamidobutylamino)pyrimidin-1-yl]-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 1
+  },
+  "OKT": {
+   "parent": "?",
+   "name": "2'-O-methyluridine-5'-phosphorothioate",
+   "type": "DNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "OMC": {
+   "parent": "C",
+   "name": "O2'-METHYLYCYTIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 4562
+  },
+  "OMG": {
+   "parent": "G",
+   "name": "O2'-METHYLGUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 6423
+  },
+  "OMU": {
+   "parent": "U",
+   "name": "O2'-METHYLURIDINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 3679
+  },
+  "ONE": {
+   "parent": "U",
+   "name": "1-(BETA-D-RIBOFURANOSYL)-PYRIDIN-4-ONE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "P4U": {
+   "parent": "U",
+   "name": "4-propyl, uridine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 26
+  },
+  "P5P": {
+   "parent": "A",
+   "name": "PURINE RIBOSIDE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 829
+  },
+  "P7G": {
+   "parent": "G",
+   "name": "7-propyl, guanosine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 56
+  },
+  "PAE": {
+   "parent": "?",
+   "name": "PHOSPHONOACETIC ACID",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "PDI": {
+   "parent": "?",
+   "name": "PHOSPHORIC ACID MONO-(3-HYDROXY-PROPYL) ESTER",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "PGP": {
+   "parent": "G",
+   "name": "GUANOSINE-3',5'-DIPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "PHA": {
+   "parent": "?",
+   "name": "PHENYLALANINAL",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 14
+  },
+  "PHE": {
+   "parent": "?",
+   "name": "PHENYLALANINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "PO2": {
+   "parent": "?",
+   "name": "HYPOPHOSPHITE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "PO4": {
+   "parent": "?",
+   "name": "PHOSPHATE ION",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 6
+  },
+  "POP": {
+   "parent": "?",
+   "name": "PYROPHOSPHATE 2-",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 6
+  },
+  "PPU": {
+   "parent": "A",
+   "name": "PUROMYCIN-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 72
+  },
+  "PQ1": {
+   "parent": "?",
+   "name": "PHOSPHORIC ACID MONO-[5-(2-AMINO-5-AMINOMETHYL-4-OXO-3,5-DIHYDRO-4H-PYRIDO[2,3-D]PYRIMIDIN-8-YL)-3,4-DIHYDROXY-TETRAHYDRO-FURAN-2-YLMETHYL] ESTER",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "PRO": {
+   "parent": "?",
+   "name": "PROLINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 4
+  },
+  "PST": {
+   "parent": "?",
+   "name": "THYMIDINE-5'-THIOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "PSU": {
+   "parent": "U",
+   "name": "PSEUDOURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "pseudouridine",
+   "count": 18305
+  },
+  "PU": {
+   "parent": "A",
+   "name": "PUROMYCIN-N-AMINOPHOSPHONIC ACID",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "PYO": {
+   "parent": "U",
+   "name": "1-(BETA-D-RIBOFURANOSYL)-PYRIMIDIN-2-ONE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "PYY": {
+   "parent": "?",
+   "name": "D-RIBOFURANOSYL-BENZENE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "QSK": {
+   "parent": "?",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-5-(4-azanyl-2-oxidanylidene-pyrimidin-1-yl)-3-oxidanyl-4-(trifluoromethyloxy)oxolan-2-yl]methoxyphosphinic acid",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 1
+  },
+  "QSQ": {
+   "parent": "A",
+   "name": "[(2~{R},3~{R},4~{R},5~{R})-5-(6-aminopurin-9-yl)-3-oxidanyl-4-(trifluoromethyloxy)oxolan-2-yl]methyl dihydrogen phosphite",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 3
+  },
+  "QUO": {
+   "parent": "G",
+   "name": "2-AMINO-7-DEAZA-(2'',3''-DIHYDROXY-CYCLOPENTYLAMINO)-GUANOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 21
+  },
+  "RFJ": {
+   "parent": "G",
+   "name": "2'-O-methyl-5'-O-thiophosphonoguanosine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 3
+  },
+  "RIA": {
+   "parent": "A",
+   "name": "2'-O-[(5'-PHOSPHO)RIBOSYL]ADENOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 15
+  },
+  "RPC": {
+   "parent": "C",
+   "name": "cytidine 3',5'-bis(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "RSP": {
+   "parent": "C",
+   "name": "4-amino-1-(5-O-phosphono-beta-D-ribofuranosyl)pyrimidine-2(1H)-thione",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 33
+  },
+  "RSQ": {
+   "parent": "C",
+   "name": "5-formylcytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 34
+  },
+  "RUS": {
+   "parent": "U",
+   "name": "1-(5-O-phosphono-beta-D-ribofuranosyl)-2-selanylpyrimidin-4(1H)-one",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 13
+  },
+  "RY": {
+   "parent": "?",
+   "name": "5'-3,6-dihydrocytidylic acid",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 5
+  },
+  "S4C": {
+   "parent": "C",
+   "name": "4'-THIO-4'-DEOXY-CYTOSINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "S9L": {
+   "parent": "?",
+   "name": "2-[2-(2-HYDROXYETHOXY)ETHOXY]ETHYL DIHYDROGEN PHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 10
+  },
+  "SC": {
+   "parent": "?",
+   "name": "2'-deoxycytidine-5'-thio-monophosphate",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 6
+  },
+  "SRA": {
+   "parent": "A",
+   "name": "ADENOSINE -5'-THIO-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 17
+  },
+  "SSU": {
+   "parent": "U",
+   "name": "URIDINE-5'-PHOSPHOROTHIOATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 50
+  },
+  "SUR": {
+   "parent": "U",
+   "name": "1-(BETA-D-RIBOFURANOSYL)-2-THIO-URACIL-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 21
+  },
+  "T39": {
+   "parent": "?",
+   "name": "2'-O-METHOXYETHYLENE THYMIDINE 5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "T6A": {
+   "parent": "A",
+   "name": "N-[N-(9-B-D-RIBOFURANOSYLPURIN-6-YL)CARBAMOYL]THREONINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 113
+  },
+  "TFT": {
+   "parent": "?",
+   "name": "(L)-ALPHA-THREOFURANOSYL-THYMINE-3'-MONOPHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "TG": {
+   "parent": "?",
+   "name": "(3S,4R,5R)-5-(2-amino-6-oxo-3,6-dihydro-9H-purin-9-yl)-4-hydroxyoxolan-3-yl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "THR": {
+   "parent": "?",
+   "name": "THREONINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "TKW": {
+   "parent": "C",
+   "name": "5-hydroxycytidine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 13
+  },
+  "TLN": {
+   "parent": "?",
+   "name": "[(1R,3R,4R,7S)-7-HYDROXY-3-(THYMIN-1-YL)-2,5-DIOXABICYCLO[2.2.1]HEPT-1-YL]METHYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 43
+  },
+  "TM2": {
+   "parent": "?",
+   "name": "5-{[(2-sulfoethyl)amino]methyl}uridine 5'-(dihydrogen phosphate)",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 2
+  },
+  "TRP": {
+   "parent": "?",
+   "name": "TRYPTOPHAN",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 9
+  },
+  "TSE": {
+   "parent": "?",
+   "name": "THIOPHOSPHONOACETIC ACID",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "U23": {
+   "parent": "U",
+   "name": "URIDINE-5'-MONOPHOSPHATE-2',3'-CYCLIC PHOSPHATE",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "U2L": {
+   "parent": "U",
+   "name": "5-METHYL-3'-O-METHOXYETHYL URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 2
+  },
+  "U33": {
+   "parent": "?",
+   "name": "5-BROMO-2'-DEOXY URIDINE",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "U34": {
+   "parent": "U",
+   "name": "URIDINE 5'-MONOMETHYLPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "U36": {
+   "parent": "U",
+   "name": "2'-O-METHYOXYETHYL-URIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 16
+  },
+  "U37": {
+   "parent": "U",
+   "name": "URIDINE 5'-MONOTHIOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 13
+  },
+  "U4M": {
+   "parent": "?",
+   "name": "1-{2,5-dideoxy-2-fluoro-4-[(phosphonooxy)methyl]-alpha-L-lyxofuranosyl}pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "U5M": {
+   "parent": "?",
+   "name": "1-(2,6-dideoxy-2-fluoro-5-O-phosphono-alpha-L-talofuranosyl)pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 2
+  },
+  "U5P": {
+   "parent": "?",
+   "name": "URIDINE-5'-MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "U5R": {
+   "parent": "?",
+   "name": "1-(2,6-dideoxy-2-fluoro-5-O-phosphono-beta-D-allofuranosyl)pyrimidine-2,4(1H,3H)-dione",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "U8U": {
+   "parent": "U",
+   "name": "5-METHYLAMINOMETHYL-2-THIOURIDINE-5'-MONOPHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 53
+  },
+  "UAR": {
+   "parent": "U",
+   "name": "URACIL ARABINOSE-5'-PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 5
+  },
+  "UBD": {
+   "parent": "U",
+   "name": "URIDINE 3',5'-BIS(DIHYDROGEN PHOSPHATE)",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 3
+  },
+  "UD5": {
+   "parent": "U",
+   "name": "5-FLUOROURIDINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "UFB": {
+   "parent": "?",
+   "name": "2'-F,4'-beta-OMe Uridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 8
+  },
+  "UFT": {
+   "parent": "?",
+   "name": "2'-deoxy-2'-fluorouridine 5'-(dihydrogen phosphate)",
+   "type": "DNA LINKING",
+   "class": "other",
+   "count": 818
+  },
+  "UMO": {
+   "parent": "U",
+   "name": "2'-F-4'-OMe U",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "UMS": {
+   "parent": "?",
+   "name": "2'-METHYLSELENYL-2'-DEOXYURIDINE-5'-PHOSPHATE",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 11
+  },
+  "UNK": {
+   "parent": "?",
+   "name": "UNKNOWN",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 318
+  },
+  "UOA": {
+   "parent": "?",
+   "name": "[(2R,3S,4R,5R)-5-(2,4-dioxo-3,4-dihydropyrimidin-1(2H)-yl)-3-hydroxy-2,4-dimethoxytetrahydrofuran-2-yl]methyl dihydrogen phosphate (non-preferred name)",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 2
+  },
+  "UOB": {
+   "parent": "?",
+   "name": "2'-OMe,4'beta-OMe uridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 8
+  },
+  "UPV": {
+   "parent": "U",
+   "name": "2'-O-{[(2,2-dimethylpropanoyl)oxy]methyl}uridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "UR3": {
+   "parent": "U",
+   "name": "3-METHYLURIDINE-5'-MONOPHOSHATE",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 995
+  },
+  "URU": {
+   "parent": "?",
+   "name": "((2S,3S,4R,5R)-5-(2,4-dioxo-3,4-dihydropyrimidin-1(2H)-yl)-3-(2- ((((2R,5R)-5-(2,4-dioxo-3,4-dihydropyrimidin-1(2H)-yl)- 3,4-dihydroxytetrahydrofuran-2-yl)methyl)amino)-2-oxoethyl)-4- hydroxytetrahydrofuran-2-yl)methyl phosphate\" _chem_comp.type                                  \"RNA LINKING\" _chem_comp.pdbx_type                             ATOMN _chem_comp.formula                               \"C20 H26 N5 O14 P\" _chem_comp.mon_nstd_parent_comp_id               ? _chem_comp.pdbx_synonyms                         ? _chem_comp.pdbx_formal_charge                    0 _chem_comp.pdbx_initial_date                     2014-01-07 _chem_comp.pdbx_modified_date                    2014-07-03 _chem_comp.pdbx_ambiguous_flag                   N _chem_comp.pdbx_release_status                   REL _chem_comp.pdbx_replaced_by                      ? _chem_comp.pdbx_replaces                         ? _chem_comp.formula_weight                        591.419 _chem_comp.one_letter_code                       ? _chem_comp.three_letter_code                     URU _chem_comp.pdbx_model_coordinates_details        ? _chem_comp.pdbx_model_coordinates_missing_flag   Y _chem_comp.pdbx_ideal_coordinates_details        Corina _chem_comp.pdbx_ideal_coordinates_missing_flag   N _chem_comp.pdbx_model_coordinates_db_code        4O41 _chem_comp.pdbx_subcomponent_list                ? _chem_comp.pdbx_processing_site                  RCSB # loop_ _chem_comp_atom.comp_id _chem_comp_atom.atom_id _chem_comp_atom.alt_atom_id _chem_comp_atom.type_symbol _chem_comp_atom.charge _chem_comp_atom.pdbx_align _chem_comp_atom.pdbx_aromatic_flag _chem_comp_atom.pdbx_leaving_atom_flag _chem_comp_atom.pdbx_stereo_config _chem_comp_atom.model_Cartn_x _chem_comp_atom.model_Cartn_y _chem_comp_atom.model_Cartn_z _chem_comp_atom.pdbx_model_Cartn_x_ideal _chem_comp_atom.pdbx_model_Cartn_y_ideal _chem_comp_atom.pdbx_model_Cartn_z_ideal _chem_comp_atom.pdbx_component_atom_id _chem_comp_atom.pdbx_component_comp_id _chem_comp_atom.pdbx_ordinal URU P     P     P 0 1 N N N 8.858  -1.049 9.850  -5.936 3.625  0.733  P     URU 1 URU OP1   OP1   O 0 1 N N N 9.016  0.138  8.973  -6.589 3.395  -0.575 OP1   URU 2 URU \"O5'\" \"O5'\" O 0 1 N N N 7.303  -1.392 10.016 -4.976 2.380  1.080  \"O5'\" URU 3 URU \"C5'\" \"C5'\" C 0 1 N N N 6.408  -1.433 8.886  -3.943 1.925  0.204  \"C5'\" URU 4 URU \"C4'\" \"C4'\" C 0 1 N N S 5.039  -1.832 9.363  -3.227 0.730  0.837  \"C4'\" URU 5 URU \"C3'\" \"C3'\" C 0 1 N N S 4.442  -1.058 10.531 -2.091 0.223  -0.086 \"C3'\" URU 6 URU \"C6'\" \"C6'\" C 0 1 N N N 3.887  0.313  10.144 -0.795 0.997  0.166  \"C6'\" URU 7 URU \"C2'\" \"C2'\" C 0 1 N N R 3.442  -2.055 11.096 -1.946 -1.253 0.357  \"C2'\" URU 8 URU \"O2'\" \"O2'\" O 0 1 N N N 2.245  -2.012 10.296 -0.868 -1.394 1.284  \"O2'\" URU 9 URU \"C1'\" \"C1'\" C 0 1 N N R 4.209  -3.373 10.920 -3.291 -1.576 1.038  \"C1'\" URU 10 URU \"O4'\" \"O4'\" O 0 1 N N N 5.100  -3.202 9.858  -4.116 -0.404 0.932  \"O4'\" URU 11 URU N1    N1    N 0 1 N N N 4.942  -3.681 12.156 -3.936 -2.702 0.358  N1    URU 12 URU C6    C6    C 0 1 N N N 6.284  -3.423 12.301 -4.120 -3.882 1.027  C6    URU 13 URU C5    C5    C 0 1 N N N 6.953  -3.690 13.433 -4.714 -4.920 0.400  C5    URU 14 URU C4    C4    C 0 1 N N N 6.257  -4.269 14.544 -5.137 -4.764 -0.942 C4    URU 15 URU N3    N3    N 0 1 N N N 4.921  -4.486 14.311 -4.937 -3.585 -1.566 N3    URU 16 URU C2    C2    C 0 1 N N N 4.221  -4.222 13.192 -4.346 -2.565 -0.916 C2    URU 17 URU O2    O2    O 0 1 N N N 3.034  -4.448 13.090 -4.177 -1.507 -1.489 O2    URU 18 URU O4    O4    O 0 1 N N N 6.779  -4.545 15.614 -5.675 -5.686 -1.528 O4    URU 19 URU OP2   OP2   O 0 1 N N N 9.421  -1.049 11.228 -5.060 4.974  0.664  OP2   URU 20 URU C     C     C 0 1 N N N 3.263  0.997  11.337 0.250  0.565  -0.830 C     URU 21 URU O3    O3    O 0 1 N N N 3.511  0.720  12.501 -0.014 -0.280 -1.659 O3    URU 22 URU \"NZ'\" \"NZ'\" N 0 1 N N N 2.330  1.996  11.027 1.479  1.117  -0.798 \"NZ'\" URU 23 URU \"CZ'\" \"CZ'\" C 0 1 N N N 1.656  2.802  12.030 2.496  0.696  -1.766 \"CZ'\" URU 24 URU \"CY'\" \"CY'\" C 0 1 N N R 0.190  2.339  12.049 3.791  1.471  -1.514 \"CY'\" URU 25 URU \"CX'\" \"CX'\" C 0 1 N N S -0.502 2.774  13.335 4.833  1.115  -2.592 \"CX'\" URU 26 URU \"OX'\" \"OX'\" O 0 1 N N N -0.849 4.136  13.211 5.218  2.283  -3.321 \"OX'\" URU 27 URU \"CW'\" \"CW'\" C 0 1 N N R -1.617 1.746  13.448 6.033  0.557  -1.791 \"CW'\" URU 28 URU \"OW'\" \"OW'\" O 0 1 N N N -2.634 2.136  12.569 7.270  1.029  -2.329 \"OW'\" URU 29 URU \"CV'\" \"CV'\" C 0 1 N N R -0.964 0.463  12.928 5.783  1.145  -0.379 \"CV'\" URU 30 URU \"OY'\" \"OY'\" O 0 1 N N N 0.101  0.871  12.106 4.346  1.095  -0.243 \"OY'\" URU 31 URU N11   N11   N 0 1 N N N -0.428 -0.373 14.026 6.427  0.320  0.646  N11   URU 32 URU C16   C16   C 0 1 N N N 0.925  -0.569 14.218 7.452  0.840  1.389  C16   URU 33 URU C15   C15   C 0 1 N N N 1.370  -1.394 15.192 8.045  0.079  2.334  C15   URU 34 URU C14   C14   C 0 1 N N N 0.453  -2.060 16.050 7.592  -1.247 2.536  C14   URU 35 URU N13   N13   N 0 1 N N N -0.882 -1.810 15.795 6.580  -1.722 1.783  N13   URU 36 URU C12   C12   C 0 1 N N N -1.366 -0.998 14.816 6.003  -0.940 0.851  C12   URU 37 URU O12   O12   O 0 1 N N N -2.584 -0.837 14.661 5.088  -1.380 0.183  O12   URU 38 URU O14   O14   O 0 1 N N N 0.681  -2.835 16.975 8.112  -1.952 3.382  O14   URU 39 URU H2    H2    H 0 1 N N N 6.772  -2.168 8.153  -4.380 1.623  -0.748 H2    URU 40 URU H3    H3    H 0 1 N N N 6.360  -0.439 8.417  -3.228 2.730  0.037  H3    URU 41 URU H4    H4    H 0 1 N N N 4.340  -1.781 8.515  -2.837 0.995  1.820  H4    URU 42 URU H5    H5    H 0 1 N N N 5.233  -0.906 11.280 -2.383 0.287  -1.134 H5    URU 43 URU H6    H6    H 0 1 N N N 4.706  0.938  9.758  -0.983 2.065  0.054  H6    URU 44 URU H7    H7    H 0 1 N N N 3.124  0.185  9.362  -0.441 0.794  1.176  H7    URU 45 URU H8    H8    H 0 1 N N N 3.242  -1.856 12.159 -1.792 -1.898 -0.508 H8    URU 46 URU H9    H9    H 0 1 N N N 1.612  -2.631 10.639 -0.732 -2.300 1.595  H9    URU 47 URU H10   H10   H 0 1 N N N 3.491  -4.177 10.703 -3.126 -1.822 2.087  H10   URU 48 URU H11   H11   H 0 1 N N N 6.821  -2.988 11.471 -3.791 -3.983 2.050  H11   URU 49 URU H12   H12   H 0 1 N N N 8.008  -3.470 13.506 -4.866 -5.857 0.916  H12   URU 50 URU H13   H13   H 0 1 N N N 4.404  -4.890 15.066 -5.224 -3.471 -2.485 H13   URU 51 URU H14   H14   H 0 1 N N N 9.851  -0.218 11.395 -4.602 5.188  1.489  H14   URU 52 URU H15   H15   H 0 1 N N N 2.117  2.163  10.064 1.691  1.792  -0.135 H15   URU 53 URU H16   H16   H 0 1 N N N 2.117  2.645  13.016 2.684  -0.371 -1.655 H16   URU 54 URU H17   H17   H 0 1 N N N 1.715  3.868  11.763 2.142  0.900  -2.777 H17   URU 55 URU H18   H18   H 0 1 N N N -0.345 2.735  11.173 3.591  2.542  -1.528 H18   URU 56 URU H19   H19   H 0 1 N N N 0.194  2.634  14.175 4.438  0.356  -3.268 H19   URU 57 URU H20   H20   H 0 1 N Y N -1.283 4.426  14.005 5.872  2.117  -4.013 H20   URU 58 URU H21   H21   H 0 1 N N N -1.956 1.631  14.488 6.012  -0.533 -1.767 H21   URU 59 URU H22   H22   H 0 1 N N N -3.042 2.932  12.889 7.429  0.760  -3.244 H22   URU 60 URU H23   H23   H 0 1 N N N -1.706 -0.110 12.352 6.140  2.173  -0.323 H23   URU 61 URU H24   H24   H 0 1 N N N 1.635  -0.058 13.584 7.784  1.854  1.221  H24   URU 62 URU H25   H25   H 0 1 N N N 2.431  -1.548 15.319 8.856  0.477  2.927  H25   URU 63 URU H26   H26   H 0 1 N N N -1.551 -2.266 16.382 6.264  -2.629 1.915  H26   URU 64 URU OP3   OP3   O 0 1 N Y N ?      ?      ?      -7.060 3.772  1.876  OP3   URU 65 URU H1    H1    H 0 1 N Y N ?      ?      ?      -7.674 4.505  1.731  H1    URU 66 # loop_ _chem_comp_bond.comp_id _chem_comp_bond.atom_id_1 _chem_comp_bond.atom_id_2 _chem_comp_bond.value_order _chem_comp_bond.pdbx_aromatic_flag _chem_comp_bond.pdbx_stereo_config _chem_comp_bond.pdbx_ordinal URU \"C5'\" \"C4'\" SING N N 1 URU \"C5'\" \"O5'\" SING N N 2 URU OP1   P     DOUB N N 3 URU \"C4'\" \"O4'\" SING N N 4 URU \"C4'\" \"C3'\" SING N N 5 URU P     \"O5'\" SING N N 6 URU P     OP2   SING N N 7 URU \"O4'\" \"C1'\" SING N N 8 URU \"C6'\" \"C3'\" SING N N 9 URU \"C6'\" C     SING N N 10 URU \"O2'\" \"C2'\" SING N N 11 URU \"C3'\" \"C2'\" SING N N 12 URU \"C1'\" \"C2'\" SING N N 13 URU \"C1'\" N1    SING N N 14 URU \"NZ'\" C     SING N N 15 URU \"NZ'\" \"CZ'\" SING N N 16 URU C     O3    DOUB N N 17 URU \"CZ'\" \"CY'\" SING N N 18 URU \"CY'\" \"OY'\" SING N N 19 URU \"CY'\" \"CX'\" SING N N 20 URU \"OY'\" \"CV'\" SING N N 21 URU N1    C6    SING N N 22 URU N1    C2    SING N N 23 URU C6    C5    DOUB N N 24 URU \"OW'\" \"CW'\" SING N N 25 URU \"CV'\" \"CW'\" SING N N 26 URU \"CV'\" N11   SING N N 27 URU O2    C2    DOUB N N 28 URU C2    N3    SING N N 29 URU \"OX'\" \"CX'\" SING N N 30 URU \"CX'\" \"CW'\" SING N N 31 URU C5    C4    SING N N 32 URU N11   C16   SING N N 33 URU N11   C12   SING N N 34 URU C16   C15   DOUB N N 35 URU N3    C4    SING N N 36 URU C4    O4    DOUB N N 37 URU O12   C12   DOUB N N 38 URU C12   N13   SING N N 39 URU C15   C14   SING N N 40 URU N13   C14   SING N N 41 URU C14   O14   DOUB N N 42 URU \"C5'\" H2    SING N N 43 URU \"C5'\" H3    SING N N 44 URU \"C4'\" H4    SING N N 45 URU \"C3'\" H5    SING N N 46 URU \"C6'\" H6    SING N N 47 URU \"C6'\" H7    SING N N 48 URU \"C2'\" H8    SING N N 49 URU \"O2'\" H9    SING N N 50 URU \"C1'\" H10   SING N N 51 URU C6    H11   SING N N 52 URU C5    H12   SING N N 53 URU N3    H13   SING N N 54 URU OP2   H14   SING N N 55 URU \"NZ'\" H15   SING N N 56 URU \"CZ'\" H16   SING N N 57 URU \"CZ'\" H17   SING N N 58 URU \"CY'\" H18   SING N N 59 URU \"CX'\" H19   SING N N 60 URU \"OX'\" H20   SING N N 61 URU \"CW'\" H21   SING N N 62 URU \"OW'\" H22   SING N N 63 URU \"CV'\" H23   SING N N 64 URU C16   H24   SING N N 65 URU C15   H25   SING N N 66 URU N13   H26   SING N N 67 URU P     OP3   SING N N 68 URU OP3   H1    SING N N 69 # loop_ _pdbx_chem_comp_descriptor.comp_id _pdbx_chem_comp_descriptor.type _pdbx_chem_comp_descriptor.program _pdbx_chem_comp_descriptor.program_version _pdbx_chem_comp_descriptor.descriptor URU SMILES           ACDLabs              12.01 \"O=P(O)(O)OCC2OC(N1C=CC(=O)NC1=O)C(O)C2CC(=O)NCC4OC(N3C(=O)NC(=O)C=C3)C(O)C4O\" URU InChI            InChI                1.03",
+   "type": "?",
+   "class": "methylation",
+   "count": 5
+  },
+  "US3": {
+   "parent": "?",
+   "name": "1-(2-deoxy-5-O-phosphono-beta-D-erythro-pentofuranosyl)-5-methyl-2-selanylpyrimidin-4(1H)-one",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 4
+  },
+  "US5": {
+   "parent": "U",
+   "name": "1-(5-O-phosphono-beta-D-ribofuranosyl)-4-selanylpyrimidin-2(1H)-one",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "UTP": {
+   "parent": "?",
+   "name": "URIDINE 5'-TRIPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 4
+  },
+  "UVP": {
+   "parent": "?",
+   "name": "1-[(5E)-5,6-dideoxy-2-O-methyl-6-phosphono-beta-D-ribo-hex-5-enofuranosyl]-2,4-dihydroxypyrimidin-1-ium",
+   "type": "NON-POLYMER",
+   "class": "methylation",
+   "count": 1
+  },
+  "UY1": {
+   "parent": "?",
+   "name": "2'-O-methylpseudouridine-5'-monophosphate",
+   "type": "RNA linking",
+   "class": "pseudouridine",
+   "count": 139
+  },
+  "UY4": {
+   "parent": "?",
+   "name": "(2S,3S)-2-{[(9-{(2R,3R,4S,5R)-3,4-dihydroxy-5-[(phosphonooxy)methyl]tetrahydrofuran-2-yl}-9H-purin-6-yl)carbamoyl]amino}-3-hydroxybutanoic acid",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "UZL": {
+   "parent": "?",
+   "name": "O2'-methylycytidine",
+   "type": "RNA OH 3 prime terminus",
+   "class": "methylation",
+   "count": 3
+  },
+  "UZR": {
+   "parent": "U",
+   "name": "2'-deoxy-2'-triaza-1,2-dien-2-ium-1-yl-uridine-5'-monophosphate",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 1
+  },
+  "VAL": {
+   "parent": "?",
+   "name": "VALINE",
+   "type": "L-PEPTIDE LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "VC7": {
+   "parent": "G",
+   "name": "5'-O-[(R)-hydroxy(methyl)phosphoryl]guanosine",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "XEC": {
+   "parent": "?",
+   "name": "1-(2-O-methyl-5-O-phosphono-beta-L-ribofuranosyl)pyrimidine-2,4(1H,3H)-dione",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 5
+  },
+  "XMP": {
+   "parent": "?",
+   "name": "XANTHOSINE-5'-MONOPHOSPHATE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 2
+  },
+  "XNY": {
+   "parent": "?",
+   "name": "[(2~{R},3~{S},4~{R},5~{R})-5-(4-azanyl-3~{H}-imidazo[4,5-c]pyridin-1-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl dihydrogen phosphate",
+   "type": "RNA linking",
+   "class": "methylation",
+   "count": 1
+  },
+  "XSX": {
+   "parent": "U",
+   "name": "3-[(3R)-3-amino-3-carboxypropyl]uridine 5'-(dihydrogen phosphate)",
+   "type": "RNA linking",
+   "class": "other",
+   "count": 9
+  },
+  "XUG": {
+   "parent": "?",
+   "name": "2'-SE-METHYL-2'-SELENOGUANOSINE 5'-(DIHYDROGEN PHOSPHATE)",
+   "type": "DNA LINKING",
+   "class": "methylation",
+   "count": 2
+  },
+  "Y5P": {
+   "parent": "?",
+   "name": "1-(5-O-phosphono-beta-D-ribofuranosyl)-1,4-dihydropyrimidine",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1063
+  },
+  "YG": {
+   "parent": "G",
+   "name": "WYBUTOSINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 36
+  },
+  "YYG": {
+   "parent": "G",
+   "name": "4-(3-[5-O-PHOSPHONORIBOFURANOSYL]-4,6-DIMETHYL-8-OXO-4,8-DIHYDRO-3H-1,3,4,5,7A-PENTAAZA-S-INDACEN-YLAMINO-BUTYRIC ACID METHYL ESTER",
+   "type": "RNA LINKING",
+   "class": "methylation",
+   "count": 28
+  },
+  "ZAD": {
+   "parent": "A",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-ADENINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "ZBC": {
+   "parent": "C",
+   "name": "(2S)-3-(4-AMINO-5-BROMO-2-OXOPYRIMIDIN-1(2H)-YL)-2-HYDROXYPROPYL DIHYDROGEN PHOSPHATE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "ZBU": {
+   "parent": "U",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-5-BROMO-URACIL",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 1
+  },
+  "ZCY": {
+   "parent": "C",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-CYTOSINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 6
+  },
+  "ZGU": {
+   "parent": "G",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-GUANINE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 7
+  },
+  "ZHP": {
+   "parent": "?",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-HYDROXYPYRIDONE",
+   "type": "RNA LINKING",
+   "class": "other",
+   "count": 2
+  },
+  "ZIV": {
+   "parent": "?",
+   "name": "(2~{S})-4-[[(2~{R},3~{S},4~{R},5~{R})-5-(6-aminopurin-9-yl)-3,4-bis(oxidanyl)oxolan-2-yl]methyl-[2-[2-azanyl-9-[(2~{R},3~{R},4~{R},5~{R})-5-[bis(oxidanyl)phosphanyloxymethyl]-3,4-bis(oxidanyl)oxolan-2-yl]-6-oxidanylidene-3~{H}-purin-7-yl]ethyl]amino]-2-azanyl-butanoic acid",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 1
+  },
+  "ZJS": {
+   "parent": "?",
+   "name": "N-(3-methylbut-2-en-1-yl)adenosine 5'-(dihydrogen phosphate)",
+   "type": "non-polymer",
+   "class": "methylation",
+   "count": 6
+  },
+  "ZTH": {
+   "parent": "?",
+   "name": "(S)-1'-(2',3'-DIHYDROXYPROPYL)-THYMINE",
+   "type": "NON-POLYMER",
+   "class": "other",
+   "count": 10
+  }
+ }
+}

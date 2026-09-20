@@ -252,12 +252,53 @@ in the FFN. This was already the right call and is retained.
 | **Sugar pucker propensity** | C3′-endo / C2′-endo prior (2) | literature |
 | **Stacking** | polarisability, stacking-energy prior (2) | literature |
 | **Backbone** | phosphate charge state, 2′-OH present (2) | derived |
-| **Modification** | methylation / pseudouridylation / other (3) | mmCIF `comp_id` |
+| **Modification** | methylation / pseudouridylation / other (3) | mmCIF `comp_id` → PDB Chemical Component Dictionary |
 | **Local context** | GC fraction ±16 (1) | computed |
 
 All 24 are available at inference for any sequence. None is a structural
 observable, so none leaks the answer — the separation v0.1 established between
 **inputs** and **supervision targets** is preserved and is load-bearing.
+
+#### Implemented, and the modification classes are now measured **[v0.2]**
+
+`src/pharos/data/chemistry.py`, with `test_chemistry.py` pinning 34 properties.
+Two things changed on contact with the archive.
+
+**The three modification dims were specified against five hand-picked examples;
+the archive holds 370 species.** Over all 10,520 RNA-bearing entries, 75,434 of
+13,348,166 residues are modified (0.565%):
+
+| dim | class | residues | share |
+|---|---|---|---|
+| 20 | methylation | 42,555 | **56.4%** |
+| 21 | pseudouridylation | 18,458 | **24.5%** |
+| 22 | other | 14,421 | 19.1% |
+
+Pseudouridine is a quarter of all modifications by itself, which retroactively
+justifies giving it a dim rather than a share of "other" — and it earns that dim
+mechanically, not just by frequency: it adds an N1-H donor on the Hoogsteen
+face, which `chemistry.py` applies at dim 8.
+
+**Parent resolution is by dictionary, because it cannot be anything else.**
+`VOCAB.md` specifies a `MOD` embedding "falling back to the parent base", and
+the obvious source — `_chem_comp.mon_nstd_parent_comp_id` — is **not in the
+entry files**. They carry only id/type/mon_nstd_flag/name/synonyms/formula/
+formula_weight; a first implementation parsed for the parent and got one for
+zero of 55 species. The field lives in the PDB Chemical Component Dictionary
+(119 MB, acquired). All 370 species are in it, and **88.6% of modified residues
+resolve to a standard A/C/G/U parent**. The 11.4% that do not — inosine, UNK,
+L-nucleotides, locked and fluorinated analogues — are genuinely parentless and
+are reported as `N` rather than assigned one.
+
+Classification reads the CCD's systematic *name*, which is chemistry, rather
+than a list of component codes, which is the curated list defect #22 was about.
+A2M is the regression case: nothing in the string says adenosine.
+
+**The leak boundary is enforced in code.** Dim 13 (shifted pKa) is the one
+feature set from structural context, so `chain_chemistry` has no parameter that
+can set it — a caller must go residue-by-residue and ask for it explicitly, on
+recycles ≥ 1. Setting it from a known structure in training and from nothing at
+inference is a train/test mismatch that would otherwise be one keyword away.
 
 ### 4.2 What stays a target, never an input
 
@@ -815,10 +856,12 @@ entry_composition_rawpdb.py           -> entry_composition_rawpdb.json   (G1/G2/
                                       -> entry_composition_rawpdb_table.json
 derivative_coverage.py                -> derivative_coverage.json        (§11.4)
                                       -> uncovered_entries.json          (the 2,581)
+modification_census.py                -> modification_census.json        (§4.1)
+resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **202** checks. Counting
+JSONs and fails the build on drift; it currently pins **214** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

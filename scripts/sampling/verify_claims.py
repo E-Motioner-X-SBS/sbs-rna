@@ -128,6 +128,30 @@ def main() -> int:
             tc["G3_ribosomal"]["frac_residues"], ec["G3_ribosomal"]["frac_residues"],
             abs_tol=0.0001)
 
+        # ---- §4 chemistry: the modification census and CCD resolution ----
+        # CHEMISTRY.md dims 20-22 were specified against five hand-picked
+        # examples; the archive holds 370 species. Parent resolution is by
+        # dictionary, because the parent field is not in the entry files at all.
+        mc = load("modification_census.json")
+        chk("chem census residues", mc["n_residues"], 13348166)
+        chk("chem census modified", mc["n_modified"], 75434)
+        chk("chem census modified fraction", mc["frac_modified"], 0.00565,
+            abs_tol=0.00002)
+        chk("chem distinct modification species", mc["n_distinct_species"], 370)
+        chk("PSU is the commonest modification",
+            mc["top_modifications"][0][0] == "PSU", 1)
+
+        cp = load("ccd_parents.json")
+        chk("chem all species found in the CCD",
+            cp["n_species_in_ccd"], cp["n_species"])
+        chk("chem residues resolvable to an A/C/G/U parent",
+            cp["frac_residues_with_parent"], 0.8858, abs_tol=0.0005)
+        cl = cp["by_class_residues"]
+        chk("chem no residue left unclassified", int("unknown" not in cl), 1)
+        chk("chem methylation residues", cl["methylation"], 42555)
+        chk("chem pseudouridine residues", cl["pseudouridine"], 18458)
+        chk("chem other residues", cl["other"], 14421)
+
         # ---- §11.4: the derivatives are not the archive ------------------
         # The finding that reframed D23: the derivative maximum is correct for
         # the population the derivatives hold, and every chain above it is one
@@ -459,7 +483,8 @@ def main() -> int:
     import subprocess
     suites = [ROOT / "research/architecture/reference/test_hierarchical_pair_track.py",
               ROOT / "src/pharos/physics/test_manning.py",
-              ROOT / "src/pharos/data/test_mmcif_entities.py"]
+              ROOT / "src/pharos/data/test_mmcif_entities.py",
+              ROOT / "src/pharos/data/test_chemistry.py"]
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's

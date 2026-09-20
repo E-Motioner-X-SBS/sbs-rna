@@ -1,6 +1,7 @@
 # Per-nucleotide chemistry vector — the 24 features
 
 Specification for `pharos/data/chemistry.py`, introduced in ARCHITECTURE v0.2 §4.
+**Implemented** — see `chemistry.py` and `test_chemistry.py` (34 properties).
 
 ## Why this exists
 
@@ -108,20 +109,43 @@ is **b = 1.40 Å**, giving ξ = 5.11, θ = 0.804 and q_eff = −0.196 for A-RNA 
 `physics/manning.py`. Dim 19 distinguishes the DNA residues that appear in
 hybrid duplexes, which raw PDB entries genuinely contain.
 
-### Modification class (3 dims)
+### Modification class (3 dims) **[measured on the whole archive]**
 
-| Dim | Class | Examples seen in raw PDB |
-|---|---|---|
-| 20 | methylation | 5MC, OMG, OMU, 2MG, 7MG |
-| 21 | pseudouridylation | PSU |
-| 22 | other / unknown | I (inosine), UNK, and the long tail |
+| Dim | Class | residues | share of modified |
+|---|---|---|---|
+| 20 | methylation | 42,555 | **56.4%** |
+| 21 | pseudouridylation | 18,458 | **24.5%** |
+| 22 | other | 14,421 | 19.1% |
 
-**Measured: 1.005% of RNA polymer residues across 11.6M residues are modified**
-(raw PDB). The derivative corpora carry 0.025% — a 40× under-representation —
-so these dims are only meaningful when training consumes raw entries.
-Pseudouridine alone is 1,750 residues in a 60-entry sample: it is the most
-common modification and it changes H-bond capacity (adds an N1-H donor), so it
-is given its own dim rather than being pooled into "other".
+**Measured over all 10,520 RNA-bearing PDB entries: 75,434 of 13,348,166
+residues are modified (0.565%), across 370 distinct species.** The derivative
+corpora carry 0.025%, so these dims are only meaningful when training consumes
+raw entries. (The 1.005% quoted elsewhere is over *all* polymer residues in the
+ion-rigidity pass; 0.565% is over canonical RNA chains — different denominators,
+both correct.)
+
+The three-way split is not a guess about what the archive contains; it is what
+it contains. Pseudouridine is a quarter of all modifications on its own, which
+is why it has a dim rather than a share of "other", and it changes H-bond
+capacity (adds an N1-H donor on the Hoogsteen face) — `chemistry.py` applies
+that at dim 8.
+
+**Resolution is by dictionary, not by name.** The parent base of a modified
+residue is `_chem_comp.mon_nstd_parent_comp_id`, and that field is **not in the
+entry files**: they carry only id / type / mon_nstd_flag / name / synonyms /
+formula / formula_weight. It lives in the PDB Chemical Component Dictionary.
+`scripts/sampling/resolve_ccd_parents.py` reads the CCD once and emits
+`ccd_parents.json`; all 370 species are found there and **88.6% of modified
+residues resolve to a standard A/C/G/U parent**. The 11.4% that do not are
+genuinely parentless — inosine, UNK, L-nucleotides (0G, 0C), locked and
+fluorinated synthetic analogues — and are reported as parent `N` rather than
+assigned one.
+
+Classification uses the CCD's systematic `name` ("5-METHYLURIDINE
+5'-MONOPHOSPHATE"), which is chemistry, rather than a list of component codes,
+which is the curated list defect #22 was about. **A2M is the test case** in
+`test_chemistry.py`: nothing in the string says adenosine, and only the
+dictionary knows that it is 2'-O-methyladenosine.
 
 ### Context (1 dim)
 
@@ -152,9 +176,10 @@ Dims 6–17 are **literature values compiled into a static table**, not measured
 from our corpus — they are properties of the chemistry, not of the dataset, and
 a table is the right representation. They should be cited, not re-derived.
 
-Dims 20–22 are **measured**: `recheck_ions_rigidity_rawpdb.py` gives the 1.005%
-modification rate over 11,581,890 residues, and the species breakdown comes from
-the same pass.
+Dims 20–22 are **measured**: `modification_census.py` gives 75,434 modified
+residues of 13,348,166 across 370 species over the whole archive, and
+`resolve_ccd_parents.py` maps every one of them to a parent and a class through
+the Chemical Component Dictionary.
 
 The one place to be careful: dim 13 (shifted pKa) is set from *context*, and the
 contexts that shift it are structural. At inference, before any structure is
