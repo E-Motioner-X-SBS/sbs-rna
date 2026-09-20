@@ -273,6 +273,7 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
     atoms: dict[tuple, list] = defaultdict(list)
     names: dict[tuple, str] = {}
     ribo: set = set()
+    model: str | None = None
     with _open(path) as fh:
         for line in fh:
             s = line.rstrip("\n")
@@ -290,6 +291,25 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
                 if len(p) < len(cols):
                     continue
                 r = dict(zip(cols, p))
+                # C16: FIRST MODEL ONLY. An NMR entry deposits an ensemble --
+                # 20 models is the convention -- and every model repeats every
+                # atom of every residue. Keyed only by (chain, seq, ins), the
+                # ensemble collapsed into one residue holding 20 superposed
+                # copies: 1ARJ came back with **424 atoms per residue** against
+                # a nucleotide's real ~21. Geometry built from that is the
+                # UNION of the ensemble's contacts, so two residues count as
+                # touching if they touch in any single model, and both the
+                # contact count and `effective_c` inflate for every NMR chain.
+                # It also made the raw-corpus scan allocate 28 GB in one worker.
+                # The four chains that set the published maxima (7PAS, 6Q95,
+                # 1VY7, 6XHV) are all single-model cryo-EM or X-ray, so the
+                # published tail statistics are unaffected by this.
+                mn = r.get("pdbx_PDB_model_num")
+                if mn is not None:
+                    if model is None:
+                        model = mn
+                    elif mn != model:
+                        continue
                 ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
                 if ch not in want:
                     continue
@@ -313,6 +333,110 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
             continue            # deoxyribonucleotide inside a hybrid chain
         out[key[0]].append((key, names[key], atoms[key]))
     return dict(out)
+
+
+def entry_composition(path: Path) -> dict:
+    """Whole-entry polymer residue counts, by declared entity type.
+
+    The entry-level counterpart of `rna_chain_coords`, for the claims that are
+    about *entries* rather than chains -- G1 (RNA residues per entry), G2 (what
+    fraction sit in entries containing protein), G3 (what fraction come from
+    ribosome-like entries). None of the three is computable on RNA3DB or
+    RNASolo, which distribute per-chain extracts with the protein stripped out,
+    so they can only be measured on raw PDB entries.
+
+    C15: this function exists because defect #22 recurred. Two analysis scripts
+    had each grown a private `entry_composition` that keyed `_atom_site` rows by
+    **`label_asym_id`** while `entity_poly_types` returns **auth** chain ids.
+    Where an entry's two labellings differ -- overwhelmingly the older entries,
+    e.g. 1ARJ, whose sole RNA chain is `label A` / `auth N` -- every row missed
+    its entity and the entry reported zero polymer residues of any kind. It hit
+    **3,254 of 10,527** raw entries, including 686 that reported no polymer at
+    all, and it silently deflated G2 and G3. Counting rules therefore live here,
+    once, beside the resolver whose keys they have to match.
+
+    Rules, identical to `rna_chain_coords` so the two never disagree:
+
+      * chain identity is `auth_asym_id`, falling back to `label_asym_id`;
+      * a residue is counted only at a polymer position (`label_seq_id` set),
+        which excludes water, ions and ligands sharing the auth chain;
+      * residues are deduplicated on (chain, label_seq_id, ins_code), so the
+        20 models of an NMR entry collapse to one copy;
+      * a hybrid chain is split per residue on the `O2'` test -- ribose has a
+        2'-hydroxyl, deoxyribose does not.
+    """
+    types = entity_poly_types(path)
+    prot = {c for c, t in types.items() if "polypeptide" in t}
+    pure = {c for c, t in types.items() if t == "polyribonucleotide"}
+    hyb = {c for c, t in types.items()
+           if t.startswith("polydeoxyribonucleotide/polyribonucleotide")}
+    dna = {c for c, t in types.items()
+           if t.startswith("polydeoxyribonucleotide")} - hyb
+    want = prot | pure | hyb | dna
+
+    per_rna: dict[str, int] = {}
+    n_prot = n_dna = 0
+    seen: set = set()
+    hyb_ribo: set = set()
+    cols: list[str] = []
+    in_loop = header = False
+    if want:
+        with _open(path) as fh:
+            for line in fh:
+                s = line.rstrip("\n")
+                if s.startswith("_atom_site."):
+                    if not in_loop:
+                        in_loop, cols = True, []
+                    cols.append(s.split(".", 1)[1].strip())
+                    header = True
+                    continue
+                if not (header and in_loop):
+                    continue
+                if s.startswith(("#", "_", "loop_")):
+                    in_loop = header = False
+                    continue
+                p = s.split()
+                if len(p) < len(cols):
+                    continue
+                r = dict(zip(cols, p))
+                ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
+                if ch not in want:
+                    continue
+                sq = r.get("label_seq_id", ".")
+                if sq in (".", "?"):
+                    continue
+                key = (ch, sq, r.get("pdbx_PDB_ins_code", "?"))
+                if ch in hyb:
+                    # decided after the pass, once every atom of the residue
+                    # has been seen -- the O2' may come after other atoms
+                    if r.get("label_atom_id", "").strip('"') == "O2'":
+                        hyb_ribo.add(key)
+                    continue
+                if key in seen:
+                    continue
+                seen.add(key)
+                if ch in prot:
+                    n_prot += 1
+                elif ch in pure:
+                    per_rna[ch] = per_rna.get(ch, 0) + 1
+                else:
+                    n_dna += 1
+    for ch, _, _ in hyb_ribo:
+        per_rna[ch] = per_rna.get(ch, 0) + 1
+    n_rna = sum(per_rna.values())
+
+    return {
+        "pdb": Path(path).stem.replace(".cif", ""),
+        "n_protein_res": n_prot,
+        "n_rna_res": n_rna,
+        "n_dna_res": n_dna,
+        "n_protein_chains": len(prot),
+        "n_rna_chains": len(per_rna),
+        "longest_rna_chain": max(per_rna.values(), default=0),
+        "has_protein": len(prot) > 0,
+        "has_dna": n_dna > 0,
+        "entity_types": sorted(set(types.values())),
+    }
 
 
 def longest_rna_chain(path: Path):

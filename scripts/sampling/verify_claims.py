@@ -101,6 +101,84 @@ def main() -> int:
             ir["inner_sphere"]["phosphate_frac"], 0.7792, abs_tol=0.0005)
         chk("v0.2 modified-residue fraction (raw PDB)",
             ir["modified_residues"]["frac"], 0.01005, abs_tol=0.00005)
+
+        ec = load("entry_composition_rawpdb.json")
+        # ---- D9/D23: target_c, closed on raw chains ----------------------
+        # The budget had never been measured on data containing modified
+        # residues at anything like their real rate. On raw chains they are
+        # present at 0.476% against the derivatives' 0.025%, and the maximum
+        # rose from 21.14 to 23.30 -- the mechanism D9 predicted. 24 holds,
+        # with 2.9% headroom and zero breaches in 14,106 chains.
+        tc = load("targetc_g2g3_rawpdb.json")
+        chk("D23 raw chains measured", tc["n_chains"], 14106)
+        chk("D23 raw max effective c", tc["target_c_raw"]["max_effective_c"], 23.30)
+        chk("D23 raw p99.9 effective c", tc["target_c_raw"]["p999"], 23.08)
+        chk("D23 chains over 20", tc["target_c_raw"]["n_over_20"], 34)
+        chk("D23 chains over target_c=24", tc["target_c_raw"]["n_over_24"], 0)
+        chk("D23 modified residues in analysed chains",
+            tc["modified_residues"]["frac"], 0.00476, abs_tol=0.00002)
+        chk("D23 raw max contacts/nt", tc["contacts_per_nt_raw"]["max"], 7.79)
+        # The two independent code paths -- chain geometry and entry counting
+        # -- must agree on the entry-level claims. C15 was exactly a case of
+        # them silently not agreeing.
+        chk("G2 agrees across both raw scripts",
+            tc["G2_in_complex"]["frac_residues"], ec["G2_complex"]["frac_residues"],
+            abs_tol=0.0001)
+        chk("G3 agrees across both raw scripts",
+            tc["G3_ribosomal"]["frac_residues"], ec["G3_ribosomal"]["frac_residues"],
+            abs_tol=0.0001)
+
+        # ---- §11.4: the derivatives are not the archive ------------------
+        # The finding that reframed D23: the derivative maximum is correct for
+        # the population the derivatives hold, and every chain above it is one
+        # they do not. A parameter fitted to a curated corpus inherits that
+        # corpus's snapshot date.
+        dc = load("derivative_coverage.json")
+        de, du = dc["entries"], dc["uncovered_character"]
+        chk("11.4 RNA3DB entries", de["rna3db"], 5389)
+        chk("11.4 gRNAde/RNASolo entries", de["grnade_rnasolo"], 6156)
+        chk("11.4 derivative union", de["union"], 7943)
+        chk("11.4 entries in neither", de["uncovered"], 2581)
+        chk("11.4 uncovered with a chain in 64-3000", du["entries_chain_in_window"], 608)
+        chk("11.4 uncovered protein-free", du["protein_free"], 925)
+
+        dec, dt = dc["effective_c_by_coverage"], dc["tail"]
+        chk("11.4 max effective c, COVERED entries", dec["max_covered"], 21.14)
+        chk("11.4 max effective c, UNCOVERED entries", dec["max_uncovered"], 23.30)
+        chk("11.4 top-30 all outside both derivatives",
+            int(dt["top34_all_uncovered"]), 1)
+        chk("11.4 top-34 from the 9T series", dt["n_top34_in_series"], 30)
+        chk("11.4 rank of the first other structure",
+            dt["rank_of_first_other_structure"], 31)
+        chk("11.4 modification enrichment, length-matched",
+            dt["enrichment_vs_length_matched"], 1.9)
+
+        # ---- G1 / G2 / G3, closed on raw whole entries -------------------
+        # These three are properties of ENTRIES, so none of them was
+        # computable on RNA3DB or RNASolo -- those ship per-chain extracts
+        # with the protein stripped. All three stood on 180 BGSU structures
+        # until the raw corpus was acquired.
+        chk("v0.2 raw entries holding an RNA chain", ec["n_entries_with_rna"], 10520)
+        g1, g2, g3 = ec["G1_length"], ec["G2_complex"], ec["G3_ribosomal"]
+
+        # G1. The ENTRY maximum failed (11,478 -> 22,345, 1.95x) -- the fifth
+        # extreme quantile from n=180 to do so. The CHAIN maximum did not: it
+        # reproduces 6HRM's 4,450 exactly, which is what closes D10.
+        chk("v0.2 G1 max RNA residues per entry", g1["max_rna_residues_per_entry"], 22345)
+        chk("v0.2 G1 longest single RNA chain in the PDB", g1["max_single_rna_chain"], 4450)
+        chk("v0.2 G1 entries over 4,096 RNA residues", g1["entries_over_4096"], 1584)
+
+        # G2. Holds as a residue fraction, but isolated RNA is 2.7x the share
+        # v0.1 measured -- the stratum the mandatory eval split runs on.
+        chk("v0.2 G2 frac residues in complex", g2["frac_residues"], 0.9715, abs_tol=0.0002)
+        chk("v0.2 G2 entries containing protein", g2["entries_with_protein"], 8092)
+        chk("v0.2 G2 isolated-RNA share of residues",
+            g2["frac_residues_rna_only"], 0.0283, abs_tol=0.0002)
+
+        # G3. Skew survives at 85.94%, 6.7 points below the figure every
+        # residue-weighted v0.1 statement was qualified with.
+        chk("v0.2 G3 frac residues ribosomal", g3["frac_residues"], 0.8594, abs_tol=0.0002)
+        chk("v0.2 G3 ribosome-like entries", g3["n_ribosome_like"], 2197)
     except FileNotFoundError as e:
         chk(f"v0.2 analysis artefact missing: {e.filename}", 0, 1)
 
@@ -377,18 +455,27 @@ def main() -> int:
         if miss: fails.append(f"missing config {need}")
 
     print("\n== reference implementation correctness tests ==")
+    import os
     import subprocess
     suites = [ROOT / "research/architecture/reference/test_hierarchical_pair_track.py",
               ROOT / "src/pharos/physics/test_manning.py",
               ROOT / "src/pharos/data/test_mmcif_entities.py"]
+    # Forced onto CPU. These are correctness tests over tensors of a few
+    # thousand elements, so the GPU buys nothing -- and a shared GPU costs
+    # something real: with another job holding 80.9 of 81.9 GB, Adam's
+    # capture health-check raised `CUDA error: out of memory` and this
+    # harness printed DRIFT DETECTED for a suite that passes. A verifier
+    # whose job is catching silent regressions must not manufacture loud
+    # false ones out of a neighbour's memory usage.
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": ""}
     for t in suites:
         if not t.exists():
             print(f"  FAIL {t.name} missing"); fails.append(f"{t.name} missing"); continue
-        r = subprocess.run([sys.executable, t.name], cwd=t.parent,
+        r = subprocess.run([sys.executable, t.name], cwd=t.parent, env=env,
                            capture_output=True, text=True, timeout=1800)
         ok = r.returncode == 0 and "ALL TESTS PASS" in r.stdout
         print(f"  {'OK ' if ok else 'FAIL'} {t.name:34s} "
-              f"{'all pass' if ok else 'FAILURES -- run it directly'}")
+              f"{'all pass (cpu)' if ok else 'FAILURES -- run it directly'}")
         if not ok:
             fails.append(f"{t.name} failing")
 

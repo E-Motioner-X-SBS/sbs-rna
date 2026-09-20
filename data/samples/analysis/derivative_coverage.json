@@ -1,0 +1,38 @@
+{
+ "entries": {
+  "rna3db": 5389,
+  "grnade_rnasolo": 6156,
+  "union": 7943,
+  "raw_with_rna": 10520,
+  "uncovered": 2581,
+  "frac_uncovered": 0.2453,
+  "in_derivative_not_in_raw": 4
+ },
+ "uncovered_character": {
+  "rna_residues": 1372786,
+  "frac_of_all_rna_residues": 0.1028,
+  "median_longest_chain": 22,
+  "entries_with_chain_ge_64": 693,
+  "entries_chain_in_window": 608,
+  "protein_free": 925,
+  "protein_free_with_chain_ge_64": 159,
+  "ribosome_sized": 237
+ },
+ "effective_c_by_coverage": {
+  "chains_covered": 12573,
+  "max_covered": 21.14,
+  "chains_uncovered": 1533,
+  "max_uncovered": 23.3
+ },
+ "tail": {
+  "n_over_20": 34,
+  "dominant_series_prefix": "9t",
+  "n_top34_in_series": 30,
+  "rank_of_first_other_structure": 31,
+  "top34_all_uncovered": true,
+  "modified_frac_top34": 0.0198,
+  "modified_frac_all": 0.0048,
+  "modified_frac_length_matched_500_700": 0.0102,
+  "enrichment_vs_length_matched": 1.9
+ }
+}

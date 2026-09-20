@@ -25,11 +25,11 @@ graph TB
     subgraph HPT["HIERARCHICAL PAIR TRACK - 3 LEVELS"]
         L1["LEVEL 1 - DENSE coarse map at b=16<br/>0.396 pct of dense cost<br/>at L=4096 this is only 65k entries<br/>NO recall loss: it is genuinely dense"]
         L2["LEVEL 2 - refine occupied b=16 blocks to b=4<br/>0.460 pct of dense cost"]
-        L3["LEVEL 3 - refine occupied b=4 blocks to pairs<br/>1.346 pct of dense cost<br/>mean c 17.14 | p99 19.13 | MAX 21.14<br/>target_c = 24 (20 was BREACHED)"]
+        L3["LEVEL 3 - refine occupied b=4 blocks to pairs<br/>1.346 pct of dense cost<br/>mean c 17.14 | p99 19.19 | MAX 23.30 (raw PDB)<br/>target_c = 24 CLOSED: 0 of 14106 breach<br/>19.04 -&gt; 21.14 -&gt; 23.30, so overflow is load-bearing"]
         L1 --> L2 --> L3
     end
 
-    TOTAL["TOTAL 2.202 pct of dense<br/><br/>vs flat top-K: 1.118 pct of dense<br/>but only ~20 pct recall.<br/><br/>~2x the cost buys a 100 pct recall CEILING<br/>instead of a hard 20 pct floor.<br/><br/>NOTE: max c measured on derivatives that<br/>under-represent modified residues 40x.<br/>24 is interim; re-derive on raw PDB."]
+    TOTAL["TOTAL 2.202 pct of dense<br/><br/>vs flat top-K: 1.118 pct of dense<br/>but only ~20 pct recall.<br/><br/>~2x the cost buys a 100 pct recall CEILING<br/>instead of a hard 20 pct floor.<br/><br/>CLOSED on raw PDB: modified residues present<br/>at 0.476 pct vs the derivatives 0.025 pct.<br/>Max rose 21.14 -&gt; 23.30 as predicted.<br/>24 holds, with 2.9 pct headroom."]
 
     EASY["WHY IT IS EASIER TO LEARN<br/>Deciding whether a 16x16 block contains ANY contact<br/>aggregates 256 pair-decisions into one.<br/>The model ranks 32k blocks, not 4.1M pairs."]
 

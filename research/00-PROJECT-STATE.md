@@ -198,6 +198,63 @@ Highest value first:
 - [ ] Fix the four repo issues listed above (MANIFEST caps, `total_sequences()`,
       hardcoded paths, README median-length inconsistency).
 
+## Raw-archive pass (2026-09-21) — three claims closed, two defects found
+
+The 10,527 raw PDB entries acquired for v0.2 were finally used for what they
+were acquired for. **10,520 of them hold an RNA polymer chain**, 13,348,166 RNA
+residues, 29,038 RNA chains — 43x the 309,197 residues the entry-level claims
+had rested on since they were written on 180 BGSU structures.
+
+| claim | v0.1 (n=180) | raw archive | outcome |
+|---|---|---|---|
+| **D9** `target_c` max effective c | 19.04 | **23.30** (14,106 chains) | **24 holds**, 0 breaches, 2.9% headroom |
+| **G1** longest single RNA chain | 3,764 nt | **4,450 nt** (6HRM) | **reproduces exactly** -> context = 4,608 (D20) |
+| **G1** total RNA per entry, max | 11,478 | **22,345** (4V4G) | 1.95x breach, fifth tail failure |
+| **G2** residues in entries with protein | 98.95% | **97.15%** | holds; isolated RNA is 2.7x larger than thought |
+| **G3** residues from ribosome-like entries | 92.65% | **85.94%** | holds, 6.7 pts lower |
+
+Two things changed the design rather than just the numbers:
+
+1. **The chain-length maximum stopped moving.** 4,450 nt, with the same five
+   structures over 4,096, at 29,807 derived chains and again over the entire
+   archive. That is the first extreme quantile in this project to close rather
+   than merely rise, and it settles the context window at **4,608** (D20).
+2. **`target_c`'s maximum did not stop moving**: 19.04 -> 21.14 -> **23.30**.
+   24 absorbed it with 2.9% to spare, so the **overflow path is load-bearing**
+   (D23) — but D9's stated mechanism (modified residues) was wrong. Chains from
+   entries the derivatives cover max out at **21.14**, exactly the published
+   derivative figure; the extra 2.16 comes entirely from **entries no derivative
+   holds**. The top 30 chains in the archive are one deposition campaign
+   (9T-series E. coli ribosome PTC refinements, deposited 2025-10-21, after
+   RNASolo's 2023-11 snapshot); rank 31 is 21.14. Only **four independent
+   molecules in the whole PDB** exceed effective c = 20.
+
+**Two defects, both the same shape as defect #22 — a second definition drifting
+from the canonical one:**
+
+- **C15**: two scripts had private entry counters joining to `entity_poly_types`
+  (which returns **auth** chain ids) on **`label_asym_id`**. On entries whose
+  labellings differ — 1ARJ is `label A` / `auth N` — every atom missed its
+  entity and the entry reported zero polymer residues. **3,254 of 10,527**
+  entries affected; it deflated G2 to 89.2% and G3 to 33.6% before being caught.
+  Counting now lives once, in `mmcif_entities.entry_composition`.
+- **C16**: `rna_chain_coords` never read `pdbx_PDB_model_num`, so an NMR
+  ensemble's 20 models stacked into one residue — **1ARJ at 424 heavy atoms per
+  residue** against a nucleotide's ~21 — making every NMR contact map the union
+  over the ensemble. Published tail statistics are unaffected (the four chains
+  that set them are single-model, and 400-file samples of RNA3DB and
+  gRNAde/RNASolo found zero multi-model files), but it would have corrupted the
+  raw-entry pass. Fixed to first-model-only, asserted by test property 11.
+
+**Data finding — and it is the same finding as (2).** Matching both derivative
+corpora's entry ids against the archive: RNA3DB covers 5,389 entries, gRNAde/RNASolo 6,156, union **7,943** —
+so **2,581 entries (24.5%) of the world's RNA structures are in neither**, and
+all of them are already on disk. 608 have a chain inside the 64-3,000 training
+window (693 have one at least 64 nt long) and **925 are protein-free**, which is precisely the stratum D21 showed
+is under-represented. `plans/13-sequence-structure-gap-strategy.md`.
+
+`verify_claims.py` now pins **202** checks and passes.
+
 ## Reproducing everything
 
 ```bash

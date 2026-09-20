@@ -19,6 +19,19 @@ depends on:
                             losing them inflated G2 from 98.95% to 99.70%.
   5. HYBRID RESOLUTION   -- DNA/RNA hybrid chains split per residue by the
                             presence of an O2' atom.
+  7. FIRST MODEL ONLY    -- C16: an NMR ensemble repeats every atom in each
+                            of its (conventionally 20) models. Keyed only by
+                            residue, they collapsed into one residue holding
+                            20 superposed copies -- 1ARJ at **424 atoms per
+                            residue** against a nucleotide's ~21 -- so its
+                            contact map was the UNION over the ensemble.
+  6. AUTH-KEYED COUNTING -- C15: `entity_poly_types` returns AUTH chain ids,
+                            so anything joining to it must read
+                            `auth_asym_id`. Two analysis scripts had grown
+                            private counters keyed on `label_asym_id`; on
+                            every entry whose two labellings differ they
+                            reported zero polymer residues. 3,254 of 10,527
+                            raw entries, G2 and G3 both deflated.
 
 Run: python3 src/pharos/data/test_mmcif_entities.py
 """
@@ -28,8 +41,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mmcif_entities import (RNA_STD, entity_poly_types, longest_rna_chain,
-                            rna_chain_coords, rna_residues)
+from mmcif_entities import (RNA_STD, entity_poly_types, entry_composition,
+                            longest_rna_chain, rna_chain_coords, rna_residues)
 
 S = Path(__file__).resolve().parents[3] / "data" / "samples" / "structures"
 
@@ -202,6 +215,71 @@ def main() -> int:
         "every residue has >=1 heavy atom")
     chk("hydrogens excluded by default",
         all(True for _ in c), "drop_hydrogens=True")
+
+    print("\n== property 10: entry_composition agrees with the geometry path ==")
+    # The two must never disagree: G1/G2/G3 are counted by entry_composition and
+    # every chain-level statistic by rna_chain_coords, and the architecture
+    # quotes them side by side. C15: they disagreed on 3,254 of 10,527 raw
+    # entries because the counter keyed `label_asym_id` against auth-keyed
+    # entity declarations.
+    disagree = []
+    for f in files:
+        c = entry_composition(f)["n_rna_res"]
+        g = sum(len(v) for v in rna_chain_coords(f).values())
+        if c != g:
+            disagree.append(f"{f.stem}: comp {c} vs coords {g}")
+    chk("RNA residue counts identical on every sampled entry", not disagree,
+        f"{len(files)} entries; " + ("; ".join(disagree[:3]) if disagree else "no disagreement"))
+
+    # The auth/label distinction itself, on an entry that exhibits it. 1ARJ's
+    # sole RNA chain is `label A` / `auth N`; a label-keyed counter sees zero.
+    RAW = Path(__file__).resolve().parents[3] / "data/structures/raw_pdb_entries"
+    arj = next((c for c in (S / "1ARJ.cif.gz", RAW / "1arj.cif.gz") if c.exists()), None)
+    if arj is not None:
+        c = entry_composition(arj)
+        chk("1ARJ (label A / auth N) counts its RNA", c["n_rna_res"] == 29,
+            f'{c["n_rna_res"]} residues (want 29)')
+    else:
+        # The sample directory happens not to hold an entry whose labellings
+        # differ; assert the weaker property that the join works at all.
+        chk("auth-keyed join is exercised", any(entry_composition(f)["n_rna_res"]
+                                                for f in files),
+            "1ARJ absent from both the sample and the raw corpus")
+
+    chk("protein is counted where the entry declares it",
+        any(entry_composition(f)["n_protein_res"] > 0 for f in files),
+        "G2 is meaningless if protein never registers")
+
+    print("\n== property 11: NMR ensembles contribute one model, not twenty ==")
+    # C16. A nucleotide has ~21 heavy atoms. Anything far above that means the
+    # models of an ensemble were stacked into one residue, which turns the
+    # contact map into the union over the ensemble and inflates effective_c.
+    #
+    # The bound is 50, not 25, because ALTERNATE CONFORMATIONS are legitimate
+    # and are deliberately kept: 4X4T models 670 A and 669 B altloc atoms, so
+    # a fully dual-occupancy nucleotide is ~42 atoms. Both conformers are real
+    # modelled positions sitting ~1 A apart, so they add no contacts worth
+    # speaking of; 20 stacked models give ~424 and are a different thing
+    # entirely. 50 separates the two with an order of magnitude to spare.
+    RAWD = Path(__file__).resolve().parents[3] / "data/structures/raw_pdb_entries"
+    worst = (0.0, None)
+    for f in files:
+        for ch, res in rna_chain_coords(f).items():
+            n = sum(len(a) for _, _, a in res)
+            if res:
+                worst = max(worst, (n / len(res), f"{f.stem}:{ch}"))
+    chk("heavy atoms per residue stays nucleotide-sized", worst[0] < 50,
+        f"max {worst[0]:.1f} at {worst[1]} (~21 plain, ~42 fully dual-altloc, ~424 if models stack)")
+
+    nmr = next((c for c in (S / "1ARJ.cif.gz", RAWD / "1arj.cif.gz",
+                            RAWD / "2koc.cif.gz") if c.exists()), None)
+    if nmr is not None:
+        res = next(iter(rna_chain_coords(nmr).values()))
+        apr = sum(len(a) for _, _, a in res) / len(res)
+        chk(f"{nmr.stem} (20-model NMR ensemble) yields one model",
+            apr < 30, f"{apr:.1f} atoms/residue (20 models stacked gives ~424)")
+    else:
+        chk("an NMR entry is available to exercise the model filter", 0, 1)
 
     print("\n== property 8: determinism ==")
     a = rna_residues(files[0])[1]

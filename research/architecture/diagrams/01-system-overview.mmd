@@ -1,6 +1,6 @@
 graph TB
     subgraph INPUTS["INPUTS"]
-        SEQ["RNA sequence<br/>vocab: 5 + DNA + I + UNK + MOD (raw PDB)<br/>N_seq and N_struct are DIFFERENT tokens<br/>L up to 4096 = 99.97 pct of chains"]
+        SEQ["RNA sequence<br/>vocab: 5 + DNA + I + UNK + MOD (raw PDB)<br/>N_seq and N_struct are DIFFERENT tokens<br/>L up to 4608 = every RNA chain ever solved<br/>longest in the whole PDB: 4450 nt (6HRM)"]
         ION["Ionic condition c_ion<br/>Mg2+, K+, Na+, T, pH<br/>NOVEL: no predictor accepts this"]
         MSA["MSA / Rfam alignment<br/>optional, 4227 families"]
         PROBE["Chemical probing<br/>optional, SHAPE/DMS<br/>335616 Ribonanza profiles ACQUIRED"]
@@ -16,7 +16,7 @@ graph TB
     subgraph PAIR["B+C. HIERARCHICAL PAIR TRACK - coarse to fine"]
         PROP["L1: DENSE block map at b=16<br/>0.396 pct of dense, 65k entries at L=4096<br/>genuinely dense = no recall loss here"]
         SEL["L2: refine occupied b=16 blocks to b=4<br/>0.460 pct of dense"]
-        TRI["L3: refine occupied b=4 blocks to pairs<br/>1.346 pct - mean c 17.14, MAX 21.14<br/>target_c = 24 + overflow handling<br/>selects BLOCKS, never ranks pairs"]
+        TRI["L3: refine occupied b=4 blocks to pairs<br/>1.346 pct - mean c 17.14, MAX 23.30 on raw PDB<br/>target_c = 24: 0 of 14106 chains breach<br/>2.9 pct headroom, so overflow handling is REQUIRED<br/>selects BLOCKS, never ranks pairs"]
         PROP --> SEL --> TRI
     end
 

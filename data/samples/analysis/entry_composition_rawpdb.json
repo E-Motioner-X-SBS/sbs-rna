@@ -1,0 +1,63 @@
+{
+ "n_entries_scanned": 10527,
+ "n_entries_parsed": 10527,
+ "n_entries_with_rna": 10520,
+ "published_on_180_bgsu": {
+  "G1_max_rna_per_entry": 11478,
+  "G1_entries_over_4096": "44 of 179",
+  "G2_frac_residues_in_complex": 0.9895,
+  "G3_frac_residues_ribosomal": 0.9265
+ },
+ "G1_length": {
+  "max_rna_residues_per_entry": 22345,
+  "p50": 73,
+  "p90": 4717,
+  "p99": 9421,
+  "p999": 10687,
+  "entries_over_4096": 1584,
+  "frac_entries_over_4096": 0.1506,
+  "max_single_rna_chain": 4450,
+  "largest": [
+   [
+    22345,
+    "4v4g"
+   ],
+   [
+    18020,
+    "4v9o"
+   ],
+   [
+    18020,
+    "4v9p"
+   ],
+   [
+    15871,
+    "6sv4"
+   ],
+   [
+    13572,
+    "4v8p"
+   ],
+   [
+    11883,
+    "9b0s"
+   ]
+  ]
+ },
+ "G2_complex": {
+  "entries_with_protein": 8092,
+  "frac_entries": 0.7692,
+  "rna_residues_total": 13348166,
+  "rna_residues_in_complex": 12967420,
+  "frac_residues": 0.9715,
+  "median_protein_chains_when_present": 8.0,
+  "entries_rna_only": 2350,
+  "frac_residues_rna_only": 0.0283
+ },
+ "G3_ribosomal": {
+  "n_ribosome_like": 2197,
+  "frac_entries": 0.2088,
+  "rna_residues": 11471601,
+  "frac_residues": 0.8594
+ }
+}

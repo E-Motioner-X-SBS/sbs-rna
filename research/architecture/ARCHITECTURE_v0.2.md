@@ -32,10 +32,10 @@ the shape is the most useful thing this document can tell a reader.
 | modified-residue fraction | 1.05% | **1.005%** | holds (11.6M residues) |
 | Mg–rigidity gradient | 1.76 σ | **1.523 σ**, monotonic | holds, −13% |
 | **Extreme quantiles** | | | |
-| max effective c | 19.04 | **21.14** | **breach** |
+| max effective c | 19.04 | **21.14** | **breach**, closed at **23.30** on raw (§7.3) |
 | longest chain | 3,764 nt | **4,450 nt** | **breach** |
-| chains over 4,096 nt | 0 | **8** | **breach** |
-| max contacts/nt | 5.50 | **7.66** | **breach** |
+| chains over 4,096 nt | 0 | **8** | **breach**, closed at 5 entries (§0.1) |
+| max contacts/nt | 5.50 | **7.66** | **breach**, 7.79 on raw |
 | Mg : K ratio | 9 : 1 | **54 : 1** | wrong 6× |
 
 **Every mean held. Every maximum failed.** This is not eleven separate errors;
@@ -47,6 +47,38 @@ window) had been set from maxima.
 quantile measured on fewer than 10³ structures.** Where the corpus cannot
 supply that, the parameter is set from a mean plus an explicit safety factor,
 and the factor is stated.
+
+### 0.1 A third pass, on raw whole entries **[v0.2]**
+
+Three claims — G1, G2, G3 — describe *entries*, not chains, so none of them is
+computable on RNA3DB or RNASolo, which distribute per-chain extracts with the
+protein stripped out. All three still rested on the 180-structure sample after
+the corpus pass. The raw archive was acquired to close them: **10,520 of 10,527
+entries hold an RNA polymer chain, carrying 13,348,166 RNA residues**, 43x the
+309,197 the three were originally measured on.
+
+| | v0.1 (n=180) | raw PDB (10,520 entries) | |
+|---|---|---|---|
+| **G2** residues in entries with protein | 98.95% | **97.15%** | holds, −1.8 pts |
+| **G3** residues from ribosome-like entries | 92.65% | **85.94%** | holds, −6.7 pts |
+| **G1** longest single RNA chain | 3,764 nt | **4,450 nt** | **reproduces exactly** |
+| **G1** entries over 4,096 RNA residues | 24.6% | **15.06%** | over-stated |
+| **G1** total RNA residues per entry, max | 11,478 | **22,345** | **1.95x breach** |
+| **`target_c`** max effective c | 19.04 | **23.30** (14,106 chains) | **within 24** |
+
+The pattern from the corpus pass repeats and then breaks once, informatively.
+The two *aggregate* claims held and both moved **downward**: the corpus is less
+protein-bound and less ribosome-dominated than BGSU representative sets — which
+deliberately over-weight large assemblies — made it look. The entry maximum
+failed at 1.95x, the fifth extreme quantile from n=180 to do so.
+
+**The exception is the one that matters most.** The longest single RNA chain
+reproduces *exactly* — 4,450 nt, 6HRM, with the same five structures above 4,096
+that the derivative corpora found. A maximum that does not move when the sample
+goes from 29,807 derived chains to the entire archive is not an estimate any
+more; it is the value. That is what lets the context window be settled at 4,608
+(D20) rather than left provisional, and it is the first extreme quantile in this
+project to be closed rather than merely raised.
 
 ---
 
@@ -395,28 +427,90 @@ level**; loss can enter only at the tunable selection thresholds. Identifying
 whether a 16×16 block contains any contact aggregates 256 pair-decisions into
 one, which is why the coarse level is learnable where flat pair ranking is not.
 
-### 7.3 `target_c` — raised to 24 **[v0.2]**
+### 7.3 `target_c` = 24 — **closed on raw PDB** **[v0.2]**
 
 v0.1 set `target_c = 20` against a maximum of 19.04 observed on 180 structures.
-On **20,266 chains** the maximum is **21.14** — the budget is **breached**.
+The derivative corpora broke it at 21.14, and 24 was adopted as an interim
+value because those derivatives carry **0.025%** modified residues against raw
+PDB's **1.005%** — a 40× under-representation of exactly the quantity that
+pushes a chain's effective `c` up. The budget therefore had never been measured
+on data containing the thing it depends on. It has now been.
 
-| | v0.1 | v0.2 |
+| | v0.1 | derivatives | **raw PDB** |
+|---|---|---|---|
+| chains measured | 180 | 20,266 | **14,106** (from 10,520 entries) |
+| modified residues in them | 1.05% | 0.025% | **0.476%** |
+| mean effective c | 17.2 | 17.14 | **11.79** (all lengths) |
+| p99 / p99.9 | — | 19.13 / 19.52 | **19.19 / 23.08** |
+| **max** | 19.04 | 21.14 | **23.30** |
+| chains over 20 | 0 | 1 | **34** (0.24%) |
+| **chains over 24** | — | — | **0** |
+| `target_c` | 20 | 24 | **24, confirmed** |
+
+**Decision: 24 stands, and D9 closes.** Zero of 14,106 chains breach it across
+the complete archive. The maximum did rise, 21.14 → **23.30**, and 24 absorbed
+it.
+
+#### The hedge was right; the mechanism it named was not
+
+D9 predicted the tail would worsen because the derivatives under-represent
+modified residues 40×. Splitting the raw chains by whether their entry appears
+in RNA3DB or gRNAde/RNASolo settles what actually happened:
+
+| | chains | max effective c |
 |---|---|---|
-| chains measured | 180 | **20,266** |
-| mean effective c (long) | 17.2 | 17.14 |
-| p99 / p99.9 | — | 19.13 / 19.52 |
-| **max** | 19.04 | **21.14** |
-| `target_c` | 20 | **24** |
+| entries the derivatives cover | 12,573 | **21.14** |
+| entries they do not (§11.4) | 1,533 | **23.30** |
 
-24 clears the observed maximum by 12% and costs proportionally more only in L3.
-**And the true tail is worse than 21.14**: this was measured on derivatives
-carrying 0.025% modified residues against raw PDB's 1.005%, a 40× under-
-representation of the quantity that pushes a chain up. Re-deriving on raw
-entries is an open action; 24 is an interim value with a stated margin, not a
-measured maximum.
+**21.14 is exactly the published derivative maximum.** The derivative
+measurement was not wrong, and it was not distorted by missing modifications —
+it was *correct for the entries it contained*. The whole of the difference is
+coverage.
 
-The track must additionally **handle overflow gracefully** — truncate to budget
-and record the miss — rather than assume the budget always suffices.
+It is sharper than that. **The top 30 chains in the entire PDB are one
+deposition campaign**, and all 30 are in the uncovered set: the 9T-series
+*E. coli* ribosome peptidyl-transferase-centre focused refinements (9T1E, 9T1A,
+9T1F, …), ~596-nt fragments of 23S rRNA at 2.28 Å, in rRNA-methyltransferase
+knockout strains. 9T1E was deposited **2025-10-21** — after RNASolo's 2023-11
+snapshot. The first chain from any other structure is **rank 31**, at 21.14.
+
+Modification enrichment is real but secondary: the top 34 carry 1.98% modified
+residues against the corpus's 0.48%, but against a **length-matched** control
+(chains of 500–700 nt) the enrichment is only **1.9×**, not 40×. These are
+methylation-variant ribosome structures, so they are modification-rich by
+design; that is a property of what happens to sit at the top, not the reason the
+derivatives missed it.
+
+**The operative lesson is not about modified residues. It is that the curated
+derivatives are a stale and partial view of the archive, and the extremes live
+in precisely what they omit.** A parameter set from a derivative corpus inherits
+that corpus's snapshot date. This is a stronger argument for open action 8 than
+the chain counts in §11.4.
+
+**The headroom is 2.9%, not the 12% v0.2 claimed.** The maximum has risen at
+every re-measurement: 19.04 → 21.14 → 23.30, and unlike the chain-length maximum
+(D20) this one is not a closed population — it is a property of whatever gets
+deposited next, as the 9T series demonstrates by having been deposited during
+this project. So:
+
+**The overflow path is load-bearing, not defensive.** The track must truncate to
+budget and record the miss, and the recorded miss-rate is a metric to watch in
+training, not a debug counter. A budget with 2.9% headroom against a statistic
+that has grown every time it was looked at is a budget that will be exceeded by
+some future deposition; the design is correct only because it does not assume
+otherwise.
+
+Raising to 28 would buy headroom for **34 chains in 14,106** and cost
+proportionally in L3 refinement on all of them. That trade is not worth making
+while the overflow path exists.
+
+> **The effective sample size at the top is 1, not 14,106.** Ranks 1–30 are the
+> same ~596-nt molecule solved thirty times in one campaign. Ranks 31–34 are
+> 7PAS (21.14), 9Z80 (20.97, a 119-nt chain in which **all 119 residues are
+> modified**), and 4V6O/4V6P (20.11/20.01). Four independent molecules exceed
+> 20 in the entire Protein Data Bank. A budget validated against that tail is
+> validated against very little, which is the argument for the overflow path
+> and against reading 23.30 as a ceiling.
 
 ### 7.4 Reference implementation **[v0.1, measured]**
 
@@ -504,30 +598,124 @@ and `Neff/L` is a defensible *router feature* on literature grounds.
 Ground truth is also incomplete: the WUSS parser ignores pseudoknot brackets,
 **53 of 537 pairs (9.87%)**, which deflates precision — 0.670 is a lower bound.
 
-### 11.2 G2 — the largest generalisation hazard **[v0.1, and still unmeasured at scale]**
+### 11.2 G2 — the largest generalisation hazard **[v0.2, now measured at scale]**
 
-**98.95%** of RNA residues in the sample come from entries containing protein.
-The model takes one RNA sequence and predicts a fold that, in reality, only
-exists inside a ribonucleoprotein. Isolated RNA is 11.7% of *structures* but
-**1.05% of residues**.
+G2 and G3 are properties of *entries*, not chains, so neither is computable on
+RNA3DB or RNASolo — those distribute per-chain extracts with the protein
+stripped out. Both have therefore stood on the 180-structure sample since they
+were written. The raw corpus closes them: **10,520 of 10,527 acquired entries
+contain an RNA polymer chain, carrying 13,348,166 RNA residues** — 43x the
+309,197 residues G2 and G3 were originally measured on.
 
-Not fixable by tuning. Mandatory mitigation: **evaluation must be reported split
-by isolated vs in-complex**, and the in-complex flag is a model input.
+| | v0.1 (n=180) | **raw PDB (10,520 entries)** | |
+|---|---|---|---|
+| RNA residues in entries containing protein | 98.95% | **97.15%** | holds, −1.8 pts |
+| entries containing protein | 88.3% (158/179) | **76.92%** (8,092/10,520) | −11.4 pts |
+| isolated RNA, share of residues | 1.05% | **2.83%** | **2.7x larger** |
+| isolated RNA, share of entries | 11.7% | **22.34%** (2,350) | **1.9x larger** |
+| median protein chains, when present | — | **8** | |
 
-> Raw entries were acquired partly to re-measure this properly — G2 and G3 are
-> whole-entry properties and are not computable on per-chain extracts. That
-> re-derivation is an open action.
+**The hazard is real and it is smaller than v0.1 claimed.** 97.15% of structural
+RNA still sits inside a ribonucleoprotein, so the headline stands. But the
+isolated-RNA stratum the mitigation has to be evaluated on is **2.7x** the size
+v0.1 measured — 2,350 entries and 378 thousand residues, not a rounding error.
+That is enough to train on, not merely enough to report.
+
+Not fixable by tuning. Mandatory mitigation, unchanged: **evaluation must be
+reported split by isolated vs in-complex**, and the in-complex flag is a model
+input.
+
+### 11.2a G3 — ribosome skew, also re-measured **[v0.2]**
+
+| | v0.1 (n=180) | **raw PDB (10,520 entries)** | |
+|---|---|---|---|
+| ribosome-like entries | 33.5% (60/179) | **20.88%** (2,197) | −12.6 pts |
+| RNA residues they contribute | 92.65% | **85.94%** | holds, −6.7 pts |
+
+Same definition as v0.1 (>2,000 RNA residues and >500 protein residues in the
+entry). The skew survives — a fifth of the entries still carry six sevenths of
+the residues — but it is **6.7 points lower** than the number every
+residue-weighted statement in v0.1 was qualified with, and the non-ribosomal
+remainder is 1.88M residues rather than 22.7k.
+
+> **Both corrections move in the same direction: the corpus is less
+> ribosome-dominated and less protein-bound than the 180-structure sample said.**
+> The sample over-stated both skews because BGSU representative sets deliberately
+> over-weight large assemblies. Every residue-weighted figure inherited from
+> v0.1 is therefore slightly pessimistic about diversity, not optimistic — the
+> safe direction, but it should be restated rather than left standing.
 
 ### 11.3 Scope statement
 
 PHAROS predicts **single RNA chains**. Coverage of the corpus at a 4,096 context
-is **99.97%** — v0.1 claimed 100%, but 8 chains (5 unique structures: 6HRM
-4,450 nt, 7UPH, 4V6X, 8TOC, 7LHD, all large ribosomal rRNA) exceed it **[v0.2]**.
-Either state 99.97% or set the context to 4,608.
+is **99.95%** of entries **[v0.2, closed on raw PDB]**.
 
-It is **not** a whole-transcript or whole-ribosome model: total RNA per entry
-reaches 11,478 residues, and lncRNAs (XIST ~19 knt) and viral genomes
-(SARS-CoV-2 ~30 knt) are an order of magnitude beyond any context considered.
+**The longest-chain maximum is now settled rather than provisional.** Scanned
+across all 10,520 RNA-bearing PDB entries, the longest single RNA chain in the
+world's structural corpus is **4,450 nt (6HRM)**, and exactly **five** entries
+exceed 4,096 — 6HRM 4,450, 7UPH 4,438, 4V6X 4,298, 8TOC 4,269, 7LHD 4,217, all
+large ribosomal rRNA. These are the same five the derivative corpora found. A
+maximum that reproduces exactly when the sample grows from 29,807 derived chains
+to the entire archive is not a sample artefact: **4,096 leaves five structures
+uncovered and 4,608 covers every RNA chain that has ever been solved.** This is
+the one extreme quantile in this project that has stopped moving, and the
+context-window decision (D10) can now be closed on it.
+
+It is **not** a whole-transcript or whole-ribosome model, and the raw corpus
+makes that limit sharper than v0.1 stated. Total RNA per *entry* reaches
+**22,345 residues** (4V4G, a 70S ribosome with two copies in the asymmetric
+unit) — **1.95x** the 11,478 measured on 180 structures — and **1,584 of 10,520
+entries (15.06%)** hold more than 4,096 RNA residues in total, carrying **72.2%
+of all structural RNA** between them. A single-chain model sees the world's RNA
+structures one chain at a time; on the residue-weighted majority of entries that
+is a genuine loss of context, not a formality. lncRNAs (XIST ~19 knt) and viral
+genomes (SARS-CoV-2 ~30 knt) remain an order of magnitude beyond any context
+considered.
+
+### 11.4 The curated derivatives are not the archive **[v0.2]**
+
+Every structural number in this project before the raw pass came from RNA3DB or
+gRNAde/RNASolo. Matching both corpora's entry identifiers against every
+RNA-bearing entry in the PDB:
+
+| | entries |
+|---|---|
+| RNA3DB | 5,389 |
+| gRNAde / RNASolo (2023-11 snapshot) | 6,156 |
+| union | 7,943 |
+| **RNA-bearing entries in the PDB** | **10,520** |
+| **in neither** | **2,581 (24.5%)** |
+
+All 2,581 are already on disk in `data/structures/raw_pdb_entries/`. Their
+median longest chain is 22 nt — the uncovered population is dominated by small
+crystallographic oligos, which is presumably why the derivative pipelines
+dropped them — but the tail is not small, and it points at exactly what this
+corpus is shortest of:
+
+| | count |
+|---|---|
+| RNA residues held | 1,372,786 (10.3% of all structural RNA) |
+| entries with a chain ≥ 64 nt | 693 |
+| **entries with a chain inside the 64–3,000 training window** | **608** |
+| **protein-free entries** | **925**, of which 159 have a chain ≥ 64 nt |
+| ribosome-sized (>2,000 RNA residues) | 237 |
+
+Two reasons this is not a housekeeping item.
+
+**It contains the extremes.** §7.3 shows the top 30 chains in the archive by
+effective `c` are all in this uncovered set, and that the maximum over the
+*covered* entries is 21.14 — precisely the published derivative figure. A
+parameter fitted to a derivative corpus inherits that corpus's snapshot date,
+and the 9T series that now tops the distribution was deposited 2025-10-21,
+during this project.
+
+**It contains the stratum we are shortest of.** D21 measures isolated RNA at
+2.83% of residues and makes it the stratum the mandatory G2 evaluation split
+runs on. 925 of these entries are protein-free — clean, high-resolution,
+small-molecule RNA of exactly the kind ribosomal cryo-EM does not provide.
+
+Four entries appear in a derivative but not in the archive; they are obsoleted
+depositions, not a gap.
 
 ---
 
@@ -600,13 +788,14 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 
 | # | Action | Blocks |
 |---|---|---|
-| 1 | Re-derive `target_c` on raw PDB entries | final pair-track budget |
+| ~~1~~ | ~~Re-derive `target_c` on raw PDB entries~~ | **CLOSED** — max 23.30 on 14,106 chains, 24 confirmed (§7.3) |
 | 2 | Acquire RMDB titration ladders | the learned ionic *response* |
 | 3 | Complete Ribonanza — 335,616 of 2.1M acquired; the rest needs Kaggle credentials | head 7 coverage |
 | 4 | Train the block-detection scorer | §7.4, the largest unvalidated assumption |
-| 5 | Re-measure G2/G3 on raw whole entries | scope claims |
-| 6 | Re-derive every remaining max/min at scale | four of four failed so far |
+| ~~5~~ | ~~Re-measure G2/G3 on raw whole entries~~ | **CLOSED** — 97.15% / 85.94% on 10,520 entries (§11.2, §11.2a) |
+| 6 | Re-derive every remaining max/min at scale | five of six failed; the chain-length maximum is the one that held (D20) |
 | 7 | Restore sample structures to the server | `test_mmcif_entities.py` cannot run |
+| 8 | Ingest the 2,581 entries no derivative covers | they hold the entire top-30 of the effective-c tail; 608 with a chain in the training window, 925 protein-free (§11.4) |
 
 ---
 
@@ -620,6 +809,20 @@ recheck_block_sparsity_fullcorpus.py  -> block_sparsity_fullcorpus.json
 recheck_contact_tails_fullcorpus.py   -> contact_tails_fullcorpus.json
 recheck_ions_rigidity_rawpdb.py       -> ions_rigidity_rawpdb.json
 acquire_raw_pdb_entries.py            -> raw_pdb_manifest.json
+recheck_targetc_g2g3_rawpdb.py        -> targetc_g2g3_rawpdb.json        (D9/D23)
+                                      -> targetc_g2g3_rawpdb_chains.json (per chain)
+entry_composition_rawpdb.py           -> entry_composition_rawpdb.json   (G1/G2/G3)
+                                      -> entry_composition_rawpdb_table.json
+derivative_coverage.py                -> derivative_coverage.json        (§11.4)
+                                      -> uncovered_entries.json          (the 2,581)
 ```
+
+`scripts/sampling/verify_claims.py` re-derives every one of them from those
+JSONs and fails the build on drift; it currently pins **202** checks. Counting
+rules for entries and chains live once, in
+`src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
+entry counter and the geometry resolver agree on every sampled entry — the two
+defects this revision found (C15, C16) were both a second definition drifting
+from that one.
 
 Full comparison against v0.1 in `plans/rigor-recheck/fullcorpus-validation.md`.

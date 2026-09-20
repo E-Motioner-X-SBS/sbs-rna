@@ -2214,15 +2214,266 @@ on rRNA-saturated random splits. Sequence-identity deduplication is mandatory.
 \end{enumerate}
 
 %========================================================
+\section{Scaling the evidence: the corpus and raw-archive passes}
+\label{sec:v02}
+
+Everything up to this point was measured on $180$ non-redundant structures
+fetched onto a laptop. Two later passes re-derived those measurements at scale:
+a \emph{corpus} pass over $29{,}807$ chains of RNA3DB and RNASolo, and a
+\emph{raw-archive} pass over the $10{,}527$ PDB entries that contain an RNA
+polymer entity, acquired in full ($15$~GB) because three of the claims describe
+entries rather than chains and are therefore not computable on per-chain
+extracts at all. Of those, $\mathbf{10{,}520}$ hold an RNA polymer chain:
+$29{,}038$ chains, $13{,}348{,}166$ residues, $43\times$ the $309{,}197$
+residues \S\ref{sec:v02} supersedes.
+
+This section states what changed. It does not revise the sections above: those
+record the $n=180$ analysis and its eleven audit cycles, and the value of that
+record is that it is what was actually believed at the time.
+
+\subsection{Every mean held; every maximum failed}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccl}
+\toprule
+& \textbf{$n=180$} & \textbf{full corpus} & \\
+\midrule
+\multicolumn{4}{l}{\emph{Central estimates}}\\
+mean effective $c$, long chains  & $17.2$    & $\mathbf{17.14}$ & holds \\
+sequence entropy (bits/nt)       & $2.0167$  & $\mathbf{2.0165}$ & holds, 238M nt \\
+$b{=}4$ block occupancy          & $1.34\%$  & $1.67\%$ & holds \\
+contact separation, band $512$   & $0.812$   & $0.8545$ & holds \\
+modified-residue fraction        & $1.05\%$  & $\mathbf{1.005\%}$ & holds, 11.6M res \\
+Mg--rigidity gradient            & $1.76\sigma$ & $\mathbf{1.523\sigma}$ & holds, $-13\%$ \\
+\midrule
+\multicolumn{4}{l}{\emph{Extreme quantiles}}\\
+max effective $c$                & $19.04$   & $21.14$ & \textbf{breach} \\
+longest chain                    & $3{,}764$ & $\mathbf{4{,}450}$ & \textbf{breach} \\
+chains over $4{,}096$            & $0$       & $8$ & \textbf{breach} \\
+max contacts/nt                  & $5.50$    & $7.66$ & \textbf{breach} \\
+Mg\,:\,K ratio                   & $9{:}1$   & $54{:}1$ & wrong $6\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+This is not eleven separate errors. It is one property of an $n=180$ sample,
+which estimates a mean well and cannot estimate a $p_{99.9}$ at all. Two
+load-bearing parameters---the pair-track budget \texttt{target\_c} and the
+context window---had been set from maxima. The rule adopted in response:
+\textbf{no parameter may be set from an extreme quantile measured on fewer than
+$10^3$ structures}; where the corpus cannot supply that, the parameter is set
+from a mean plus a stated safety factor.
+
+\subsection{The raw archive closes G1, G2 and G3}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccl}
+\toprule
+& \textbf{$n=180$} & \textbf{raw PDB} & \\
+\midrule
+\textbf{G2} residues in entries with protein   & $98.95\%$ & $\mathbf{97.15\%}$ & holds, $-1.8$ pts \\
+\textbf{G2} isolated RNA, share of residues    & $1.05\%$  & $\mathbf{2.83\%}$  & $2.7\times$ larger \\
+\textbf{G3} residues from ribosome-like entries& $92.65\%$ & $\mathbf{85.94\%}$ & holds, $-6.7$ pts \\
+\textbf{G3} ribosome-like entries              & $33.5\%$  & $\mathbf{20.88\%}$ & $-12.6$ pts \\
+\textbf{G1} longest single RNA chain           & $3{,}764$ & $\mathbf{4{,}450}$ & reproduces exactly \\
+\textbf{G1} entries over $4{,}096$ RNA residues& $24.6\%$  & $\mathbf{15.06\%}$ & over-stated \\
+\textbf{G1} total RNA per entry, max           & $11{,}478$& $\mathbf{22{,}345}$& $1.95\times$ breach \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+Both aggregate claims held, and both moved \emph{downward}: the archive is less
+protein-bound and less ribosome-dominated than BGSU representative sets---which
+deliberately over-weight large assemblies---made it look. Every residue-weighted
+figure inherited from the $n=180$ analysis is therefore pessimistic about
+diversity rather than optimistic. That is the safe direction to have been wrong
+in, and it is still wrong.
+
+The consequence that matters is not the headline but the stratum underneath it.
+G2 mandates that evaluation be reported split by isolated versus in-complex RNA.
+The isolated stratum is $2{,}350$ entries and $378$ thousand residues,
+$\mathbf{2.7\times}$ what $n=180$ measured---large enough to \emph{train} on,
+not merely large enough to report a number for.
+
+\subsection{One maximum stopped moving}
+
+Scanned across every RNA polymer chain in all $10{,}520$ RNA-bearing entries,
+the longest single RNA chain is $\mathbf{4{,}450}$~nt (6HRM), and exactly five
+entries exceed $4{,}096$: 6HRM $4{,}450$, 7UPH $4{,}438$, 4V6X $4{,}298$, 8TOC
+$4{,}269$, 7LHD $4{,}217$, all large ribosomal rRNA. These are the same five
+structures, at the same lengths, that the derivative corpora found.
+
+A maximum that does not move when the sample grows from $29{,}807$ derived
+chains to the entire archive is not an estimate any more. It is the value, over
+a closed population, and there is no larger sample to be had. The context window
+is therefore set to $\mathbf{4{,}608}$: it covers every RNA chain that has ever
+been solved, with $158$~nt of headroom. Choosing $4{,}096$ to save $11\%$ of the
+position budget would leave the five largest rRNA chains---among the hardest and
+most-studied folds in the corpus---permanently outside the model.
+
+\subsection{One maximum did not: \texttt{target\_c}}
+
+The pair-track budget was raised $20 \rightarrow 24$ provisionally, because the
+$21.14$ that forced the raise came from corpora carrying $0.025\%$ modified
+residues against raw PDB's $1.005\%$---a $40\times$ under-representation of
+precisely the quantity that drives the tail. Re-measured on $14{,}106$ chains
+from the raw archive, at $0.476\%$ modified residues:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+& \textbf{$n=180$} & \textbf{derivatives} & \textbf{raw} \\
+\midrule
+chains measured        & $180$   & $20{,}266$ & $\mathbf{14{,}106}$ \\
+max effective $c$      & $19.04$ & $21.14$    & $\mathbf{23.30}$ \\
+$p_{99.9}$             & ---     & $19.52$    & $\mathbf{23.08}$ \\
+chains over $20$       & $0$     & $1$        & $\mathbf{34}$ \\
+chains over $24$       & ---     & ---        & $\mathbf{0}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+The maximum did rise and $24$ still contains it: zero of $14{,}106$ chains
+breach the budget across the complete archive. But the stated mechanism was
+wrong, and the right one generalises further than \texttt{target\_c} does.
+
+Splitting the raw chains by whether their entry appears in RNA3DB or
+gRNAde/RNASolo: the $12{,}573$ chains from \emph{covered} entries reach
+$\mathbf{21.14}$---\emph{exactly} the published derivative figure---and the
+$1{,}533$ chains from uncovered entries reach $\mathbf{23.30}$. The derivative
+measurement was not distorted by missing modifications; it was correct for the
+population it contained. The entire difference is \textbf{coverage}.
+
+More precisely: the top $30$ chains in the whole archive are a single deposition
+campaign, and all $30$ are entries no derivative holds---the 9T-series
+\emph{E.\ coli} ribosome peptidyl-transferase-centre focused refinements,
+${\sim}596$-nt fragments of 23S rRNA at $2.28$~\AA{} in
+rRNA-methyltransferase-knockout strains. 9T1E was deposited \textbf{2025-10-21},
+after RNASolo's 2023-11 snapshot. The first chain belonging to any other
+structure is \textbf{rank 31}, at $21.14$.
+
+Modification enrichment is real but secondary: the top $34$ carry $1.98\%$
+modified residues against the corpus's $0.48\%$, but against a
+\emph{length-matched} control ($500$--$700$~nt chains) the enrichment is only
+$\mathbf{1.9\times}$, not $40\times$. These are methylation-variant ribosome
+structures and are modification-rich by design---which describes what happens to
+sit at the top, not why the derivatives missed it.
+
+\textbf{The lesson is not about modified nucleotides. A parameter fitted to a
+curated derivative inherits that derivative's snapshot date, and the extremes
+live in precisely what it omits.}
+
+But the headroom is $\mathbf{2.9\%}$, not the $12\%$ originally claimed, against
+a statistic that has risen at every single re-measurement---$19.04 \rightarrow
+21.14 \rightarrow 23.30$, roughly $+2.1$ per pass. Unlike the chain-length
+maximum, this is not a closed population; it is a property of whatever is
+deposited next. \textbf{The overflow path is therefore load-bearing rather than
+defensive}: the track truncates to budget, records the miss, and the recorded
+miss-rate is a training metric, not a debug counter. Raising to $28$ would buy
+headroom for $34$ chains in $14{,}106$ and cost proportionally in L3 refinement
+on all of them.
+
+The effective sample size at the top of this distribution is $1$, not
+$14{,}106$. Ranks $1$--$30$ are the same ${\sim}596$-nt molecule solved thirty
+times in one campaign. Ranks $31$--$34$ are 7PAS ($21.14$), 9Z80 ($20.97$---a
+$119$-nt chain in which \emph{all} $119$ residues are modified), and 4V6O/4V6P
+($20.11$/$20.01$). \textbf{Four independent molecules exceed $20$ in the entire
+Protein Data Bank.} A budget validated against that tail is validated against
+very little, which is the argument for the overflow path and against reading
+$23.30$ as a ceiling.
+
+\subsection{Two defects, both the same shape}
+
+The raw pass found two, and both are the recurrence of an earlier one---a second
+definition of something the canonical resolver already defines, drifting from it.
+
+\textbf{C15.} \texttt{entity\_poly\_types()} returns \emph{auth} chain
+identifiers. Two analysis scripts had each grown a private entry counter that
+joined to it on \texttt{label\_asym\_id}. Where an entry's two labellings differ
+---overwhelmingly older depositions, e.g.\ 1ARJ, whose sole RNA chain is
+\texttt{label A} / \texttt{auth N}---every atom row missed its entity and the
+entry reported zero polymer residues of any kind. It affected $\mathbf{3{,}254}$
+of $10{,}527$ entries, $686$ of them reporting no polymer at all, and it
+deflated G2 to $89.2\%$ and G3 to $33.6\%$ before being caught. What caught it
+was not a test: the scan reported thousands of RNA-free entries in a corpus
+selected for containing RNA, and 1ARJ---a textbook TAR RNA structure---was on
+the list. The number was implausible on its face.
+
+\textbf{C16.} The geometry resolver never read \texttt{pdbx\_PDB\_model\_num}.
+An NMR entry deposits an ensemble---$20$ models by convention---and every model
+repeats every atom, so all $20$ collapsed into one residue: 1ARJ returned
+$\mathbf{424}$ heavy atoms per residue against a nucleotide's real ${\sim}21$.
+Geometry built from that is the \emph{union} of the ensemble's contacts, so two
+residues count as touching if they touch in any single model, and both the
+contact count and effective $c$ inflate for every NMR chain. Blast radius was
+checked rather than assumed: the four chains setting the published maxima (7PAS,
+6Q95, 1VY7, 6XHV) are single-model cryo-EM or X-ray, and sampling $400$ files
+from each derivative corpus found zero multi-model files, so no published
+statistic moves. The defect only ever bit the raw-entry path, which is new.
+
+Both are fixed, both are asserted by tests, and counting now lives once---beside
+the resolver whose keys it has to match.
+
+\subsection{A quarter of the archive was outside the training corpus}
+
+Matching the entry identifiers of both derivative corpora against every
+RNA-bearing entry in the archive:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+& \textbf{entries} \\
+\midrule
+RNA3DB                              & $5{,}389$ \\
+gRNAde / RNASolo (2023-11 snapshot) & $6{,}156$ \\
+union of the two                    & $7{,}943$ \\
+\textbf{RNA-bearing entries in the PDB} & $\mathbf{10{,}520}$ \\
+\textbf{in neither derivative}      & $\mathbf{2{,}581}$ ($24.5\%$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+All $2{,}581$ are already on disk. Their median longest chain is $22$~nt---the
+uncovered population is dominated by small crystallographic oligos, which is
+presumably why the derivative pipelines dropped them---but the tail is not
+small, and it points at the three things this corpus is shortest of.
+$\mathbf{608}$ entries carry a chain inside the $64$--$3{,}000$ training window that
+neither derivative exposes. $\mathbf{925}$ are protein-free, which is exactly
+the isolated-RNA stratum G2's mitigation is evaluated on. And, as the previous
+subsection showed, this set contains the entire top $30$ of the effective-$c$
+distribution---so it is not a marginal $24.5\%$ but the part of the archive
+where the parameters are decided.
+
 \section{Status}
 
 This is a design specification. No model has been trained and no predictive
 performance is claimed. What has been established is the evidentiary basis:
 the contact-scaling law, the ion--rigidity coupling, the ion inventory and
-coordination chemistry, and the GNRA negative result, all measured on 180
-non-redundant structures with reproducible scripts. The next phase is to
-implement the sparse pair track and validate proposal recall before any
-large-scale training is attempted.
+coordination chemistry, and the GNRA negative result---measured first on $180$
+non-redundant structures, then re-derived on $29{,}807$ chains and on the
+$10{,}520$ RNA-bearing entries of the entire PDB (\S\ref{sec:v02}). Every
+central estimate reproduced; five of six extreme quantiles did not, and the one
+that did---the $4{,}450$~nt longest chain---did so over a closed population and
+is therefore settled rather than merely confirmed. $202$ automated checks pin
+every quoted number to the JSON artefact it came from and fail the build on
+drift.
+
+The next phase is to \textbf{train the block-detection scorer}. The reference
+implementation proves the sparse pair track's cost and structure; it does not
+prove that a model can find the occupied blocks, and that is now the largest
+unvalidated assumption in the design by a clear margin.
 
 \appendix
 \section{Reproducing the measurements}

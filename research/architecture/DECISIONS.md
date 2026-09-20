@@ -199,6 +199,10 @@ residues against raw PDB's 1.005%, a 40x under-representation of the quantity
 that drives the tail. The pair track must also **handle overflow** rather than
 assume the budget suffices.
 
+> **CLOSED by D23.** Re-measured on 14,106 chains from the raw archive, with
+> modified residues present at 19x the derivative rate: max **23.30**, zero
+> chains over 24. The hedge was right and 24 absorbed it.
+
 ## D10 — Context window: coverage restated, not silently raised
 
 8 chain files / 5 unique structures exceed 4,096 (6HRM 4,450; 7UPH; 4V6X; 8TOC;
@@ -206,6 +210,10 @@ assume the budget suffices.
 
 **Decision:** keep 4,096 and state coverage as **99.97%**, or raise to 4,608 if
 whole-ribosome chains matter. Do not claim 100%.
+
+> **RESOLVED by D20.** The choice was left open because the longest-chain
+> maximum had moved every time the sample grew. It has now been measured over
+> the entire archive and it stops at 4,450 nt. **4,608.**
 
 ## D11 — `N` is two tokens [changed]
 
@@ -293,3 +301,204 @@ for a structure model. `plans/14-mars-acquisition-assessment.md`.
 `scripts/integrate_pdb_hunter.py` indexes it into
 `data/catalog/pdb_hunter_index.json` with paths into that tree. Copying would
 duplicate 154 GB on a volume with 290 GB free, for no gain.
+
+## D20 — Context window: **4,608, and the question is now closed** [D10 resolved]
+
+D10 left this open: keep 4,096 and state 99.97% coverage, or raise to 4,608. It
+was left open because the longest-chain maximum had moved every time the sample
+grew — 3,764 nt on 180 structures, 4,450 nt on 29,807 derived chains — and there
+was no reason to think 4,450 was the end of it.
+
+It is the end of it. Scanning **every RNA polymer chain in all 10,520
+RNA-bearing PDB entries** — the whole archive, not a derivative of it — the
+longest chain is **4,450 nt (6HRM)** and exactly **five** entries exceed 4,096:
+6HRM 4,450, 7UPH 4,438, 4V6X 4,298, 8TOC 4,269, 7LHD 4,217, all large ribosomal
+rRNA. These are the same five the derivative corpora found, at the same lengths.
+
+**Decision: 4,608.** It covers every RNA chain that has ever been solved, with
+158 nt of headroom, and it is the one extreme quantile in this project that has
+stopped moving under a 58x increase in sample size. Choosing 4,096 to save 11%
+of the position budget would leave the five largest rRNA chains — the hardest
+and most-studied folds in the corpus — permanently outside the model.
+
+This does not violate D8. D8 forbids setting a parameter from an extreme
+quantile measured on fewer than 10³ structures; this one is measured on 10,520,
+and it is not an estimate of a maximum but the maximum itself, over a closed
+population. There is no larger sample to be had.
+
+## D21 — G2 and G3 restated downward **[new, measured on raw entries]**
+
+Both are entry-level properties, so neither was computable on RNA3DB or RNASolo,
+and both stood on 180 BGSU structures until the raw corpus was acquired.
+Measured on 10,520 entries / 13.3M RNA residues, 43x the original basis:
+
+| | v0.1 (n=180) | raw PDB | |
+|---|---|---|---|
+| **G2** RNA residues in entries with protein | 98.95% | **97.15%** | holds, −1.8 pts |
+| **G2** isolated RNA, share of residues | 1.05% | **2.83%** | **2.7x larger** |
+| **G3** residues from ribosome-like entries | 92.65% | **85.94%** | holds, −6.7 pts |
+| **G3** ribosome-like entries | 33.5% | **20.88%** | −12.6 pts |
+
+**Decision: keep both mitigations, restate both numbers.** The mandatory
+isolated-vs-in-complex evaluation split (§11.2) and the family-disjoint splits
+(D17) were justified by these skews and both skews survive. What changes is the
+size of the isolated-RNA stratum: 2,350 entries and 378k residues, **2.7x** what
+v0.1 measured. That is a stratum large enough to *train* on, not merely large
+enough to report a number for, which makes the D17 weighting a live lever rather
+than a gesture.
+
+Both corrections move the same way — the corpus is **less** ribosome-dominated
+and **less** protein-bound than the sample said — because BGSU representative
+sets deliberately over-weight large assemblies. Every residue-weighted v0.1
+figure is therefore pessimistic about diversity rather than optimistic. That is
+the safe direction to have been wrong in, and it is still wrong.
+
+## D22 — G1's entry maximum is the fifth tail failure; its chain maximum is the first tail success
+
+| | v0.1 (n=180) | raw PDB (10,520 entries) | |
+|---|---|---|---|
+| total RNA residues per **entry**, max | 11,478 | **22,345** (4V4G) | **1.95x breach** |
+| entries over 4,096 RNA residues | 24.6% (44/179) | **15.06%** (1,584) | over-stated |
+| longest single **chain** | 3,764 nt | **4,450 nt** (6HRM) | reproduces exactly |
+
+The entry maximum is the **fifth** extreme quantile from the 180-structure
+sample to fail at scale, joining `target_c`, contacts/nt, the longest chain and
+the Mg:K ratio. D8 predicted it.
+
+The chain maximum is the first to *hold* — and it holds because by the time it
+was measured the second time, the sample was already 29,807 chains rather than
+180. That is D8 working as intended, not an exception to it.
+
+**Consequence for scope (§11.3):** 1,584 entries hold more than 4,096 RNA
+residues in total and carry **72.2% of all structural RNA** between them. A
+single-chain model is the right first target, but on the residue-weighted
+majority of the archive it is predicting a part while the crystal contains the
+whole. That belongs in the scope statement, not in a footnote.
+
+## Defect C15 — a private counter keyed on the wrong chain id
+
+`entity_poly_types()` returns **auth** chain ids. Two analysis scripts had each
+grown a private `entry_composition()` that joined to it on **`label_asym_id`**.
+Where an entry's two labellings differ — overwhelmingly older depositions, e.g.
+1ARJ, whose sole RNA chain is `label A` / `auth N` — every atom row missed its
+entity and the entry reported **zero polymer residues of any kind**. It affected
+**3,254 of 10,527** raw entries, 686 of them reporting no polymer at all, and it
+deflated G2 to 89.2% and G3 to 33.6% before it was caught.
+
+This is **defect #22 recurring**: two scripts rolling their own definition of a
+thing the canonical resolver already defines. The fix is the same fix — counting
+now lives once, in `pharos.data.mmcif_entities.entry_composition`, beside the
+resolver whose keys it has to match, and test property 10 asserts that its RNA
+counts equal `rna_chain_coords`' on every sampled entry, with 1ARJ pinned as the
+regression case.
+
+**What caught it:** not a test. The scan reported 3,254 RNA-free entries in a
+corpus selected for containing RNA, and 1ARJ — a textbook TAR RNA structure —
+was in the list. The number was implausible on its face. Property 10 exists so
+that the next one does not need to be.
+
+
+## D23 — `target_c` stays at 24, and D9 closes **[measured on the raw archive]**
+
+D9 raised the budget 20 -> 24 and said so provisionally, because the 21.14 that
+forced the raise came from corpora carrying **0.025%** modified residues against
+raw PDB's **1.005%** — a 40x under-representation of the quantity that drives
+the tail. Re-measured on 14,106 chains from 10,520 raw entries, at **0.476%**
+modified residues:
+
+| | v0.1 (n=180) | derivatives (20,266) | **raw (14,106)** |
+|---|---|---|---|
+| max effective c | 19.04 | 21.14 | **23.30** |
+| p99.9 | — | 19.52 | **23.08** |
+| chains over 20 | 0 | 1 | **34** (0.24%) |
+| **chains over 24** | — | — | **0** |
+
+**Decision: 24, confirmed, not raised.** The maximum did rise and 24 still
+contains it.
+
+**But D9's stated mechanism was wrong, and the right one matters more.** D9
+blamed modified residues. Splitting the raw chains by whether their entry is in
+RNA3DB or gRNAde/RNASolo:
+
+| | chains | max effective c |
+|---|---|---|
+| entries the derivatives cover | 12,573 | **21.14** |
+| entries they do not | 1,533 | **23.30** |
+
+21.14 is *exactly* the published derivative figure. The derivative measurement
+was right for the population it had; the entire difference is **coverage**. The
+top 30 chains in the whole archive are one deposition campaign — the 9T-series
+E. coli ribosome PTC focused refinements, ~596 nt of 23S rRNA at 2.28 A in
+methyltransferase-knockout strains — and all 30 are entries no derivative holds.
+9T1E was deposited **2025-10-21**, after RNASolo's 2023-11 snapshot. The first
+chain from any other structure is rank 31, at 21.14.
+
+Modification enrichment is real but secondary: 1.98% in the top 34 against the
+corpus's 0.48%, but only **1.9x** against a length-matched control. These are
+methylation-variant structures, so they are modification-rich by design. That
+describes what sits at the top; it does not explain why the derivatives missed
+it.
+
+**The lesson generalises past `target_c`: a parameter fitted to a curated
+derivative inherits that derivative's snapshot date, and the extremes live in
+what it omits.**
+
+**Two things are true at once and both belong in the record.** Zero of 14,106
+chains breach the budget, over the complete archive. And the headroom is
+**2.9%**, not the 12% §7.3 claimed, against a statistic that has risen at every
+single re-measurement: 19.04 -> 21.14 -> 23.30, about +2.1 per pass. Unlike the
+chain-length maximum (D20), this is not a closed population — it is a property
+of whatever is deposited next.
+
+So the **overflow path is load-bearing**: truncate to budget, record the miss,
+and treat the miss-rate as a training metric rather than a debug counter. 24 is
+the right number *given* that path exists. Without it, 24 would be a bet.
+
+Raising to 28 would buy headroom for 34 chains in 14,106 and cost proportionally
+in L3 refinement on all of them. Not worth it.
+
+**The effective sample size at the top is 1, not 14,106.** Ranks 1-30 are the
+same ~596-nt molecule solved thirty times in one campaign. Ranks 31-34 are 7PAS
+(21.14), 9Z80 (20.97 -- a 119-nt chain in which **all 119 residues are
+modified**), and 4V6O/4V6P (20.11/20.01). **Four independent molecules exceed 20
+in the entire Protein Data Bank.** A budget validated against that tail is
+validated against very little; that is the argument for the overflow path, and
+against reading 23.30 as a ceiling.
+
+## Defect C16 — NMR ensembles were stacked into single residues
+
+`rna_chain_coords()` keyed atoms by `(chain, label_seq_id, ins_code)` and never
+read `pdbx_PDB_model_num`. An NMR entry deposits an ensemble — 20 models by
+convention — and every model repeats every atom, so all 20 collapsed into one
+residue: **1ARJ came back with 424 heavy atoms per residue** against a
+nucleotide's real ~21.
+
+Geometry built from that is the **union of the ensemble's contacts**: two
+residues count as touching if they touch in *any* model. Contact counts and
+`effective_c` inflate for every NMR chain. It also made one worker of the
+raw-corpus scan allocate **28 GB** (52 GB peak) and stop making progress, which
+is how it was noticed.
+
+**Blast radius, checked rather than assumed:** the four chains that set the
+published maxima — 7PAS, 6Q95, 1VY7, 6XHV — are all single-model cryo-EM or
+X-ray, so no published tail statistic moves. Sampling 400 files from each
+derivative corpus found **0 multi-model files** in either RNA3DB or
+gRNAde/RNASolo, so the corpus-scale numbers derived from them are unaffected
+too. The defect only ever bit the raw-entry path, which is new.
+
+Fixed: first model only. Asserted by test property 11, which bounds heavy atoms
+per residue at 50 — chosen to pass legitimate alternate conformations (4X4T
+models 670 A and 669 B altlocs, so a fully dual-occupancy nucleotide is ~42
+atoms, and both conformers are real positions ~1 A apart that add no contacts)
+while catching 20 stacked models at ~424 with an order of magnitude to spare.
+
+## Performance note — the contact builder was O(atom pairs) in Python
+
+`contact_pairs` iterated `cKDTree.query_pairs` output and accumulated `(i, j)`
+tuples in a Python set. On a 1,758-nt rRNA chain (37,455 heavy atoms, millions
+of atom pairs within 8 A) that is tens of millions of tuple objects at ~100
+bytes of overhead each. Vectorised — map atom indices to residue owners in
+numpy, filter `|i-j| >= 4`, dedup with one `np.unique` over a packed key — the
+same chain takes **0.4 s and 0.29 GB** instead of 28 GB and no completion. The
+vectorised output was checked bit-identical to the original on 26 chains before
+the old code was removed.

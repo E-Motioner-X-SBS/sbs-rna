@@ -1,0 +1,91 @@
+{
+ "n_entries_scanned": 10527,
+ "n_entries_with_rna": 10520,
+ "n_chains": 14106,
+ "published": {
+  "max_effective_c_derivatives": 21.14,
+  "target_c_v02": 24,
+  "G2_frac_in_complex": 0.9895,
+  "G3_frac_ribosomal": 0.9265,
+  "max_contacts_per_nt_derivatives": 7.66
+ },
+ "target_c_raw": {
+  "max_effective_c": 23.3,
+  "p99": 19.19,
+  "p999": 23.08,
+  "mean": 11.79,
+  "n_over_20": 34,
+  "n_over_24": 0,
+  "frac_over_24": 0.0,
+  "worst": [
+   [
+    23.3,
+    "9t1e",
+    "a",
+    596
+   ],
+   [
+    23.25,
+    "9t1a",
+    "a",
+    596
+   ],
+   [
+    23.22,
+    "9t1j",
+    "a",
+    596
+   ],
+   [
+    23.22,
+    "9t1h",
+    "a",
+    596
+   ],
+   [
+    23.22,
+    "9t1f",
+    "a",
+    596
+   ],
+   [
+    23.19,
+    "9t1g",
+    "a",
+    596
+   ]
+  ]
+ },
+ "contacts_per_nt_raw": {
+  "max": 7.79,
+  "p999": 6.04,
+  "median": 3.52
+ },
+ "modified_residues": {
+  "residues": 10545190,
+  "modified": 50202,
+  "frac": 0.00476
+ },
+ "G2_in_complex": {
+  "entries_with_protein": 8092,
+  "frac_entries": 0.7692,
+  "rna_residues_total": 13348166,
+  "rna_residues_in_complex": 12967420,
+  "frac_residues": 0.9715,
+  "median_protein_chains_when_present": 8.0
+ },
+ "G1_whole_entry": {
+  "published_max_rna_per_entry": 11478,
+  "published_entries_over_4096": "44 of 179",
+  "max_rna_residues_per_entry": 22345,
+  "entries_over_4096": 1584,
+  "frac_entries_over_4096": 0.1506,
+  "median_rna_residues_per_entry": 73.0
+ },
+ "G3_ribosomal": {
+  "n_ribosome_like": 2197,
+  "frac_entries": 0.2088,
+  "rna_residues": 11471601,
+  "frac_residues": 0.8594
+ }
+}

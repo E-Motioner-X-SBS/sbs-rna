@@ -47,7 +47,9 @@ src/pharos/
 | A-RNA theta = 0.804 (not the B-DNA 0.76) | `physics/manning.py` |
 | Coevolution gated on Neff/L | `model/trunk.py` router input |
 | Stiffness: sequence and structure near-equal | `model/stiffness.py` |
-| **G2: 98.95% of RNA is in complex** (unmeasured at scale) | `eval/stratified.py` — mandatory split |
+| **G2: 97.15% of RNA is in complex** (10,520 raw entries; isolated RNA is 2.83% of residues, 2.7x the v0.1 figure) | `eval/stratified.py` — mandatory split |
+| **G3: 85.94% of residues ribosomal** (down from 92.65% on n=180) | `data/splits.py` — family-disjoint (v0.2 D21) |
+| **Context 4,608**: longest RNA chain in the whole PDB is 4,450 nt (6HRM), closed | `model/trunk.py` (v0.2 D20) |
 | **G7: 1.005% outside ACGU on raw PDB, 0.025% on derivatives** | `data/tokenizer.py` — vocab depends on SOURCE (v0.2 D6) |
 | Token over-provisioned 139x | `data/attributes.py`, `train/precision.py` |
 | **Mg-rigidity 1.523 sigma, X-ray only** | `model/heads.py` rigidity head (v0.2 D12) |
