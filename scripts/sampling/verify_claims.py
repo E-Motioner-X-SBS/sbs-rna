@@ -72,6 +72,38 @@ def main() -> int:
     g = rig["gnra_tetraloop"]
     chk("GNRA effect (sigma)", round(g["mean_zB_other"] - g["mean_zB_GNRA"], 3), 0.073)
 
+    # ---- v0.2 claims, re-derived at corpus scale -------------------------
+    # The checks above pin the ORIGINAL n=180 analysis and must keep passing:
+    # they prove that pipeline still reproduces itself. These pin the values
+    # that SUPERSEDE them, so a future edit cannot silently revert to the
+    # small-sample numbers.
+    try:
+        bs = load("block_sparsity_fullcorpus.json")
+        g4 = bs["acgu"]["global"]["4"]
+        chk("v0.2 max effective c (20,266 chains)", g4["max_effective_c"], 21.14)
+        chk("v0.2 chains breaching c=20", g4["n_over_20"], 1)
+
+        ct = load("contact_tails_fullcorpus.json")["contacts_per_nt"]
+        chk("v0.2 max contacts/nt", round(ct["max"], 2), 7.66)
+        chk("v0.2 chains over published 5.50", ct["n_over_5_50"], 280)
+
+        ir = load("ions_rigidity_rawpdb.json")
+        chk("v0.2 Mg gradient span, X-ray (sigma)",
+            ir["gradient_xray"]["span_sigma"], 1.523, abs_tol=0.002)
+        chk("v0.2 Mg gradient monotonic, X-ray",
+            int(ir["gradient_xray"]["monotonic"]), 1)
+        chk("v0.2 Mg gradient X-ray structures",
+            ir["gradient_xray"]["n_structures"], 1535)
+        chk("v0.2 cryo-EM NOT monotonic",
+            int(ir["gradient_cryoem"]["monotonic"]), 0)
+        chk("v0.2 Mg:K ratio", ir["mg_vs_k"], 53.98, abs_tol=0.02)
+        chk("v0.2 inner-sphere phosphate fraction",
+            ir["inner_sphere"]["phosphate_frac"], 0.7792, abs_tol=0.0005)
+        chk("v0.2 modified-residue fraction (raw PDB)",
+            ir["modified_residues"]["frac"], 0.01005, abs_tol=0.00005)
+    except FileNotFoundError as e:
+        chk(f"v0.2 analysis artefact missing: {e.filename}", 0, 1)
+
     cs = load("contact_sparsity.json")["summary"]
     chk("contacts/nt median", cs["contacts_per_nt_median"], 4.397)
     chk("long-chain map density %", cs["by_length_bin"][-1]["median_density_pct"], 0.353)
@@ -209,6 +241,19 @@ def main() -> int:
         """A number not embedded in a longer number."""
         return r"(?<![\d.,])" + re.escape(tok) + r"(?![\d,]*\d)"
 
+    # Tokens that are SUPERSEDED by a v0.2 measurement. They remain in the
+    # narrative documents, which carry the audit trail, but were removed from
+    # the HTML blueprint, which is a summary and must show only current values.
+    # Requiring them everywhere would force wrong numbers back into the summary
+    # -- the guard would be enforcing the error it was written to catch.
+    SUPERSEDED_SCOPE = {
+        "1.76":   {"ARCH", "TEX"},    # -> 1.523 sigma, X-ray, 1,535 structures
+        "17,428": {"ARCH", "TEX"},    # -> 816,270 Mg sites
+        "19.04":  {"ARCH", "TEX"},    # -> max effective c 21.14
+        "1.34":   {"ARCH", "TEX"},    # -> b=4 occupancy 1.67%
+        "17.2":   {"ARCH", "TEX"},    # -> mean effective c 17.14
+    }
+
     ANCHORED = {
         # short numbers that collide with unrelated values in the documents
         "78":  r"A100[^\n]{0,60}?78|78[^\n]{0,60}?A100",
@@ -221,7 +266,8 @@ def main() -> int:
         "179": r"(?:/|of\s+|across\s+)179|179\s*(?:of|parsed|structures|\.|,)",
     }
 
-    for tok in ["17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
+    for tok in ["1.523", "21.14", "7.66", "54", "77.9",
+                "17,428", "1.76", "0.200", "0.746", "1.34", "17.2", "0.670",
                 "0.224", "0.372", "1.514", "0.804", "9.87",
                 # PHAROS-Small is the current headline config; 910M/382M survives
                 # only as the superseded Base row in the progression tables.
@@ -265,9 +311,11 @@ def main() -> int:
         else:
             pat = ANCHORED.get(tok) or numpat(tok)
             how = "anchored" if tok in ANCHORED else "boundary"
-        missing = [k for k, v in txt.items() if not re.search(pat, v, re.I)]
+        scope = SUPERSEDED_SCOPE.get(tok)
+        items = ({k: v for k, v in txt.items() if k in scope} if scope else txt)
+        missing = [k for k, v in items.items() if not re.search(pat, v, re.I)]
         print(f"  {'OK ' if not missing else 'FAIL'} token {tok:8s} ({how:8s}) "
-              f"{'present in all 3' if not missing else 'MISSING from ' + ','.join(missing)}")
+              f"{('present in ' + (','.join(sorted(scope)) if scope else 'all 3')) if not missing else 'MISSING from ' + ','.join(missing)}")
         if missing: fails.append(f"doc-token {tok}")
 
     print("\n== defect #24 guard: the correction table must record BOTH columns ==")

@@ -28,3 +28,6 @@ data/derived/
 !data/samples/
 data/samples/*
 !data/samples/analysis/
+
+# symlink farm pointing at data/structures/raw_pdb_entries (regenerable)
+data/samples/structures/

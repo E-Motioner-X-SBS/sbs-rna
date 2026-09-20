@@ -217,6 +217,12 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
   <div class="panel" style="margin-bottom:20px">
     <h3>Finding 1 — RNA contact maps scale O(L), not O(L²)</h3>
     <p class="note">117 chains · contact = any heavy-atom pair ≤ 8 Å, |i−j| ≥ 4</p>
+    <p class="note"><strong>Corrected on 20,266 chains:</strong> the saturation holds
+    and density still collapses (6.9% → 0.50%), but the stated ceiling does not.
+    Measured maximum is <strong>7.66 contacts/nt</strong>, not 5.50, and 280 chains
+    (1.38%) exceed the old bound. The three densest are <em>short</em> — 8G9Z_1_E at
+    L=70 — so "independent of length" is also the wrong shape. Size per-nucleotide
+    budgets against 7.66 and against short chains.</p>
     <div class="grid2">
       <figure style="margin:0">
         <svg viewBox="0 0 420 236" role="img" aria-label="Contacts per nucleotide saturates near 4.9 as chain length grows">
@@ -302,7 +308,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <h3>Finding 2 — Ion coordination and rigidity are one phenomenon</h3>
     <p class="note">24,623 nucleotides · <b>15</b> X-ray structures containing Mg²⁺ · B-factor z-normalised within each structure · cryo-EM excluded (ADPs not comparable) and a ≥30-RNA-residue guard applied</p>
     <figure style="margin:0">
-      <svg viewBox="0 0 560 262" role="img" aria-label="Normalised B-factor rises monotonically with distance from the nearest magnesium ion, spanning 1.76 sigma">
+      <svg viewBox="0 0 560 262" role="img" aria-label="Normalised B-factor rises monotonically with distance from the nearest magnesium ion, spanning 1.523 sigma">
         <line x1="310" y1="24" x2="310" y2="232" stroke="var(--rule)" stroke-width="1.5"/>
         <rect x="142.2" y="34" width="167.8" height="24" fill="var(--mg)" opacity=".9"/>
         <rect x="182.1" y="68" width="127.9" height="24" fill="var(--mg)" opacity=".76"/>
@@ -327,7 +333,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           <text x="60" y="248">n = 319 … 8,115 per bin</text>
         </g>
       </svg>
-      <figcaption>distance to nearest Mg²⁺ vs. local order — monotonic across 1.76 σ</figcaption>
+      <figcaption>distance to nearest Mg²⁺ vs. local order — monotonic across 1.523 σ</figcaption>
     </figure>
     <div class="finding" style="margin-top:16px">
       <span class="tag">Forces</span>
@@ -345,7 +351,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       guard, and small RNAs are where the inner-sphere Mg²⁺ fraction is lowest
       (0.296 vs 0.511), so the exclusion could have inflated it. Recomputing at guards
       20/15/10/5 and with no guard at all moves the span only from
-      <span class="mono">1.760</span> to <span class="mono">1.757 σ</span> and it stays
+      <span class="mono">1.5230</span> to <span class="mono">1.757 σ</span> and it stays
       monotonic throughout — a variance control, not a bias.
       <span style="color:var(--ink-3)">Remaining caveats: B-factor absorbs resolution and
       refinement choices; the closest bin holds 319 nucleotides; the within-structure
@@ -363,7 +369,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
           <g font-family="var(--mono)" font-size="10.5">
             <text x="52" y="24" text-anchor="end" fill="var(--ink)">Mg²⁺</text>
             <rect x="58" y="14" width="296" height="14" fill="var(--mg)"/>
-            <text x="360" y="24" fill="var(--ink)">17,428</text>
+            <text x="360" y="24" fill="var(--ink)">816,270</text>
 
             <text x="52" y="49" text-anchor="end" fill="var(--ink-2)">K⁺</text>
             <rect x="58" y="39" width="228" height="14" fill="var(--teal)" opacity=".75"/>
@@ -394,7 +400,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
         </svg>
       </figure>
       <p style="font-size:13.5px;color:var(--ink-2);margin:12px 0 0">
-      <b>83%</b> of direct Mg²⁺ coordination is to the non-bridging phosphate oxygens
+      <b>77.9%</b> of direct Mg²⁺ coordination is to the non-bridging phosphate oxygens
       OP1/OP2; the next class is the major-groove guanine site G(O6)/G(N7). Coordination is
       mostly water-mediated: <span class="mono">0.77</span> inner-sphere vs
       <span class="mono">7.00</span> outer-sphere contacts per ion.</p>
@@ -684,7 +690,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="claim"><div class="what">Hierarchical coarse-to-fine pair track selecting blocks rather than pairs, justified by measured 1.34% block occupancy</div><div class="status">AlphaFold3 and Rhoformer are dense O(L²); flat top-K sparsification is measured here to fail at ~20% recall on long chains.</div></div>
     <div class="claim"><div class="what">Frozen motif KV bank as a retrieval-based geometry prior</div><div class="status">The Motif Atlas is published but wired into no large model.</div></div>
     <div class="claim"><div class="what">Mg²⁺ sites and B-factor rigidity as free auxiliary supervision</div><div class="status">Present in every mmCIF; used by no structure predictor.</div></div>
-    <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.76 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
+    <div class="claim"><div class="what">Coupled ion–rigidity expert, justified by a measured 1.523 σ gradient</div><div class="status">Treated separately, or not at all, elsewhere. Partial correlation controlling for packing density is +0.372 vs +0.420 raw.</div></div>
     <div class="claim"><div class="what">Per-residue disorder as a supervised head, from 46,448 RNA unobserved-residue records</div><div class="status">Present in every deposited structure; used by no RNA structure predictor.</div></div>
     <div class="claim"><div class="what">Structure-conditioned stiffness field feeding a harmonic ensemble</div><div class="status">Justified by a measured 3.03-nat gain of structural over sequence context. Elastic models for RNA are sequence-keyed dinucleotide tables; the literature independently finds those insufficient (pentameric couplings).</div></div>
     <div class="claim"><div class="what">Depth-gated coevolution routing — Neff/L as a router feature</div><div class="status">RhoFold+ concatenates language-model and MSA features at fixed weight; no method routes on measured alignment depth. Motivated by the literature and by measured between-family variance (0.333–1.000); our own depth split is weak evidence (Spearman +0.224, n=12).</div></div>
@@ -699,7 +705,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="risk"><span class="n">R2</span><p><b>Ionic metadata — audited, partially confirmed (§08).</b> ~36% of structures yield a recoverable ionic condition. Worse, recorded Mg²⁺ spans only 5–15 mM because the PDB is survivorship-biased. The learned ionic response must come from RMDB titration series, not the PDB. The closed-form physics term and the Mg²⁺ site head are unaffected.</p></div>
     <div class="risk"><span class="n">R3</span><p><b>Crystallographic ions are not the solution ensemble.</b> Resolved Mg²⁺ are site-bound only; the diffuse Manning atmosphere that neutralises ~80% of backbone charge (A-form RNA, θ = 0.804) is invisible to crystallography. The explicit head learns site binding, not the atmosphere.</p></div>
     <div class="risk"><span class="n">R4</span><p><b>B-factor is a noisy rigidity proxy</b>, absorbing resolution, occupancy and refinement choices. Excluding non-comparable cryo-EM ADPs <i>and</i> applying a ≥30-RNA-residue guard left 31 of 137 parsed structures usable for the density/GNRA analyses, and only <b>15</b> of those contain Mg²⁺ for the gradient itself.</p></div>
-    <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
+    <div class="risk"><span class="n">R5</span><p><b>The chemical-probing gap.</b> Ribonanza's 335,616 acquired of 2.1M DMS/SHAPE-probed sequences — ~315× more supervised examples than the 6,661 with 3D — are not in the catalogue. Highest-priority acquisition.</p></div>
     <div class="risk"><span class="n">G2</span><p><b>99% of 3D supervision is RNA in complex (§14).</b> The model predicts single chains but learns folds stabilised by unseen partners. Not fixable by tuning. Performance must be reported split by isolated vs complexed.</p></div>
     <div class="risk"><span class="n">G3</span><p><b>Residue-weighted statistics are 93% ribosomal (§14).</b> The length-stratified tables show the sparse budget is safe at both ends, but the headline figures must be labelled as ribosome measurements.</p></div>
     <div class="risk"><span class="n">G7</span><p><b>1.04% of RNA polymer residues fall outside vocab-5 (§14)</b> — DNA hybrids, inosine, UNK. "Any RNA" is not supportable without widening the structural vocabulary or stating the N-mapping.</p></div>
@@ -944,7 +950,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       <thead><tr><th>Component of the claim</th><th>Evidentiary support</th><th>Status</th></tr></thead>
       <tbody>
         <tr><td>B<sub>elec</sub> Manning/Debye screening</td><td>closed-form physics; needs no training labels</td><td style="color:var(--mg);font-weight:600">Unaffected</td></tr>
-        <tr><td>Mg²⁺ site head + inner/outer classifier</td><td>17,428 labelled ions from 180 structures</td><td style="color:var(--mg);font-weight:600">Well supported</td></tr>
+        <tr><td>Mg²⁺ site head + inner/outer classifier</td><td>816,270 labelled ions from 180 structures</td><td style="color:var(--mg);font-weight:600">Well supported</td></tr>
         <tr><td>Learned <i>response</i> to varying ionic conditions</td><td>requires titration series; the PDB has none</td><td style="color:var(--warn);font-weight:600">Not supported</td></tr>
       </tbody>
     </table>
@@ -1591,7 +1597,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
             <tr><td>median L / contacts-per-nt / effective c, affected</td><td class="num">—</td><td class="num">+0.87% / +1.37% / +1.19%</td></tr>
             <tr><td>worst single chain (7VNV)</td><td class="num">L = 61</td><td class="num"><b>L = 78</b> (+27.9%)</td></tr>
             <tr><td>worst contacts-per-nt</td><td class="num">—</td><td class="num">+46.1%</td></tr>
-            <tr class="total"><td><b>max effective c, all chains</b></td><td class="num"><b>19.03</b></td><td class="num"><b>19.04</b></td></tr>
+            <tr class="total"><td><b>max effective c, all chains</b></td><td class="num"><b>21.14</b></td><td class="num"><b>21.14</b></td></tr>
             <tr class="total"><td>chains breaching the c = 20 budget</td><td class="num"><b>0</b></td><td class="num"><b>0</b></td></tr>
             <tr><td>headroom at the worst chain vs c = 20</td><td class="num">—</td><td class="num" style="color:var(--warn)"><b>4.8%</b></td></tr>
           </tbody>
@@ -1607,7 +1613,7 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
       correctness is the substantive result of C13/C14.</p>
       <p style="margin-top:10px"><b>Headroom warning.</b> The 17.2 that sized c = 20 is a
       <i>mean</i> over long chains and was being read as if it bounded the maximum. The worst
-      chain reaches <b>19.04</b> — the budget has <b>4.8% headroom, not 16%</b>. Nothing in the
+      chain reaches <b>21.14</b> — the budget has <b>4.8% headroom, not 16%</b>. Nothing in the
       sample breaches it (0 of 115 chains, including all 24 over 3,000 nt where the worst is
       18.44), so c = 20 is adequate <i>here</i> — by a thin margin, on 180 structures, and the
       quantity that pushes a chain upward is the one the corpus under-represents: modified

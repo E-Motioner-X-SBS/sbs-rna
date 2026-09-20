@@ -56,8 +56,9 @@ contact-map density falls from $6.5\%$ at $L \approx 56$ to $0.353\%$ at
 $L \approx 2900$: RNA contact maps scale as $O(L)$, not $O(L^2)$, so a dense
 pair representation spends over $99\%$ of its compute on empty space and would
 require $309$~GB of activations at $L=2048$. Third, we measure a monotonic
-$1.76\sigma$ gradient in normalised crystallographic B-factor as a function of
-distance to the nearest $\mathrm{Mg}^{2+}$ ion across $24{,}623$ nucleotides,
+$1.523\sigma$ gradient in normalised crystallographic B-factor as a function of
+distance to the nearest $\mathrm{Mg}^{2+}$ ion across $3{,}858{,}271$ nucleotides
+in $1{,}535$ X-ray structures,
 establishing that ion coordination and local rigidity are not independent
 features but two readouts of one phenomenon.
 
@@ -221,6 +222,7 @@ $8.0$~\AA{} and sequence separation $|i-j| \geq 4$.
 $\geq 1500$ & 61 & 2901 & $4.854$ & $\mathbf{0.353\%}$ \\
 \midrule
 \multicolumn{2}{l}{\textbf{Overall}} & & median $4.397$, p95 $5.422$, max $5.497$ & median $0.389\%$ \\
+\multicolumn{2}{l}{\emph{full corpus, 20{,}266 chains}} & & \emph{median $3.55$, p95 $5.44$, max $\mathbf{7.66}$} & \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -274,8 +276,13 @@ $> 20$~\AA{}      & 3{,}174 & $\mathbf{+0.877}$ \\
 \end{tabular}
 \end{table}
 
-The gradient is monotonic and spans $1.76$ standard deviations. Local packing
-density independently correlates with rigidity at Pearson $r = -0.294$.
+The gradient is monotonic and spans $1.523$ standard deviations, re-derived on
+$1{,}535$ X-ray structures of the raw-PDB corpus; the $1.76\sigma$ first reported
+came from the $15$ $\mathrm{Mg}$-containing structures of a $180$-structure
+sample. Local packing density independently correlates with rigidity at Pearson
+$r = -0.294$. Cryo-EM does \emph{not} reproduce the gradient ($0.934\sigma$,
+non-monotonic, $1{,}885$ structures), so the rigidity head must train on
+crystallographic B-factors only.
 
 \paragraph{The obvious confound, tested.} $\mathrm{Mg}^{2+}$ proximity and dense
 packing both mark folded cores, so the gradient might merely restate that cores
@@ -303,7 +310,10 @@ from $0.420$ to $0.372$, so the signal is largely \emph{independent} of packing.
 \paragraph{The selection objection, also tested.} The gradient applies a
 $\geq30$-RNA-residue guard, and small RNAs are exactly where the inner-sphere
 $\mathrm{Mg}^{2+}$ fraction is lowest ($0.296$ versus $0.511$), so the exclusion
-could have inflated the result. Sweeping the guard shows it does not:
+could have inflated the result. Sweeping the guard shows it does not. \emph{The
+sweep below is the original $180$-structure measurement, retained because it is
+the control that closed the selection objection; the span it reports is
+superseded by the $1.523\sigma$ measured on $1{,}535$ X-ray structures.}
 
 \begin{table}[h]
 \centering
@@ -373,9 +383,10 @@ $\mathrm{Mn}^{2+}$ & 12    & O2$'$ (ribose)  & 196 \\
 \end{tabular}
 \end{table}
 
-$\mathrm{Mg}^{2+}$ outnumbers all other cations by roughly $9\!:\!1$, so an
-ion-aware model that handles a single species should handle $\mathrm{Mg}^{2+}$.
-Some $83\%$ of direct coordination is to the two non-bridging phosphate oxygens;
+$\mathrm{Mg}^{2+}$ outnumbers $\mathrm{K}^{+}$ by $54\!:\!1$ ($816{,}270$ against
+$15{,}123$) and all other cations together by $19.7\!:\!1$, so an ion-aware model
+that handles a single species should handle $\mathrm{Mg}^{2+}$.
+Some $77.9\%$ of direct coordination is to the two non-bridging phosphate oxygens;
 the next largest class, G(O6)/G(N7), is the textbook major-groove guanine site.
 
 Coordination is predominantly water-mediated: a mean of $0.77$ inner-sphere
@@ -966,7 +977,7 @@ with compactness ($0.511$ overall, $0.296$ below $500$~nt).
 The term $E_{\text{rigid}}$ closes the loop with Table~\ref{tab:mgrigid}:
 predicted $\mathrm{Mg}^{2+}$ sites raise local rigidity, which stiffens harmonic
 restraints, which constrains the decoder. That pathway is the architectural
-encoding of the measured $1.76\sigma$ gradient.
+encoding of the measured $1.523\sigma$ gradient.
 
 \subsection{Heads and decoder}
 
@@ -1742,7 +1753,9 @@ such rather than quoted as ``RNA''.
 long chains, and it was being read as though it bounded the maximum. Measured per
 chain across all $179$ structures under both RNA definitions, the worst chain
 reaches an effective $c$ of $\mathbf{19.04}$: the budget has
-\textbf{$4.8\%$ headroom, not $16\%$}. Nothing in the sample breaches it---$0$ of
+\textbf{$4.8\%$ headroom, not $16\%$}. \emph{Re-measured on $20{,}266$ chains of
+the full corpus the maximum is $\mathbf{21.14}$ and $c=20$ is breached; the budget
+is raised to $24$.} Nothing in the $180$-structure sample breaches it---$0$ of
 $115$ chains checked, including all $24$ with chains over $3{,}000$~nt, where the
 worst is $18.44$---so $c=20$ is adequate \emph{here}. It is adequate by a thin
 margin on a 180-structure sample, and the quantity that pushes a chain upward is
@@ -1895,7 +1908,8 @@ Median effective $c$, affected   & ---      & $+1.19\%$ \\
 Worst single chain (7VNV)        & $L=61$   & $\mathbf{L=78}$ ($+27.9\%$) \\
 Worst contacts/nt                & ---      & $+46.1\%$ \\
 \textbf{Max effective $c$}       & $19.03$  & $\mathbf{19.04}$ \\
-Chains breaching $c=20$          & $\mathbf{0}$ & $\mathbf{0}$ \\
+\quad\emph{full corpus, 20{,}266 chains} & --- & $\mathbf{21.14}$ \\
+Chains breaching $c=20$          & $\mathbf{0}$ & $\mathbf{1}$ \emph{(full corpus)} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2147,7 +2161,7 @@ Frozen motif KV bank as a retrieval-based geometry prior & The Motif Atlas is
 published but wired into no large model. \\
 $\mathrm{Mg}^{2+}$ sites and B-factor rigidity as free auxiliary supervision &
 Present in mmCIF; used by no structure predictor. \\
-Coupled ion--rigidity expert justified by a measured $1.76\sigma$ gradient &
+Coupled ion--rigidity expert justified by a measured $1.523\sigma$ gradient &
 Treated separately or not at all elsewhere. Partial correlation controlling for
 packing density is $+0.372$ vs $+0.420$ raw. \\
 Learned stiffness encoder emitting a per-step $6\times6$ precision matrix
