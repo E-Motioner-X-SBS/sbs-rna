@@ -1320,6 +1320,23 @@ viral genomes (SARS-CoV-2 ~30 knt) are an order of magnitude beyond any context
 considered here. **Scope statement required: PHAROS predicts single RNA chains
 up to 4,096 nt. It is not a whole-transcript or whole-ribosome model.**
 
+> **CORRECTED on the full corpus — 4096 does NOT cover every chain.** Measured
+> over all **29,807** chains of the server corpus rather than the 180-structure
+> sample, the longest-chain distribution is p50 **95**, p90 2,831, p99 3,562,
+> p99.9 3,773, **max 4,450 nt**. **Eight chain files — five unique structures —
+> exceed 4096**: 6HRM (4,450), 7UPH (4,438), 4V6X (4,298), 8TOC (4,269), 7LHD
+> (4,217), each appearing in both RNA3DB and RNASolo. All are large ribosomal
+> subunit rRNAs.
+>
+> The breach is small (0.027% of chains) but the row above read **0**, and the
+> sentence "covers every single chain we hold" is false as written. Either state
+> the coverage as **99.97%** or raise the context to 4,608. This is the second
+> tail claim from the 180-structure sample to fail on the full corpus, the first
+> being `target_c` (§5); in both cases the *central* estimates reproduced and
+> only the extreme quantile was wrong, which is the expected behaviour of an
+> n=180 sample and should be assumed for every remaining max/min in this
+> document.
+
 ### G2 — 99% of the structural evidence is RNA *in complex* [most serious]
 
 | Quantity | Value |

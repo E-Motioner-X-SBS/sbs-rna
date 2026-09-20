@@ -112,6 +112,26 @@ Finding G7: **8.90%** of structural residues fall outside `{A,C,G,U}`.
   mmCIF `comp_id`. Until built, the honest statement is that modified residues
   map to `N` and their geometry is not predicted.
 
+> **The premise is source-dependent, measured Sep 2026.** The 8.90% figure comes
+> from raw BGSU mmCIFs. The structural data actually on disk — RNA3DB and
+> RNASolo — is **pre-normalised**: over 1,800 sampled structures / 1.26M polymer
+> residues it carries **0.025%** non-ACGU (top species `N`, 245 of 310
+> instances), a **42x** under-representation. So the second vocabulary is
+> required only if training consumes **raw PDB entries**; against RNA3DB/RNASolo
+> a 5-symbol vocabulary is very nearly exact. Decide the vocabulary and the data
+> source together, not separately.
+>
+> Related, and worth splitting: `N` means two different things. In sequences
+> (elDORS) it is an **ambiguous base call** — measured **0.203%** of nucleotides
+> pooled over 238M nt, and strongly chunk-dependent (0.51% in chunk 001 vs
+> 0.0077% in chunk 006), against the ~0.1% the data README states. In structures
+> it is a residue whose **geometry is fully modelled but whose base identity the
+> depositor left unassigned** — e.g. `8vvt_ZA` residue 1248 carries a complete
+> ribose including O2' plus a partial base ring. The first has no identity and
+> no geometry; the second has full geometry and no identity, so it can train the
+> geometry heads normally and makes base-identity imputation a free auxiliary
+> task. One shared token conflates them.
+
 ## D7 — Cost, hardware-explicit [defect #15 corrected]
 
 A100 (Ampere) has **no FP8 tensor cores**, so the published "~79 A100-hours"
