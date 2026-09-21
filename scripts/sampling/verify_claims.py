@@ -176,6 +176,42 @@ def main() -> int:
         chk("7.1 separation beats flat complementarity on long chains",
             int(lb["separation"]["32"] > lb["complementary"]["32"]), 1)
 
+        # ---- is every catalogued dataset still on disk? ------------------
+        # The manifest records what was downloaded; this records what is there.
+        # A source that quietly went missing fails at training time otherwise.
+        dp = load("data_presence.json")
+        chk("catalogued sources complete", dp["n_sources_complete"], dp["n_sources"])
+        chk("catalogued files present", dp["n_present"], dp["n_files"])
+        chk("no file changed size since acquisition", dp["n_resized"], 0)
+        chk("no file missing", dp["n_missing"], 0)
+
+        # ---- R1: the block scorer, trained -------------------------------
+        bsr = load("block_scorer_results.json")
+        bt = bsr["test"]
+        chk("R1 random L2 recall", bt["random"]["l2_recall"], 0.5435, abs_tol=0.0002)
+        chk("R1 separation-prior L2 recall", bt["separation"]["l2_recall"],
+            0.6333, abs_tol=0.0002)
+        chk("R1 learned L2 recall", bt["learned"]["l2_recall"], 0.8345, abs_tol=0.0002)
+        chk("R1 sequence gain over the separation prior",
+            bsr["l2_sequence_gain"], 0.2012, abs_tol=0.0002)
+        # the number the pair track exists for: long chains
+        lb = bt["learned"]["recall_by_length"]
+        sb = bt["separation"]["recall_by_length"]
+        chk("R1 long chains (>=1500), learned", lb["l2_>=1500"], 0.9972, abs_tol=0.0002)
+        chk("R1 long chains (>=1500), separation prior", sb["l2_>=1500"], 0.2779,
+            abs_tol=0.0002)
+        chk("R1 the ablated prior costs almost nothing",
+            int(abs(bt["learned"]["l2_recall"]
+                    - bt["learned_noprior"]["l2_recall"]) < 0.01), 1)
+
+        # ---- completeness: does the code implement the specification? ----
+        cp = load("completeness.json")
+        chk("every specified component is present",
+            cp["n_present"], cp["n_components"])
+        chk("every curriculum stage has a runner",
+            cp["n_stages_present"], cp["n_stages"])
+        chk("nothing specified is missing", len(cp["missing"]), 0)
+
         # ---- §6.4: RMDB ionic titrations (open action 2) -----------------
         import json as _jj
         tf = ROOT / "data/benchmarks/rmdb/titrations.json"

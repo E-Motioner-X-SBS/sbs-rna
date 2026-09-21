@@ -47,9 +47,16 @@ CONTACT_CUTOFF = 8.0
 MIN_SEPARATION = 4
 #: Hierarchical Pair Track levels (ARCHITECTURE v0.2 §7): b1 coarse, b2 fine.
 BLOCK_SIZES = (16, 4)
-#: Training window. The lower bound is where a contact map carries structure;
-#: the upper is the pair-track measurement window, NOT the context window --
-#: chains up to 4,450 nt exist and the model's context is 4,608 (D20).
+#: Training window. The upper bound is the context window (D20); chains reach
+#: 4,450 nt and nothing is lost at 4,608.
+#:
+#: The lower bound is measured, not assumed. Dropping it from 32 to 8 over a
+#: 400-entry stride sample adds **+10.6% chains for +0.3% residues and +0.1%
+#: contacts**: the excluded chains are numerous and nearly empty. `MIN_CONTACTS`
+#: is the filter that matters -- it is about whether a chain has tertiary
+#: structure to learn from, which is the actual question, and it is not a
+#: proxy for length. 32 is kept because moving it would churn every pinned
+#: figure in the corpus for a tenth of a percent of the signal.
 MIN_LENGTH, MAX_LENGTH = 32, 4608
 #: Below this a chain has no tertiary structure worth supervising.
 MIN_CONTACTS = 8

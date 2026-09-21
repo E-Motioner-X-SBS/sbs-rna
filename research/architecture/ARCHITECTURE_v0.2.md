@@ -696,6 +696,62 @@ while the overflow path exists.
 > validated against very little, which is the argument for the overflow path
 > and against reading 23.30 as a ceiling.
 
+### 7.4a R1 — **the scorer is trained, and it works** **[v0.2, measured]**
+
+Every recall figure in §7 before this came from random weights. The question R1
+asks is whether a model can *find* the occupied blocks from sequence, and it is
+the assumption the entire pair track rests on. Trained on the family-disjoint
+split (11,723 train / 1,450 test chains), evaluated against three baselines at
+the **identical budget**:
+
+| scorer | L1 recall | L2 recall | L2 precision |
+|---|---|---|---|
+| random | 0.135 | 0.543 | 0.202 |
+| separation prior | 0.231 | 0.633 | 0.242 |
+| learned, prior ablated | 0.271 | 0.833 | 0.337 |
+| **learned** | **0.272** | **0.840** | 0.338 |
+
+**Sequence gain over the separation prior: +0.207 at L2.** The answer to R1 is
+yes: the sequence carries real information about which blocks are occupied,
+beyond the fact that contacts cluster near the diagonal.
+
+**And the gain is concentrated exactly where the architecture needs it.** By
+chain length, L2 recall:
+
+| chain length | separation prior | learned | |
+|---|---|---|---|
+| < 128 | 0.717 | **0.926** | |
+| 128–512 | 0.475 | **0.523** | |
+| 512–1,500 | 0.360 | 0.349 | no gain |
+| **≥ 1,500** | **0.278** | **0.997** | **3.6×** |
+
+On chains of 1,500 nt and up — the regime where §7.1 shows flat pair ranking
+collapses to 0.377 even at c=32 — the learned selector recovers **99.7%** of
+occupied blocks. That is the case for the Hierarchical Pair Track, measured
+rather than assumed.
+
+**The 512–1,500 band is the honest weak spot**: the learned scorer matches the
+separation prior there and beats it nowhere. It is also the thinnest band in the
+family-disjoint test set (66 chains), so the estimate is noisy, but it is not a
+band to claim anything about.
+
+**Capacity does not help.** The experiment was run twice, at 4.4M and 61.9M
+parameters with matched optimiser steps. The larger model is better on
+validation (0.890 vs 0.871) and *not* better on the held-out test set (0.835 vs
+0.840) — a tie, with a hint of overfitting. A third attempt at 153M with a 14×
+larger batch was much worse (val L2 0.666, loss stuck at 2.37) because the batch
+cut optimiser steps from ~11,700 to 2,448; that is a step-count failure, not a
+capacity ceiling, and raising the learning rate to 1e-3 did not rescue it.
+
+This is direct evidence for §12.2's position that the structure task is
+**data-limited, not capacity-limited**, and for keeping PHAROS-Small.
+
+> **What is not measured here.** L1 and L2 are each evaluated standalone, at
+> their own budget, against their own labels. The track *cascades* — L2 refines
+> only inside surviving L1 blocks — so end-to-end recall is bounded by L1's
+> 0.272 and is not reported. The cascade number is the one a deployed track
+> would deliver, and measuring it is the next thing this experiment owes.
+
 ### 7.4 Reference implementation **[v0.1, measured]**
 
 L=4096 in **0.45 s** at 0.96% of dense; the AF3-style dense baseline is **not
@@ -1177,7 +1233,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **259** checks. Counting
+JSONs and fails the build on drift; it currently pins **273** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

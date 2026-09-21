@@ -1,0 +1,288 @@
+{
+ "n_components": 30,
+ "n_present": 30,
+ "n_stages": 6,
+ "n_stages_present": 6,
+ "missing": [],
+ "components": [
+  {
+   "section": "2",
+   "component": "input embedding",
+   "module": "pharos.model.pharos",
+   "symbol": "InputEmbedding",
+   "present": true,
+   "note": "tokens + mods + chemistry + position"
+  },
+  {
+   "section": "3",
+   "component": "structural tokenizer",
+   "module": "pharos.data.vocab",
+   "symbol": "encode_residue",
+   "present": true,
+   "note": "parent base + modification id (D6, D11)"
+  },
+  {
+   "section": "3",
+   "component": "modification vocabulary",
+   "module": "pharos.data.vocab",
+   "symbol": "mod_vocab_size",
+   "present": true,
+   "note": "370 CCD species"
+  },
+  {
+   "section": "4",
+   "component": "24-dim chemistry",
+   "module": "pharos.data.chemistry",
+   "symbol": "chain_chemistry",
+   "present": true,
+   "note": "CHEMISTRY.md"
+  },
+  {
+   "section": "4",
+   "component": "CCD parent resolution",
+   "module": "pharos.data.chemistry",
+   "symbol": "resolve",
+   "present": true,
+   "note": "by dictionary, not by name"
+  },
+  {
+   "section": "5.1",
+   "component": "Gated DeltaNet",
+   "module": "pharos.model.attention",
+   "symbol": "GatedDeltaNet",
+   "present": true,
+   "note": "linear, chunked delta rule"
+  },
+  {
+   "section": "5.1",
+   "component": "sliding-window attn",
+   "module": "pharos.model.attention",
+   "symbol": "SlidingWindowAttention",
+   "present": true,
+   "note": "w=128"
+  },
+  {
+   "section": "5.1",
+   "component": "full attn + physics bias",
+   "module": "pharos.model.attention",
+   "symbol": "FullAttention",
+   "present": true,
+   "note": "2 of 16 blocks"
+  },
+  {
+   "section": "5.1",
+   "component": "block pattern",
+   "module": "pharos.model.attention",
+   "symbol": "BLOCK_PATTERN",
+   "present": true,
+   "note": "10 GDN / 4 SWA / 2 FULL"
+  },
+  {
+   "section": "5.2",
+   "component": "trunk with loops",
+   "module": "pharos.model.trunk",
+   "symbol": "TokenTrunk",
+   "present": true,
+   "note": "one-step gradient, deep supervision"
+  },
+  {
+   "section": "5.3",
+   "component": "MoE feed-forward",
+   "module": "pharos.model.moe",
+   "symbol": "MoEFeedForward",
+   "present": true,
+   "note": "fine-grained + shared expert"
+  },
+  {
+   "section": "5.3",
+   "component": "conditioned router",
+   "module": "pharos.model.moe",
+   "symbol": "RouterFeatures",
+   "present": true,
+   "note": "length, Neff/L, in-complex, chemistry"
+  },
+  {
+   "section": "6.1",
+   "component": "Manning condensation",
+   "module": "pharos.physics.manning",
+   "symbol": "condensed_fraction",
+   "present": true,
+   "note": "theta = 0.804 for A-RNA"
+  },
+  {
+   "section": "6.2",
+   "component": "Debye screening",
+   "module": "pharos.physics.manning",
+   "symbol": "debye_kappa",
+   "present": true,
+   "note": "kappa from ionic condition"
+  },
+  {
+   "section": "6.2",
+   "component": "electrostatic pair bias",
+   "module": "pharos.model.pharos",
+   "symbol": "ElectrostaticBias",
+   "present": true,
+   "note": "B_elec into FULL attention"
+  },
+  {
+   "section": "7",
+   "component": "hierarchical pair track",
+   "module": "pharos.model.block_scorer",
+   "symbol": "BlockScorer",
+   "present": true,
+   "note": "L1/L2 selectors"
+  },
+  {
+   "section": "7",
+   "component": "occupancy loss",
+   "module": "pharos.model.block_scorer",
+   "symbol": "occupancy_loss",
+   "present": true,
+   "note": "recall-weighted BCE"
+  },
+  {
+   "section": "7.3",
+   "component": "budgets from target_c",
+   "module": "pharos.model.block_scorer",
+   "symbol": "l2_budget",
+   "present": true,
+   "note": "K = target_c . L"
+  },
+  {
+   "section": "8",
+   "component": "frozen motif bank",
+   "module": "pharos.model.motif_bank",
+   "symbol": "MotifBank",
+   "present": true,
+   "note": "667 BGSU classes"
+  },
+  {
+   "section": "9",
+   "component": "ten output heads",
+   "module": "pharos.model.heads",
+   "symbol": "PharosHeads",
+   "present": true,
+   "note": "contact..base identity"
+  },
+  {
+   "section": "9",
+   "component": "head specification",
+   "module": "pharos.model.heads",
+   "symbol": "HEAD_SPEC",
+   "present": true,
+   "note": "the table, as data"
+  },
+  {
+   "section": "10",
+   "component": "stiffness field",
+   "module": "pharos.model.dynamics",
+   "symbol": "StiffnessField",
+   "present": true,
+   "note": "per-step 6x6, Cholesky"
+  },
+  {
+   "section": "10",
+   "component": "harmonic ensemble",
+   "module": "pharos.model.dynamics",
+   "symbol": "HarmonicEnsemble",
+   "present": true,
+   "note": "normal modes -> amplitudes"
+  },
+  {
+   "section": "10",
+   "component": "O(L) selected inversion",
+   "module": "pharos.model.dynamics",
+   "symbol": "block_tridiagonal_variance",
+   "present": true,
+   "note": "not O(L^3)"
+  },
+  {
+   "section": "11",
+   "component": "entry composition (G2/G3)",
+   "module": "pharos.data.mmcif_entities",
+   "symbol": "entry_composition",
+   "present": true,
+   "note": "whole-entry properties"
+  },
+  {
+   "section": "12",
+   "component": "3D dataset",
+   "module": "pharos.data.dataset",
+   "symbol": "build_entry",
+   "present": true,
+   "note": "contacts + block labels"
+  },
+  {
+   "section": "12",
+   "component": "free supervision",
+   "module": "pharos.data.mmcif_entities",
+   "symbol": "residue_labels",
+   "present": true,
+   "note": "Mg, B-factor, N_struct, disorder"
+  },
+  {
+   "section": "12",
+   "component": "length-bucketed loader",
+   "module": "pharos.data.loader",
+   "symbol": "Pharos3DDataset",
+   "present": true,
+   "note": "quality weighting (D16)"
+  },
+  {
+   "section": "12",
+   "component": "ionic channel",
+   "module": "pharos.data.rdat",
+   "symbol": "titration_examples",
+   "present": true,
+   "note": "RMDB Mg ladders"
+  },
+  {
+   "section": "12",
+   "component": "assembled model",
+   "module": "pharos.model.pharos",
+   "symbol": "Pharos",
+   "present": true,
+   "note": "everything above, wired"
+  }
+ ],
+ "stages": [
+  {
+   "stage": "1 pretrain (MLM + spans)",
+   "script": "scripts/pretrain_mlm.py",
+   "present": true
+  },
+  {
+   "stage": "2 secondary structure",
+   "script": "scripts/train_sequence_stages.py",
+   "present": true
+  },
+  {
+   "stage": "3 chemical probing",
+   "script": "scripts/train_sequence_stages.py",
+   "present": true
+  },
+  {
+   "stage": "4 physics",
+   "script": null,
+   "present": true
+  },
+  {
+   "stage": "5 3D multi-task",
+   "script": "scripts/train_pharos.py",
+   "present": true
+  },
+  {
+   "stage": "R1 block selector",
+   "script": "scripts/train_block_scorer.py",
+   "present": true
+  }
+ ],
+ "not_built": {
+  "decoder.py (frame diffusion)": "\u00a79 head 3 emits coordinates directly; diffusion is a v0.3 item",
+  "eval/ package": "splits are enforced in build_dataset.py and reported by the trainers",
+  "train/precision.py": "settled as a decision (PRECISION.md, D3), not code",
+  "train/schedule.py": "settled as a decision (D2), the token budget is a CLI flag",
+  "attributes.py": "the supervision-target array; labels live in dataset.py"
+ }
+}
