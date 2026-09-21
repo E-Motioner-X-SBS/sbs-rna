@@ -44,12 +44,33 @@
 | `history_of_failed_attempts/` | everything that did not work: `DEFECTS.md`, `NEGATIVE_RESULTS.md`, and the superseded v0.1 and v0.2 documents with their correction tables |
 | `data/catalog/SOURCES.md` | every acquisition link and program, generated from `acquire_all.py` |
 
-A second cron entry (`4,34 * * * *`) runs `scripts/architecture_watch.sh`: it
-reruns `verify_claims.py` and `audit_completeness.py`, checks that the
-specification has not drifted back into narrating its own corrections, notes
-where training has got to, and appends to the changelog **only when something
-changed**. It holds its own lock and never touches the GPU, so it is safe
-alongside a training run.
+A second cron entry (`4,34 * * * *`) runs `scripts/architecture_watch.sh`
+every 30 minutes. **It does not stop.** Each tick it:
+
+1. reruns `verify_claims.py` and `audit_completeness.py`;
+2. checks the specification has not drifted back into narrating corrections
+   (it greps for "was wrong", "defect #", "previously claimed");
+3. runs **one** due CPU task from a staleness queue — source inventory,
+   completeness, inventory gap, data presence, data integrity, pretrain
+   coverage, packing waste — most stale first, so a tick stays short;
+4. if the GPU gate is open, starts one GPU task; otherwise prints
+   **"I am waiting for GPU permission"** and exits 0, which is a normal tick;
+5. appends to `research/architecture/CHANGELOG.md` only when something changed.
+
+**The GPU gate.** The loop never takes the card on its own. It needs both:
+
+```bash
+touch data/samples/analysis/cron/GPU_PERMITTED   # you offer the card
+rm    data/samples/analysis/cron/GPU_PERMITTED   # you take it back
+```
+
+and enough free memory, measured rather than assumed — 60 GiB to resume the
+curriculum, 8 GiB for the probes. It also refuses if training is already
+running. Training is launched **detached**, because it runs for hours and a
+30-minute cron holding it would kill its own run.
+
+Granting permission is how training resumes: the loop will start
+`gpu_cron_runner.sh` itself, which picks up stage 1 from its checkpoint.
 
 ## Key documents
 | File | Content |

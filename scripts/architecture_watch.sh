@@ -2,11 +2,19 @@
 # Fired every 30 minutes: check that the architecture is still consistent with
 # itself, and record anything that changed.
 #
-# Separate from gpu_cron_runner.sh on purpose. That one trains and needs the
-# GPU; this one only reads and runs CPU-only test suites, so the two must not
-# block each other and do not share a lock. It is safe while training is
-# running -- verify_claims.py forces CUDA_VISIBLE_DEVICES="" for exactly this
-# reason, after a neighbour's memory use once made a passing suite report drift.
+# It checks, then it works, then it says what it is waiting for. It does not
+# stop: when the only work left needs the GPU and the GPU has not been offered,
+# it prints "I am waiting for GPU permission" and exits 0. That is a normal
+# tick, not a failure.
+#
+# Separate from gpu_cron_runner.sh on purpose. That one trains; this one only
+# reads and runs CPU-only work by default, so the two must not block each other
+# and do not share a lock. It is safe while training is running --
+# verify_claims.py forces CUDA_VISIBLE_DEVICES="" for exactly this reason, after
+# a neighbour's memory use once made a passing suite report drift.
+#
+# It takes the card ONLY when data/samples/analysis/cron/GPU_PERMITTED exists
+# AND enough memory is free. Remove the file to take the card back.
 set -uo pipefail
 
 REPO=/store/shuvam/E-motioner-X-SBS/sbs-rna

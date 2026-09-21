@@ -42,3 +42,6 @@ data/acquisition/
 # architecture_watch state: rewritten every tick, per-machine. The durable
 # record is research/architecture/CHANGELOG.md, which IS tracked.
 data/samples/analysis/architecture_watch.json
+
+# GPU permission sentinel: per-machine, deliberately not shared
+data/samples/analysis/cron/GPU_PERMITTED

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Every 30 minutes: is the architecture still consistent with itself?
+"""Every 30 minutes: check the architecture, then do whatever work is possible.
+
+This does not stop. Cron fires it, it checks, it does what it can, and it says
+what it is waiting for. When the only work left needs the GPU and the GPU has
+not been offered, it says **"waiting for GPU permission"** and exits cleanly --
+that is a normal outcome, not a failure.
 
 Runs the two audits, records a snapshot, and appends a dated entry to
 `research/architecture/CHANGELOG.md` **only when something actually changed**.
@@ -21,9 +26,32 @@ The changelog entry says what moved and in which direction. It does not record
 failures or intermediate states -- those belong in
 `history_of_failed_attempts/`, and the specification links there.
 
+## The GPU gate
+
+The loop never takes the card on its own. It runs GPU work only when BOTH hold:
+
+    data/samples/analysis/cron/GPU_PERMITTED exists     (you put it there)
+    the card has enough free memory                      (measured, not assumed)
+
+Remove the file and the loop goes back to CPU work and reports what it is
+blocked on. This is deliberate: the card is shared, and a maintenance loop that
+decides for itself when to seize it is a maintenance loop that will do so at
+the worst moment.
+
+    touch data/samples/analysis/cron/GPU_PERMITTED    # allow GPU work
+    rm    data/samples/analysis/cron/GPU_PERMITTED    # take it back
+
+## The CPU work queue
+
+Each task names an output, the inputs it derives from, and a maximum age. It
+runs when the output is missing, older than any input, or past its age. One
+task per tick, most-stale first, so a tick stays short and the loop stays
+responsive to being killed.
+
 Usage:
-    python3 scripts/architecture_watch.py            # check, record if changed
+    python3 scripts/architecture_watch.py            # check, work, record
     python3 scripts/architecture_watch.py --quick    # skip verify_claims
+    python3 scripts/architecture_watch.py --no-work  # check only
 """
 from __future__ import annotations
 
@@ -51,6 +79,154 @@ NARRATIVE_MARKERS = [
     "was wrong", "turned out to be wrong", "the old value", "previously claimed",
     "defect #", "this was a bug", "used to be", "had never been measured",
 ]
+
+
+A = ROOT / "data/samples/analysis"
+GPU_PERMIT = ROOT / "data/samples/analysis/cron/GPU_PERMITTED"
+HOUR = 3600
+
+#: CPU-only work, re-run when it goes stale. `out` is what it produces, `deps`
+#: the things it derives from, `max_age_h` how long a result stays trustworthy
+#: even when nothing it depends on has changed -- the data on disk can move
+#: under a measurement without any tracked file changing.
+CPU_TASKS = [
+    ("source inventory", "scripts/sampling/emit_source_inventory.py",
+     "data/catalog/SOURCES.md", ["scripts/acquire_all.py"], 24 * 7),
+    ("completeness audit", "scripts/sampling/audit_completeness.py",
+     "data/samples/analysis/completeness.json",
+     ["scripts/pretrain_mlm.py", "scripts/train_pharos.py",
+      "scripts/train_sequence_stages.py", "scripts/train_block_scorer.py"], 12),
+    ("inventory gap", "scripts/sampling/audit_inventory_gap.py",
+     "data/samples/analysis/inventory_gap.json", [], 24),
+    ("data presence", "scripts/sampling/audit_data_presence.py",
+     "data/samples/analysis/data_presence.json", [], 24),
+    ("data integrity", "scripts/sampling/verify_data_integrity.py",
+     "data/samples/analysis/data_integrity.json", [], 24 * 3),
+    ("pretrain coverage", "scripts/sampling/audit_pretrain_coverage.py",
+     "data/samples/analysis/pretrain_coverage.json",
+     ["scripts/eldors_to_parquet.py"], 24 * 7),
+    ("packing waste", "scripts/sampling/measure_packing_waste.py",
+     "data/samples/analysis/packing_waste.json",
+     ["scripts/pretrain_mlm.py"], 24 * 7),
+]
+
+#: Work that needs the card, in the order it should be taken. `need_gib` is
+#: measured against free memory before anything starts; `detach` marks work
+#: that runs for hours and must not be held inside this tick.
+#:
+#: Nothing here runs unless GPU_PERMITTED exists. The loop reports what it is
+#: blocked on instead, which is the useful thing to say.
+GPU_TASKS = [
+    {"name": "resume stage 1 and the curriculum",
+     "cmd": ["scripts/gpu_cron_runner.sh"], "need_gib": 60.0, "detach": True,
+     "out": None, "max_age_h": 0.0},
+    {"name": "re-probe router specialisation",
+     "cmd": [PY, "scripts/sampling/probe_router_specialisation.py"],
+     "need_gib": 8.0, "detach": False,
+     "out": "data/samples/analysis/router_specialisation.json",
+     "max_age_h": 6.0},
+    {"name": "re-measure cascade recall",
+     "cmd": [PY, "scripts/sampling/measure_cascade_recall.py"],
+     "need_gib": 8.0, "detach": False,
+     "out": "data/samples/analysis/cascade_recall.json", "max_age_h": 24.0},
+]
+
+
+def gpu_free_gib() -> Optional[float]:
+    """Free VRAM without creating a CUDA context."""
+    code, out = run(["nvidia-smi", "--query-gpu=memory.free",
+                     "--format=csv,noheader,nounits"], timeout=60)
+    if code != 0 or not out.strip():
+        return None
+    try:
+        return int(out.strip().splitlines()[0]) / 1024.0
+    except (ValueError, IndexError):
+        return None
+
+
+def stale(out: str, deps: list, max_age_h: float) -> Optional[str]:
+    """Why this task is due, or None if it is not."""
+    o = ROOT / out
+    if not o.exists():
+        return "never run"
+    age_h = (datetime.now().timestamp() - o.stat().st_mtime) / HOUR
+    for d in deps:
+        dp = ROOT / d
+        if dp.exists() and dp.stat().st_mtime > o.stat().st_mtime:
+            return f"{d} is newer"
+    if age_h > max_age_h:
+        return f"{age_h:.0f}h old (max {max_age_h:.0f}h)"
+    return None
+
+
+def do_cpu_work() -> Dict:
+    """Run the single most-stale due task. One per tick keeps a tick short."""
+    due = []
+    for name, script, out, deps, age in CPU_TASKS:
+        why = stale(out, deps, age)
+        if why:
+            o = ROOT / out
+            mtime = o.stat().st_mtime if o.exists() else 0
+            due.append((mtime, name, script, why))
+    if not due:
+        return {"ran": None, "due": 0}
+    due.sort()
+    _, name, script, why = due[0]
+    code, out = run([PY, script], timeout=2400)
+    return {"ran": name, "script": script, "why": why, "ok": code == 0,
+            "due": len(due), "tail": "" if code == 0 else out[-600:]}
+
+
+def training_alive() -> bool:
+    code, out = run(["pgrep", "-f",
+                     "gpu_cron_runner.sh|pretrain_mlm.py|train_pharos.py|"
+                     "train_sequence_stages.py|train_block_scorer.py"],
+                    timeout=60)
+    return code == 0 and bool(out.strip())
+
+
+def gpu_status() -> Dict:
+    """Permitted, free, and what is queued behind the gate."""
+    free = gpu_free_gib()
+    permitted = GPU_PERMIT.exists()
+    ready, short = [], []
+    for task in GPU_TASKS:
+        (ready if (free is not None and free >= task["need_gib"]) else short
+         ).append(task["name"])
+    return {"permitted": permitted,
+            "free_gib": None if free is None else round(free, 1),
+            "ready_if_permitted": ready, "short_of_memory": short,
+            "training_alive": training_alive(),
+            "waiting": (not permitted) or not ready}
+
+
+def do_gpu_work(g: Dict) -> Dict:
+    """Run one GPU task, but only behind the gate.
+
+    Training is launched DETACHED: it runs for hours and holding it inside this
+    tick would mean a 30-minute cron killing its own training run. Everything
+    else is short and runs inline.
+    """
+    if not g["permitted"]:
+        return {"ran": None, "why": "no GPU permission"}
+    if g["training_alive"]:
+        return {"ran": None, "why": "training already running"}
+    free = g["free_gib"]
+    for task in GPU_TASKS:
+        if free is None or free < task["need_gib"]:
+            continue
+        if task["out"] and not stale(task["out"], [], task["max_age_h"]):
+            continue
+        if task["detach"]:
+            # setsid so it outlives this tick and the cron session
+            code, out = run(["setsid", "nohup", *[str(c) for c in task["cmd"]]],
+                            timeout=20)
+            return {"ran": task["name"], "detached": True,
+                    "note": "launched in the background"}
+        code, out = run([str(c) for c in task["cmd"]], timeout=2400)
+        return {"ran": task["name"], "detached": False, "ok": code == 0,
+                "tail": "" if code == 0 else out[-600:]}
+    return {"ran": None, "why": "permitted, but nothing due"}
 
 
 def run(cmd: list, timeout: int = 2400) -> tuple:
@@ -130,6 +306,8 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--quick", action="store_true",
                     help="skip verify_claims (which runs 13 test suites)")
+    ap.add_argument("--no-work", action="store_true",
+                    help="check only; do not run any queued CPU work")
     args = ap.parse_args()
 
     now = datetime.now().astimezone()
@@ -163,6 +341,11 @@ def main() -> int:
     else:
         snap["claims"] = check_claims()
 
+    snap["work"] = {"skipped": True} if args.no_work else do_cpu_work()
+    snap["gpu"] = gpu_status()
+    snap["gpu_work"] = ({"ran": None, "why": "--no-work"} if args.no_work
+                        else do_gpu_work(snap["gpu"]))
+
     def summary(s: Dict) -> Dict:
         return {"head": s.get("git_head"),
                 "claims_ok": s.get("claims", {}).get("checks_ok"),
@@ -182,10 +365,35 @@ def main() -> int:
     print(f"{now:%Y-%m-%d %H:%M}  head {snap['git_head']}  "
           f"claims {'skipped' if args.quick else snap['claims'].get('checks_ok')}  "
           f"{' '.join(f'{k} {v}' for k, v in snap['completeness'].items() if k != 'passed')}")
+    w, g = snap["work"], snap["gpu"]
+    if w.get("ran"):
+        print(f"  ran: {w['ran']} ({w['why']})"
+              f"{'' if w.get('ok') else '  FAILED'}")
+        if not w.get("ok"):
+            print(f"    {w.get('tail', '')[:300]}")
+            problems.append("work")
+    elif not w.get("skipped"):
+        print("  CPU work queue: nothing due")
+
+    gw = snap["gpu_work"]
+    if gw.get("ran"):
+        print(f"  GPU: started {gw['ran']}"
+              + ("  (detached)" if gw.get("detached") else
+                 "" if gw.get("ok", True) else "  FAILED"))
+    elif not g["permitted"]:
+        print(f"  **I am waiting for GPU permission.** "
+              f"{g['free_gib']} GiB free; queued: "
+              f"{', '.join(x['name'] for x in GPU_TASKS)}")
+        print(f"  (grant it with: touch {GPU_PERMIT.relative_to(ROOT)})")
+    elif g["training_alive"]:
+        print(f"  GPU: training is already running; leaving it alone")
+    else:
+        print(f"  GPU permitted, {g['free_gib']} GiB free — {gw.get('why')}")
+
     if problems:
         print(f"  PROBLEMS: {', '.join(problems)}")
         for k in problems:
-            print(f"    {k}: {json.dumps(snap[k])[:300]}")
+            print(f"    {k}: {json.dumps(snap.get(k, {}))[:300]}")
     if not changed:
         print("  unchanged since the last check; nothing written")
         return 1 if problems else 0
