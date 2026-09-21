@@ -746,11 +746,74 @@ capacity ceiling, and raising the learning rate to 1e-3 did not rescue it.
 This is direct evidence for §12.2's position that the structure task is
 **data-limited, not capacity-limited**, and for keeping PHAROS-Small.
 
-> **What is not measured here.** L1 and L2 are each evaluated standalone, at
-> their own budget, against their own labels. The track *cascades* — L2 refines
-> only inside surviving L1 blocks — so end-to-end recall is bounded by L1's
-> 0.272 and is not reported. The cascade number is the one a deployed track
-> would deliver, and measuring it is the next thing this experiment owes.
+#### The cascade, which §7.4a owed **[v0.2a, measured]**
+
+L1 and L2 above are each evaluated standalone, at their own budget, against
+their own labels, as if the other did not exist. The track *cascades*: L2 only
+ever refines inside the L1 pairs that survived, so an L2 block whose parent was
+dropped is unrecoverable however well L2 scores it. End-to-end, on the same
+1,450-chain family-disjoint test split
+(`scripts/sampling/measure_cascade_recall.py`):
+
+| scorer | **cascade** | L1 ceiling | L2 standalone |
+|---|---|---|---|
+| random | 0.099 | 0.107 | 0.543 |
+| separation prior | 0.201 | 0.224 | 0.633 |
+| learned, prior ablated | 0.263 | 0.269 | 0.833 |
+| **learned** | **0.264** | 0.270 | 0.835 |
+
+The `L1 ceiling` is the fraction of true L2 blocks whose parent L1 pair
+survived — the best cascade recall L2 could possibly reach. **Cascade 0.264
+against a ceiling of 0.270: L2 loses 0.006 and L1 loses everything else.** L2
+does not even bind on 82.5% of chains, because below about 400 nt the surviving
+L1 region holds fewer L2 pairs than the pair budget allows, and the cascade is
+then *exactly* the L1 ceiling. The pair track's end-to-end recall is an L1
+problem, not a refinement problem.
+
+**Sequence still earns its place end-to-end**: 0.264 learned against 0.201 for
+the separation prior and 0.099 for random. And the gain is still concentrated
+where §7.1 says flat ranking collapses — cascade recall by chain length:
+
+| chain length | cascade | |
+|---|---|---|
+| < 128 | 0.210 | |
+| 128–512 | 0.264 | |
+| 512–1,500 | 0.293 | |
+| **≥ 1,500** | **0.902** | the regime the track exists for |
+
+**And the measurement found a defect.** Widening L1 to keep *every* valid pair
+gives a ceiling of **0.811, not 1.0**:
+
+| keep_frac_l1 | cascade | ceiling | pairs/nt |
+|---|---|---|---|
+| 0.12 (shipped) | 0.264 | 0.270 | 8.2 |
+| 0.25 | 0.367 | 0.392 | 11.5 |
+| 0.50 | 0.559 | 0.619 | 18.2 |
+| 1.00 | 0.678 | **0.811** | 22.7 |
+
+The missing 0.189 is not a budget: **18.9% of true L2 blocks sit inside a
+single L1 block**, and `valid_mask` clamps the separation to at least one
+block — `max(1, min_sep // b)`. At L2 that is `max(1, 4//4) = 1`, four
+residues. At L1 it is `max(1, 4//16) = 1`, **sixteen** residues. So the cascade
+discards every contact between 4 and 15 residues apart before L2 ever sees it,
+and no budget anywhere recovers them. The two levels were given the same
+minimum separation in different units.
+
+Admitting the L1 diagonal is the obvious fix and **the current weights cannot
+use it**:
+
+| keep_frac_l1 | cascade, diagonal excluded | diagonal admitted |
+|---|---|---|
+| 0.12 | 0.264 | **0.247** |
+| 0.25 | 0.367 | **0.396** |
+
+At the shipped budget it is *worse*. The scorer was trained with the diagonal
+masked out, so it has never been asked to score one, and at a tight budget
+arbitrary diagonal scores displace off-diagonal blocks it ranks well. At 0.25
+the extra reachability wins. The fix is therefore not a mask change; it is a
+mask change **plus a retrain**, and that is the next thing this experiment
+owes. What is settled is the diagnosis: the pair track's end-to-end ceiling is
+set by L1's separation units and L1's budget, and by nothing about L2.
 
 ### 7.4 Reference implementation **[v0.1, measured]**
 

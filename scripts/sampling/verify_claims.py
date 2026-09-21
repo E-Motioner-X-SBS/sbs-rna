@@ -127,6 +127,40 @@ def main() -> int:
         chk("v0.2a packing: useful tokens per step gain",
             pw["useful_tokens_per_step_gain"], 1.53, abs_tol=0.02)
 
+        # ---- v0.2a: the pair track END TO END, which S7.4a owed -----------
+        # L1 and L2 standalone are not what a deployed track delivers: L2 only
+        # refines inside surviving L1 pairs. Cascade 0.264 against an L1
+        # ceiling of 0.270 says L2 loses 0.006 and L1 loses the rest.
+        cr = load("cascade_recall.json")
+        chk("v0.2a cascade: test chains", cr["learned"]["n_chains"], 1450)
+        chk("v0.2a cascade: learned", cr["learned"]["cascade"], 0.264, abs_tol=0.002)
+        chk("v0.2a cascade: separation prior",
+            cr["separation"]["cascade"], 0.2006, abs_tol=0.002)
+        chk("v0.2a cascade: random", cr["random"]["cascade"], 0.0988, abs_tol=0.002)
+        chk("v0.2a cascade: L1 ceiling bounds it",
+            int(cr["learned"]["l1_ceiling"] >= cr["learned"]["cascade"]), 1)
+        chk("v0.2a cascade: L2 loses almost nothing",
+            round(cr["learned"]["l1_ceiling"] - cr["learned"]["cascade"], 4),
+            0.0057, abs_tol=0.002)
+        chk("v0.2a cascade: >=1500 nt, the regime the track exists for",
+            cr["learned"]["cascade_by_length"][">=1500"], 0.902, abs_tol=0.005)
+        # The defect the cascade exposed: L1 clamps its minimum separation to
+        # one SIXTEEN-residue block where L2 clamps to one FOUR-residue block,
+        # so contacts 4-15 apart have no valid parent at any budget.
+        chk("v0.2a cascade: blocks unreachable on the L1 diagonal",
+            cr["learned"]["diag_unreachable"], 0.189, abs_tol=0.003)
+        full = cr["l1_budget_sweep"]["1.00"]
+        chk("v0.2a cascade: keeping every L1 pair still ceilings below 1",
+            full["l1_ceiling"], 0.8106, abs_tol=0.003)
+        chk("v0.2a cascade: and the gap IS the diagonal",
+            round(full["l1_ceiling"] + cr["learned"]["diag_unreachable"], 2),
+            1.0, abs_tol=0.01)
+        # Admitting the diagonal without retraining is worse at the shipped
+        # budget: the scorer has never been asked to score a diagonal block.
+        chk("v0.2a cascade: diagonal admitted, shipped budget, is worse",
+            int(cr["l1_diagonal_admitted"]["0.12"]["cascade"]
+                < cr["learned"]["cascade"]), 1)
+
         ec = load("entry_composition_rawpdb.json")
         # ---- D9/D23: target_c, closed on raw chains ----------------------
         # The budget had never been measured on data containing modified
