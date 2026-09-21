@@ -137,19 +137,31 @@ def main() -> int:
         "checked": now.isoformat(timespec="seconds"),
         "git_head": git("rev-parse", "--short", "HEAD"),
         "git_subject": git("log", "-1", "--format=%s"),
-        "git_clean": git("status", "--porcelain") == "",
+        # The watcher writes CHANGELOG.md, so counting its own output as
+        # dirt makes `git_clean` false forever and meaningless.
+        "git_clean": not [
+            ln for ln in git("status", "--porcelain").splitlines()
+            if ln and not ln.endswith(("architecture_watch.json",
+                                       "CHANGELOG.md"))],
         "spec": check_spec(),
         "completeness": check_completeness(),
         "training": check_training(),
     }
-    snap["claims"] = ({"skipped": True} if args.quick else check_claims())
-
     prev: Optional[Dict] = None
     if STATE.exists():
         try:
             prev = json.loads(STATE.read_text())
         except (OSError, ValueError):
             prev = None
+
+    if args.quick:
+        # Carry the previous result forward rather than recording "skipped".
+        # Writing a null here makes the NEXT full check see None -> 330 and
+        # report a change that did not happen -- which it did, twice, in the
+        # first two entries of the changelog.
+        snap["claims"] = dict((prev or {}).get("claims", {}), stale=True)
+    else:
+        snap["claims"] = check_claims()
 
     def summary(s: Dict) -> Dict:
         return {"head": s.get("git_head"),

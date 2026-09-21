@@ -38,3 +38,7 @@ data/acquisition/
 
 # pytest cache
 .pytest_cache/
+
+# architecture_watch state: rewritten every tick, per-machine. The durable
+# record is research/architecture/CHANGELOG.md, which IS tracked.
+data/samples/analysis/architecture_watch.json
