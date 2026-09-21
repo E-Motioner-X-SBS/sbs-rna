@@ -381,7 +381,18 @@ def main() -> None:
     print(f"[pharos] {args.size}: {pc['total']:,} total, {pc['active']:,} active")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01,
                             betas=(0.9, 0.95))
-    n_steps = max(1, len(tr.length_batches(token_budget=args.token_budget)) * args.epochs)
+    # Precompute each epoch's batches and total them EXACTLY. Multiplying one
+    # epoch's count by the epoch count is wrong here: batches are packed greedily
+    # to a token budget, so a different shuffle yields a different number of them
+    # -- measured 39/40/40/40/39/40/39/40 over eight seeds, 317 against the 312
+    # the multiplication predicts. OneCycleLR raises on the step past its total,
+    # which killed a completed 8-epoch run at its very last step, after the
+    # training was done and before the test evaluation ran.
+    epoch_batches = [tr.length_batches(token_budget=args.token_budget, seed=ep)
+                     for ep in range(args.epochs)]
+    n_steps = max(1, sum(len(b) for b in epoch_batches))
+    print(f"[pharos] {n_steps:,} optimiser steps over {args.epochs} epochs "
+          f"({[len(b) for b in epoch_batches]})", flush=True)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr,
                                                 total_steps=n_steps, pct_start=0.05)
     CKPT.mkdir(parents=True, exist_ok=True)
@@ -390,7 +401,7 @@ def main() -> None:
     for ep in range(args.epochs):
         model.train()
         t0, run = time.time(), []
-        for idxs in tr.length_batches(token_budget=args.token_budget, seed=ep):
+        for idxs in epoch_batches[ep]:
             t = to_device(tr.collate(idxs), device)
             # sampled recycling: 1..max_loops, uniform
             nl = int(rng.integers(1, cfg.n_loops + 1)) if args.sample_loops \

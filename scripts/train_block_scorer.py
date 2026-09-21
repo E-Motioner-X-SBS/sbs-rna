@@ -231,8 +231,14 @@ def train(args) -> None:
     print(f"[bs] {n_par:,} parameters")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01,
                             betas=(0.9, 0.95))
-    batches = tr.length_batches(token_budget=args.token_budget, seed=0)
-    total_steps = max(1, len(batches) * args.epochs)
+    # Exact, not len(one epoch) x epochs -- greedy token-budget packing gives a
+    # different batch count per shuffle, and OneCycleLR raises on the step past
+    # its total. See the note in train_pharos.py.
+    epoch_batches = [tr.length_batches(token_budget=args.token_budget, seed=ep)
+                     for ep in range(args.epochs)]
+    total_steps = max(1, sum(len(b) for b in epoch_batches))
+    print(f"[bs] {total_steps:,} optimiser steps over {args.epochs} epochs",
+          flush=True)
     sched = torch.optim.lr_scheduler.OneCycleLR(
         opt, max_lr=args.lr, total_steps=total_steps, pct_start=0.05)
 
@@ -243,7 +249,7 @@ def train(args) -> None:
     for ep in range(args.epochs):
         model.train()
         t0, run = time.time(), []
-        for bidx in tr.length_batches(token_budget=args.token_budget, seed=ep):
+        for bidx in epoch_batches[ep]:
             t = to_device(tr.collate(bidx), device)
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"])
