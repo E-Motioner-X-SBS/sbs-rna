@@ -43,6 +43,15 @@ it is one property of an n=180 sample, which estimates a mean well and cannot
 estimate a p99.9 at all. Two load-bearing parameters (`target_c`, the context
 window) had been set from maxima.
 
+> **A twelfth claim failed differently, and it was the most load-bearing of
+> all.** §7.1 — the justification for selecting blocks rather than ranking
+> pairs — did not fail by being a small-sample maximum. It failed by comparing
+> **two different populations**: a recall measured on five long chains against a
+> random baseline measured on all 43, most of them short. Re-derived on 2,994
+> chains at matched budgets the conclusion is not merely restored but
+> strengthened from ~2× to an order of magnitude (§7.1). The lesson generalises
+> past sample size: *what* was measured matters as much as *how much*.
+
 **Design rule adopted for v0.2: no parameter may be set from an extreme
 quantile measured on fewer than 10³ structures.** Where the corpus cannot
 supply that, the parameter is set from a mean plus an explicit safety factor,
@@ -1103,7 +1112,7 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 |---|---|---|
 | ~~1~~ | ~~Re-derive `target_c` on raw PDB entries~~ | **CLOSED** — max 23.30 on 14,106 chains, 24 confirmed (§7.3) |
 | ~~2~~ | ~~Acquire RMDB titration ladders~~ | **CLOSED** — 24 Mg²⁺ ladders, 527 points, all crossing sub-mM (§6.4) |
-| 3 | Complete Ribonanza — 335,616 of 2.1M acquired; the rest needs Kaggle credentials | head 7 coverage |
+| 3 | Complete Ribonanza — 335,616 of 2.1M acquired | head 7 coverage. **Confirmed blocked on Kaggle credentials**: the public mirrors are the same file. `multimolecule/ribonanza` is gated; `TerminatorJ/RNA_chemical_ribonanza` is public but is `train_data_QUICK_START.csv`, 550,743,596 bytes / 335,616 rows — byte-for-byte what we already hold. The remaining ~1.76M profiles exist only behind the competition login. |
 | 4 | Train the block-detection scorer | §7.4, the largest unvalidated assumption |
 | ~~5~~ | ~~Re-measure G2/G3 on raw whole entries~~ | **CLOSED** — 97.15% / 85.94% on 10,520 entries (§11.2, §11.2a) |
 | ~~6~~ | ~~Re-derive every remaining max/min at scale~~ | **CLOSED** — the last load-bearing one was §7.1's flat-top-K result, re-derived on 2,994 chains and corrected (it compared two different populations) |

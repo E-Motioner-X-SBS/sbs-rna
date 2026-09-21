@@ -3,12 +3,12 @@
 ## Session Summary
 | Field | Value |
 |-------|-------|
-| Phase | **ARCHITECTURE v0.2 COMPLETE, raw-archive pass done** — D9, D10 and G1/G2/G3 all closed on 10,520 entries; ready for implementation |
-| What I did | Collected, verified, organized, and catalogued 256.6 GB of RNA data (25 sources); built exploration reports; created this repo |
+| Phase | **v0.2 SPECIFIED, MEASURED AND BUILT.** Every open action is closed except two blocked externally: training the block scorer (waiting on a free GPU, watcher armed) and the rest of Ribonanza (Kaggle credentials). |
+| What I did | Collected and verified 256.6 GB of RNA data; closed D9/D10/G1/G2/G3 on the raw archive; **built the model** (hybrid trunk, MoE, 667-class motif bank, harmonic ensemble, ten heads) and the **16,604-chain training set** with its free supervision; acquired the **RMDB ionic ladders**; re-derived S7.1 on 2,994 chains |
 | What worked | elDORS S3 anonymous download (SHA256 verified); HF/GitHub direct fetches; catalog + loader API; parquet ETL; exploration pipeline |
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
-| Next priorities | 1) **Train the block-detection scorer and run stage 5** -- both trainers are written, GPU-only, and `scripts/await_gpu_and_train.sh` fires when the shared A100 frees; 2) complete Ribonanza beyond the 335,616 acquired (needs Kaggle credentials); 3) re-derive the remaining max/min at scale. Old items 1, 2, 5, 7, 8 and 9 are closed. |
-| Blockers | none |
+| Next priorities | **Everything not blocked externally is done.** 1) `scripts/await_gpu_and_train.sh` is armed and starts the block-scorer run the moment the shared A100 frees -- that is open action 4, the last unvalidated assumption; then `scripts/train_pharos.py` for stage 5. 2) Open action 3 (Ribonanza beyond 335,616) needs the user's Kaggle credentials; the public mirrors are confirmed to be the same file we already hold. |
+| Blockers | the shared A100 has been at 100% utilisation / 0.3 GiB free throughout; both trainers refuse to start on it rather than OOM mid-run |
 | Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **257** checks. |
 
 ## State of the data (all verified)
