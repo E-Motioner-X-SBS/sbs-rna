@@ -118,6 +118,32 @@ def encode_batch(seqs: List[str], device) -> Dict[str, torch.Tensor]:
             "mask": torch.as_tensor(mask, device=device)}
 
 
+def masked_chemistry(tokens: torch.Tensor, mask: torch.Tensor,
+                     device) -> torch.Tensor:
+    """Chemistry derived from the MASKED tokens, so it cannot leak the target.
+
+    Every feature in `chain_chemistry` is a function of base identity, and dims
+    0-4 are literally a one-hot of it. Computing it from the original sequence
+    and masking only the token stream leaves the answer sitting in the chemistry
+    channel. This recomputes it from what the model actually sees, so a masked
+    position gets the `UNK` row and its stated unknown-residue fallback rather
+    than any particular base.
+    """
+    import numpy as _np
+    from pharos.data.chemistry import N_DIMS as _N
+    from pharos.data.vocab import SYMBOLS as _SYM
+    toks = tokens.detach().cpu().numpy()
+    msk = mask.detach().cpu().numpy()
+    B, L = toks.shape
+    out = _np.zeros((B, L, _N), dtype=_np.float32)
+    for i in range(B):
+        n = int(msk[i].sum())
+        comps = [_SYM[int(t)] if 0 <= int(t) < len(_SYM) else "UNK"
+                 for t in toks[i, :n]]
+        out[i, :n] = chain_chemistry(comps)
+    return torch.as_tensor(out, device=device)
+
+
 def apply_span_mask(tokens: torch.Tensor, mask: torch.Tensor, rng: np.random.Generator,
                     frac: float = MASK_FRAC, span_mean: float = SPAN_MEAN):
     """BERT corruption with geometric spans. Returns (inputs, targets, selected).
@@ -232,14 +258,24 @@ def main() -> None:
             b = encode_batch(buf, device)
             buf = []
             inp, tgt, sel = apply_span_mask(b["tokens"], b["mask"], rng)
+            # THE CHEMISTRY MUST BE RECOMPUTED FROM THE MASKED INPUT.
+            #
+            # `chain_chemistry` one-hot-encodes base identity in dims 0-4, and
+            # `encode_batch` derives it from the ORIGINAL sequence -- so a
+            # masked position still carried its own answer in the chemistry
+            # channel and the model read it straight off. Measured: masked-token
+            # accuracy 0.948 and loss 0.392 nats = 0.57 bits at step 100,
+            # against a corpus entropy of 2.0165 bits/nt. A number below the
+            # entropy of the data is not a good model, it is a leak.
+            chem = masked_chemistry(inp, b["mask"], device)
             if not bool(sel.any()):
                 continue
             feats = RouterFeatures(
                 length=b["mask"].sum(1).float(),
-                chem_summary=(b["chem"].sum(1)
+                chem_summary=(chem.sum(1)
                               / b["mask"].sum(1, keepdim=True).clamp(min=1))[:, :5])
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                out = model(inp, torch.zeros_like(inp), b["chem"], b["mask"],
+                out = model(inp, torch.zeros_like(inp), chem, b["mask"],
                             feats=feats, n_loops=args.n_loops, mlm=True)
                 logits = out["mlm_logits"].float()
                 loss = F.cross_entropy(logits[sel], tgt[sel])

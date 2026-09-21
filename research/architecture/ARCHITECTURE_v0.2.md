@@ -1265,7 +1265,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **282** checks. Counting
+JSONs and fails the build on drift; it currently pins **283** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two
