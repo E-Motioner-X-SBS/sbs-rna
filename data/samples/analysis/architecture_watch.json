@@ -1,0 +1,39 @@
+{
+ "checked": "2026-09-22T00:27:47+05:30",
+ "git_head": "0c8c420",
+ "git_subject": "Status said 'resumes next fire'; cron is disabled, so it does not",
+ "git_clean": false,
+ "spec": {
+  "passed": true,
+  "narrative_markers": [],
+  "history_files": [
+   "ARCHITECTURE_v0.1_with_corrections.md",
+   "ARCHITECTURE_v0.2_revision_trail.md",
+   "DEFECTS.md",
+   "NEGATIVE_RESULTS.md",
+   "README.md"
+  ],
+  "spec_lines": 357,
+  "links_history": true
+ },
+ "completeness": {
+  "passed": true,
+  "components": "30/30",
+  "stages": "6/6",
+  "scheduled": "4/4",
+  "resumable": "4/4",
+  "telemetry": "4/4"
+ },
+ "training": {
+  "state": "stopped",
+  "updated": "2026-09-21T23:35:54+05:30",
+  "detail": "stopped on request so the GPU could be handed over; cron is DISABLED, so there is no next fire. Stage 1 resumes from 188,601,237 tokens / step 7,500 when the crontab line is uncommented or gpu_cron_runner.sh is run by hand.",
+  "stage1_tokens": 188601237,
+  "stage1_step": 7500
+ },
+ "claims": {
+  "skipped": true
+ },
+ "changed_since_last": false,
+ "problems": []
+}

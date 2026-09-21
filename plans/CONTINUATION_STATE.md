@@ -34,6 +34,23 @@
   files do not carry the field. Resolves all 370 modification species the archive
   contains; 88.6% of modified residues map to a standard A/C/G/U parent.
 
+## Where the documentation lives
+
+| | |
+|---|---|
+| `research/architecture/ARCHITECTURE.md` | **the final specification** — what the architecture is, its features, and what each is measured to do. No changelog, no corrections narrative. |
+| `research/architecture/CHANGELOG.md` | written by `architecture_watch.py`; records only what changed, every 30 minutes |
+| `research/architecture/DECISIONS.md` | the numbered decisions and their rationale |
+| `history_of_failed_attempts/` | everything that did not work: `DEFECTS.md`, `NEGATIVE_RESULTS.md`, and the superseded v0.1 and v0.2 documents with their correction tables |
+| `data/catalog/SOURCES.md` | every acquisition link and program, generated from `acquire_all.py` |
+
+A second cron entry (`4,34 * * * *`) runs `scripts/architecture_watch.sh`: it
+reruns `verify_claims.py` and `audit_completeness.py`, checks that the
+specification has not drifted back into narrating its own corrections, notes
+where training has got to, and appends to the changelog **only when something
+changed**. It holds its own lock and never touches the GPU, so it is safe
+alongside a training run.
+
 ## Key documents
 | File | Content |
 |------|---------|

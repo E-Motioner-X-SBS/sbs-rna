@@ -173,7 +173,8 @@ are redundant rather than informative.
 > entries, 10,424 pdb_hunter entries and 238M nt. Every central estimate held;
 > every extreme quantile failed. Full comparison in
 > `plans/rigor-recheck/fullcorpus-validation.md`; specification in
-> `research/architecture/ARCHITECTURE_v0.2.md`.
+> `history_of_failed_attempts/ARCHITECTURE_v0.2_revision_trail.md`; the final specification is
+> `research/architecture/ARCHITECTURE.md`.
 
 ## D8 — Parameters may not be set from small-sample maxima **[new, process]**
 

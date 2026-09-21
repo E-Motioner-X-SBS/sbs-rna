@@ -625,7 +625,14 @@ def main() -> int:
     chk("A-RNA theta (z=1)", round(1-1/xi, 3), 0.804)
 
     print("\n== cross-document consistency ==")
-    docs = {"ARCH": ROOT/"research/architecture/ARCHITECTURE.md",
+    # ARCH is the AUDIT TRAIL, not the specification. It carries the v0.1 text
+    # with its correction tables -- published value beside canonical value --
+    # and the guards below exist to stop those tables being flattened. It moved
+    # to history_of_failed_attempts/ when the final specification was written
+    # separately; the guards followed it, because what they protect is the
+    # record of what was wrong, which is exactly what must not be quietly
+    # tidied away.
+    docs = {"ARCH": ROOT/"history_of_failed_attempts/ARCHITECTURE_v0.1_with_corrections.md",
             "TEX": ROOT/"research/report/main.tex",
             "HTML": ROOT/"research/architecture/blueprint.html"}
     txt = {}
@@ -763,9 +770,10 @@ def main() -> int:
         if present: fails.append(f"stale {bad}")
 
     print("\n== architecture config consistency (PHAROS-Small is the default) ==")
-    cfg_docs = {"ARCH": ROOT/"research/architecture/ARCHITECTURE.md",
+    cfg_docs = {"ARCH": ROOT/"history_of_failed_attempts/ARCHITECTURE_v0.1_with_corrections.md",
                 "TEX":  ROOT/"research/report/main.tex",
-                "HTML": ROOT/"research/architecture/blueprint.html"}
+                "HTML": ROOT/"research/architecture/blueprint.html",
+                "SPEC": ROOT/"research/architecture/ARCHITECTURE.md"}
     cfg_txt = {k: v.read_text() for k, v in cfg_docs.items()}
     # phrases describing the SUPERSEDED default; Base-v2 scale-up rows are fine
     stale_cfg = ["32 blocks at d=768", "20 of 32 blocks", "4 of 32 blocks",

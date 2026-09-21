@@ -101,7 +101,8 @@ hand-set 3-valued base-pairing bias. Inductive bias, not scale, is the lever.
 | **Coevolution depth gate** | **Neff/L >= 1: 0.975 precision; Neff/L < 1: 0.609.** tRNA = 1.000/1.000 |
 | **HPT reference impl.** | L=4096 in **0.45 s**, 0.96% of dense; dense **not runnable** past L=1024 here |
 
-**Architecture** -> `research/architecture/ARCHITECTURE.md` (PHAROS v0.1).
+**Architecture** -> `research/architecture/ARCHITECTURE.md` — the final
+specification. The v0.1 text and the v0.2 revision trail are in `history_of_failed_attempts/`.
 The efficiency claim was tested rather than assumed, and **the original flat sparse pair
 track failed and was replaced** by a 3-level hierarchical coarse-to-fine track
 (2.202% of dense at L=2861, 100% recall ceiling). This is the most important result of

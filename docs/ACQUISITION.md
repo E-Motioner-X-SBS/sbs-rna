@@ -7,7 +7,7 @@
 > size, its record count, and its verification status.
 >
 > This is an inventory, not a design document. Architecture lives in
-> `research/architecture/ARCHITECTURE_v0.2.md`; the corpus narrative is in
+> `history_of_failed_attempts/ARCHITECTURE_v0.2_revision_trail.md`; the corpus narrative is in
 > `data/catalog/README.md`.
 
 ---

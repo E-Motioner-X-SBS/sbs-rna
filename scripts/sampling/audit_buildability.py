@@ -12,7 +12,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = {
+    # the final specification, plus the v0.1 trail: some component detail was
+    # written once, in v0.1, and never restated
     "ARCH": ROOT / "research/architecture/ARCHITECTURE.md",
+    "ARCH_V01": ROOT / "history_of_failed_attempts/ARCHITECTURE_v0.1_with_corrections.md",
     "CFG_M": ROOT / "configs/model/pharos_small.yaml",
     "CFG_T": ROOT / "configs/train/pharos_small_stage1.yaml",
     "REF": ROOT / "research/architecture/reference/hierarchical_pair_track.py",
