@@ -580,7 +580,8 @@ def main() -> int:
               ROOT / "src/pharos/model/test_attention.py",
               ROOT / "src/pharos/model/test_pharos.py",
               ROOT / "src/pharos/model/test_motif_bank.py",
-              ROOT / "src/pharos/model/test_dynamics.py"]
+              ROOT / "src/pharos/model/test_dynamics.py",
+              ROOT / "src/pharos/data/test_dataset.py"]
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's

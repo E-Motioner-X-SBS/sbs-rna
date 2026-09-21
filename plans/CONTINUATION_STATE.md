@@ -9,7 +9,7 @@
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
 | Next priorities | 1) **Train the block-detection scorer and run stage 5** -- both trainers are written, GPU-only, and `scripts/await_gpu_and_train.sh` fires when the shared A100 frees; 2) complete Ribonanza beyond the 335,616 acquired (needs Kaggle credentials); 3) re-derive the remaining max/min at scale. Old items 1, 2, 5, 7, 8 and 9 are closed. |
 | Blockers | none |
-| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **248** checks. |
+| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **249** checks. |
 
 ## State of the data (all verified)
 - Sequences: 1,369,926,204 (elDORS 1,323,715,880 SHA256-verified + RNAcentral 46,210,324)
