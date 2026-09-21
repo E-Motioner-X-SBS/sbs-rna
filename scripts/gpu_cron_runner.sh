@@ -117,16 +117,23 @@ if [ ! -f "$LOGDIR/.done-scorer" ]; then
     # 520 s/epoch. The previous 4.4M / 16k-token configuration used 0.6 GiB and
     # left the GPU at 13%.
     #
-    # LR and epoch count are raised WITH the batch, not left at the small-batch
-    # values. A 131k-token budget is ~14x the old one, which cut an epoch from
-    # 1,465 optimiser steps to 102; at lr=3e-4 / 8 epochs that is 816 steps for
-    # a 153M model, and the first epoch duly came out WORSE than the 4.4M run
-    # (val L2 recall 0.650 against 0.775). Bigger batches need a larger step and
-    # more of them: lr 1e-3, 24 epochs = 2,448 steps.
+    # Capacity and OPTIMISER STEPS both matter, and the first attempt at scaling
+    # traded the second away for the first. A 131k-token budget gives 102
+    # batches/epoch, so even 24 epochs is 2,448 steps for a 153M model against
+    # the original run's ~11,700 for 4.4M. Measured, and the answer was not
+    # subtle: the 153M model was worse at every epoch (val L2 0.664 / 0.671 /
+    # 0.666 against 0.775 / 0.821 / 0.845) and its loss barely moved
+    # (2.457 -> 2.372 against 1.55 -> 0.39). A step-count failure, not a
+    # capacity ceiling.
+    #
+    # So: 61.9M parameters -- 14x the original, 20.6 GiB peak -- at a 32k budget
+    # for 357 batches/epoch and 30 epochs = 10,710 steps, which is the step
+    # count the 4.4M run had. lr 5e-4 for the ~2x batch. Filling VRAM is not the
+    # objective; a better answer to R1 is, and steps buy that.
     if $PY -u scripts/train_block_scorer.py \
             --device cuda --min-free-gib "$NEED_GIB" \
-            --d-model 1024 --d-block 768 --n-conv 12 --n-attn 8 \
-            --token-budget 131072 --lr 1e-3 --epochs 24 >> "$LOG" 2>&1; then
+            --d-model 768 --d-block 512 --n-conv 10 --n-attn 6 \
+            --token-budget 32768 --lr 5e-4 --epochs 30 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-scorer"
         note "block scorer finished"
         grep -E "sequence gain|recall" "$LOG" | tail -8 | tee -a "$LOG" >/dev/null
