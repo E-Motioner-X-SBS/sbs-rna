@@ -202,6 +202,15 @@ def main() -> int:
         # balance_weight 0.01 x 16 blocks x 1.0, which is what the Switch form
         # evaluates to at perfect uniformity -- NOT zero, which is why it has
         # no business in a bits/token figure
+        # Replicated across three runs and two corpora -- the point is that it
+        # does not move, and the two comparable points move the wrong way.
+        _rs82 = next((h for h in _rsh if h["tokens"] == 82103583), None)
+        if _rs82 is not None:
+            chk("v0.2a router: still uniform at 82.1M tokens",
+                _rs82["frac_of_uniform"], 0.9906, abs_tol=0.002)
+            chk("v0.2a router: no drift toward specialisation",
+                int(_rs82["frac_of_uniform"] >= rs["frac_of_uniform"]), 1)
+        chk("v0.2a router: probes recorded", int(len(_rsh) >= 3), 1)
         chk("v0.2a router: load is uniform to 3 decimals",
             round(rs["expert_load_max"] - rs["expert_load_min"], 4),
             0.0043, abs_tol=0.0005)

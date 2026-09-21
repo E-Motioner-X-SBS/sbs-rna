@@ -395,12 +395,28 @@ a coin flip across 32 experts; the sharpest of the 16 blocks reaches 3.178 nats
 against a 3.466 ceiling. At this point in training the MoE is a dense
 feed-forward with 32× the parameters and `top_k`/`n_experts` of them active.
 
-What this does **not** establish is that it stays that way. 55.4M tokens is
-2.8% of the stage-1 budget, the router has seen almost nothing, and routers
-commonly stay flat through early training and sharpen later. The claim is a
-measurement at one point, not a verdict, which is why the probe writes a
-history keyed on token count rather than a single number: re-run it against the
-checkpoint as the run proceeds and the trajectory answers the question.
+What one measurement does **not** establish is that it stays that way. Three
+now exist, and they do not move:
+
+| tokens | run | per-token entropy | fraction of uniform | top-1 |
+|---|---|---|---|---|
+| 12.0M | budget sweep, corrected corpus | 3.4094 | 0.9837 | 0.0490 |
+| 55.4M | 19:26 run, **8-chunk corpus** | 3.4326 | 0.9904 | 0.0466 |
+| 82.1M | 21:39 run, corrected corpus | 3.4331 | **0.9906** | 0.0486 |
+
+**These are three separate runs, not one trajectory** -- different corpora and,
+in two cases, different initialisations -- so this is a replication rather than
+a curve. As a replication it is the stronger result: the router sits at 98.4-99.1%
+of uniform regardless of run, corpus and token count, and the two comparable
+points move the wrong way, 0.9904 at 55.4M to 0.9906 at 82.1M.
+
+It remains early -- 82.1M is 4% of the stage-1 budget, and routers can sharpen
+late. What can be said now is that nothing has begun to: across three runs
+there is no sign of the router moving toward specialisation, and `top_k`/32 of
+239.6M total parameters are being paid for behaviour a dense feed-forward of
+63.4M active would reproduce. A genuine single-run trajectory needs the probe
+re-run against this run's checkpoint as it proceeds, which the loop now does
+with a token-count guard so it cannot fold a throwaway checkpoint in again.
 
 `token_router_entropy` is now in the aux dict beside `router_entropy`, so any
 future run logs it rather than needing a probe. If it is still at 99% of
