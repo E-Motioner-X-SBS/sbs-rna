@@ -55,9 +55,9 @@ def chk(name: str, ok, detail: str = "") -> None:
 #: What the built family is, given the recipe in `PharosConfig`. Pinned so a
 #: change to the MoE numbers cannot silently move the cost model.
 EXPECTED = {
-    "PHAROS-Small": (239_607_570, 63_446_802, 128),
-    "PHAROS-Mini": (102_601_096, 28_283_272, 144),
-    "Base-v2": (1_062_253_042, 269_529_586, 96),
+    "PHAROS-Small": (239_608_607, 63_447_839, 128),
+    "PHAROS-Mini": (102_601_877, 28_284_053, 144),
+    "Base-v2": (1_062_254_591, 269_531_135, 96),
 }
 #: What §5.4 prints. Kept beside the built numbers deliberately: the active
 #: column is close (61 vs 62.7, 269 vs 267.9) and the total column is not.
@@ -169,6 +169,34 @@ def main() -> int:
     missing = [s["name"] for s in HEAD_SPEC if s["key"] not in o]
     chk("§9 lists ten heads and ten are produced",
         len(HEAD_SPEC) == 10 and not missing, f"missing: {missing or 'none'}")
+
+    print("\n== property 7b: the MLM head starts at chance, not off a cliff ==")
+    import math as _m
+    import torch.nn.functional as _F
+    for d in (64, 256):
+        c = PharosConfig(d_model=d, n_blocks=2, n_loops=1, n_heads=4, d_pair=32,
+                         n_experts=4, d_expert=32, top_k=2, n_shared=1,
+                         max_length=128)
+        mm = Pharos(c)
+        tk = torch.randint(0, 5, (4, 48))
+        with torch.no_grad():
+            lg = mm(tk, torch.zeros_like(tk), torch.randn(4, 48, 24),
+                    torch.ones(4, 48, dtype=torch.bool), n_loops=1,
+                    mlm=True)["mlm_logits"].float()
+            l0 = float(_F.cross_entropy(lg.reshape(-1, lg.shape[-1]), tk.reshape(-1)))
+        # The head is TIED to the token embedding, so logits are h . W^T over d
+        # dims. With nn.Embedding's default N(0,1) they inherit std ~sqrt(d) and
+        # the initial loss was 39.19 against log(13) = 2.56 -- a run that opens
+        # by unlearning its own initialisation. std 0.02 init is the fix.
+        chk(f"d={d}: initial masked-token loss is near chance",
+            abs(l0 - _m.log(c.n_symbols)) < 0.5,
+            f"{l0:.3f} vs log({c.n_symbols}) = {_m.log(c.n_symbols):.3f}")
+    chk("embeddings use std-0.02 init, not N(0,1)",
+        float(Pharos(PharosConfig.small()).embed.tok.weight.std()) < 0.05,
+        f"std {float(Pharos(PharosConfig.small()).embed.tok.weight.std()):.4f}")
+    chk("the MLM head is tied, adding no output matrix",
+        not any(n.startswith("mlm_head") for n, _ in model.named_parameters()),
+        "only mlm_norm and mlm_bias are its own")
 
     print("\n== property 8: §10's ensemble outputs are present ==")
     for key in ("fluctuation", "disorder_logit", "stiffness_diag",

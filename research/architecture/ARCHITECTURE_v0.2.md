@@ -1014,6 +1014,23 @@ depositions, not a gap.
 ### 12.1 Curriculum
 
 1. **Pretrain** on sequence (MLM + span masking), 5B → 25B tokens staged.
+   **Implemented [v0.2]:** `scripts/pretrain_mlm.py`, over the 48-shard /
+   12M-sequence elDORS parquet. Five symbols, not twenty-five (D6) — elDORS is
+   pre-normalised to ACGUN, and a wider input vocabulary is dead embedding rows
+   and dead softmax mass, which is the NucleicBERT vocab-25 mistake. Spans are
+   geometric with mean 3 rather than single tokens: a helix is locally periodic,
+   so a single masked base is fillable from its neighbours without learning
+   anything about structure. Chemistry is available here too — every dim but the
+   shifted-pKa flag is computable from sequence — so stage 1 trains the same
+   projection stage 5 uses rather than leaving it cold.
+
+   > **The tied MLM head needed the embedding init fixed.** The output
+   > projection is tied to the token embedding, so logits are `h · Wᵀ` over `d`
+   > dims; with `nn.Embedding`'s default N(0,1) they inherit a standard
+   > deviation of ~√d, and the initial masked-token loss measured **39.19**
+   > against the **log 13 = 2.565** a fresh model should start from. The run
+   > would have opened by unlearning its own initialisation. With std-0.02 init
+   > it starts at 2.43–2.53, and `test_pharos.py` pins that at two widths.
 2. **2D** on bpRNA + pdb_hunter dot-bracket.
 3. **Probing** on Ribonanza — **335,616 profiles acquired** (2A3_MaP and
    DMS_MaP, 206 reactivity positions, ~177 nt sequences): **499× the 673 clean

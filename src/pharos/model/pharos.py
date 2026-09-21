@@ -117,6 +117,17 @@ class InputEmbedding(nn.Module):
         self.chem = nn.Linear(cfg.d_chem, d)
         self.pos = nn.Embedding(cfg.max_length, d)
         self.norm = nn.LayerNorm(d)
+        # Standard transformer init, std 0.02, and it is not cosmetic here.
+        # `nn.Embedding` defaults to N(0, 1); the MLM head is TIED to this
+        # matrix, so logits are h . W^T over d dims and inherit a standard
+        # deviation of ~sqrt(d). At d=512 that is a softmax sharp enough to put
+        # the initial masked-token loss at **39.19** against the log(13) = 2.56
+        # a fresh model should start from -- the run would open by unlearning
+        # its own initialisation.
+        for emb in (self.tok, self.mod, self.pos):
+            nn.init.normal_(emb.weight, mean=0.0, std=0.02)
+        with torch.no_grad():
+            self.mod.weight[0].zero_()          # padding_idx stays exactly zero
 
     def forward(self, tokens: torch.Tensor, mod_ids: torch.Tensor,
                 chem: torch.Tensor) -> torch.Tensor:
@@ -172,13 +183,21 @@ class Pharos(nn.Module):
         # free. Equilibrium breathing, not a folding pathway.
         self.dynamics = HarmonicEnsemble(DynamicsConfig(d_model=cfg.d_model,
                                                         dropout=cfg.dropout))
+        # Stage 1 of §12.1: masked-token prediction. The output projection is
+        # TIED to the input embedding -- the same 13 x d matrix read both ways.
+        # Untied it would add 13d parameters that have to learn the identity of
+        # a symbol the embedding already knows, and tying is what makes the
+        # pretraining and structural vocabularies (D6) one model rather than two.
+        self.mlm_norm = nn.LayerNorm(cfg.d_model)
+        self.mlm_bias = nn.Parameter(torch.zeros(cfg.n_symbols))
 
     def forward(self, tokens: torch.Tensor, mod_ids: torch.Tensor,
                 chem: torch.Tensor, mask: torch.Tensor,
                 pair_index: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
                 feats: Optional[RouterFeatures] = None,
                 n_loops: Optional[int] = None,
-                deep_supervision: bool = False) -> Dict:
+                deep_supervision: bool = False,
+                mlm: bool = False) -> Dict:
         x = self.embed(tokens, mod_ids, chem)
         iterates = []
 
@@ -197,6 +216,9 @@ class Pharos(nn.Module):
                 pair = pair + self.motif_mix(retrieved)
                 aux["motif_gate"] = minfo["gate_mean"]
         out = self.heads(h, mask, pair)
+        if mlm:
+            out["mlm_logits"] = (self.mlm_norm(h) @ self.embed.tok.weight.T
+                                 + self.mlm_bias)
         dyn = self.dynamics(h, mask)
         # the structure head already emits K-state weights from the token
         # track; the ensemble's are the physics-derived ones, so they are kept
