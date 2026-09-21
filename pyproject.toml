@@ -1,0 +1,26 @@
+[project]
+name = "sbs-rna"
+version = "0.1.0"
+description = "RNA data repository and tooling for the PHAROS RNA foundation model"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "pdb-hunter",
+    "requests>=2.28.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "tqdm>=4.64.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "responses>=0.22",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+pdb-hunter = { path = "../pdb_hunter", editable = true }

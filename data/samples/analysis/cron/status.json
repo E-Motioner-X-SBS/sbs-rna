@@ -1,14 +1,14 @@
 {
- "updated": "2026-09-21T20:29:46+05:30",
- "state": "paused",
- "detail": "cron entry disabled by hand while the pretraining corpus was rebuilt across all 20 elDORS chunks and the token budget re-measured; stage 1 restarts on the corrected corpus",
- "free_gib_at_check": null,
- "log": "run-20260921-192500.log",
+ "updated": "2026-09-21T20:52:25+05:30",
+ "state": "running",
+ "detail": "pipeline started",
+ "free_gib_at_check": 79,
+ "log": "run-20260921-205055.log",
  "stages": {
-  "verify": "done",
-  "stage1": null,
-  "scorer": "done",
+  "verify":  "done",
+  "stage1":  null,
+  "scorer":  "done",
   "seqstages": null,
-  "stage5": null
+  "stage5":  null
  }
 }

@@ -31,3 +31,7 @@ data/samples/*
 
 # symlink farm pointing at data/structures/raw_pdb_entries (regenerable)
 data/samples/structures/
+
+# Acquisition state: written by scripts/acquire_all.py on the host that did the
+# downloading. It is per-machine bookkeeping, not corpus content.
+data/acquisition/
