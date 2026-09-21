@@ -44,6 +44,19 @@
 | plans/12-nucleicbert-data-scanner.md | acquisition log + recipes |
 | plans/13-sequence-structure-gap-strategy.md | strategy for the 3D gap |
 
+## The `docs/acquisition-inventory` branch is superseded -- DO NOT MERGE IT
+
+Its five useful files (`scripts/acquire_all.py`, `build_raw_pdb_entrylist.py`,
+`watch_downloads.py`, `pyproject.toml`, `uv.lock`) were cherry-picked onto main
+on 2026-09-21. The branch itself is a snapshot from before the model existed:
+it is **47 commits behind main**, and merging it would **delete 65 files**,
+including all of `src/pharos/`. Opening the PR that its URL suggests would
+propose exactly that deletion.
+
+Nothing on it is now missing from main. It is kept only as history; it should
+be deleted once someone confirms they do not want the history, and until then
+it must not be merged.
+
 ## Repo
 - Local: /store/shuvam/E-motioner-X-SBS/sbs-rna
 - Remote: https://github.com/E-Motioner-X-SBS/sbs-rna (public, main)
