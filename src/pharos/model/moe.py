@@ -161,6 +161,25 @@ class GroupedExperts(nn.Module):
         order = torch.argsort(expert_idx)
         e_sorted = expert_idx[order]
         counts = torch.bincount(e_sorted, minlength=E)
+        # `int(...)` is a device synchronisation, and under `torch.compile` a
+        # graph break -- once per MoE block per loop, so 32 times a step at 16
+        # blocks and 2 loops. The textbook fix is a fixed capacity
+        # `ceil(f * M / E)` with the overflow dropped, which needs nothing read
+        # back from the device.
+        #
+        # MEASURED, and it is worse. Compiled, 48x512: 0.289 s/step exact
+        # against 0.377 / 0.364 / 0.389 at capacity factors 1.25 / 1.5 / 2.0,
+        # so 25% SLOWER at the best of them, and slower eager too. Selecting
+        # the survivors is itself data-dependent -- `e_sorted[keep]`,
+        # `row[order][keep]`, `weight[order][keep]` are three boolean gathers
+        # with their own syncs and allocations -- so it trades one
+        # synchronisation for several. And there was nothing to win: the drop
+        # fraction was 0.00% at every factor tried, because the load-balance
+        # loss keeps the groups near-uniform and `counts.max()` is already
+        # close to `M / E`.
+        #
+        # So the sync stays. It is exact, no token is ever dropped, and the
+        # obvious optimisation has been tried and rejected on measurement.
         cap = int(counts.max())
         starts = torch.cumsum(counts, 0) - counts
         slot = torch.arange(M, device=tokens.device) - starts[e_sorted]
