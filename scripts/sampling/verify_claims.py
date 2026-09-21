@@ -169,6 +169,21 @@ def main() -> int:
         else:
             chk("RMDB titrations acquired (scripts/acquire_rmdb_titrations.py)", 0, 1)
 
+        io = ROOT / "data/derived/ionic/meta.json"
+        if io.exists():
+            im = _jj.loads(io.read_text())
+            chk("ionic: ladders parsed", im["n_ladders"], 24)
+            chk("ionic: training examples", im["n_examples"], 701)
+            chk("ionic: residues", im["n_residues"], 75706)
+            chk("ionic: all ladders cross sub-mM", im["ladders_crossing_sub_mM"], 24)
+            # the folding transition must be IN the data, not assumed
+            chk("ionic: ladders showing the folding transition",
+                im["folding_check"]["n_showing_folding"], 16)
+            chk("ionic: median Spearman(conc, reactivity) is negative",
+                int(im["folding_check"]["median_rho"] < -0.3), 1)
+        else:
+            chk("ionic channel built (scripts/build_ionic_dataset.py)", 0, 1)
+
         # ---- §8: the motif bank is the atlas, not a subset ---------------
         import json as _j
         mb = ROOT / "data/derived/motif_bank/meta.json"

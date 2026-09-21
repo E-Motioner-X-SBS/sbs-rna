@@ -495,10 +495,42 @@ because unfolded RNA is not deposited. The MTTR series alone gives 12
 constructs × 32 concentrations of the same folding transition. Four ATP
 titrations came with them, which supervise ligand response rather than ionic.
 
+#### And the physics is measurably in it **[v0.2]**
+
+`build_ionic_dataset.py` turns the ladders into **701 examples over 75,706
+residues** — one per (construct, concentration), never averaged, because the
+quantity of interest is how reactivity at each position *changes* with [Mg²⁺]
+and averaging a ladder destroys exactly that.
+
+The build then checks the physics rather than assuming it. As Mg²⁺ rises, RNA
+folds and becomes less reactive to SHAPE and DMS chemistry, so mean reactivity
+should fall along a ladder. Measured as Spearman(concentration, mean
+reactivity):
+
+| | |
+|---|---|
+| ladders showing the transition (ρ < −0.3) | **16 of 24** |
+| median ρ | **−0.65** |
+| strongest | **−0.98** (MTTR5: 0.604 → 0.180) |
+
+That is the folding transition PHAROS's ionic conditioning claims to model,
+present in the supervision before any training. The eight ladders that do not
+show it are kept and flagged, not dropped: a construct that does not fold under
+Mg²⁺ is a real negative, and discarding it would leave a corpus in which the
+effect is true by selection.
+
+**One parser defect on the way.** RDAT 0.34 separates fields with tabs and 0.24
+with spaces. Splitting only on tab turned every line of a 0.24 file into one
+unrecognised key, so the file parsed to *nothing* rather than to an error, and
+SRPDIV_DMS_0001's 16 Mg²⁺ levels silently vanished — 24 ladders reported as 23.
+Concentrations are now recovered by scanning each annotation line rather than
+tokenising it, because annotation values contain spaces (`MgCl2:0.04 mM`) and
+tokenising splits them apart.
+
 **Scope statement, updated:** PHAROS accepts ionic condition as an input and its
 *physics* terms respond correctly by construction. The *learned* response is now
-supervisable — and the claim that it tracks a titration remains untested until
-stage 5 runs, which is a training result, not a data gap.
+supervisable, and whether it tracks a titration is a training result rather than
+a data gap.
 
 ---
 
@@ -1057,7 +1089,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **242** checks. Counting
+JSONs and fails the build on drift; it currently pins **248** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two
