@@ -1,0 +1,2 @@
+58fe724e270dc3477b07debba41279ba5a37a218  2026-09-21 15:15:48 +0530  Add the acquisition tooling and methods behind the 833 GB corpus
+4413d44b23de39ad18cf665b0965fa2775602e34  2026-09-21 14:59:53 +0530  Document the acquisition inventory: every source URL, count and verification

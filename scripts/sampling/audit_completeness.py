@@ -178,7 +178,29 @@ def main() -> None:
         if not ok:
             missing.append(f"{script}: cannot resume ({', '.join(bad)})")
 
+    print("\ntelemetry, per trainer")
+    tel_rows = []
+    for script in sorted(RESUMABLE):
+        f = ROOT / script
+        src = f.read_text() if f.exists() else ""
+        checks = {
+            "streams a CSV": "RunLog(" in src,
+            "records a manifest": "manifest=" in src,
+            "logs an epoch or finish row": 'runlog.log("epoch"' in src
+                                           or 'runlog.log("step"' in src,
+            "logs OOM events": "runlog.event(" in src,
+        }
+        ok = all(checks.values())
+        bad = [k for k, v in checks.items() if not v]
+        print(f"  {'OK  ' if ok else 'FAIL'} {script:38s}"
+              + ("" if ok else f"  MISSING: {', '.join(bad)}"))
+        tel_rows.append({"script": script, "telemetry": ok, "missing": bad})
+        if not ok:
+            missing.append(f"{script}: telemetry ({', '.join(bad)})")
+
     res = {"n_components": len(rows),
+           "n_telemetry": sum(1 for r in tel_rows if r["telemetry"]),
+           "telemetry": tel_rows,
            "n_resumable": sum(1 for r in resume_rows if r["resumable"]),
            "resume": resume_rows,
            "n_scheduled": sum(1 for r in sched_rows if r["scheduled"]),
@@ -193,7 +215,8 @@ def main() -> None:
     print(f"\ncomponents present: {res['n_present']}/{res['n_components']}   "
           f"curriculum stages: {res['n_stages_present']}/{res['n_stages']}   "
           f"trainers scheduled: {res['n_scheduled']}/{res['n_trainers']}   "
-          f"resumable: {res['n_resumable']}/{res['n_trainers']}")
+          f"resumable: {res['n_resumable']}/{res['n_trainers']}   "
+          f"telemetry: {res['n_telemetry']}/{res['n_trainers']}")
     print("MISSING: " + (", ".join(missing) if missing else "none"))
     print(f"\n-> {out}")
 

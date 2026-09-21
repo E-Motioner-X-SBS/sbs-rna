@@ -61,7 +61,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
 from pharos.model.moe import RouterFeatures                       # noqa: E402
-from pharos.model.pharos import Pharos, PharosConfig              # noqa: E402
+from pharos.model.pharos import Pharos, PharosConfig
+from pharos.train.telemetry import RunLog              # noqa: E402
 
 sys.path.insert(0, str(ROOT / "scripts"))
 from train_block_scorer import gpu_free_gib                       # noqa: E402
@@ -480,6 +481,23 @@ def main() -> None:
             print(f"[pharos] all {args.epochs} epochs already done", flush=True)
             return
 
+    runlog = RunLog(ROOT, "stage5_3d", [
+        "lr", "loss", "n_oom", "peak_gib", "note",
+        "val_contact_ap", "val_mg_ap", "val_rigidity_r", "val_bfactor_r",
+    ], manifest={
+        "size": args.size, "config": cfg.__dict__, "params": pc,
+        "epochs": args.epochs, "token_budget": args.token_budget,
+        "lr_peak": args.lr, "n_neg": args.n_neg,
+        "sample_loops": args.sample_loops, "n_steps_total": n_steps,
+        "batches_per_epoch": [len(b) for b in epoch_batches],
+        "splits": {"train": len(tr), "val": len(va)},
+        "init_from": str(args.init_from) if args.init_from else None,
+        "resumed_from_epoch": start_ep, "resumed_from_step": step,
+        "checkpoint": str(ck),
+    })
+    if step:
+        runlog.event("resumed", epoch=start_ep, step=step)
+
     def save(ep: int, done: bool, val=None) -> None:
         torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
@@ -520,6 +538,7 @@ def main() -> None:
                 if n_oom <= 5 or n_oom % 50 == 0:
                     print(f"[pharos] OOM #{n_oom} at step {step}; batch skipped",
                           flush=True)
+                runlog.event(f"OOM #{n_oom}", epoch=ep, step=step, n_oom=n_oom)
                 continue
             sched.step()
             run.append(float(loss.detach()))
@@ -527,6 +546,14 @@ def main() -> None:
             if step % args.ckpt_every == 0:
                 save(ep, False)
             if step % args.log_every == 0:
+                runlog.log("step", epoch=ep, step=step,
+                           lr=sched.get_last_lr()[0],
+                           loss=round(float(np.mean(run[-args.log_every:])), 6),
+                           n_oom=n_oom,
+                           peak_gib=round(
+                               torch.cuda.max_memory_allocated() / 2**30, 2),
+                           **{f"part_{k}": round(float(v), 6)
+                              for k, v in parts.items() if k != "n_pairs"})
                 print(f"[pharos] ep{ep} step{step} loss "
                       f"{np.mean(run[-args.log_every:]):.4f} "
                       f"{ {k: round(v, 3) for k, v in parts.items() if k != 'n_pairs'} }",
@@ -535,6 +562,11 @@ def main() -> None:
         history.append({"epoch": ep, "loss": float(np.mean(run)), "val": ev})
         print(f"[pharos] epoch {ep}: loss {np.mean(run):.4f} val {ev} "
               f"({time.time()-t0:.0f}s)", flush=True)
+        runlog.log("epoch", epoch=ep, step=step,
+                   loss=round(float(np.mean(run)), 6), n_oom=n_oom,
+                   lr=sched.get_last_lr()[0],
+                   **{f"val_{k}": v for k, v in ev.items()
+                      if isinstance(v, (int, float))})
         save(ep, True, ev)
 
     if not history:

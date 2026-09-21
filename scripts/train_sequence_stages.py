@@ -64,6 +64,7 @@ from pharos.data.chemistry_torch import BatchChemistry               # noqa: E40
 from pharos.data.vocab import PAD_ID, SYMBOLS, encode_chain          # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
+from pharos.train.telemetry import RunLog                            # noqa: E402
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
 #: dot-bracket alphabet, matching HeadConfig.n_ss_symbols = 8
@@ -93,6 +94,11 @@ def enable_gpu_fast_paths() -> None:
 @lru_cache(maxsize=4)
 def _batch_chem(device_str: str) -> BatchChemistry:
     return BatchChemistry(SYMBOLS, torch.device(device_str))
+
+
+def _m(xs, n):
+    """Mean of the last `n`, or None when there is nothing to average."""
+    return round(float(np.mean(xs[-n:])), 6) if xs else None
 
 
 def lr_at(step: float, total: float, peak: float,
@@ -373,6 +379,21 @@ def main() -> None:
                   flush=True)
             return
 
+    runlog = RunLog(ROOT, "stage23_seq", [
+        "gstep", "lr", "ss_loss", "ss_accuracy", "probing_loss",
+        "probing_pearson", "n_oom", "note",
+    ], manifest={
+        "size": args.size, "config": cfg.__dict__, "params": pc,
+        "epochs": args.epochs, "batch": args.batch, "lr_peak": args.lr,
+        "total_steps_estimated": total_steps,
+        "stage_weights": STAGE_WEIGHTS,
+        "init_from": str(args.init_from) if args.init_from else None,
+        "resumed_from_epoch": start_ep, "resumed_from_gstep": gstep,
+        "checkpoint": str(ck),
+    })
+    if gstep:
+        runlog.event("resumed", epoch=start_ep, step=gstep, gstep=gstep)
+
     def save(ep: int, done: bool) -> None:
         torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
@@ -432,11 +453,18 @@ def main() -> None:
                 if n_oom <= 5 or n_oom % 50 == 0:
                     print(f"[seq] OOM #{n_oom} at step {step}; batch skipped",
                           flush=True)
+                runlog.event(f"OOM #{n_oom}", epoch=ep, step=step, n_oom=n_oom)
                 continue
             step += 1
             if step % args.ckpt_every == 0:
                 save(ep, False)
             if step % args.log_every == 0:
+                runlog.log("step", epoch=ep, step=step, gstep=gstep, lr=lr_now,
+                           ss_loss=_m(ss_loss, args.log_every),
+                           ss_accuracy=_m(ss_acc, args.log_every),
+                           probing_loss=_m(pr_loss, args.log_every),
+                           probing_pearson=_m(pr_r, args.log_every),
+                           n_oom=n_oom)
                 print(f"[seq] ep{ep} step{step} lr {lr_now:.2e}  2D loss "
                       f"{np.mean(ss_loss[-args.log_every:]):.4f} acc "
                       f"{np.mean(ss_acc[-args.log_every:]):.4f}  |  probing loss "
@@ -448,6 +476,10 @@ def main() -> None:
                      "probing_loss": float(np.mean(pr_loss)) if pr_loss else None,
                      "probing_pearson": float(np.mean(pr_r)) if pr_r else None})
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
+        runlog.log("epoch", epoch=ep, step=step, gstep=gstep,
+                   ss_loss=hist[-1]["ss_loss"], ss_accuracy=hist[-1]["ss_accuracy"],
+                   probing_loss=hist[-1]["probing_loss"],
+                   probing_pearson=hist[-1]["probing_pearson"], n_oom=n_oom)
         save(ep, True)
 
     if not hist:

@@ -54,6 +54,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pharos.data.chemistry_torch import BatchChemistry               # noqa: E402
+from pharos.train.telemetry import RunLog                            # noqa: E402
 from pharos.data.vocab import PAD_ID, SYM2ID, SYMBOLS, encode_chain  # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
@@ -465,6 +466,7 @@ def main() -> None:
     CKPT.mkdir(parents=True, exist_ok=True)
 
     seen = step = resumed_padded = 0
+    hist_resumed: List[Dict] = []
     # Resume, because this is the job that runs for days on a shared card and
     # will be interrupted. Without it every interruption discards everything and
     # the run can never finish -- an unattended pretraining script that restarts
@@ -491,6 +493,7 @@ def main() -> None:
         if "opt" in sd:
             opt.load_state_dict(sd["opt"])
         seen, step = int(sd.get("tokens", 0)), int(sd.get("step", 0))
+        hist_resumed = list(sd.get("history", []))
         resumed_padded = int(sd.get("padded", 0))
         # advance the stream so a resumed run does not re-read the same
         # sequences it has already been trained on
@@ -504,10 +507,28 @@ def main() -> None:
     padded = int(resumed_padded)
     seen_mark, padded_mark = seen, padded
     t0 = tmark = time.time()
+    # Telemetry is appended and flushed per row. `hist` used to reach disk only
+    # in the report at the end of a run, and on a shared card runs do not end --
+    # 188.6M tokens of stage 1 left no history file at all, only a text log.
+    runlog = RunLog(ROOT, "stage1_mlm", [
+        "tokens", "padded_tokens", "ce_nats", "bits_per_token", "balance",
+        "total_loss", "lr", "masked_accuracy", "tok_per_s", "padded_per_s",
+        "mfu", "pad_frac", "token_budget", "n_oom", "peak_gib", "note",
+    ], manifest={
+        "size": args.size, "config": cfg.__dict__, "params": pc,
+        "token_budget_requested": args.token_budget,
+        "token_budget_total": budget, "n_loops": args.n_loops,
+        "lr_peak": args.lr, "compiled": not args.no_compile,
+        "len_quantum": LEN_QUANTUM, "gib_per_token": GIB_PER_TOKEN,
+        "resumed_from_tokens": seen, "resumed_from_step": step,
+        "checkpoint": str(ck),
+    })
+    if step:
+        runlog.event("resumed", step=step, tokens=seen, padded_tokens=padded)
     run: List[float] = []
     bals: List[float] = []
     accs: List[float] = []
-    hist: List[Dict] = []
+    hist: List[Dict] = list(hist_resumed)
     stop = False
     budget_tokens = args.token_budget
     n_oom = 0
@@ -605,6 +626,22 @@ def main() -> None:
                         f"{rate_r/1e3:.1f}k tok/s "
                         f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
                         f"MFU {100*mfu:.1f}%", flush=True)
+                  _ce = float(np.mean(run[-args.log_every:]))
+                  _bal = float(np.mean(bals[-args.log_every:]))
+                  runlog.log("step", step=step, tokens=seen,
+                             padded_tokens=padded,
+                             ce_nats=round(_ce, 6),
+                             bits_per_token=round(_ce / np.log(2), 6),
+                             balance=round(_bal, 6),
+                             total_loss=round(_ce + _bal, 6), lr=lr_now,
+                             masked_accuracy=round(
+                                 float(np.mean(accs[-args.log_every:])), 6),
+                             tok_per_s=round(rate_r, 1),
+                             padded_per_s=round(rate_p, 1), mfu=round(mfu, 6),
+                             pad_frac=round(1 - seen / max(padded, 1), 6),
+                             token_budget=budget_tokens, n_oom=n_oom,
+                             peak_gib=round(
+                                 torch.cuda.max_memory_allocated() / 2**30, 2))
                   hist.append({"step": step, "tokens": seen, "padded": padded,
                                "lr": lr_now,
                                "balance": float(np.mean(bals[-args.log_every:])),
@@ -615,7 +652,8 @@ def main() -> None:
               if step % args.ckpt_every == 0 or seen >= budget:
                   torch.save({"cfg": cfg.__dict__, "model": _clean_state(model),
                               "opt": opt.state_dict(), "padded": padded,
-                              "tokens": seen, "step": step}, ck)
+                              "tokens": seen, "step": step,
+                              "history": hist, "run_id": runlog.run_id}, ck)
               if seen >= budget:
                   stop = True
                   break
@@ -634,6 +672,9 @@ def main() -> None:
             print(f"[mlm] OOM #{n_oom} at step {step}; token budget "
                   f"-> {budget_tokens:,}, rebuilding the stream and continuing",
                   flush=True)
+            runlog.event(f"OOM #{n_oom}: token budget -> {budget_tokens}",
+                         step=step, tokens=seen, token_budget=budget_tokens,
+                         n_oom=n_oom)
             break
 
         else:

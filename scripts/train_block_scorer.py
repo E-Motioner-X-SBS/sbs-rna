@@ -54,6 +54,7 @@ CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                      # noqa: E402
+from pharos.train.telemetry import RunLog
 from pharos.model.block_scorer import (BlockScorer, ScorerConfig,   # noqa: E402
                                        l1_budget, l2_budget, occupancy_labels,
                                        occupancy_loss, recall_at_budget,
@@ -283,6 +284,21 @@ def train(args) -> None:
         if start_ep >= args.epochs:
             print(f"[bs] all {args.epochs} epochs already done", flush=True)
 
+    runlog = RunLog(ROOT, "r1_block_scorer", [
+        "lr", "loss", "n_oom", "best_val_l2", "note",
+        "val_l1_recall", "val_l1_precision", "val_l2_recall", "val_l2_precision",
+    ], manifest={
+        "config": cfg.__dict__, "n_parameters": n_par, "epochs": args.epochs,
+        "token_budget": args.token_budget, "lr_peak": args.lr,
+        "total_steps": total_steps,
+        "batches_per_epoch": [len(b) for b in epoch_batches],
+        "splits": {"train": len(tr), "val": len(va), "test": len(te)},
+        "resumed_from_epoch": start_ep, "resumed_from_step": step,
+        "checkpoint": str(args.ckpt), "state": str(state),
+    })
+    if step:
+        runlog.event("resumed", epoch=start_ep, step=step)
+
     def save_state(ep: int, done: bool) -> None:
         torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
@@ -316,6 +332,7 @@ def train(args) -> None:
                 if n_oom <= 5 or n_oom % 50 == 0:
                     print(f"[bs] OOM #{n_oom} at step {step}; batch skipped",
                           flush=True)
+                runlog.event(f"OOM #{n_oom}", epoch=ep, step=step, n_oom=n_oom)
                 continue
             sched.step()
             run.append(float(loss.detach()))
@@ -323,6 +340,9 @@ def train(args) -> None:
             if step % args.ckpt_every == 0:
                 save_state(ep, False)
             if step % args.log_every == 0:
+                runlog.log("step", epoch=ep, step=step,
+                           lr=sched.get_last_lr()[0], n_oom=n_oom,
+                           loss=round(float(np.mean(run[-args.log_every:])), 6))
                 print(f"[bs] ep{ep} step{step} loss {np.mean(run[-args.log_every:]):.4f} "
                       f"lr {sched.get_last_lr()[0]:.2e}", flush=True)
         ev = evaluate(model, va, cfg, device, "learned",
@@ -331,6 +351,13 @@ def train(args) -> None:
         print(f"[bs] epoch {ep}: loss {np.mean(run):.4f}  "
               f"val L1 recall {ev['l1_recall']}  L2 recall {ev['l2_recall']}  "
               f"({time.time()-t0:.0f}s)", flush=True)
+        runlog.log("epoch", epoch=ep, step=step,
+                   loss=round(float(np.mean(run)), 6), n_oom=n_oom,
+                   lr=sched.get_last_lr()[0], best_val_l2=best,
+                   val_l1_recall=ev.get("l1_recall"),
+                   val_l1_precision=ev.get("l1_precision"),
+                   val_l2_recall=ev.get("l2_recall"),
+                   val_l2_precision=ev.get("l2_precision"))
         score = (ev["l2_recall"] or 0.0)
         if score > best:
             best = score

@@ -1,5 +1,28 @@
 {
  "n_components": 30,
+ "n_telemetry": 4,
+ "telemetry": [
+  {
+   "script": "scripts/pretrain_mlm.py",
+   "telemetry": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_block_scorer.py",
+   "telemetry": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_pharos.py",
+   "telemetry": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_sequence_stages.py",
+   "telemetry": true,
+   "missing": []
+  }
+ ],
  "n_resumable": 4,
  "resume": [
   {

@@ -44,6 +44,49 @@
 | plans/12-nucleicbert-data-scanner.md | acquisition log + recipes |
 | plans/13-sequence-structure-gap-strategy.md | strategy for the 3D gap |
 
+## How to resume training
+
+Training was stopped by request at **188,601,237 tokens, step 7,500** (9.4% of
+the 2e9 stage-1 budget), with optimiser state, on a clean signal. Nothing was
+lost: the checkpoint's step matches the last logged step exactly.
+
+```bash
+crontab -e            # uncomment the #STOPPED-BY-REQUEST line
+```
+
+That is all. The next fire resumes stage 1 from its checkpoint, sizes the batch
+from whatever VRAM is free, and carries on to stages 2-3 and 5. To run it now
+instead of waiting for the half-hour tick:
+
+```bash
+./scripts/gpu_cron_runner.sh >> data/samples/analysis/cron/cron.log 2>&1 &
+```
+
+Every stage resumes: model, optimiser, and for stage 5 and the scorer the
+OneCycleLR state too. `--restart` renames rather than overwrites.
+
+## Where the training record lives
+
+`data/samples/analysis/runs/` — a CSV per stage, appended and flushed per row,
+so a killed run keeps everything up to its last logged step:
+
+```
+runs/stage1_mlm.csv            every row every stage-1 run ever logged
+runs/stage1_mlm/<run_id>.csv   one run alone
+runs/stage1_mlm/<run_id>.json  the manifest: argv, git commit, config,
+                               params, device, resume point
+```
+
+23 columns for stage 1: tokens, padded tokens, CE in nats and bits, the MoE
+balance term, total loss, learning rate, masked accuracy, real and padded
+throughput, MFU, padding fraction, token budget, OOM count, peak GiB. `kind`
+distinguishes `step` / `epoch` / `eval` / `event` rows, so an OOM or a resume
+appears in the same file as the metrics around it.
+
+This exists because it did not before: history was serialised once, at the end
+of a run, and on a shared card runs do not end. Stage 1 reached 188.6M tokens
+across several fires and produced no history file at all.
+
 ## The `docs/acquisition-inventory` branch is superseded -- DO NOT MERGE IT
 
 Its five useful files (`scripts/acquire_all.py`, `build_raw_pdb_entrylist.py`,
@@ -53,9 +96,12 @@ it is **47 commits behind main**, and merging it would **delete 65 files**,
 including all of `src/pharos/`. Opening the PR that its URL suggests would
 propose exactly that deletion.
 
-Nothing on it is now missing from main. It is kept only as history; it should
-be deleted once someone confirms they do not want the history, and until then
-it must not be merged.
+Nothing on it is now missing from main, and it is archived at
+`archive/acquisition-inventory/` -- the branch's own copies of the three
+scripts, its commit list, its full file list, and a README recording what was
+taken and how to use `acquire_all.py` to fetch datasets (including MARS, the
+one source skipped by decision). The branch can be deleted whenever you like;
+until then it must not be merged.
 
 ## Repo
 - Local: /store/shuvam/E-motioner-X-SBS/sbs-rna
