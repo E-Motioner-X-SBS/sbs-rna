@@ -152,6 +152,20 @@ def main() -> int:
         chk("chem pseudouridine residues", cl["pseudouridine"], 18458)
         chk("chem other residues", cl["other"], 14421)
 
+        # ---- §8: the motif bank is the atlas, not a subset ---------------
+        import json as _j
+        mb = ROOT / "data/derived/motif_bank/meta.json"
+        if mb.exists():
+            bm = _j.loads(mb.read_text())
+            chk("motif classes", bm["n_motifs"], 667)
+            chk("motif: internal loops", bm["n_internal_loop"], 413)
+            chk("motif: hairpin loops", bm["n_hairpin_loop"], 254)
+            chk("motif instances", bm["n_instances_total"], 4992)
+            chk("motif: interaction vocabulary read from the atlas",
+                len(bm["bp_families"]), 21)
+        else:
+            chk("motif bank compiled (scripts/build_motif_bank.py)", 0, 1)
+
         # ---- §12.4 / D25: the built training set and its splits ----------
         import json as _json
         mf = ROOT / "data/derived/pharos3d/manifest.json"
@@ -515,7 +529,8 @@ def main() -> int:
               ROOT / "src/pharos/data/test_mmcif_entities.py",
               ROOT / "src/pharos/data/test_chemistry.py",
               ROOT / "src/pharos/model/test_attention.py",
-              ROOT / "src/pharos/model/test_pharos.py"]
+              ROOT / "src/pharos/model/test_pharos.py",
+              ROOT / "src/pharos/model/test_motif_bank.py"]
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's

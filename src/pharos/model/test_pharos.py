@@ -55,9 +55,9 @@ def chk(name: str, ok, detail: str = "") -> None:
 #: What the built family is, given the recipe in `PharosConfig`. Pinned so a
 #: change to the MoE numbers cannot silently move the cost model.
 EXPECTED = {
-    "PHAROS-Small": (238_849_548, 62_688_780, 128),
-    "PHAROS-Mini": (102_143_362, 27_825_538, 144),
-    "Base-v2": (1_060_648_684, 267_925_228, 96),
+    "PHAROS-Small": (238_897_870, 62_737_102, 128),
+    "PHAROS-Mini": (102_191_684, 27_873_860, 144),
+    "Base-v2": (1_060_697_006, 267_973_550, 96),
 }
 #: What §5.4 prints. Kept beside the built numbers deliberately: the active
 #: column is close (61 vs 62.7, 269 vs 267.9) and the total column is not.

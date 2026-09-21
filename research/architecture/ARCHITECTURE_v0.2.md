@@ -599,6 +599,29 @@ tetraloops, kink-turns, A-minor motifs, sarcin-ricin loops. These are the
 **Retrieval, not memorisation:** a frozen KV bank of 667 motif classes, indexed
 from the BGSU motif atlas, queried by the pair track after pairing is estimated.
 
+**Implemented [v0.2]** — `scripts/build_motif_bank.py` compiles atlas release
+4.12 into the bank and `pharos.model.motif_bank` retrieves from it. The counts
+are the atlas's own: **667 classes = 413 internal-loop + 254 hairpin-loop**,
+4,992 instances, 21 interaction families. Each class carries an
+interaction-family histogram, a position-specific base profile computed across
+its instances, and size/type/instance scalars. Those are facts about RNA, so
+they are **frozen buffers**; what trains is only the projections that turn them
+into keys and values, and the query projection from the pair track — 31,810
+learned parameters against 82,041 frozen ones.
+
+Three details that are load-bearing rather than incidental:
+
+* **There is no sequence query path, by construction.** `MotifBank.forward`
+  takes a pair-derived query and nothing else, and `test_motif_bank.py` asserts
+  the module contains no k-mer machinery. The negative result below is not a
+  caution to remember; it is enforced.
+* **Rare classes are distrusted, not dropped.** Only **231 of 667** have five or
+  more instances. Instance count enters as a log-prior on the retrieval logits,
+  so a class seen twice cannot outrank one seen 300 times on equal evidence,
+  and a motif with one instance is still reachable when the evidence is strong.
+* **The gate starts closed** (bias −3, gate ≈ 0.04 at init), so an untrained
+  bank injects nothing into the pair track and has to earn its way in.
+
 **Critical negative result [v0.1, measured]:** GNRA k-mer context alone predicts
 rigidity at **0.073 σ** — negligible. Motif identity requires the *interaction
 graph*, not sequence n-grams. Motif routing therefore happens in the **pair**
@@ -918,7 +941,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **226** checks. Counting
+JSONs and fails the build on drift; it currently pins **232** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

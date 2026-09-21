@@ -36,6 +36,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .heads import HeadConfig, PharosHeads
+from .motif_bank import MotifBankConfig, load_bank
 from .moe import MoEConfig, RouterFeatures
 from .trunk import TokenTrunk, TrunkConfig
 
@@ -157,6 +158,15 @@ class Pharos(nn.Module):
         self.heads = PharosHeads(cfg.head_cfg())
         self.pair_proj = nn.Linear(2 * cfg.d_model, cfg.d_pair)
         self.elec = ElectrostaticBias()
+        # §8: retrieval, not memorisation. Queried from the PAIR features --
+        # i.e. after pairing is estimated -- never from sequence, because the
+        # sequence-only version of this idea was measured at 0.073 sigma. The
+        # bank is absent rather than fabricated if it has not been compiled.
+        self.motifs = load_bank(MotifBankConfig(d_query=cfg.d_pair,
+                                                d_value=cfg.d_pair,
+                                                dropout=cfg.dropout))
+        self.motif_mix = (nn.Linear(cfg.d_pair, cfg.d_pair)
+                          if self.motifs is not None else None)
 
     def forward(self, tokens: torch.Tensor, mod_ids: torch.Tensor,
                 chem: torch.Tensor, mask: torch.Tensor,
@@ -177,6 +187,10 @@ class Pharos(nn.Module):
         if pair_index is not None:
             ii, jj = pair_index
             pair = self.pair_proj(torch.cat([h[0, ii], h[0, jj]], dim=-1))
+            if self.motifs is not None:
+                retrieved, minfo = self.motifs(pair)
+                pair = pair + self.motif_mix(retrieved)
+                aux["motif_gate"] = minfo["gate_mean"]
         out = self.heads(h, mask, pair)
         out["hidden"] = h
         out["aux"] = aux
