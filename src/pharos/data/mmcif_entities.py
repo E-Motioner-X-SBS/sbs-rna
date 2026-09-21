@@ -439,6 +439,210 @@ def entry_composition(path: Path) -> dict:
     }
 
 
+def residue_labels(path: Path, ion_cutoff: float = 3.0,
+                   ions: tuple = ("MG",)) -> dict:
+    """The per-residue supervision that is already inside every deposited file.
+
+    Four of ARCHITECTURE v0.2's heads are trained on labels nobody has to
+    produce, because the depositor already did. This extracts them in one pass:
+
+    * **head 5, Mg2+ sites** -- a residue is positive if any of its atoms lies
+      within `ion_cutoff` of a magnesium. 3.0 A is inner-sphere coordination;
+      the corpus holds 816,270 Mg sites and 77.9% of their inner-sphere contacts
+      are to OP1/OP2.
+    * **head 6, rigidity** -- the mean B-factor of a residue's atoms, and the
+      experimental method, because **D12 restricts this head to X-ray**. The
+      Mg-rigidity gradient is monotonic on 1,535 X-ray structures and *not*
+      monotonic on cryo-EM, where per-atom B is a fitted display parameter
+      rather than a measured one. The method travels with the label so a
+      training loop cannot mix them by accident.
+    * **head 10, base identity** -- which residues are `N_struct`: identity
+      unassigned but ribose modelled, so their geometry trains normally and
+      recovering the base is free supervision.
+    * **head 11, disorder** -- `_pdbx_unobs_or_zero_occ_residues` names every
+      residue too mobile or disordered to model. It is a direct per-residue
+      flexibility label, present in every deposited structure, used by no RNA
+      structure predictor. It is returned as `unobserved_seq_id` rather than as
+      a mask over the modelled residues, because an unobserved residue has no
+      atoms and so is absent from them -- a disorder mask aligned to the
+      coordinates is necessarily all zeros.
+
+    Returns `{chain: {...}}` keyed the same way as `rna_chain_coords`, so the
+    arrays line up position for position with the coordinates.
+    """
+    from collections import defaultdict
+    import numpy as _np
+
+    types = entity_poly_types(path)
+    pure = {c for c, t in types.items() if t == "polyribonucleotide"}
+    hyb = {c for c, t in types.items()
+           if t.startswith("polydeoxyribonucleotide/polyribonucleotide")}
+    want = pure | hyb
+    if not want:
+        return {}
+
+    method = "?"
+    unobs: set = set()
+    cols: list[str] = []
+    in_loop = header = False
+    model: str | None = None
+    bsum: dict = defaultdict(float)
+    bcnt: dict = defaultdict(int)
+    names: dict = {}
+    order: dict = defaultdict(list)
+    ion_xyz: list = []
+    res_xyz: dict = defaultdict(list)
+
+    # `_pdbx_unobs_or_zero_occ_residues` is its own loop and has to be read
+    # before the coordinates, since unobserved residues have none
+    ucols: list[str] = []
+    uin = uhdr = False
+
+    with _open(path) as fh:
+        for line in fh:
+            s = line.rstrip("\n")
+            st = s.strip()
+
+            if st.startswith("_exptl.method"):
+                # exact token: `_exptl.method_details` is a different field, and
+                # a prefix match on it silently zeroed the cryo-EM stratum once
+                tag, _, rest = st.partition(" ")
+                if tag == "_exptl.method" and rest.strip():
+                    method = rest.strip().strip("'\"")
+                continue
+
+            if st.startswith("_pdbx_unobs_or_zero_occ_residues."):
+                if not uin:
+                    uin, ucols = True, []
+                ucols.append(st.split(".", 1)[1])
+                uhdr = True
+                continue
+            if uhdr and uin:
+                if st.startswith(("#", "_", "loop_")):
+                    uin = uhdr = False
+                else:
+                    q = st.split()
+                    if len(q) >= len(ucols):
+                        r = dict(zip(ucols, q))
+                        ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
+                        sq = r.get("label_seq_id", ".")
+                        if sq not in (".", "?"):
+                            unobs.add((ch, sq))
+                    continue
+
+            if s.startswith("_atom_site."):
+                if not in_loop:
+                    in_loop, cols = True, []
+                cols.append(s.split(".", 1)[1].strip())
+                header = True
+                continue
+            if not (header and in_loop):
+                continue
+            if s.startswith(("#", "_", "loop_")):
+                in_loop = header = False
+                continue
+            q = s.split()
+            if len(q) < len(cols):
+                continue
+            r = dict(zip(cols, q))
+            mn = r.get("pdbx_PDB_model_num")
+            if mn is not None:
+                if model is None:
+                    model = mn
+                elif mn != model:
+                    continue
+            comp = r.get("label_comp_id", "").strip('"').upper()
+            try:
+                xyz = (float(r["Cartn_x"]), float(r["Cartn_y"]), float(r["Cartn_z"]))
+            except (KeyError, ValueError):
+                continue
+            if comp in ions:
+                ion_xyz.append(xyz)
+                continue
+            ch = r.get("auth_asym_id", r.get("label_asym_id", "?"))
+            if ch not in want:
+                continue
+            sq = r.get("label_seq_id", ".")
+            if sq in (".", "?"):
+                continue
+            if r.get("type_symbol") == "H":
+                continue
+            key = (ch, int(sq), r.get("pdbx_PDB_ins_code", "?"))
+            if key not in names:
+                names[key] = comp
+                order[ch].append(key)
+            res_xyz[key].append(xyz)
+            try:
+                bsum[key] += float(r.get("B_iso_or_equiv", "0") or 0.0)
+                bcnt[key] += 1
+            except ValueError:
+                pass
+
+    out: dict = {}
+    ions_arr = _np.asarray(ion_xyz, dtype=float) if ion_xyz else None
+    tree = None
+    if ions_arr is not None and len(ions_arr):
+        from scipy.spatial import cKDTree
+        tree = cKDTree(ions_arr)
+
+    for ch, keys in order.items():
+        keys = sorted(keys, key=lambda k: k[1])
+        n = len(keys)
+        bf = _np.zeros(n, dtype=_np.float32)
+        mg = _np.zeros(n, dtype=_np.uint8)
+        unk = _np.zeros(n, dtype=_np.uint8)
+        for i, k in enumerate(keys):
+            if bcnt[k]:
+                bf[i] = bsum[k] / bcnt[k]
+            if tree is not None and res_xyz[k]:
+                if tree.query_ball_point(_np.asarray(res_xyz[k]), ion_cutoff,
+                                         return_length=True).sum():
+                    mg[i] = 1
+            if names[k] in ("N", "UNK"):
+                unk[i] = 1
+        # B-factors are only comparable within a structure, so normalise per
+        # chain; the raw mean travels too, because the scale itself differs
+        # between X-ray and cryo-EM and D12 needs that distinction visible
+        obs = bf[bf > 0]
+        norm = ((bf - obs.mean()) / obs.std()) if obs.size > 1 and obs.std() > 0 \
+            else _np.zeros_like(bf)
+        # Positions named by `_pdbx_unobs_or_zero_occ_residues` for this chain.
+        # These are NOT in the arrays above and cannot be: an unobserved
+        # residue has no atoms, so it never appears in `_atom_site`. Keeping
+        # `disordered` aligned to the modelled residues therefore makes it
+        # vacuously zero, which is what a first version returned. The label is
+        # a statement about the polymer, not about the coordinates, so the
+        # missing positions travel separately and the dataset builder places
+        # them against the full sequence.
+        missing = sorted(int(q) for (c, q) in unobs if c == ch and q.isdigit())
+        modelled = [k[1] for k in keys]
+        n_poly = max(max(modelled, default=0), max(missing, default=0))
+        out[ch] = {"b_factor": bf, "b_factor_z": norm.astype(_np.float32),
+                   "mg_site": mg, "unknown_base": unk,
+                   "modelled_seq_id": _np.asarray(modelled, dtype=_np.int32),
+                   "unobserved_seq_id": _np.asarray(missing, dtype=_np.int32),
+                   "n_polymer": int(n_poly),
+                   "frac_unobserved": (len(missing) / n_poly) if n_poly else 0.0,
+                   "method": method,
+                   "rigidity_valid": bool("X-RAY" in method.upper())}
+    # a chain whose residues are ALL unobserved has no coordinates and so no
+    # entry above; it is still a real disorder observation, recorded as such
+    for (c, q) in unobs:
+        if c in want and c not in out:
+            out[c] = {"b_factor": _np.zeros(0, dtype=_np.float32),
+                      "b_factor_z": _np.zeros(0, dtype=_np.float32),
+                      "mg_site": _np.zeros(0, dtype=_np.uint8),
+                      "unknown_base": _np.zeros(0, dtype=_np.uint8),
+                      "modelled_seq_id": _np.zeros(0, dtype=_np.int32),
+                      "unobserved_seq_id": _np.asarray(
+                          sorted(int(x) for (cc, x) in unobs
+                                 if cc == c and x.isdigit()), dtype=_np.int32),
+                      "n_polymer": 0, "frac_unobserved": 1.0,
+                      "method": method,
+                      "rigidity_valid": bool("X-RAY" in method.upper())}
+    return out
+
+
 def longest_rna_chain(path: Path):
     """The longest canonical RNA chain, as a list of per-residue atom lists."""
     chains = rna_chain_coords(path)

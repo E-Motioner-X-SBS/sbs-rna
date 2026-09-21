@@ -37,7 +37,8 @@ from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from data.chemistry import N_DIMS, chain_chemistry           # noqa: E402
-from data.mmcif_entities import rna_chain_coords             # noqa: E402
+from data.mmcif_entities import (residue_labels,             # noqa: E402
+                                 rna_chain_coords)
 from data.vocab import PAD_ID, encode_chain, is_deoxy        # noqa: E402
 
 #: Contact definition, identical to every measurement in the project so the
@@ -72,6 +73,20 @@ class ChainExample:
     has_protein: bool = False
     ribosome_like: bool = False
     n_modified: int = 0
+    # ---- the supervision the depositor already produced (heads 5, 6, 10, 11)
+    mg_site: Optional[np.ndarray] = None       # uint8 (L,)   head 5
+    b_factor_z: Optional[np.ndarray] = None    # float16 (L,) head 6
+    unknown_base: Optional[np.ndarray] = None  # uint8 (L,)   head 10
+    #: head 11's label is about the POLYMER, not the coordinates: an unobserved
+    #: residue has no atoms, so it cannot be a mask over the modelled residues
+    unobserved_seq_id: Optional[np.ndarray] = None
+    n_polymer: int = 0
+    #: D12 -- the rigidity head trains on X-ray B-factors ONLY. cryo-EM per-atom
+    #: B is a fitted display parameter, on a different scale entirely (7PAS
+    #: reads a mean of 987 against 1VY7's 72), and the Mg-rigidity gradient is
+    #: monotonic on X-ray and not on cryo-EM. The flag travels with the example
+    #: so a training loop cannot mix them by accident.
+    rigidity_valid: bool = False
 
     @property
     def contacts_per_nt(self) -> float:
@@ -105,8 +120,14 @@ class ChainExample:
 
     def meta(self) -> Dict:
         d = asdict(self)
-        for k in ("tokens", "mod_ids", "chem", "contacts"):
-            d.pop(k)
+        for k in ("tokens", "mod_ids", "chem", "contacts", "mg_site",
+                  "b_factor_z", "unknown_base", "unobserved_seq_id"):
+            d.pop(k, None)
+        d["n_mg_sites"] = int(self.mg_site.sum()) if self.mg_site is not None else 0
+        d["n_unobserved"] = (len(self.unobserved_seq_id)
+                             if self.unobserved_seq_id is not None else 0)
+        d["n_unknown_base"] = (int(self.unknown_base.sum())
+                               if self.unknown_base is not None else 0)
         d["n_contacts"] = int(len(self.contacts))
         d["contacts_per_nt"] = round(self.contacts_per_nt, 4)
         d["effective_c_b4"] = round(self.effective_c(4), 2)
@@ -159,6 +180,10 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
         chains = rna_chain_coords(path)
     except Exception:                                        # noqa: BLE001
         return []
+    try:
+        labels = residue_labels(path)
+    except Exception:                                        # noqa: BLE001
+        labels = {}
     out: List[ChainExample] = []
     for ch, residues in chains.items():
         L = len(residues)
@@ -171,6 +196,12 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             continue
         tokens, mods = encode_chain(comps)
         chem = chain_chemistry(comps, deoxy_mask=is_deoxy(tokens))
+        lab = labels.get(ch, {})
+        def _arr(key, dtype, n=L):
+            a = lab.get(key)
+            if a is None or len(a) != n:
+                return np.zeros(n, dtype=dtype)
+            return np.asarray(a, dtype=dtype)
         out.append(ChainExample(
             pdb=path.stem.replace(".cif", ""), chain=ch, length=L,
             tokens=tokens, mod_ids=mods, chem=chem.astype(np.float16),
@@ -182,6 +213,13 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             has_protein=bool(em.get("has_protein", False)),
             ribosome_like=bool(em.get("ribosome_like", False)),
             n_modified=int((mods != 0).sum()),
+            mg_site=_arr("mg_site", np.uint8),
+            b_factor_z=_arr("b_factor_z", np.float16),
+            unknown_base=_arr("unknown_base", np.uint8),
+            unobserved_seq_id=np.asarray(lab.get("unobserved_seq_id", []),
+                                         dtype=np.int32),
+            n_polymer=int(lab.get("n_polymer", L)),
+            rigidity_valid=bool(lab.get("rigidity_valid", False)),
         ))
     return out
 
@@ -198,11 +236,30 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
             else np.empty((0, N_DIMS), np.float16))
     con = (np.concatenate([e.contacts for e in examples]) if examples
            else np.empty((0, 2), np.int32))
+
+    def cat(attr, dtype, width=None):
+        parts = [getattr(e, attr) for e in examples]
+        parts = [p if p is not None else np.zeros(e.length, dtype=dtype)
+                 for p, e in zip(parts, examples)]
+        return (np.concatenate(parts).astype(dtype) if parts
+                else np.empty(0, dtype))
+
+    mg = cat("mg_site", np.uint8)
+    bz = cat("b_factor_z", np.float16)
+    ub = cat("unknown_base", np.uint8)
+    unob = (np.concatenate([e.unobserved_seq_id if e.unobserved_seq_id is not None
+                            else np.empty(0, np.int32) for e in examples])
+            if examples else np.empty(0, np.int32))
+    unob_off = np.cumsum([0] + [0 if e.unobserved_seq_id is None else len(e.unobserved_seq_id)
+                                for e in examples]
+                         ).astype(np.int64)
     res_off = np.cumsum([0] + [e.length for e in examples]).astype(np.int64)
     con_off = np.cumsum([0] + [len(e.contacts) for e in examples]).astype(np.int64)
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, tokens=tok, mod_ids=mod, chem=chem, contacts=con,
-                        res_off=res_off, con_off=con_off)
+                        res_off=res_off, con_off=con_off,
+                        mg_site=mg, b_factor_z=bz, unknown_base=ub,
+                        unobserved_seq_id=unob, unob_off=unob_off)
     return {"file": path.name, "n_chains": len(examples),
             "n_residues": int(res_off[-1]), "n_contacts": int(con_off[-1]),
             "chains": [e.meta() for e in examples]}
@@ -231,6 +288,13 @@ class ShardReader:
         out = {"tokens": self._z["tokens"][a:b], "mod_ids": self._z["mod_ids"][a:b],
                "chem": self._z["chem"][a:b], "contacts": self._z["contacts"][c:d],
                "length": b - a}
+        for key in ("mg_site", "b_factor_z", "unknown_base"):
+            if key in self._z.files:
+                out[key] = self._z[key][a:b]
+        if "unob_off" in self._z.files:
+            uo = self._z["unob_off"]
+            out["unobserved_seq_id"] = self._z["unobserved_seq_id"][
+                int(uo[i]):int(uo[i + 1])]
         if i < len(self.meta):
             out["meta"] = self.meta[i]
         return out
@@ -244,12 +308,34 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
     mod = np.zeros((B, L), dtype=np.int16)
     chem = np.zeros((B, L, N_DIMS), dtype=np.float32)
     mask = np.zeros((B, L), dtype=bool)
+    # per-residue supervision, padded alongside. Each carries its own validity
+    # mask: a head must never be trained on a zero that means "absent" rather
+    # than "measured zero", and B-factors in particular are only valid for
+    # X-ray chains (D12).
+    mg = np.zeros((B, L), dtype=np.uint8)
+    bz = np.zeros((B, L), dtype=np.float32)
+    ub = np.zeros((B, L), dtype=np.uint8)
     for i, x in enumerate(items):
         n = int(x["length"])
         tok[i, :n] = x["tokens"]
         mod[i, :n] = x["mod_ids"]
         chem[i, :n] = x["chem"]
         mask[i, :n] = True
+        if "mg_site" in x:
+            mg[i, :n] = x["mg_site"]
+        if "b_factor_z" in x:
+            bz[i, :n] = x["b_factor_z"]
+        if "unknown_base" in x:
+            ub[i, :n] = x["unknown_base"]
+    meta = [x.get("meta") or {} for x in items]
+    rigid_ok = np.array([bool(m.get("rigidity_valid")) for m in meta], dtype=bool)
     return {"tokens": tok, "mod_ids": mod, "chem": chem, "mask": mask,
             "contacts": [x["contacts"] for x in items],
-            "lengths": np.array([int(x["length"]) for x in items], dtype=np.int32)}
+            "lengths": np.array([int(x["length"]) for x in items], dtype=np.int32),
+            "mg_site": mg, "b_factor_z": bz, "unknown_base": ub,
+            # D12: the rigidity target is valid only where the structure is
+            # X-ray, so the mask is per-chain AND per-residue
+            "rigidity_mask": mask & rigid_ok[:, None],
+            # head 10 recovers identity exactly where it was not assigned
+            "base_mask": mask & (ub > 0),
+            "unobserved_seq_id": [x.get("unobserved_seq_id") for x in items]}

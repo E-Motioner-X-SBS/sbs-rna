@@ -950,8 +950,9 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 | 4 | Train the block-detection scorer | §7.4, the largest unvalidated assumption |
 | ~~5~~ | ~~Re-measure G2/G3 on raw whole entries~~ | **CLOSED** — 97.15% / 85.94% on 10,520 entries (§11.2, §11.2a) |
 | 6 | Re-derive every remaining max/min at scale | five of six failed; the chain-length maximum is the one that held (D20) |
-| 7 | Restore sample structures to the server | `test_mmcif_entities.py` cannot run |
-| 8 | Ingest the 2,581 entries no derivative covers | they hold the entire top-30 of the effective-c tail; 608 with a chain in the training window, 925 protein-free (§11.4) |
+| ~~7~~ | ~~Restore sample structures to the server~~ | **CLOSED** — 8,043 present; all six test suites run under `verify_claims.py` |
+| ~~8~~ | ~~Ingest the 2,581 entries no derivative covers~~ | **CLOSED** — `build_dataset.py` reads raw entries directly, so all 10,520 are in the built set (§12.4) |
+| 9 | Train the disorder head's labels out of `_pdbx_unobs_or_zero_occ_residues` | head 11; 46,448 RNA records, not yet extracted |
 
 ---
 
