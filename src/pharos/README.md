@@ -1,9 +1,24 @@
 # `src/pharos/` — implementation
 
-**Built, not trained.** Every module below exists and is under
-`scripts/sampling/verify_claims.py`; what has not happened is a training run,
-because the shared A100 has not been free. The trainers refuse to start on a
-busy card rather than OOM mid-run.
+**Built, and now training.** Every module below exists and is under
+`scripts/sampling/verify_claims.py` (301 checks, 12 suites). The §12.1
+curriculum runs unattended from `scripts/gpu_cron_runner.sh` whenever the
+shared A100 frees, in order, **passing weights forward** -- stages that do not
+chain are four unrelated runs, and stage 5 from random weights is what produced
+r = 0.049 on unseen folds.
+
+What has been measured on a real card, rather than assumed:
+
+| | |
+|---|---|
+| stage 1 throughput | **36.1k real tok/s**, 2.84x the first working version |
+| achieved MFU | **6.6%**, against the 35% the cost model assumed for two versions |
+| stage 1 peak memory | 51.8 GiB, which is why the runner requires 60 free and not 40 |
+| block scorer, end to end | cascade recall **0.264**, and **0.902** on chains >= 1,500 nt |
+
+The trainers refuse to start on a busy card rather than OOM mid-run, and
+`pretrain_mlm.py` resumes from its own checkpoint every 250 steps, because a
+shared card gets taken back without warning.
 
 The layout is flatter than v0.1's sketch, and deliberately: that sketch listed
 files by *concept* (`attention_bias.py`, `debye.py`, `splits.py`) and several of
@@ -66,8 +81,21 @@ trainers.
 | 5 3D | `scripts/train_pharos.py` | 16,604 chains |
 | — block selector (R1) | `scripts/train_block_scorer.py` | same |
 
-`scripts/await_gpu_and_train.sh` starts the block-scorer run when the shared
-GPU frees.
+`scripts/gpu_cron_runner.sh` runs the whole curriculum in order when the shared
+GPU frees -- verify, stage 1, stages 2-3, the block scorer, stage 5, verify
+again -- with `--init-from` carrying the checkpoint forward at each step. The
+block scorer is deliberately NOT chained: it is a convolutional residue
+encoder, not the trunk, so there is nothing to chain from.
+
+**Throughput is a property of the data path, not just the model.** Three things
+were costing stage 1 most of its time, all measured and all fixed:
+
+| defect | cost | fix |
+|---|---|---|
+| packer batched in corpus order, so a 20-nt and a 1,024-nt sequence shared a batch | **42.9% of every step was padding** | length-sorted pool, width quantised to the 128-token GDN chunk (10.4%) |
+| chemistry built twice per step on the host, used once | 545 ms of a ~1.26 s step | `data/chemistry_torch.py`, 1.6 ms on device, asserted bit-identical |
+| span mask read `mask[b].sum()` off the GPU per sequence | one device sync per sequence per step | built in numpy from lengths packing already knows |
+| trunk never compiled | — | `torch.compile`, 1.65x and -23% memory; quantising is what makes it possible |
 
 ## Where the measured findings bind
 

@@ -3,13 +3,13 @@
 ## Session Summary
 | Field | Value |
 |-------|-------|
-| Phase | **v0.2 SPECIFIED, MEASURED AND BUILT.** Every open action is closed except two blocked externally: training the block scorer (waiting on a free GPU, watcher armed) and the rest of Ribonanza (Kaggle credentials). |
+| Phase | **v0.2a SPECIFIED, MEASURED, BUILT AND TRAINING.** The §12.1 curriculum runs chained and unattended; the block scorer is trained and measured end to end. One item is still blocked externally: the rest of Ribonanza (Kaggle credentials). |
 | What I did | Collected and verified 256.6 GB of RNA data; closed D9/D10/G1/G2/G3 on the raw archive; **built the model** (hybrid trunk, MoE, 667-class motif bank, harmonic ensemble, ten heads) and the **16,604-chain training set** with its free supervision; acquired the **RMDB ionic ladders**; re-derived S7.1 on 2,994 chains |
 | What worked | elDORS S3 anonymous download (SHA256 verified); HF/GitHub direct fetches; catalog + loader API; parquet ETL; exploration pipeline |
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
-| Next priorities | **Everything not blocked externally is done.** 1) `scripts/await_gpu_and_train.sh` is armed and starts the block-scorer run the moment the shared A100 frees -- that is open action 4, the last unvalidated assumption; then `scripts/train_pharos.py` for stage 5. 2) Open action 3 (Ribonanza beyond 335,616) needs the user's Kaggle credentials; the public mirrors are confirmed to be the same file we already hold. |
-| Blockers | the shared A100 has been at 100% utilisation / 0.3 GiB free throughout; both trainers refuse to start on it rather than OOM mid-run |
-| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **283** checks. |
+| Next priorities | 1) **Stage 1 is running** to 2e9 tokens (31.5 tok/param) at ~30k tok/s, resuming every 250 steps; stages 2-3 and 5 follow chained. 2) **Retrain the block scorer with the L1 diagonal admitted** -- the cascade measurement showed 18.9% of true L2 blocks are unreachable at any budget because L1 clamps its minimum separation to a 16-residue block where L2 clamps to a 4-residue one, and the current weights cannot exploit the fixed mask because they never scored a diagonal block. 3) Profile stage 5 and decide whether `torch.compile` and width quantisation pay there too; SWA is O(L^2) with a band mask at a 4x longer context. 4) Open action 3 (Ribonanza beyond 335,616) needs the user's Kaggle credentials; the public mirrors are the same file we already hold. |
+| Blockers | none for training. The A100 is shared and gets taken back without warning, which is why every stage resumes and the runner requires 60 GiB free -- 40 was too low, stage 1 peaks at 51.8 and the old floor let runs start on cards they would then OOM on. |
+| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ) found and fixed in the raw pass. v0.2a adds four more, all from measuring things that had been assumed: the stage-1 packer was **42.9% padding**, the chemistry was built **twice per step and used once**, `train_flops` charged every refinement loop a full backward the one-step gradient does not do (**1.8x overcharge**), and `MFU = 0.35` had never been checked against a run (**measured 3.6%, now 6.6%**). `verify_claims.py` pins **301** checks across 12 suites. |
 
 ## State of the data (all verified)
 - Sequences: 1,369,926,204 (elDORS 1,323,715,880 SHA256-verified + RNAcentral 46,210,324)
@@ -67,9 +67,24 @@ session dies with the session:
 9,39 * * * * .../scripts/gpu_cron_runner.sh >> .../cron/cron.log 2>&1
 ```
 
-Every 30 minutes it checks the card, and when it is genuinely free it runs
-`verify_claims.py` -> `train_block_scorer.py` (R1) -> `train_pharos.py` (stage 5)
--> `verify_claims.py` again. State lands in
+Every 30 minutes it checks the card, and when it is genuinely free it runs the
+**whole §12.1 curriculum in order, passing weights forward**:
+
+```
+verify_claims.py
+  -> pretrain_mlm.py        stage 1, MLM        resumes from its own checkpoint
+  -> train_sequence_stages  stages 2-3          --init-from pretrain_small.pt
+  -> train_block_scorer.py  R1                  standalone BY DESIGN: a conv
+                                                residue encoder, not the trunk
+  -> train_pharos.py        stage 5             --init-from seqstages_small.pt
+  -> verify_claims.py
+```
+
+Chaining is the point. Stages that do not pass weights are four unrelated runs,
+and stage 5 from random init is what produced r = 0.049 on unseen folds.
+`--init-from` refuses rather than proceeds if more than half the tensors fail to
+load, and `pretrain_mlm.py` strips `torch.compile`'s `_orig_mod.` prefix when it
+saves, so an uncompiled stage 5 finds the tensors it expects. State lands in
 `data/samples/analysis/cron/status.json`; one log per run beside it.
 
 Four guards, each for a failure this job can actually hit:
