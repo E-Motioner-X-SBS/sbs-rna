@@ -259,7 +259,18 @@ class MoEFeedForward(nn.Module):
         return x + out, {
             "balance_loss": cfg.balance_weight * balance,
             "expert_usage": frac.detach(),
+            # Entropy of the MEAN routing distribution. At perfect balance
+            # this is log(n_experts) BY CONSTRUCTION -- it says the load is
+            # even and nothing about whether any token is routed sharply.
             "router_entropy": (-(pbar.clamp_min(1e-9).log() * pbar).sum()).detach(),
+            # Entropy of each token's OWN distribution, averaged. This is the
+            # one that distinguishes a specialising router from a collapsed
+            # one: both give a uniform mean, and only the collapsed one gives
+            # every token a uniform distribution of its own. At log(n_experts)
+            # the MoE is an expensive dense model.
+            "token_router_entropy": (
+                (-(probs.clamp_min(1e-9).log() * probs).sum(-1)
+                 * m).sum() / n_tok).detach(),
         }
 
     @property

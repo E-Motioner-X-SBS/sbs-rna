@@ -161,6 +161,27 @@ def main() -> int:
             int(cr["l1_diagonal_admitted"]["0.12"]["cascade"]
                 < cr["learned"]["cascade"]), 1)
 
+        # ---- v0.2a: is the MoE router routing, or just balanced? ----------
+        # The balance loss at its floor says the LOAD is even and nothing about
+        # whether any token is routed sharply. Per-token entropy separates a
+        # specialising router from a collapsed one; the mean cannot.
+        rs = load("router_specialisation.json")["history"][0]
+        chk("v0.2a router: experts", rs["n_experts"], 32)
+        chk("v0.2a router: probe token count", rs["tokens"], 55382967)
+        chk("v0.2a router: per-token entropy", rs["token_router_entropy"],
+            3.433, abs_tol=0.002)
+        chk("v0.2a router: as a fraction of uniform",
+            rs["frac_of_uniform"], 0.99, abs_tol=0.005)
+        chk("v0.2a router: mean top-1 probability",
+            rs["mean_top1_prob"], 0.047, abs_tol=0.002)
+        # and the balance term really is pinned at its analytic floor:
+        # balance_weight 0.01 x 16 blocks x 1.0, which is what the Switch form
+        # evaluates to at perfect uniformity -- NOT zero, which is why it has
+        # no business in a bits/token figure
+        chk("v0.2a router: load is uniform to 3 decimals",
+            round(rs["expert_load_max"] - rs["expert_load_min"], 4),
+            0.0043, abs_tol=0.0005)
+
         ec = load("entry_composition_rawpdb.json")
         # ---- D9/D23: target_c, closed on raw chains ----------------------
         # The budget had never been measured on data containing modified

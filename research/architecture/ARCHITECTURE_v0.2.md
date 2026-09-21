@@ -364,6 +364,51 @@ conditioned on *what kind of RNA this is*, which is the point.
 features derived from the pair track are unavailable on the first pass. Current
 plan is a sequence-only router at recycle 0, switching at recycle ≥ 1.
 
+#### Is the router actually routing? **[v0.2a, measured]**
+
+The load-balance term sits at **0.161 nats**, which is exactly `balance_weight`
+0.01 × 16 blocks × 1.0 — and 1.0 is what `n_experts * sum(frac * pbar)`
+evaluates to at perfect uniformity. So the load is even to three decimal
+places. That is the statistic the aux dict reports, and it cannot distinguish
+the two things it might mean:
+
+* **specialising** — each token concentrates on a few experts, and the mean
+  over tokens is uniform because different tokens pick different ones. What a
+  MoE is for.
+* **collapsed** — every token spreads over every expert at ~1/E. The mean is
+  *also* uniform. A dense model paying MoE's memory bill.
+
+`router_entropy` is the entropy of the mean and is `log(n_experts)` in both
+cases by construction. The entropy of each token's **own** distribution
+separates them, and at 55.4M tokens
+(`scripts/sampling/probe_router_specialisation.py`):
+
+| | measured | uniform |
+|---|---|---|
+| per-token routing entropy | **3.433** | 3.466 = log 32 |
+| as a fraction of uniform | **99.0%** | 100% |
+| mean top-1 probability | **0.047** | 0.031 |
+| expert load, min/max | 0.0287 / 0.0330 | 0.0312 |
+
+**The router is not specialising.** Per-token top-1 is 0.047 against 0.031 for
+a coin flip across 32 experts; the sharpest of the 16 blocks reaches 3.178 nats
+against a 3.466 ceiling. At this point in training the MoE is a dense
+feed-forward with 32× the parameters and `top_k`/`n_experts` of them active.
+
+What this does **not** establish is that it stays that way. 55.4M tokens is
+2.8% of the stage-1 budget, the router has seen almost nothing, and routers
+commonly stay flat through early training and sharpen later. The claim is a
+measurement at one point, not a verdict, which is why the probe writes a
+history keyed on token count rather than a single number: re-run it against the
+checkpoint as the run proceeds and the trajectory answers the question.
+
+`token_router_entropy` is now in the aux dict beside `router_entropy`, so any
+future run logs it rather than needing a probe. If it is still at 99% of
+uniform at the end of stage 1, §5.3's fine-grained MoE is not earning its
+parameters on this corpus and the honest conclusion is a dense feed-forward at
+the same active width — which §12.2 already argues for on other grounds, since
+the structure task is data-limited rather than capacity-limited.
+
 ### 5.4 Sizing **[v0.2 — built and counted; v0.1's table was not reproducible]**
 
 | Model | d | blocks | loops | eff. layers | total | active | active % | A100-h @25B |
