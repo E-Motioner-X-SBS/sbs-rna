@@ -141,7 +141,7 @@ def evaluate(model: Optional[BlockScorer], ds: Pharos3DDataset, cfg: ScorerConfi
                 s = out[f"{lvl}_scores"][i]
                 bm = out[f"{lvl}_bmask"][i]
                 n = s.shape[0]
-                v = valid_mask(n, max(1, cfg.min_sep // b), bm)
+                v = valid_mask(n, cfg.sep_blocks(lvl), bm)
                 if not bool(v.any()):
                     continue
                 lab = occupancy_labels(t["contacts"][i], b, n, device)
@@ -215,7 +215,8 @@ def train(args) -> None:
 
     cfg = ScorerConfig(d_model=args.d_model, d_block=args.d_block,
                        n_conv=args.n_conv, n_attn=args.n_attn,
-                       target_c=args.target_c)
+                       target_c=args.target_c,
+                       l1_sep_blocks=args.l1_sep_blocks)
     tr = Pharos3DDataset(args.data, split="train")
     va = Pharos3DDataset(args.data, split="val")
     te = Pharos3DDataset(args.data, split="test")
@@ -318,6 +319,13 @@ def main() -> None:
     ap.add_argument("--n-conv", type=int, default=6)
     ap.add_argument("--n-attn", type=int, default=3)
     ap.add_argument("--target-c", type=float, default=24.0)
+    ap.add_argument("--l1-sep-blocks", type=int, default=1,
+                    help="minimum L1 separation IN L1 BLOCKS. 1 (the default) "
+                         "excludes the L1 diagonal, which makes 18.9%% of true "
+                         "L2 blocks unreachable at any budget because an L1 "
+                         "block is 16 residues and L2's separation is 4. 0 "
+                         "admits it -- and only helps if the scorer is trained "
+                         "that way, so this is a retrain flag, not a switch")
     ap.add_argument("--eval-batches", type=int, default=None)
     ap.add_argument("--log-every", type=int, default=100)
     ap.add_argument("--eval-only", action="store_true")

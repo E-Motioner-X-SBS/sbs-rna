@@ -60,6 +60,29 @@ class ScorerConfig:
     keep_frac_l1: float = 0.12    # b1=16 occupancy measures 7.26%
     target_c: float = 24.0        # D23, closed on the raw archive at max 23.30
     use_sep_prior: bool = True    # ablation switch; see the module docstring
+    #: Minimum block separation at L1, IN L1 BLOCKS.
+    #:
+    #: `max(1, min_sep // b)` gives the same physical separation in different
+    #: units at the two levels: `4 // 4 = 1` block is 4 residues at L2, and
+    #: `max(1, 4 // 16)` is 1 block = **16 residues** at L1. The clamp is what
+    #: does it. The cascade measurement (§7.4a) shows the cost: 18.9% of true
+    #: L2 blocks sit inside a single L1 block, have no valid parent, and are
+    #: unreachable at any budget -- keeping every L1 pair still ceilings at
+    #: 0.811.
+    #:
+    #: 0 admits the diagonal and lets L2's own separation filter. It is NOT the
+    #: default, because flipping it under weights trained with the diagonal
+    #: masked makes the cascade WORSE at the shipped budget (0.264 -> 0.247):
+    #: the scorer has never been asked to score a diagonal block, and arbitrary
+    #: scores there displace off-diagonal blocks it ranks well. Set it to 0 and
+    #: RETRAIN; do not set it to 0 alone.
+    l1_sep_blocks: int = 1
+
+    def sep_blocks(self, level: str) -> int:
+        """Minimum block separation for `level`, in that level's block units."""
+        if level == "l1":
+            return self.l1_sep_blocks
+        return max(1, self.min_sep // self.b2)
 
 
 class ResidueEncoder(nn.Module):
@@ -213,9 +236,17 @@ def occupancy_labels(contacts: torch.Tensor, b: int, n_blocks: int,
 
 
 def valid_mask(n: int, min_sep_blocks: int, bmask: torch.Tensor) -> torch.Tensor:
-    """Upper triangle beyond the minimum separation, within the real length."""
+    """Upper triangle beyond the minimum separation, within the real length.
+
+    `min_sep_blocks` is taken literally. It used to be clamped to at least 1
+    here, which silently turned L1's `4 // 16 = 0` into "one 16-residue block"
+    and made the L1 diagonal permanently invalid -- see `ScorerConfig
+    .l1_sep_blocks`. Callers pass `cfg.sep_blocks(level)`, which states the
+    separation per level instead of deriving it from a shared residue count
+    that means different things at different block sizes.
+    """
     idx = torch.arange(n, device=bmask.device)
-    v = (idx[None, :] - idx[:, None]) >= max(1, min_sep_blocks)
+    v = (idx[None, :] - idx[:, None]) >= min_sep_blocks
     return v & bmask[:, None] & bmask[None, :]
 
 
@@ -263,7 +294,7 @@ def batched_labels(contacts, b: int, n: int, B: int, device) -> torch.Tensor:
 def batched_valid(n: int, min_sep_blocks: int, bmask: torch.Tensor) -> torch.Tensor:
     """`(B, n, n)` upper triangle beyond `min_sep_blocks`, within real length."""
     idx = torch.arange(n, device=bmask.device)
-    tri = (idx[None, :] - idx[:, None]) >= max(1, min_sep_blocks)
+    tri = (idx[None, :] - idx[:, None]) >= min_sep_blocks
     return tri[None] & bmask[:, None, :] & bmask[:, :, None]
 
 
@@ -290,7 +321,7 @@ def occupancy_loss(out: Dict[str, torch.Tensor], contacts, lengths,
     for lvl, b in (("l1", cfg.b1), ("l2", cfg.b2)):
         s_all, bm = out[f"{lvl}_scores"], out[f"{lvl}_bmask"]
         n = s_all.shape[1]
-        v = batched_valid(n, max(1, cfg.min_sep // b), bm)          # B,n,n
+        v = batched_valid(n, cfg.sep_blocks(lvl), bm)               # B,n,n
         lab = batched_labels(contacts, b, n, B, s_all.device) * v
         nv = v.flatten(1).sum(1)                                    # B
         pos = lab.flatten(1).sum(1).clamp(min=1.0)                  # B

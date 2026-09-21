@@ -101,11 +101,12 @@ def cascade(model: Optional[BlockScorer], ds: Pharos3DDataset,
             cfg: ScorerConfig, device, mode: str,
             max_batches: Optional[int], token_budget: int, seed: int,
             keep_frac_l1: Optional[float] = None,
-            l1_sep_blocks: int = 1) -> Dict:
+            l1_sep_blocks: Optional[int] = None) -> Dict:
     if model is not None:
         model.eval()
     torch.manual_seed(seed)
     kf = cfg.keep_frac_l1 if keep_frac_l1 is None else keep_frac_l1
+    sep1 = cfg.sep_blocks("l1") if l1_sep_blocks is None else l1_sep_blocks
     got: Dict[str, List[float]] = {"cascade": [], "l1_ceiling": [],
                                    "l2_standalone": [], "kept_frac": [],
                                    "l2_binds": [], "pairs_per_nt": [],
@@ -138,8 +139,8 @@ def cascade(model: Optional[BlockScorer], ds: Pharos3DDataset,
             L = int(Lt)
             s1, s2 = out["l1_scores"][i], out["l2_scores"][i]
             n1, n2 = s1.shape[0], s2.shape[0]
-            v1 = l1_valid(n1, l1_sep_blocks, out["l1_bmask"][i])
-            v2 = valid_mask(n2, max(1, cfg.min_sep // cfg.b2), out["l2_bmask"][i])
+            v1 = l1_valid(n1, sep1, out["l1_bmask"][i])
+            v2 = valid_mask(n2, cfg.sep_blocks("l2"), out["l2_bmask"][i])
             if not (bool(v1.any()) and bool(v2.any())):
                 continue
             lab2 = occupancy_labels(t["contacts"][i], cfg.b2, n2, device) * v2
@@ -182,7 +183,7 @@ def cascade(model: Optional[BlockScorer], ds: Pharos3DDataset,
             by_len.setdefault(band, []).append(hit / n_pos)
 
     res = {"mode": mode, "n_chains": n_chains, "keep_frac_l1": kf,
-           "l1_sep_blocks": l1_sep_blocks}
+           "l1_sep_blocks": sep1}
     for k, v in got.items():
         res[k] = round(float(np.mean(v)), 4) if v else None
     res["cascade_by_length"] = {k: round(float(np.mean(v)), 4)
