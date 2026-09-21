@@ -1,57 +1,30 @@
 {
  "documented_total_gb": 833.3,
- "here_gb": 497.23,
+ "here_gb": 513.41,
  "n_sources": 18,
- "n_present": 10,
- "n_partial": 3,
- "n_missing": 4,
+ "n_present": 13,
+ "n_partial": 4,
+ "n_missing": 0,
  "n_decided": 1,
- "missing_gb": 16.3,
+ "missing_gb": 0,
  "sources": [
-  {
-   "source": "RNAcentral species-specific",
-   "documented_gb": 11.69,
-   "here_gb": 0.0,
-   "state": "MISSING",
-   "decision": null,
-   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_species_specific_ids.fasta.gz",
-   "note": "56,419,280 sequences"
-  },
-  {
-   "source": "Rfam full alignments",
-   "documented_gb": 3.25,
-   "here_gb": 0.0,
-   "state": "MISSING",
-   "decision": null,
-   "path": "sbs-rna/data/families/rfam/full_alignments",
-   "note": "4,077 Stockholm files -- the MSA the coevolution track (\u00a711) needs"
-  },
-  {
-   "source": "RNAcentral inactive",
-   "documented_gb": 1.33,
-   "here_gb": 0.0,
-   "state": "MISSING",
-   "decision": null,
-   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_inactive.fasta.gz",
-   "note": "12,322,545 sequences"
-  },
-  {
-   "source": "EternaBench",
-   "documented_gb": 0.029,
-   "here_gb": 0.0,
-   "state": "MISSING",
-   "decision": null,
-   "path": "sbs-rna/data/benchmarks/eternabench",
-   "note": "chemical-mapping benchmarks, 6 HF datasets"
-  },
   {
    "source": "RMDB",
    "documented_gb": 12.51,
-   "here_gb": 0.19,
+   "here_gb": 6.24,
    "state": "partial",
    "decision": null,
    "path": "sbs-rna/data/benchmarks/rmdb",
    "note": "1,024 constructs; this machine fetched only the <2 MB assets"
+  },
+  {
+   "source": "RNAcentral species-specific",
+   "documented_gb": 11.69,
+   "here_gb": 2.81,
+   "state": "partial",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_species_specific_ids.fasta.gz",
+   "note": "56,419,280 sequences"
   },
   {
    "source": "splicing",
@@ -135,6 +108,15 @@
    "note": "CASP15/16, RNA-Puzzles"
   },
   {
+   "source": "Rfam full alignments",
+   "documented_gb": 3.25,
+   "here_gb": 3.03,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/families/rfam/full_alignments",
+   "note": "4,077 Stockholm files -- the MSA the coevolution track (\u00a711) needs"
+  },
+  {
    "source": "RNA3DB",
    "documented_gb": 2.15,
    "here_gb": 21.44,
@@ -142,6 +124,15 @@
    "decision": null,
    "path": "sbs-rna/data/structures/databases/rna3db",
    "note": "15,441 chains"
+  },
+  {
+   "source": "RNAcentral inactive",
+   "documented_gb": 1.33,
+   "here_gb": 1.24,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_inactive.fasta.gz",
+   "note": "12,322,545 sequences"
   },
   {
    "source": "Ribonanza quick-start",
@@ -164,11 +155,20 @@
   {
    "source": "Rfam 15.1 core",
    "documented_gb": 0.17,
-   "here_gb": 0.17,
+   "here_gb": 3.19,
    "state": "present",
    "decision": null,
    "path": "sbs-rna/data/families/rfam",
    "note": "seed, CMs, region table, 3D seeds, PDB map"
+  },
+  {
+   "source": "EternaBench",
+   "documented_gb": 0.029,
+   "here_gb": 0.03,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/eternabench",
+   "note": "chemical-mapping benchmarks, 6 HF datasets"
   }
  ]
 }

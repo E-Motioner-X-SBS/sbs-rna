@@ -9,7 +9,7 @@
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
 | Next priorities | **Everything not blocked externally is done.** 1) `scripts/await_gpu_and_train.sh` is armed and starts the block-scorer run the moment the shared A100 frees -- that is open action 4, the last unvalidated assumption; then `scripts/train_pharos.py` for stage 5. 2) Open action 3 (Ribonanza beyond 335,616) needs the user's Kaggle credentials; the public mirrors are confirmed to be the same file we already hold. |
 | Blockers | the shared A100 has been at 100% utilisation / 0.3 GiB free throughout; both trainers refuse to start on it rather than OOM mid-run |
-| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **273** checks. |
+| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **278** checks. |
 
 ## State of the data (all verified)
 - Sequences: 1,369,926,204 (elDORS 1,323,715,880 SHA256-verified + RNAcentral 46,210,324)

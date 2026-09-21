@@ -1112,6 +1112,38 @@ depositions, not a gap.
 5. **3D** last and briefest, on 673 clean sequences, with the ensemble head.
 6. **Function** heads (fitness, splicing) as auxiliary tasks, co-trained.
 
+### 12.1a Stage 5 trained — and the two splits disagree by 8x **[v0.2, measured]**
+
+PHAROS-Small, 239.6M total / 63.4M active, 8 epochs over the 3D set. The
+headline is not the absolute numbers, which are weak; it is the **gap between
+the two evaluation splits D25 insists are never averaged**:
+
+| | `test` (family-disjoint) | `test_ribosomal` (entry-disjoint only) |
+|---|---|---|
+| Mg²⁺ base rate | 1.42% | 2.72% |
+| Mg²⁺ average precision | 0.0257 | **0.1089** |
+| **Mg²⁺ lift over chance** | **1.81×** | **4.0×** |
+| **rigidity Pearson r** | **0.049** (n=53,673) | **0.399** (n=36,076) |
+
+**Rigidity correlates at 0.399 on entries whose homologues are in training and
+at 0.049 on genuinely unseen folds — an eight-fold difference.** A single
+blended figure would have landed near 0.2 and described neither population.
+This is the generalisation hazard of §11.2 and D25, measured rather than
+argued, and it is the reason the protocol reports the two separately.
+
+The absolute numbers are honest and weak: a 1.81× lift on Mg²⁺ sites and
+r = 0.049 on rigidity are barely-there signals on unseen folds, from a model
+trained for 8 epochs on 7,653 chains with no pretrained initialisation. Stage 5
+is the *last and briefest* stage of §12.1 by design, and it was run here on a
+randomly initialised trunk because stages 1–3 have not been run. What it
+establishes is that the pipeline trains end to end and that the evaluation
+protocol discriminates; it does not establish that the heads work.
+
+> **`mg_precision_at_calibrated_thr` is 0.0 everywhere.** The model never
+> pushes a logit past `log(pos_weight)`, so it is *under*-confident rather than
+> over-confident — which is why average precision, not a thresholded precision,
+> is the metric reported.
+
 ### 12.2 Budget **[v0.1 arithmetic, verified exact]**
 
 **25B tokens**, not 323B. At 61M active, 323B is 5,295 tok/param = 265×
@@ -1233,7 +1265,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **273** checks. Counting
+JSONs and fails the build on drift; it currently pins **278** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

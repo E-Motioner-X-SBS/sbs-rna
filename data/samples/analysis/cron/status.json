@@ -1,12 +1,12 @@
 {
- "updated": "2026-09-21T16:01:18+05:30",
- "state": "interrupted",
- "detail": "stage 5 stopped; will retry next fire",
+ "updated": "2026-09-21T16:29:23+05:30",
+ "state": "complete",
+ "detail": "block scorer and stage 5 both finished",
  "free_gib_at_check": 79,
- "log": "run-20260921-153901.log",
+ "log": "run-20260921-160258.log",
  "stages": {
   "verify":  "done",
   "scorer":  "done",
-  "stage5":  null
+  "stage5":  "done"
  }
 }

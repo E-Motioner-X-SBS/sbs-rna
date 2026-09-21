@@ -204,6 +204,19 @@ def main() -> int:
             int(abs(bt["learned"]["l2_recall"]
                     - bt["learned_noprior"]["l2_recall"]) < 0.01), 1)
 
+        # ---- stage 5: and why D25's two splits are never averaged --------
+        ph = load("pharos_small_results.json")
+        te, tr_ = ph["test"], ph["test_ribosomal"]
+        chk("stage5 test Mg AP lift", te["mg_ap_lift"], 1.81, abs_tol=0.02)
+        chk("stage5 test rigidity r", te["rigidity_r_pooled"], 0.0487, abs_tol=0.002)
+        chk("stage5 ribosomal Mg AP lift", tr_["mg_ap_lift"], 4.0, abs_tol=0.02)
+        chk("stage5 ribosomal rigidity r", tr_["rigidity_r_pooled"], 0.3989,
+            abs_tol=0.002)
+        # the point of D25: the homolog-rich split is ~8x better on rigidity, so
+        # a blended number would describe neither population
+        chk("stage5 rigidity gap between the splits is large",
+            int(tr_["rigidity_r_pooled"] > 5 * te["rigidity_r_pooled"]), 1)
+
         # ---- completeness: does the code implement the specification? ----
         cp = load("completeness.json")
         chk("every specified component is present",
