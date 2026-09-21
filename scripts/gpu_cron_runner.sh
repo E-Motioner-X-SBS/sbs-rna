@@ -162,11 +162,31 @@ if [ ! -f "$LOGDIR/.done-stage5" ]; then
     fi
 fi
 
+# ---- 3b. stage 1: MLM pretraining, the longest job and the base of the ----
+# curriculum. It is last in this script because it is the one that can run for
+# days: the two experiments above answer specific questions and should not
+# queue behind it. It resumes from its own checkpoint, so an interrupted run
+# picks up rather than restarting.
+if [ ! -f "$LOGDIR/.done-stage1" ]; then
+    note "=== pretrain_mlm.py (curriculum stage 1) ==="
+    if $PY -u scripts/pretrain_mlm.py \
+            --device cuda --min-free-gib "$NEED_GIB" --size small \
+            --tokens "${MLM_TOKENS:-5e8}" --token-budget 24576 \
+            --n-loops 2 >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-stage1"
+        note "stage 1 finished"
+    else
+        note "stage 1 did not finish; will retry next fire"
+        write_status interrupted "stage 1 stopped; will retry next fire" "$F2"
+        exit 1
+    fi
+fi
+
 # ---- 4. re-verify: training must not have moved a pinned claim -------------
 note "=== re-verifying after training ==="
 $PY scripts/sampling/verify_claims.py >> "$LOG" 2>&1 \
     && note "claims still reproduce" \
     || note "WARNING: a pinned claim moved after training -- inspect the log"
 
-write_status complete "block scorer and stage 5 both finished" "$F2"
+write_status complete "block scorer, stage 5 and stage 1 all finished" "$F2"
 note "=== pipeline complete ==="

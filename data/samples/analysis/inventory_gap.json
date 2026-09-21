@@ -1,6 +1,6 @@
 {
  "documented_total_gb": 833.3,
- "here_gb": 560.78,
+ "here_gb": 563.31,
  "n_sources": 18,
  "n_present": 16,
  "n_partial": 1,
@@ -11,7 +11,7 @@
   {
    "source": "RNAcentral species-specific",
    "documented_gb": 11.69,
-   "here_gb": 5.47,
+   "here_gb": 8.0,
    "state": "partial",
    "decision": null,
    "path": "sbs-rna/data/sequences/rnacentral/rnacentral_species_specific_ids.fasta.gz",

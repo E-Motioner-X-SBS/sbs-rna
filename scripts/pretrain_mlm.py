@@ -217,6 +217,8 @@ def main() -> None:
     ap.add_argument("--shards", type=int, default=None)
     ap.add_argument("--log-every", type=int, default=100)
     ap.add_argument("--ckpt-every", type=int, default=2000)
+    ap.add_argument("--restart", action="store_true",
+                    help="ignore an existing checkpoint and start from scratch")
     args = ap.parse_args()
 
     device = require_gpu(args)
@@ -237,6 +239,26 @@ def main() -> None:
     CKPT.mkdir(parents=True, exist_ok=True)
 
     seen = step = 0
+    # Resume, because this is the job that runs for days on a shared card and
+    # will be interrupted. Without it every interruption discards everything and
+    # the run can never finish -- an unattended pretraining script that restarts
+    # from zero is not unattended, it is a loop that makes no progress.
+    ck = CKPT / f"pretrain_{args.size}.pt"
+    if ck.exists() and not args.restart:
+        sd = torch.load(ck, map_location=device)
+        model.load_state_dict(sd["model"])
+        if "opt" in sd:
+            opt.load_state_dict(sd["opt"])
+        seen, step = int(sd.get("tokens", 0)), int(sd.get("step", 0))
+        # advance the stream so a resumed run does not re-read the same
+        # sequences it has already been trained on
+        rng = np.random.default_rng(step)
+        print(f"[mlm] resumed from {ck.name}: {seen/1e9:.3f}B tokens, "
+              f"step {step:,}", flush=True)
+        if seen >= budget:
+            print(f"[mlm] budget already met ({seen/1e9:.2f}B >= "
+                  f"{budget/1e9:.2f}B); nothing to do")
+            return
     t0 = time.time()
     run: List[float] = []
     accs: List[float] = []
@@ -303,8 +325,8 @@ def main() -> None:
                              "acc": float(np.mean(accs[-args.log_every:]))})
             if step % args.ckpt_every == 0 or seen >= budget:
                 torch.save({"cfg": cfg.__dict__, "model": model.state_dict(),
-                            "tokens": seen, "step": step},
-                           CKPT / f"pretrain_{args.size}.pt")
+                            "opt": opt.state_dict(),
+                            "tokens": seen, "step": step}, ck)
             if seen >= budget:
                 stop = True
                 break
