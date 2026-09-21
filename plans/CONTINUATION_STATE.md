@@ -56,3 +56,33 @@
   RNA3DB with the documented split).
 - If curation decided: write the filter to `scripts/` and regenerate the
   pretraining parquet starter pack with the chosen chunk weighting.
+
+## Unattended training (installed 2026-09-21)
+
+A **system cron** entry, not an in-session watcher, because the shared A100 has
+stayed occupied for many hours at a stretch and a watcher inside a Claude
+session dies with the session:
+
+```
+9,39 * * * * .../scripts/gpu_cron_runner.sh >> .../cron/cron.log 2>&1
+```
+
+Every 30 minutes it checks the card, and when it is genuinely free it runs
+`verify_claims.py` -> `train_block_scorer.py` (R1) -> `train_pharos.py` (stage 5)
+-> `verify_claims.py` again. State lands in
+`data/samples/analysis/cron/status.json`; one log per run beside it.
+
+Four guards, each for a failure this job can actually hit:
+
+* **flock** -- cron fires every 30 min and a run takes hours, so without a lock
+  the second fire starts a second run on the same card and both OOM.
+* **sustained free-check** -- a dip between two phases of somebody else's job
+  looks exactly like a free card, so the memory floor must hold across a
+  re-check 90 s later before anything starts.
+* **done markers** -- cron fires forever; a finished stage is not repeated.
+* **validation first** -- if `verify_claims.py` fails, the architecture is
+  inconsistent with its own measurements and training it would produce a number
+  about the wrong model, so the run stops there.
+
+To check on it: `cat data/samples/analysis/cron/status.json`.
+To stop it: `crontab -e` and delete the line.
