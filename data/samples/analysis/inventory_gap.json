@@ -1,0 +1,174 @@
+{
+ "documented_total_gb": 833.3,
+ "here_gb": 497.23,
+ "n_sources": 18,
+ "n_present": 10,
+ "n_partial": 3,
+ "n_missing": 4,
+ "n_decided": 1,
+ "missing_gb": 16.3,
+ "sources": [
+  {
+   "source": "RNAcentral species-specific",
+   "documented_gb": 11.69,
+   "here_gb": 0.0,
+   "state": "MISSING",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_species_specific_ids.fasta.gz",
+   "note": "56,419,280 sequences"
+  },
+  {
+   "source": "Rfam full alignments",
+   "documented_gb": 3.25,
+   "here_gb": 0.0,
+   "state": "MISSING",
+   "decision": null,
+   "path": "sbs-rna/data/families/rfam/full_alignments",
+   "note": "4,077 Stockholm files -- the MSA the coevolution track (\u00a711) needs"
+  },
+  {
+   "source": "RNAcentral inactive",
+   "documented_gb": 1.33,
+   "here_gb": 0.0,
+   "state": "MISSING",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_inactive.fasta.gz",
+   "note": "12,322,545 sequences"
+  },
+  {
+   "source": "EternaBench",
+   "documented_gb": 0.029,
+   "here_gb": 0.0,
+   "state": "MISSING",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/eternabench",
+   "note": "chemical-mapping benchmarks, 6 HF datasets"
+  },
+  {
+   "source": "RMDB",
+   "documented_gb": 12.51,
+   "here_gb": 0.19,
+   "state": "partial",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/rmdb",
+   "note": "1,024 constructs; this machine fetched only the <2 MB assets"
+  },
+  {
+   "source": "splicing",
+   "documented_gb": 10.33,
+   "here_gb": 8.53,
+   "state": "partial",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/splicing",
+   "note": "Spliceator, SpliceBERT, G3PO"
+  },
+  {
+   "source": "secondary structure",
+   "documented_gb": 1.42,
+   "here_gb": 0.16,
+   "state": "partial",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/secondary_structure",
+   "note": "bpRNA, ArchiveII, RNAStrAlign, SPOT splits"
+  },
+  {
+   "source": "MARS",
+   "documented_gb": 427.29,
+   "here_gb": 0.0,
+   "state": "decided",
+   "decision": "D18",
+   "path": "sbs-rna/data/sequences/mars",
+   "note": "1.73B sequences; 0.17% diverse structured ncRNA yield for 413 GB"
+  },
+  {
+   "source": "elDORS v1",
+   "documented_gb": 182.36,
+   "here_gb": 169.84,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/elDORS_v1",
+   "note": "1,323,715,880 sequences, SHA256 verified"
+  },
+  {
+   "source": "pdb_hunter RNA_Database",
+   "documented_gb": 138.75,
+   "here_gb": 243.48,
+   "state": "present",
+   "decision": "D19",
+   "path": "pdb_hunter/RNA_Database",
+   "note": "referenced, not copied -- and it is present here"
+  },
+  {
+   "source": "raw PDB entries",
+   "documented_gb": 16.03,
+   "here_gb": 14.93,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/structures/raw_pdb_entries",
+   "note": "10,526 atomic mmCIFs"
+  },
+  {
+   "source": "RNAcentral active",
+   "documented_gb": 10.92,
+   "here_gb": 10.17,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/sequences/rnacentral/rnacentral_active.fasta.gz",
+   "note": "46,210,324 sequences"
+  },
+  {
+   "source": "gRNAde / RNASolo",
+   "documented_gb": 6.9,
+   "here_gb": 23.59,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/structures/databases/grnade_rnasolo",
+   "note": "14,366 cleaned PDBs"
+  },
+  {
+   "source": "blind tests",
+   "documented_gb": 4.06,
+   "here_gb": 3.78,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/structures/blind_tests",
+   "note": "CASP15/16, RNA-Puzzles"
+  },
+  {
+   "source": "RNA3DB",
+   "documented_gb": 2.15,
+   "here_gb": 21.44,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/structures/databases/rna3db",
+   "note": "15,441 chains"
+  },
+  {
+   "source": "Ribonanza quick-start",
+   "documented_gb": 0.55,
+   "here_gb": 0.51,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/chemical_probing",
+   "note": "335,616 profiles"
+  },
+  {
+   "source": "fitness",
+   "documented_gb": 0.48,
+   "here_gb": 0.44,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/benchmarks/fitness",
+   "note": "RNAGym, NABench"
+  },
+  {
+   "source": "Rfam 15.1 core",
+   "documented_gb": 0.17,
+   "here_gb": 0.17,
+   "state": "present",
+   "decision": null,
+   "path": "sbs-rna/data/families/rfam",
+   "note": "seed, CMs, region table, 3D seeds, PDB map"
+  }
+ ]
+}
