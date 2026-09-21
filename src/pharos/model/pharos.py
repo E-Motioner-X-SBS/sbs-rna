@@ -198,7 +198,7 @@ class Pharos(nn.Module):
                 n_loops: Optional[int] = None,
                 deep_supervision: bool = False,
                 mlm: bool = False,
-                dynamics: bool = True) -> Dict:
+                dynamics: bool = False) -> Dict:
         x = self.embed(tokens, mod_ids, chem)
         iterates = []
 
@@ -220,11 +220,17 @@ class Pharos(nn.Module):
         if mlm:
             out["mlm_logits"] = (self.mlm_norm(h) @ self.embed.tok.weight.T
                                  + self.mlm_bias)
-        # §10's ensemble is opt-in. Its selected inversion is O(L) SEQUENTIAL
-        # 6x6 solves -- 1,276 ms at L=981 -- and nothing supervises it unless
-        # the batch carries X-ray B-factors (D12). Computing it on every
-        # forward, including MLM pretraining where it can never be trained,
-        # was most of a second per step spent on an output nobody read.
+        # §10's ensemble is opt-in, and the default is OFF. Its selected
+        # inversion is O(L) sequential 6x6 solves -- 1,241 ms at L=981 -- plus
+        # an eigendecomposition per step, and nothing supervises it unless the
+        # batch carries X-ray B-factors (D12).
+        #
+        # It defaulted to ON, which is not what opt-in means: MLM pretraining
+        # never passes the flag, so stage 1 computed the whole ensemble on
+        # every step for an output nothing reads, and **ran out of memory doing
+        # it** -- 8.57 GiB requested inside `eigvalsh` with 4.19 GiB free. A
+        # default that every caller must remember to switch off is a default
+        # that will be paid for by the caller who forgets.
         if dynamics:
             dyn = self.dynamics(h, mask)
             # the structure head already emits K-state weights from the token

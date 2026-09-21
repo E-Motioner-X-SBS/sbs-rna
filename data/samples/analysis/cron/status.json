@@ -1,9 +1,9 @@
 {
- "updated": "2026-09-21T16:42:23+05:30",
+ "updated": "2026-09-21T17:12:59+05:30",
  "state": "complete",
  "detail": "block scorer and stage 5 both finished",
  "free_gib_at_check": 79,
- "log": "run-20260921-163901.log",
+ "log": "run-20260921-170901.log",
  "stages": {
   "verify":  "done",
   "scorer":  "done",

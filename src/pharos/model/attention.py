@@ -61,7 +61,12 @@ class GatedDeltaNet(nn.Module):
     """
 
     def __init__(self, d_model: int, n_heads: int = 8, d_head: Optional[int] = None,
-                 chunk: int = 64, dropout: float = 0.0):
+                 chunk: int = 128, dropout: float = 0.0):
+        # chunk 128, measured. The cost has two terms pulling opposite ways:
+        # L/chunk sequential iterations, each with O(chunk^2) within-chunk work.
+        # At d=512, L=1024: 64 -> 13.4 ms, **128 -> 8.8 ms**, 256 -> 12.7,
+        # 512 -> 20.5. The chunked form is exact at any size, so this is purely
+        # a throughput choice and `test_attention.py` checks it at 8/16/64.
         super().__init__()
         self.h = n_heads
         self.dk = d_head or (d_model // n_heads)

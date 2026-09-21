@@ -156,7 +156,7 @@ def main() -> int:
     ii = torch.tensor([0, 1, 2])
     jj = torch.tensor([10, 11, 12])
     with torch.no_grad():
-        o = model(tok, mod, chem, mask, pair_index=(ii, jj))
+        o = model(tok, mod, chem, mask, pair_index=(ii, jj), dynamics=True)
     chk("pair heads fire only when pair indices are given",
         "contact_logit" in o and o["contact_logit"].shape == (3,),
         str(tuple(o["contact_logit"].shape)))
@@ -198,7 +198,11 @@ def main() -> int:
         not any(n.startswith("mlm_head") for n, _ in model.named_parameters()),
         "only mlm_norm and mlm_bias are its own")
 
-    print("\n== property 8: §10's ensemble outputs are present ==")
+    print("\n== property 8: §10's ensemble outputs are present WHEN ASKED FOR ==")
+    with torch.no_grad():
+        off = model(tok, mod, chem, mask)
+    chk("the ensemble is off by default", "fluctuation" not in off,
+        "opt-in: MLM pretraining OOMed paying for it unasked")
     for key in ("fluctuation", "disorder_logit", "stiffness_diag",
                 "ensemble_state_logits"):
         chk(f"{key} emitted", key in o, str(tuple(o[key].shape)) if key in o else "")

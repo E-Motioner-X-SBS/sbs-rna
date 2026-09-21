@@ -179,7 +179,11 @@ def main() -> None:
                     help="§12.2 stages 5B -> 25B; stop when metrics flatten")
     ap.add_argument("--size", default="small", choices=("mini", "small"))
     ap.add_argument("--lr", type=float, default=6e-4)
-    ap.add_argument("--batch-seqs", type=int, default=64)
+    ap.add_argument("--token-budget", type=int, default=24576,
+                    help="padded tokens per step; PHAROS-Small peaks near 43 GiB "
+                         "at 32k, so this leaves headroom on an 80 GiB card")
+    ap.add_argument("--max-batch", type=int, default=512,
+                    help="guard against a batch of thousands of 20-nt sequences")
     ap.add_argument("--min-len", type=int, default=20)
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--n-loops", type=int, default=2,
@@ -216,7 +220,14 @@ def main() -> None:
     while not stop:
         for s in iter_sequences(CORPUS, args.min_len, args.max_len, args.shards):
             buf.append(s)
-            if len(buf) < args.batch_seqs:
+            # Batch by TOKENS, not by sequence count. A fixed count is a latent
+            # OOM: 64 sequences is 1.3k tokens if they are 20 nt and 65k if they
+            # are 1,024, and PHAROS-Small at 65k tokens does not fit in 80 GiB
+            # (stage 5 peaks at 43 GiB on a 32k budget). The budget also keeps
+            # memory flat across a run instead of spiking whenever a batch of
+            # long transcripts comes up.
+            if (len(buf) * max(len(x) for x in buf) < args.token_budget
+                    and len(buf) < args.max_batch):
                 continue
             b = encode_batch(buf, device)
             buf = []
