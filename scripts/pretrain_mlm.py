@@ -99,11 +99,28 @@ def enable_gpu_fast_paths() -> None:
 
 
 def iter_sequences(corpus: Path, min_len: int, max_len: int,
-                   shards: Optional[int] = None) -> Iterator[str]:
+                   shards: Optional[int] = None,
+                   rng: Optional[np.random.Generator] = None) -> Iterator[str]:
+    """Sequences from the parquet corpus, optionally with the SHARD ORDER shuffled.
+
+    elDORS is sorted by length -- chunk 001 averages 1,252 nt and chunk 020
+    averages 162 -- and the shards are named after their chunk, so reading them
+    in sorted order walks the corpus from longest to shortest. That is a
+    length curriculum nobody specified, and a worse one than the within-pool
+    sorting `_pack_pool` deliberately undoes, because it runs across the entire
+    run rather than inside one pool.
+
+    Passing `rng` shuffles which shard is read when, so a pool draws from across
+    the corpus. `shards` still truncates deterministically, because the tests
+    that use it want a fixed, reproducible subset.
+    """
     import pyarrow.parquet as pq
     files = sorted(corpus.glob("*.parquet"))
     if shards:
         files = files[:shards]
+    elif rng is not None:
+        files = list(files)
+        rng.shuffle(files)
     for f in files:
         pf = pq.ParquetFile(f)
         for batch in pf.iter_batches(batch_size=8192, columns=["sequence"]):
@@ -115,15 +132,30 @@ def iter_sequences(corpus: Path, min_len: int, max_len: int,
                     yield s.upper().replace("T", "U")
 
 
-#: Sequence length is padded up to a multiple of this. It is the GDN chunk
-#: (attention.py), so every chunk comes out full and the delta-rule scan has no
-#: ragged tail -- and, more importantly, it is what makes `torch.compile`
-#: usable: the chunk loop is a Python loop, so inductor specialises on the chunk
-#: count and an unquantised L (935 distinct values over 400k sequences)
-#: recompiles on nearly every batch. Quantised there are 8, compiled once each,
-#: and batch size stays dynamic. Measured cost 10.4% padding; measured return
-#: 1.65x on step time and 23% off peak memory.
-LEN_QUANTUM = 128
+#: Sequence length is padded up to a multiple of this.
+#:
+#: Quantising at all is what makes `torch.compile` usable: the delta-rule chunk
+#: loop is a Python loop, so inductor specialises on the chunk count, and an
+#: unquantised L -- 969 distinct values over 400k sequences -- recompiles on
+#: nearly every batch. Quantised there are a handful, compiled once each and
+#: cached on disk between runs, and batch size stays dynamic.
+#:
+#: 128 was chosen when the corpus was chunks c001-c008 of elDORS, whose median
+#: length is 522. The corpus now spans all twenty chunks and the median is 261,
+#: and rounding 151 up to 256 is not the same bargain as rounding 522 up to 640.
+#: Re-measured on the corrected corpus:
+#:
+#:     quantum   padding   widths   useful tokens/step
+#:        none      0.0%      969        24,830
+#:          32      4.1%       32        23,747
+#:          64      8.1%       16        22,709      <- here
+#:         128     15.1%        8        20,963
+#:         256     25.1%        4        18,406
+#:
+#: 64 is the knee. 32 buys four more points of padding for twice the graphs, and
+#: 128 gives back seven. It is still half a GDN chunk, so the scan's ragged tail
+#: is at most half empty.
+LEN_QUANTUM = 64
 
 
 def _quantised(n: int, q: int = LEN_QUANTUM) -> int:
@@ -245,7 +277,7 @@ def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
     inside a pool matches the corpus.
     """
     buf: List[str] = []
-    for s in iter_sequences(corpus, min_len, max_len, shards):
+    for s in iter_sequences(corpus, min_len, max_len, shards, rng):
         buf.append(s)
         if len(buf) >= pool:
             yield from _pack_pool(buf, token_budget, max_batch, rng, quantum)

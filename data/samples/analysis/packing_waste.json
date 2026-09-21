@@ -1,37 +1,38 @@
 {
- "n_sequences": 400000,
+ "n_sequences": 399058,
+ "quantum": 64,
  "token_budget": 24576,
  "max_batch": 512,
  "length_min": 20,
- "length_median": 522,
+ "length_median": 261,
  "length_max": 1024,
  "stream_order": {
-  "steps": 14986,
-  "real_tokens": 216865379,
-  "padded_tokens": 379701444,
-  "padding_fraction": 0.4289,
-  "distinct_widths": 461,
-  "median_batch": 26,
-  "max_batch": 61
+  "steps": 9104,
+  "real_tokens": 145903592,
+  "padded_tokens": 232983010,
+  "padding_fraction": 0.3738,
+  "distinct_widths": 833,
+  "median_batch": 27,
+  "max_batch": 449
  },
  "length_sorted": {
-  "steps": 8713,
-  "real_tokens": 216865379,
-  "padded_tokens": 216910933,
-  "padding_fraction": 0.0002,
-  "distinct_widths": 935,
-  "median_batch": 37,
+  "steps": 5876,
+  "real_tokens": 145903592,
+  "padded_tokens": 145948899,
+  "padding_fraction": 0.0003,
+  "distinct_widths": 969,
+  "median_batch": 44,
   "max_batch": 512
  },
- "quantised_128": {
-  "steps": 9793,
-  "real_tokens": 216865379,
-  "padded_tokens": 242143616,
-  "padding_fraction": 0.1044,
-  "distinct_widths": 8,
-  "median_batch": 32,
-  "max_batch": 192
+ "quantised": {
+  "steps": 6425,
+  "real_tokens": 145903592,
+  "padded_tokens": 158700224,
+  "padding_fraction": 0.0806,
+  "distinct_widths": 16,
+  "median_batch": 43,
+  "max_batch": 384
  },
- "steps_saved_fraction": 0.3465,
- "useful_tokens_per_step_gain": 1.5303
+ "steps_saved_fraction": 0.2943,
+ "useful_tokens_per_step_gain": 1.417
 }

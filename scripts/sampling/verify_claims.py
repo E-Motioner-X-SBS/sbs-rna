@@ -108,24 +108,45 @@ def main() -> int:
         # 20-nt and a 1,024-nt sequence shared a batch and both padded to
         # 1,024. Deterministic over the same 400,000 elDORS sequences.
         pw = load("packing_waste.json")
-        chk("v0.2a packing: sequences measured", pw["n_sequences"], 400000)
+        # stratified: a fixed quota per shard, so the total lands just under
+        # the target rather than on it
+        chk("v0.2a packing: sequences measured", pw["n_sequences"], 399058)
+        chk("v0.2a packing: corpus median length", pw["length_median"], 261)
         chk("v0.2a packing: shipped stream-order padding",
-            pw["stream_order"]["padding_fraction"], 0.429, abs_tol=0.001)
+            pw["stream_order"]["padding_fraction"], 0.374, abs_tol=0.002)
         chk("v0.2a packing: length-sorted padding is zero",
             pw["length_sorted"]["padding_fraction"], 0.0, abs_tol=0.001)
-        chk("v0.2a packing: quantised-to-128 padding",
-            pw["quantised_128"]["padding_fraction"], 0.104, abs_tol=0.001)
-        # 8 widths is the whole point of quantising: the delta-rule chunk loop
-        # is a Python loop, so inductor specialises on the chunk count and 935
-        # distinct widths recompiles on nearly every batch.
+        chk("v0.2a packing: quantised padding", pw["quantum"], 64)
+        chk("v0.2a packing: quantised padding fraction",
+            pw["quantised"]["padding_fraction"], 0.081, abs_tol=0.002)
+        # A handful of widths is the whole point of quantising: the delta-rule
+        # chunk loop is a Python loop, so inductor specialises on the chunk
+        # count and 969 distinct widths recompiles on nearly every batch.
         chk("v0.2a packing: quantised distinct widths",
-            pw["quantised_128"]["distinct_widths"], 8)
+            pw["quantised"]["distinct_widths"], 16)
         chk("v0.2a packing: unquantised distinct widths",
-            pw["length_sorted"]["distinct_widths"], 935)
+            pw["length_sorted"]["distinct_widths"], 969)
         chk("v0.2a packing: steps saved vs shipped",
-            pw["steps_saved_fraction"], 0.346, abs_tol=0.002)
+            pw["steps_saved_fraction"], 0.294, abs_tol=0.003)
         chk("v0.2a packing: useful tokens per step gain",
-            pw["useful_tokens_per_step_gain"], 1.53, abs_tol=0.02)
+            pw["useful_tokens_per_step_gain"], 1.42, abs_tol=0.02)
+
+        # ---- v0.2a: the pretraining corpus was a length band ---------------
+        # elDORS is SORTED BY LENGTH and ships as twenty chunks. The starter
+        # took eight of them, so stage 1 saw the long AT-rich end and none of
+        # the short GC-rich majority. "10,000,000 sequences" reads like
+        # sufficiency and says nothing about which ten million.
+        pc = load("pretrain_coverage.json")
+        chk("v0.2a corpus: elDORS chunks", pc["eldors_chunks"], 20)
+        chk("v0.2a corpus: chunks now covered", len(pc["corpus_chunks"]), 20)
+        chk("v0.2a corpus: coverage is complete", int(pc["covers_all_chunks"]), 1)
+        chk("v0.2a corpus: sequences", pc["corpus_sequences"], 25000000)
+        chk("v0.2a corpus: chunks are NOT interchangeable",
+            int(pc["chunks_interchangeable"]), 0)
+        chk("v0.2a corpus: used-vs-unused mean length gap",
+            pc["comparison"]["len_mean"]["rel_diff"], 0.7262, abs_tol=0.003)
+        chk("v0.2a corpus: used-vs-unused GC gap",
+            pc["comparison"]["gc"]["rel_diff"], 0.2076, abs_tol=0.003)
 
         # ---- v0.2a: the pair track END TO END, which S7.4a owed -----------
         # L1 and L2 standalone are not what a deployed track delivers: L2 only

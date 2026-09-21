@@ -75,8 +75,25 @@ NOT_BUILT = {
     "decoder.py (frame diffusion)": "§9 head 3 emits coordinates directly; diffusion is a v0.3 item",
     "eval/ package": "splits are enforced in build_dataset.py and reported by the trainers",
     "train/precision.py": "settled as a decision (PRECISION.md, D3), not code",
-    "train/schedule.py": "settled as a decision (D2), the token budget is a CLI flag",
     "attributes.py": "the supervision-target array; labels live in dataset.py",
+}
+
+#: Every trainer must schedule its learning rate, and the audit checks that it
+#: DOES rather than that a file exists.
+#:
+#: `train/schedule.py` used to sit in NOT_BUILT above, justified as "settled as
+#: a decision (D2), the token budget is a CLI flag". That conflated two
+#: different schedules. D2 settles the TOKEN BUDGET -- 5B/25B/100B/323B -- and
+#: is genuinely a CLI flag. It says nothing about the LEARNING RATE, and stage 1
+#: and stages 2-3 shipped with none at all: a constant rate from the first step
+#: to the last, no warm-up and no decay, while the block scorer and stage 5 both
+#: ran OneCycleLR. The audit's own note is what made that absence look
+#: deliberate, so the entry is gone and this check replaces it.
+SCHEDULED = {
+    "scripts/pretrain_mlm.py":          ("lr_at", "cosine on token progress"),
+    "scripts/train_sequence_stages.py": ("lr_at", "cosine on estimated steps"),
+    "scripts/train_pharos.py":          ("OneCycleLR", "torch scheduler"),
+    "scripts/train_block_scorer.py":    ("OneCycleLR", "torch scheduler"),
 }
 
 
@@ -112,7 +129,19 @@ def main() -> None:
     for k, v in NOT_BUILT.items():
         print(f"  {k:30s} {v}")
 
+    print("\nlearning-rate schedule, per trainer")
+    sched_rows = []
+    for script, (marker, how) in sorted(SCHEDULED.items()):
+        f = ROOT / script
+        has = f.exists() and marker in f.read_text()
+        print(f"  {'OK  ' if has else 'FAIL'} {script:38s} {how}")
+        sched_rows.append({"script": script, "how": how, "scheduled": has})
+        if not has:
+            missing.append(f"{script}: no learning-rate schedule")
+
     res = {"n_components": len(rows),
+           "n_scheduled": sum(1 for r in sched_rows if r["scheduled"]),
+           "n_trainers": len(sched_rows), "schedules": sched_rows,
            "n_present": sum(1 for r in rows if r["present"]),
            "n_stages": len(stage_rows),
            "n_stages_present": sum(1 for r in stage_rows if r["present"]),
@@ -121,7 +150,8 @@ def main() -> None:
     out = ROOT / "data/samples/analysis/completeness.json"
     out.write_text(json.dumps(res, indent=1))
     print(f"\ncomponents present: {res['n_present']}/{res['n_components']}   "
-          f"curriculum stages: {res['n_stages_present']}/{res['n_stages']}")
+          f"curriculum stages: {res['n_stages_present']}/{res['n_stages']}   "
+          f"trainers scheduled: {res['n_scheduled']}/{res['n_trainers']}")
     print("MISSING: " + (", ".join(missing) if missing else "none"))
     print(f"\n-> {out}")
 

@@ -1,0 +1,157 @@
+{
+ "used_chunks": [
+  1,
+  3,
+  5,
+  8
+ ],
+ "unused_chunks": [
+  10,
+  13,
+  17,
+  20
+ ],
+ "n_sampled_per_chunk": 60000,
+ "per_chunk": [
+  {
+   "chunk": 1,
+   "n": 60000,
+   "len_mean": 1251.6,
+   "len_median": 950,
+   "len_p10": 291,
+   "len_p90": 2737,
+   "gc": 0.4616,
+   "n_frac": 0.00512
+  },
+  {
+   "chunk": 3,
+   "n": 60000,
+   "len_mean": 1410.8,
+   "len_median": 1157,
+   "len_p10": 529,
+   "len_p90": 2836,
+   "gc": 0.4066,
+   "n_frac": 0.0021
+  },
+  {
+   "chunk": 5,
+   "n": 60000,
+   "len_mean": 465.1,
+   "len_median": 127,
+   "len_p10": 100,
+   "len_p90": 1362,
+   "gc": 0.4775,
+   "n_frac": 0.00237
+  },
+  {
+   "chunk": 8,
+   "n": 60000,
+   "len_mean": 271.8,
+   "len_median": 171,
+   "len_p10": 135,
+   "len_p90": 484,
+   "gc": 0.5492,
+   "n_frac": 8e-05
+  },
+  {
+   "chunk": 10,
+   "n": 60000,
+   "len_mean": 385.4,
+   "len_median": 342,
+   "len_p10": 151,
+   "len_p90": 711,
+   "gc": 0.6379,
+   "n_frac": 3e-05
+  },
+  {
+   "chunk": 13,
+   "n": 60000,
+   "len_mean": 164.8,
+   "len_median": 151,
+   "len_p10": 139,
+   "len_p90": 178,
+   "gc": 0.5377,
+   "n_frac": 0.0
+  },
+  {
+   "chunk": 17,
+   "n": 60000,
+   "len_mean": 218.3,
+   "len_median": 151,
+   "len_p10": 100,
+   "len_p90": 301,
+   "gc": 0.5751,
+   "n_frac": 0.00316
+  },
+  {
+   "chunk": 20,
+   "n": 60000,
+   "len_mean": 162.3,
+   "len_median": 151,
+   "len_p10": 139,
+   "len_p90": 189,
+   "gc": 0.5375,
+   "n_frac": 0.0
+  }
+ ],
+ "comparison": {
+  "len_mean": {
+   "used": 849.825,
+   "unused": 232.7,
+   "rel_diff": 0.72618
+  },
+  "len_median": {
+   "used": 601.25,
+   "unused": 198.75,
+   "rel_diff": 0.66944
+  },
+  "len_p10": {
+   "used": 263.75,
+   "unused": 132.25,
+   "rel_diff": 0.49858
+  },
+  "len_p90": {
+   "used": 1854.75,
+   "unused": 344.75,
+   "rel_diff": 0.81413
+  },
+  "gc": {
+   "used": 0.47373,
+   "unused": 0.57205,
+   "rel_diff": 0.20756
+  },
+  "n_frac": {
+   "used": 0.00242,
+   "unused": 0.0008,
+   "rel_diff": 0.67011
+  }
+ },
+ "worst_rel_diff": 0.81413,
+ "chunks_interchangeable": false,
+ "corpus_sequences": 25000000,
+ "corpus_chunks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20
+ ],
+ "eldors_chunks": 20,
+ "chunk_coverage": 1.0,
+ "covers_all_chunks": true
+}

@@ -1,5 +1,29 @@
 {
  "n_components": 30,
+ "n_scheduled": 4,
+ "n_trainers": 4,
+ "schedules": [
+  {
+   "script": "scripts/pretrain_mlm.py",
+   "how": "cosine on token progress",
+   "scheduled": true
+  },
+  {
+   "script": "scripts/train_block_scorer.py",
+   "how": "torch scheduler",
+   "scheduled": true
+  },
+  {
+   "script": "scripts/train_pharos.py",
+   "how": "torch scheduler",
+   "scheduled": true
+  },
+  {
+   "script": "scripts/train_sequence_stages.py",
+   "how": "cosine on estimated steps",
+   "scheduled": true
+  }
+ ],
  "n_present": 30,
  "n_stages": 6,
  "n_stages_present": 6,
@@ -282,7 +306,6 @@
   "decoder.py (frame diffusion)": "\u00a79 head 3 emits coordinates directly; diffusion is a v0.3 item",
   "eval/ package": "splits are enforced in build_dataset.py and reported by the trainers",
   "train/precision.py": "settled as a decision (PRECISION.md, D3), not code",
-  "train/schedule.py": "settled as a decision (D2), the token budget is a CLI flag",
   "attributes.py": "the supervision-target array; labels live in dataset.py"
  }
 }

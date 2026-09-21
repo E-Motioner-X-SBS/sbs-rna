@@ -1178,8 +1178,9 @@ depositions, not a gap.
 ### 12.1 Curriculum
 
 1. **Pretrain** on sequence (MLM + span masking), 5B → 25B tokens staged.
-   **Implemented [v0.2]:** `scripts/pretrain_mlm.py`, over the 48-shard /
-   12M-sequence elDORS parquet. Five symbols, not twenty-five (D6) — elDORS is
+   **Implemented [v0.2]:** `scripts/pretrain_mlm.py`, over the 100-shard /
+   25M-sequence elDORS parquet (**v0.2a**: it was 40 shards and 10M, and it was
+   the wrong 10M — see below). Five symbols, not twenty-five (D6) — elDORS is
    pre-normalised to ACGUN, and a wider input vocabulary is dead embedding rows
    and dead softmax mass, which is the NucleicBERT vocab-25 mistake. Spans are
    geometric with mean 3 rather than single tokens: a helix is locally periodic,
@@ -1212,6 +1213,51 @@ depositions, not a gap.
    > measured", and training on it would teach the model that the ends of every
    > construct are protected. Every reactivity loss is masked to the finite
    > entries.
+
+   #### The pretraining corpus was a length band, not a sample **[v0.2a, measured]**
+
+   elDORS ships as twenty gzipped chunks and **it is sorted by length**. The
+   starter parquet took chunks c001-c008 and 10M sequences, which sounds like a
+   sample of a 1.32-billion-sequence corpus and is not one
+   (`scripts/sampling/audit_pretrain_coverage.py`, 60,000 sequences scanned per
+   chunk):
+
+   | chunk | mean length | median | GC |
+   |---|---|---|---|
+   | 001 | 1,252 | 950 | 0.462 |
+   | 003 | 1,411 | 1,157 | 0.407 |
+   | 005 | 465 | 127 | 0.478 |
+   | 008 | 272 | 171 | 0.549 |
+   | 010 | 385 | 342 | 0.638 |
+   | 013 | 165 | 151 | 0.538 |
+   | 017 | 218 | 151 | 0.575 |
+   | 020 | 162 | 151 | 0.538 |
+
+   Chunks the starter drew from average **850 nt at GC 0.474**; chunks it did
+   not average **233 nt at GC 0.572**. Mean length differs by 3.7x and GC by 10
+   points — the chunk index is not a byte offset, it is a length band. Stage 1
+   had seen the long, AT-rich end of elDORS and none of the short, GC-rich
+   majority, and the `20 <= L <= 1024` filter then discarded much of even that,
+   because chunks 001-003 have a p90 above 2,700.
+
+   Rebuilding at the same 1.25M per chunk across all twenty gives **25M
+   sequences spanning 20/20 chunks**, and moves the median the trainer sees from
+   **522 to 261**. Two consequences follow and both are measured:
+
+   * **Shard order had to be shuffled.** The shards are named after their chunk,
+     so `sorted(glob)` walks the corpus longest-to-shortest — a length
+     curriculum across the whole run, and a worse one than the within-pool
+     sorting `_pack_pool` deliberately undoes.
+   * **The quantum had to change.** 128 was chosen at a median of 522. At 261,
+     rounding 151 up to 256 is a different bargain: padding at quantum 128 rises
+     to 15.1%, where 64 costs 8.1% for sixteen compiled widths instead of eight.
+     Re-measured and re-pinned.
+
+   The volume was never the problem — 2e9 tokens at a 261-nt median is about 7.7M
+   sequences, and even the old starter held more than that. The problem was that
+   nothing checked **which** 10M, and "10,000,000 sequences" reads like
+   sufficiency. `audit_pretrain_coverage.py` now reports chunk coverage
+   explicitly, so a corpus that spans part of elDORS says so.
 
    Because probing is 31× the size of the 2D set, the two losses carry explicit
    weights (0.5 / 1.0). Summed unweighted, 2D would dominate the gradient by
