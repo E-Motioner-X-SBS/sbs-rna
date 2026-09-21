@@ -88,7 +88,11 @@ class RouterFeatures:
             c = self.chem_summary.to(device).float()
             w = min(c.shape[-1], d_extra - 3)
             extra[:, 2:2 + w] = c[:, :w]
-        extra[:, -1] = float(self.recycle > 0)
+        # `torch.as_tensor` rather than `float(self.recycle > 0)`: under
+        # `torch.compile` the loop index that sets `recycle` is a SymInt, so the
+        # Python comparison yields a SymBool and inductor fails on ToFloat. The
+        # tensor form traces for both a plain int and a symbolic one.
+        extra[:, -1] = torch.as_tensor(self.recycle, device=device).gt(0).float()
         return torch.cat([bins, extra], dim=-1)
 
 

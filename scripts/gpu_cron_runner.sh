@@ -29,7 +29,10 @@ PY=/store/shuvam/.venv/bin/python
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
-NEED_GIB=${NEED_GIB:-40}       # free memory required, GiB
+# Free memory required, GiB. 40 was a guess and it was too low: stage 1 peaks
+# at 51.8 GiB measured, so a 40 GiB floor lets a run start on a card it will
+# then OOM on -- which is the exact failure the floor exists to prevent.
+NEED_GIB=${NEED_GIB:-60}
 SETTLE=${SETTLE:-90}           # seconds between the two free-checks
 LOGDIR=$REPO/data/samples/analysis/cron
 LOCK=$LOGDIR/run.lock
@@ -114,11 +117,18 @@ fi
 # runs, and stage 5 run from random weights is what produced r = 0.049 on
 # unseen folds. It resumes from its own checkpoint, so interruption costs at
 # most `--ckpt-every` steps rather than the whole run.
+#
+# 2e9 tokens, not the 5e8 this first ran with. 5e8 is 8 tokens per active
+# parameter -- 0.4x Chinchilla-optimal, an undertrained base for everything
+# downstream. 2e9 is 31.5 tok/param, and at the measured 36.1k tok/s it is
+# about 15 hours, which a resumable job on a shared card can actually finish.
+# The spec's 25B (410 tok/param) is 8 days at this throughput and is a
+# multi-GPU figure, not a single-card one.
 if [ ! -f "$LOGDIR/.done-stage1" ]; then
     note "=== pretrain_mlm.py (curriculum stage 1) ==="
     if $PY -u scripts/pretrain_mlm.py \
             --device cuda --min-free-gib "$NEED_GIB" --size small \
-            --tokens "${MLM_TOKENS:-5e8}" --token-budget 24576 \
+            --tokens "${MLM_TOKENS:-2e9}" --token-budget 24576 \
             --n-loops 2 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"

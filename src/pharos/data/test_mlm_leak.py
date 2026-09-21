@@ -43,13 +43,28 @@ def main() -> int:
     if not corpus.exists():
         chk("pretraining corpus available", 0, str(corpus))
         return 1
+    from pharos.data.chemistry_torch import BatchChemistry
+    from pharos.data.vocab import SYMBOLS
+
     dev = torch.device("cpu")
     seqs = [s for s in M.iter_sequences(corpus, 40, 200, shards=1)][:16]
-    b = M.encode_batch(seqs, dev)
+    tok_np, mask_np, lengths = M.encode_batch(seqs)
     rng = np.random.default_rng(0)
-    inp, tgt, sel = M.apply_span_mask(b["tokens"], b["mask"], rng)
-    leaky = b["chem"]
-    safe = M.masked_chemistry(inp, b["mask"], dev)
+    inp_np, tgt_np, sel_np = M.apply_span_mask(tok_np, lengths, rng)
+    tok = torch.as_tensor(tok_np)
+    inp = torch.as_tensor(inp_np)
+    tgt = torch.as_tensor(tgt_np)
+    sel = torch.as_tensor(sel_np)
+    bmask = torch.as_tensor(mask_np)
+
+    # The leaking path no longer exists in the trainer -- `encode_batch` stopped
+    # returning chemistry at all. It is built here ON PURPOSE, from the
+    # unmasked tokens, because a guard against a mistake has to be able to
+    # commit the mistake. Both go through the same `BatchChemistry`, so this
+    # also checks that the vectorised fast path did not quietly reintroduce it.
+    bc = BatchChemistry(SYMBOLS, dev)
+    leaky = bc(tok, bmask)          # from the ORIGINAL tokens: the leak
+    safe = bc(inp, bmask)           # from the MASKED tokens: what is fed
     true = tgt[sel].clamp(max=3)
 
     print("== the leak this guards against ==")
@@ -69,7 +84,7 @@ def main() -> int:
         "the UNK row, not a base")
 
     print("\n== and it changes nothing it should not ==")
-    un = b["mask"] & ~sel
+    un = bmask & ~sel
     diff = (leaky[un] - safe[un]).abs().max(0).values
     changed = [i for i, v in enumerate(diff) if float(v) > 1e-4]
     chk("only the GC-context dim changes at unmasked positions",

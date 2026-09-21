@@ -1152,8 +1152,91 @@ information gain — RNA entropy is **2.0165 bits/nt [v0.2]**, so the corpus is
 redundant rather than rich. 25B gives 410 tok/param ≈ 20× Chinchilla.
 
 **BF16 first, FP8 on Hopper, not 4-bit.** A100 has no FP8 tensor cores, so
-"~79 A100-hours" mixed an Ampere baseline with a Hopper-only lever. Honest
-figures: **~78 h on A100 bf16, ~12 h on H100 fp8**.
+"~79 A100-hours" mixed an Ampere baseline with a Hopper-only lever.
+
+#### The hours were never measured, and they were wrong **[v0.2a, measured]**
+
+Every A100-hour in this document descends from one constant: `MFU = 0.35`,
+written into four scripts as "a realistic MoE figure" and never once checked
+against a run. Stage 1 on the A100 in this box says it is not realistic for
+this model.
+
+| | measured | note |
+|---|---|---|
+| achieved MFU, as shipped | **3.6%** | 12.7k real tok/s, PHAROS-Small, 24,576-token budget |
+| GPU time in tensor-core GEMMs | **~18%** | the other 82% is elementwise work, copies and the delta-rule scan |
+| the cost model's assumption | 35% | **~10x optimistic** |
+
+So "~78 h on A100 bf16" for 25B tokens was never a description of this code on
+this hardware. Three defects account for most of the gap, all of them measured
+and all of them now fixed:
+
+**1. 42.9% of every step was padding.** The stage-1 packer appended sequences
+in corpus order and cut when the batch would exceed the token budget, so a
+20-nt sequence and a 1,024-nt one shared a batch and both padded to 1,024.
+Measured over 400,000 elDORS sequences at the 24,576-token budget
+(`scripts/sampling/measure_packing_waste.py`, pinned):
+
+| packer | steps | padding | distinct widths |
+|---|---|---|---|
+| stream order (shipped) | 14,986 | **42.9%** | 461 |
+| length-sorted | 8,713 | 0.0% | 935 |
+| **length-sorted, width quantised to 128** | **9,793** | **10.4%** | **8** |
+
+The budget was never a token budget; it was a padded-token budget, and 43% of
+it bought nothing. Sorting within a 131,072-sequence pool fixes it, and the
+batch ORDER is then shuffled so that sorting does not turn into a short-to-long
+curriculum nobody specified.
+
+**2. The chemistry was computed twice per step, on the host, and used once.**
+`encode_batch` built the 24-dim vector from the original sequence; the MLM path
+then rebuilt it from the MASKED tokens -- necessarily, since dims 0-4 are a
+one-hot of base identity and building it from the unmasked sequence is the leak
+S12.1a records -- and discarded the first. Both ran as a Python loop over
+`chain_chemistry`, between two GPU kernels: **273 ms for a 26x950 batch, so 545
+ms of a ~1.26 s step**. Nothing about it needs a loop. Every dim except the GC
+window is a pure function of the symbol, so it is a table lookup, and the
+window is a cumulative sum: `data/chemistry_torch.py`, **1.6 ms on the device**,
+asserted equal to `chain_chemistry` element-wise rather than approximately.
+
+**3. The span mask synchronised the device once per sequence.** It took GPU
+tensors and read `int(mask[b].sum())` inside the batch loop. The row lengths
+are known from packing, so nothing has to be read back; the mask is built in
+numpy before anything is transferred.
+
+**And the trunk was never compiled.** With the width quantised to the 128-token
+GDN chunk there are 8 distinct shapes instead of 935, which is what makes
+`torch.compile` usable at all -- the delta-rule chunk loop is a Python loop, so
+inductor specialises on the chunk count and an unquantised L recompiles on
+nearly every batch. Compiled: **1.65x on step time, 23% off peak memory** (60.0
+-> 46.4 GiB at 24,576 tokens), verified equal to eager to **1e-6 relative** in
+fp32. Quantising costs 10.4% padding back and is worth it by a factor of five.
+
+Net on real (non-padding) tokens, measured with a warm compile cache at the
+24,576-token budget: **12.7k -> 36.1k tok/s, a 2.84x speedup, MFU 3.6% ->
+6.6%**, peak 51.8 GiB. 40,960 tokens per step does not fit -- the step is
+memory-bound before it is compute-bound, which is also why the trainers must
+require **60 GiB free, not 40**: a 40 GiB floor lets stage 1 start on a card it
+will then OOM on, which is the failure the floor exists to prevent.
+
+6.6% is not a good number. It is a measured one, and the profile says where the
+rest is: 82% of GPU time outside the GEMMs, in a 16-block stack whose
+per-token arithmetic is small enough that kernel launches and memory traffic
+dominate. The honest reading is that PHAROS-Small at d_model 512 is too narrow
+to saturate an A100, not that the schedule is broken -- PHAROS-Base at d_model
+768 has 2.25x the arithmetic per matmul and should do better, which is a
+prediction this document should be held to rather than an excuse.
+
+**The FLOP convention was also wrong.** `train_flops` charged every refinement
+loop a full forward+backward, `loops * 6N`. `trunk.py` runs loops 1..N-1 under
+`torch.no_grad()` -- that is what the one-step gradient means -- so an
+intermediate loop costs 2N, not 6N. The cost is `6N + 2N(loops-1)`: at the
+specified 3 loops, 10N against 18N, so the old model **overcharged training by
+1.8x** on top of being 10x optimistic about utilisation. The two errors point
+in opposite directions and do not cancel. `scripts/pretrain_mlm.py` now reports
+MFU every log interval using this convention, and
+`scripts/sampling/training_cost_model.py` reads the measurement off the run
+instead of assuming it.
 
 ### 12.3 Quality weighting — the corpus is saturated, so weight what you have
 

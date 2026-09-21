@@ -41,6 +41,8 @@ import time
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
+from functools import lru_cache
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -52,8 +54,8 @@ CKPT = ROOT / "data/derived/checkpoints"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pharos.data.chemistry import N_DIMS, chain_chemistry            # noqa: E402
-from pharos.data.vocab import PAD_ID, encode_chain                   # noqa: E402
+from pharos.data.chemistry_torch import BatchChemistry               # noqa: E402
+from pharos.data.vocab import PAD_ID, SYMBOLS, encode_chain          # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from train_block_scorer import gpu_free_gib                          # noqa: E402
@@ -82,23 +84,38 @@ def enable_gpu_fast_paths() -> None:
     _t.set_float32_matmul_precision("high")
 
 
+@lru_cache(maxsize=4)
+def _batch_chem(device_str: str) -> BatchChemistry:
+    return BatchChemistry(SYMBOLS, torch.device(device_str))
+
+
 def encode(seqs: List[str], device) -> Dict[str, torch.Tensor]:
+    """Tokens, chemistry and mask for a padded batch.
+
+    The chemistry used to be `chain_chemistry` per sequence on the host -- a
+    Python loop between two GPU kernels, measured at 273 ms for a 26x950 batch.
+    `BatchChemistry` is the same function as two device-side lookups and a
+    cumulative sum, asserted equal to `chain_chemistry` in
+    `test_chemistry_torch.py`. Deriving it from the encoded tokens rather than
+    the letters is equivalent: a letter outside the vocabulary encodes to UNK,
+    and `residue_chemistry` gives UNK and any unresolvable component the same
+    row -- parent N, class other.
+    """
     L = max(len(s) for s in seqs)
     B = len(seqs)
-    tok = np.full((B, L), PAD_ID, dtype=np.int16)
-    chem = np.zeros((B, L, N_DIMS), dtype=np.float32)
+    tok = np.full((B, L), PAD_ID, dtype=np.int64)
     mask = np.zeros((B, L), dtype=bool)
     for i, s in enumerate(seqs):
-        comps = list(s.upper().replace("T", "U"))
-        t, _ = encode_chain(comps)
-        n = len(t)
-        tok[i, :n] = t
-        chem[i, :n] = chain_chemistry(comps)
+        e, _ = encode_chain(list(s.upper().replace("T", "U")))
+        n = len(e)
+        tok[i, :n] = e
         mask[i, :n] = True
-    return {"tokens": torch.as_tensor(tok, dtype=torch.long, device=device),
+    tokens = torch.as_tensor(tok, device=device)
+    msk = torch.as_tensor(mask, device=device)
+    return {"tokens": tokens,
             "mod_ids": torch.zeros((B, L), dtype=torch.long, device=device),
-            "chem": torch.as_tensor(chem, device=device),
-            "mask": torch.as_tensor(mask, device=device)}
+            "chem": _batch_chem(str(device))(tokens, msk),
+            "mask": msk}
 
 
 # ---------------------------------------------------------------- stage 2

@@ -168,11 +168,21 @@ class GatedDeltaNet(nn.Module):
 
 
 class SlidingWindowAttention(nn.Module):
-    """Softmax attention restricted to +/- w, O(L*w).
+    """Softmax attention restricted to +/- w.
 
-    Implemented as a dense masked attention when `L <= 2*window` (cheaper than
-    the bookkeeping) and by chunked banding otherwise, so the cost really is
-    linear in L rather than linear-looking with a quadratic mask.
+    **Implemented as a dense masked attention at every length**, so the compute
+    is O(L^2) with a band mask, not O(L*w). The docstring here used to claim a
+    chunked banded path for `L > 2*window` and there has never been one in the
+    code -- the result is identical, the cost is not. At the MLM context of
+    1,024 that is 4x the attention work these four blocks need; at the 4,608
+    structural context it is 18x, and the `(B, 1, L, L)` mask is materialised
+    on top.
+
+    It is left as it is for now because it is correct and because the measured
+    bottleneck is elsewhere -- a profile of a stage-1 step puts 18% of GPU time
+    in tensor-core GEMMs and the rest in elementwise work and copies, which is
+    what compiling the trunk addresses. Banding is worth doing for stage 5,
+    where L is four times larger; it is not worth doing blind.
     """
 
     def __init__(self, d_model: int, n_heads: int = 8, window: int = 128,

@@ -1,0 +1,37 @@
+{
+ "n_sequences": 400000,
+ "token_budget": 24576,
+ "max_batch": 512,
+ "length_min": 20,
+ "length_median": 522,
+ "length_max": 1024,
+ "stream_order": {
+  "steps": 14986,
+  "real_tokens": 216865379,
+  "padded_tokens": 379701444,
+  "padding_fraction": 0.4289,
+  "distinct_widths": 461,
+  "median_batch": 26,
+  "max_batch": 61
+ },
+ "length_sorted": {
+  "steps": 8713,
+  "real_tokens": 216865379,
+  "padded_tokens": 216910933,
+  "padding_fraction": 0.0002,
+  "distinct_widths": 935,
+  "median_batch": 37,
+  "max_batch": 512
+ },
+ "quantised_128": {
+  "steps": 9793,
+  "real_tokens": 216865379,
+  "padded_tokens": 242143616,
+  "padding_fraction": 0.1044,
+  "distinct_widths": 8,
+  "median_batch": 32,
+  "max_batch": 192
+ },
+ "steps_saved_fraction": 0.3465,
+ "useful_tokens_per_step_gain": 1.5303
+}

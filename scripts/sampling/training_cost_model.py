@@ -47,20 +47,71 @@ def attn_flops_per_token(L: int) -> float:
     return full + swa + gdn
 
 def train_flops(tokens: float, L: int, n_active: float, loops: int = 1) -> float:
-    """Training FLOPs INCLUDING refinement loops.
+    """Training FLOPs including refinement loops, as the trunk actually runs them.
 
-    Defect #17: this previously omitted `loops` entirely. Section 10b.3 specifies
-    deep supervision at EVERY segment with a one-step (detached) gradient, so each
-    of the `loops` segments is its own forward+backward. Cost therefore scales
-    linearly with the loop count. Activation MEMORY does not -- that is what the
-    detach buys -- but compute does.
+    Defect #17 added the loop count, which had been omitted entirely, but
+    charged every loop a full forward+backward: `loops * 6N`. The implementation
+    does not do that. `trunk.py` runs loops 1..N-1 under `torch.no_grad()` and
+    differentiates only the last -- that is what "one-step gradient" means -- so
+    an intermediate loop costs a forward, 2N, not 6N.
+
+        6N + 2N(loops - 1),  not  6N * loops
+
+    At the specified 3 loops that is 10N against 18N: the old model overcharged
+    training by 1.8x. Deep supervision does add backward passes, but through the
+    HEADS, on detached inputs, not through the trunk -- a much smaller term and
+    not one that scales with N_active.
+
+    `scripts/pretrain_mlm.py` uses the same convention to report MFU, so the
+    cost model and the trainer cannot disagree about what a step costs.
     """
-    per_pass = 6 * n_active * tokens + 3 * attn_flops_per_token(L) * tokens
-    return loops * per_pass
+    fwd = 2 * n_active * tokens + attn_flops_per_token(L) * tokens
+    fwd_bwd = 6 * n_active * tokens + 3 * attn_flops_per_token(L) * tokens
+    return fwd_bwd + max(loops - 1, 0) * fwd
 
 # ---- realistic hardware ----
 HW = {"A100-80G bf16": 312e12, "H100-80G bf16": 989e12, "H100-80G fp8": 1979e12}
-MFU = 0.35      # model FLOPs utilisation; 35% is a realistic MoE figure
+
+# MODEL FLOPS UTILISATION -- MEASURED, not assumed.
+#
+# 0.35 stood here as "a realistic MoE figure" and every A100-hour in the
+# architecture descended from it. Nothing had ever measured it. Running
+# PHAROS-Small on the A100 in this box says otherwise: a profile of a stage-1
+# step puts only ~18% of GPU time in tensor-core GEMMs, the rest in elementwise
+# work, copies and the delta-rule scan, and the achieved MFU is read off
+# `mlm_pretrain.json` below.
+#
+# The measurement is on PHAROS-Small (63M active, d_model 512). PHAROS-Base has
+# d_model 768 and wider matmuls and would do better, so the measured figure is
+# a floor for Base rather than an estimate of it -- which is why both are
+# printed. What is NOT defensible is continuing to quote 0.35 as though it had
+# been observed.
+MFU_ASSUMED = 0.35
+
+
+def measured_mfu() -> float | None:
+    """Achieved MFU from the last stage-1 run, or None if it has not run.
+
+    The best interval, not the mean: early intervals include `torch.compile`
+    warm-up and the first batch of each of the 8 quantised widths, which are a
+    one-off cost of the run rather than a property of the steady state.
+    """
+    f = OUT / "pretrain_small_results.json"
+    if not f.exists():
+        return None
+    try:
+        hist = json.loads(f.read_text()).get("history", [])
+    except (OSError, ValueError):
+        return None
+    vals = [h["mfu"] for h in hist if h.get("mfu")]
+    return max(vals) if vals else None
+
+
+MFU_MEASURED = measured_mfu()
+MFU = MFU_MEASURED or MFU_ASSUMED
+print(f"MFU: assumed {MFU_ASSUMED:.0%}"
+      + (f", MEASURED {MFU_MEASURED:.1%} on PHAROS-Small/A100 -- using the measurement"
+         if MFU_MEASURED else ", no measurement on disk -- using the assumption"))
 
 print("=== Stage 1 (MLM pretraining) cost, as specified ===")
 print("  corpus: elDORS 1.32B seqs; median ~245 nt cross-chunk => ~336B tokens for 1 epoch")

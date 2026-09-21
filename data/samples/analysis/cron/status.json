@@ -1,12 +1,14 @@
 {
- "updated": "2026-09-21T17:12:59+05:30",
- "state": "complete",
- "detail": "block scorer and stage 5 both finished",
+ "updated": "2026-09-21T18:10:31+05:30",
+ "state": "running",
+ "detail": "pipeline started",
  "free_gib_at_check": 79,
- "log": "run-20260921-170901.log",
+ "log": "run-20260921-180901.log",
  "stages": {
   "verify":  "done",
+  "stage1":  null,
   "scorer":  "done",
-  "stage5":  "done"
+  "seqstages": null,
+  "stage5":  null
  }
 }

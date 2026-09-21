@@ -52,8 +52,8 @@ CKPT = ROOT / "data/derived/checkpoints"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pharos.data.chemistry import N_DIMS, chain_chemistry            # noqa: E402
-from pharos.data.vocab import PAD_ID, SYM2ID, encode_chain           # noqa: E402
+from pharos.data.chemistry_torch import BatchChemistry               # noqa: E402
+from pharos.data.vocab import PAD_ID, SYM2ID, SYMBOLS, encode_chain  # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from train_block_scorer import gpu_free_gib                          # noqa: E402
@@ -64,6 +64,20 @@ MASK_ID = SYM2ID["UNK"]          # reuse UNK as the [MASK] symbol
 MASK_FRAC = 0.15
 #: mean span length; geometric, SpanBERT-style
 SPAN_MEAN = 3.0
+
+#: A100 bf16 dense peak, FLOP/s. The cost model in §12.2 assumed 35% of this
+#: and nothing ever checked; the trainer now measures it every log interval.
+A100_BF16_PEAK = 312e12
+
+
+def FLOPS_PER_PARAM_TOKEN(n_loops: int) -> float:
+    """FLOPs per active parameter per token, for `n_loops` recycles.
+
+    The last loop is forward and backward, 6; loops 1..N-1 run under
+    `torch.no_grad()` (trunk.py, the one-step gradient), so each adds a forward
+    only, 2. n_loops=2 is therefore 8, not 12.
+    """
+    return 6.0 + 2.0 * max(n_loops - 1, 0)
 
 
 def enable_gpu_fast_paths() -> None:
@@ -100,63 +114,64 @@ def iter_sequences(corpus: Path, min_len: int, max_len: int,
                     yield s.upper().replace("T", "U")
 
 
-def encode_batch(seqs: List[str], device) -> Dict[str, torch.Tensor]:
-    L = max(len(s) for s in seqs)
-    B = len(seqs)
-    tok = np.full((B, L), PAD_ID, dtype=np.int16)
-    chem = np.zeros((B, L, N_DIMS), dtype=np.float32)
-    mask = np.zeros((B, L), dtype=bool)
-    for i, s in enumerate(seqs):
-        comps = list(s)
-        t, _ = encode_chain(comps)
-        n = len(t)
-        tok[i, :n] = t
-        chem[i, :n] = chain_chemistry(comps)
-        mask[i, :n] = True
-    return {"tokens": torch.as_tensor(tok, dtype=torch.long, device=device),
-            "chem": torch.as_tensor(chem, device=device),
-            "mask": torch.as_tensor(mask, device=device)}
+#: Sequence length is padded up to a multiple of this. It is the GDN chunk
+#: (attention.py), so every chunk comes out full and the delta-rule scan has no
+#: ragged tail -- and, more importantly, it is what makes `torch.compile`
+#: usable: the chunk loop is a Python loop, so inductor specialises on the chunk
+#: count and an unquantised L (935 distinct values over 400k sequences)
+#: recompiles on nearly every batch. Quantised there are 8, compiled once each,
+#: and batch size stays dynamic. Measured cost 10.4% padding; measured return
+#: 1.65x on step time and 23% off peak memory.
+LEN_QUANTUM = 128
 
 
-def masked_chemistry(tokens: torch.Tensor, mask: torch.Tensor,
-                     device) -> torch.Tensor:
-    """Chemistry derived from the MASKED tokens, so it cannot leak the target.
+def _quantised(n: int, q: int = LEN_QUANTUM) -> int:
+    return ((n + q - 1) // q) * q
 
-    Every feature in `chain_chemistry` is a function of base identity, and dims
-    0-4 are literally a one-hot of it. Computing it from the original sequence
-    and masking only the token stream leaves the answer sitting in the chemistry
-    channel. This recomputes it from what the model actually sees, so a masked
-    position gets the `UNK` row and its stated unknown-residue fallback rather
-    than any particular base.
+
+def encode_batch(seqs: List[str], quantum: int = LEN_QUANTUM) -> tuple:
+    """`(tokens, mask, lengths)` as numpy. No chemistry, and no device.
+
+    It used to compute `chain_chemistry` for every sequence here and return it
+    on the GPU -- and then `masked_chemistry` recomputed the whole thing from
+    the masked token stream and threw this away. The chemistry was being built
+    twice per step, on CPU, and used once. It is now built once, on the GPU,
+    from the masked inputs, by `BatchChemistry`.
     """
-    import numpy as _np
-    from pharos.data.chemistry import N_DIMS as _N
-    from pharos.data.vocab import SYMBOLS as _SYM
-    toks = tokens.detach().cpu().numpy()
-    msk = mask.detach().cpu().numpy()
-    B, L = toks.shape
-    out = _np.zeros((B, L, _N), dtype=_np.float32)
-    for i in range(B):
-        n = int(msk[i].sum())
-        comps = [_SYM[int(t)] if 0 <= int(t) < len(_SYM) else "UNK"
-                 for t in toks[i, :n]]
-        out[i, :n] = chain_chemistry(comps)
-    return torch.as_tensor(out, device=device)
+    L = _quantised(max(len(s) for s in seqs), quantum)
+    B = len(seqs)
+    tok = np.full((B, L), PAD_ID, dtype=np.int64)
+    mask = np.zeros((B, L), dtype=bool)
+    lengths = np.zeros(B, dtype=np.int64)
+    for i, s in enumerate(seqs):
+        e, _ = encode_chain(list(s))
+        n = len(e)
+        tok[i, :n] = e
+        mask[i, :n] = True
+        lengths[i] = n
+    return tok, mask, lengths
 
 
-def apply_span_mask(tokens: torch.Tensor, mask: torch.Tensor, rng: np.random.Generator,
-                    frac: float = MASK_FRAC, span_mean: float = SPAN_MEAN):
+def apply_span_mask(tok: np.ndarray, lengths: np.ndarray,
+                    rng: np.random.Generator, frac: float = MASK_FRAC,
+                    span_mean: float = SPAN_MEAN):
     """BERT corruption with geometric spans. Returns (inputs, targets, selected).
 
     80/10/10 as usual: replace with [MASK], keep, or substitute a random base.
     The 10% kept and 10% substituted stop the model from learning that a
     prediction is only ever needed where it sees the mask symbol.
+
+    Numpy, on the host, before anything is transferred. The previous version
+    took `(B, L)` GPU tensors and read `int(mask[b].sum())` inside the batch
+    loop, which is a device synchronisation per sequence per step -- the card
+    idling while Python decided where to put the next span. The row lengths are
+    already known from packing, so nothing has to be read back at all.
     """
-    B, L = tokens.shape
-    sel = torch.zeros_like(mask)
-    p = 1.0 / max(span_mean, 1.0)
+    B, L = tok.shape
+    sel = np.zeros((B, L), dtype=bool)
+    p_geom = 1.0 / max(span_mean, 1.0)
     for b in range(B):
-        n = int(mask[b].sum())
+        n = int(lengths[b])
         if n < 8:
             continue
         want = max(1, int(frac * n))
@@ -164,23 +179,92 @@ def apply_span_mask(tokens: torch.Tensor, mask: torch.Tensor, rng: np.random.Gen
         guard = 0
         while got < want and guard < 4 * want:
             guard += 1
-            ln = min(int(rng.geometric(p)), 10, max(want - got, 1))
+            ln = min(int(rng.geometric(p_geom)), 10, max(want - got, 1))
             st = int(rng.integers(0, max(n - ln, 1)))
-            if bool(sel[b, st:st + ln].any()):
+            if sel[b, st:st + ln].any():
                 continue
             sel[b, st:st + ln] = True
             got += ln
-    sel &= mask
-    targets = tokens.clone()
-    targets[~sel] = -100
-    inputs = tokens.clone()
-    r = torch.rand(tokens.shape, device=tokens.device)
+    valid = np.arange(L)[None, :] < lengths[:, None]
+    sel &= valid
+    targets = np.where(sel, tok, -100)
+    inputs = tok.copy()
+    r = rng.random((B, L))
     inputs[sel & (r < 0.8)] = MASK_ID
     rand_pos = sel & (r >= 0.9)
-    if bool(rand_pos.any()):
-        inputs[rand_pos] = torch.randint(0, 4, (int(rand_pos.sum()),),
-                                         device=tokens.device)
+    k = int(rand_pos.sum())
+    if k:
+        inputs[rand_pos] = rng.integers(0, 4, k)
     return inputs, targets, sel
+
+
+def _pack_pool(seqs: List[str], token_budget: int, max_batch: int,
+               rng: np.random.Generator,
+               quantum: int = LEN_QUANTUM) -> List[List[str]]:
+    """Sort a pool by length, then cut it into token-budgeted batches.
+
+    Sorting is the whole point: a batch pads to its longest member, so mixing a
+    20-nt sequence with a 1,024-nt one costs 1,004 tokens of compute that
+    produce no gradient. Measured on 400,000 elDORS sequences at the shipped
+    24,576-token budget, the stream-order packer spends **42.9% of every step
+    on padding** and takes 14,985 steps to cover what length-sorted packing
+    covers in 8,712 -- the same tokens, 1.72x the wall clock.
+
+    The batch ORDER is then shuffled. A sorted pool fed in order would train
+    short-to-long within each pool, which correlates batch length with
+    optimiser step and is a curriculum nobody asked for.
+    """
+    order = sorted(range(len(seqs)), key=lambda i: len(seqs[i]))
+    batches: List[List[str]] = []
+    buf: List[str] = []
+    for i in order:
+        buf.append(seqs[i])
+        # ascending length, so the last appended IS the longest; the batch is
+        # padded to the QUANTISED width, which is what the budget must count
+        if (len(buf) * _quantised(len(seqs[i]), quantum) >= token_budget
+                or len(buf) >= max_batch):
+            batches.append(buf)
+            buf = []
+    if buf:
+        batches.append(buf)
+    rng.shuffle(batches)
+    return batches
+
+
+def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
+                 max_batch: int, rng: np.random.Generator,
+                 shards: Optional[int] = None, pool: int = 131072,
+                 quantum: int = LEN_QUANTUM) -> Iterator[List[str]]:
+    """Length-bucketed batches over the corpus stream.
+
+    A pool of `pool` sequences is buffered, sorted, packed and shuffled, then
+    the next pool is read. The pool bounds how far a sequence can move from its
+    position in the corpus, so this stays a stream -- 131,072 sequences is
+    about 70 MB of Python strings, and large enough that the length histogram
+    inside a pool matches the corpus.
+    """
+    buf: List[str] = []
+    for s in iter_sequences(corpus, min_len, max_len, shards):
+        buf.append(s)
+        if len(buf) >= pool:
+            yield from _pack_pool(buf, token_budget, max_batch, rng, quantum)
+            buf = []
+    if buf:
+        yield from _pack_pool(buf, token_budget, max_batch, rng, quantum)
+
+
+def _clean_state(model) -> Dict[str, torch.Tensor]:
+    """`state_dict` without `torch.compile`'s `_orig_mod.` prefix.
+
+    `torch.compile` wraps the module, so every trunk tensor is saved as
+    `trunk._orig_mod.blocks.0....`. Stage 5 loads this checkpoint into an
+    uncompiled model, where those keys match nothing -- and the curriculum
+    would silently start from random weights again, which is the exact failure
+    `--init-from`'s load guard exists to catch. Strip the prefix at the source
+    instead of relying on the guard to notice.
+    """
+    return {k.replace("._orig_mod.", "."): v
+            for k, v in model.state_dict().items()}
 
 
 def require_gpu(args) -> torch.device:
@@ -220,6 +304,9 @@ def main() -> None:
                     help="steps between checkpoints; at ~2 s/step the old 2000 "
                          "meant losing up to 65 minutes to an interruption, on "
                          "a card that gets taken back without warning")
+    ap.add_argument("--no-compile", action="store_true",
+                    help="skip torch.compile on the trunk; it costs ~3 min of "
+                         "warm-up for 8 graphs and returns 1.65x on step time")
     ap.add_argument("--restart", action="store_true",
                     help="ignore an existing checkpoint and start from scratch")
     args = ap.parse_args()
@@ -230,6 +317,16 @@ def main() -> None:
     cfg.max_length = max(cfg.max_length, args.max_len)
     model = Pharos(cfg).to(device)
     pc = model.param_counts()
+    # Compile the TRUNK, not the whole model: the trunk is 16 blocks run twice
+    # per step and is where the elementwise work is -- the profile put only 18%
+    # of GPU time in tensor-core GEMMs and the rest in copies, gating multiplies
+    # and the delta-rule scan, which is exactly what inductor fuses. The heads
+    # and the MLM projection are a small tail and compiling them only adds
+    # graphs. Verified equal to eager to 1e-6 relative in fp32.
+    if not args.no_compile:
+        model.trunk = torch.compile(model.trunk, dynamic=True)
+        print(f"[mlm] trunk compiled (dynamic B, L quantised to {LEN_QUANTUM}); "
+              "first batch of each width pays the warm-up", flush=True)
     budget = int(args.tokens)
     print(f"[mlm] {args.size}: {pc['total']:,} total / {pc['active']:,} active")
     print(f"[mlm] budget {budget/1e9:.1f}B tokens = "
@@ -241,7 +338,7 @@ def main() -> None:
     rng = np.random.default_rng(0)
     CKPT.mkdir(parents=True, exist_ok=True)
 
-    seen = step = 0
+    seen = step = resumed_padded = 0
     # Resume, because this is the job that runs for days on a shared card and
     # will be interrupted. Without it every interruption discards everything and
     # the run can never finish -- an unattended pretraining script that restarts
@@ -249,10 +346,17 @@ def main() -> None:
     ck = CKPT / f"pretrain_{args.size}.pt"
     if ck.exists() and not args.restart:
         sd = torch.load(ck, map_location=device)
-        model.load_state_dict(sd["model"])
+        want = set(model.state_dict())
+        got = {k: v for k, v in sd["model"].items()}
+        if not (set(got) <= want):      # saved uncompiled, loading compiled
+            got = {k.replace("trunk.", "trunk._orig_mod.", 1)
+                   if k.startswith("trunk.") and k not in want else k: v
+                   for k, v in got.items()}
+        model.load_state_dict(got)
         if "opt" in sd:
             opt.load_state_dict(sd["opt"])
         seen, step = int(sd.get("tokens", 0)), int(sd.get("step", 0))
+        resumed_padded = int(sd.get("padded", 0))
         # advance the stream so a resumed run does not re-read the same
         # sequences it has already been trained on
         rng = np.random.default_rng(step)
@@ -262,45 +366,50 @@ def main() -> None:
             print(f"[mlm] budget already met ({seen/1e9:.2f}B >= "
                   f"{budget/1e9:.2f}B); nothing to do")
             return
-    t0 = time.time()
+    padded = int(resumed_padded)
+    seen_mark, padded_mark = seen, padded
+    t0 = tmark = time.time()
     run: List[float] = []
     accs: List[float] = []
     hist: List[Dict] = []
-    buf: List[str] = []
     stop = False
+    # The chemistry tables live on the device for the whole run; building them
+    # is a few hundred calls to `residue_chemistry`, done once.
+    batch_chem = BatchChemistry(SYMBOLS, device)
     while not stop:
-        for s in iter_sequences(CORPUS, args.min_len, args.max_len, args.shards):
-            buf.append(s)
-            # Batch by TOKENS, not by sequence count. A fixed count is a latent
-            # OOM: 64 sequences is 1.3k tokens if they are 20 nt and 65k if they
-            # are 1,024, and PHAROS-Small at 65k tokens does not fit in 80 GiB
-            # (stage 5 peaks at 43 GiB on a 32k budget). The budget also keeps
-            # memory flat across a run instead of spiking whenever a batch of
-            # long transcripts comes up.
-            if (len(buf) * max(len(x) for x in buf) < args.token_budget
-                    and len(buf) < args.max_batch):
+        # Batches are length-bucketed and budgeted by TOKENS, not by sequence
+        # count. A fixed count is a latent OOM -- 64 sequences is 1.3k tokens if
+        # they are 20 nt and 65k if they are 1,024, and PHAROS-Small at 65k
+        # tokens does not fit in 80 GiB. Bucketing is what makes the budget
+        # honest: without it 42.9% of each "24,576-token" step was padding.
+        for group in iter_batches(CORPUS, args.min_len, args.max_len,
+                                  args.token_budget, args.max_batch, rng,
+                                  args.shards):
+            tok_np, mask_np, lengths = encode_batch(group)
+            inp_np, tgt_np, sel_np = apply_span_mask(tok_np, lengths, rng)
+            if not sel_np.any():
                 continue
-            b = encode_batch(buf, device)
-            buf = []
-            inp, tgt, sel = apply_span_mask(b["tokens"], b["mask"], rng)
-            # THE CHEMISTRY MUST BE RECOMPUTED FROM THE MASKED INPUT.
+            inp = torch.as_tensor(inp_np, device=device)
+            tgt = torch.as_tensor(tgt_np, device=device)
+            sel = torch.as_tensor(sel_np, device=device)
+            bmask = torch.as_tensor(mask_np, device=device)
+            # THE CHEMISTRY MUST BE DERIVED FROM THE MASKED INPUT.
             #
-            # `chain_chemistry` one-hot-encodes base identity in dims 0-4, and
-            # `encode_batch` derives it from the ORIGINAL sequence -- so a
-            # masked position still carried its own answer in the chemistry
-            # channel and the model read it straight off. Measured: masked-token
-            # accuracy 0.948 and loss 0.392 nats = 0.57 bits at step 100,
-            # against a corpus entropy of 2.0165 bits/nt. A number below the
-            # entropy of the data is not a good model, it is a leak.
-            chem = masked_chemistry(inp, b["mask"], device)
-            if not bool(sel.any()):
-                continue
+            # `chain_chemistry` one-hot-encodes base identity in dims 0-4, so
+            # chemistry built from the ORIGINAL sequence leaves a masked
+            # position carrying its own answer, and the model reads it straight
+            # off. Measured when it did: masked-token accuracy 0.948 and loss
+            # 0.392 nats = 0.57 bits at step 100, against a corpus entropy of
+            # 2.0165 bits/nt. A number below the entropy of the data is not a
+            # good model, it is a leak. `inp` is the masked stream.
+            chem = batch_chem(inp, bmask)
+            n_real = bmask.sum(1)
             feats = RouterFeatures(
-                length=b["mask"].sum(1).float(),
+                length=n_real.float(),
                 chem_summary=(chem.sum(1)
-                              / b["mask"].sum(1, keepdim=True).clamp(min=1))[:, :5])
+                              / n_real.unsqueeze(1).clamp(min=1))[:, :5])
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                out = model(inp, torch.zeros_like(inp), chem, b["mask"],
+                out = model(inp, torch.zeros_like(inp), chem, bmask,
                             feats=feats, n_loops=args.n_loops, mlm=True)
                 logits = out["mlm_logits"].float()
                 loss = F.cross_entropy(logits[sel], tgt[sel])
@@ -314,21 +423,42 @@ def main() -> None:
                 acc = float((logits[sel].argmax(-1) == tgt[sel]).float().mean())
             run.append(float(loss.detach()))
             accs.append(acc)
-            seen += int(b["mask"].sum())
+            seen += int(lengths.sum())
+            padded += int(tok_np.size)
             step += 1
 
             if step % args.log_every == 0:
-                el = time.time() - t0
+                # PER-INTERVAL, not cumulative since t0. Averaging from the
+                # start folds in `torch.compile`'s warm-up -- 8 quantised
+                # widths, forward and backward -- so the reported rate climbs
+                # for hundreds of steps and never reaches the steady state it
+                # is supposed to report. The first interval after a resume or a
+                # compile still carries warm-up; the ones after it do not.
+                now = time.time()
+                el = now - tmark
+                tmark = now
+                # MFU is spent on PADDED tokens, so it is padded throughput
+                # that divides into the card's peak. Reporting only real tokens
+                # hid a 42.9% padding tax behind a number that looked fine.
+                rate_p = (padded - padded_mark) / max(el, 1e-9)
+                rate_r = (seen - seen_mark) / max(el, 1e-9)
+                seen_mark, padded_mark = seen, padded
+                mfu = FLOPS_PER_PARAM_TOKEN(args.n_loops) * pc["active"] \
+                    * rate_p / A100_BF16_PEAK
                 print(f"[mlm] step {step} {seen/1e6:.1f}M tok "
                       f"loss {np.mean(run[-args.log_every:]):.4f} "
                       f"acc {np.mean(accs[-args.log_every:]):.4f} "
-                      f"{seen/max(el,1e-9)/1e3:.1f}k tok/s", flush=True)
-                hist.append({"step": step, "tokens": seen,
+                      f"{rate_r/1e3:.1f}k tok/s "
+                      f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
+                      f"MFU {100*mfu:.1f}%", flush=True)
+                hist.append({"step": step, "tokens": seen, "padded": padded,
+                             "tok_per_s": rate_r,
+                             "padded_per_s": rate_p, "mfu": mfu,
                              "loss": float(np.mean(run[-args.log_every:])),
                              "acc": float(np.mean(accs[-args.log_every:]))})
             if step % args.ckpt_every == 0 or seen >= budget:
-                torch.save({"cfg": cfg.__dict__, "model": model.state_dict(),
-                            "opt": opt.state_dict(),
+                torch.save({"cfg": cfg.__dict__, "model": _clean_state(model),
+                            "opt": opt.state_dict(), "padded": padded,
                             "tokens": seen, "step": step}, ck)
             if seen >= budget:
                 stop = True
@@ -343,6 +473,15 @@ def main() -> None:
               # RNA sequence entropy is 2.0165 bits/nt; a model that has learned
               # nothing sits at that, so bits/token below it is the real gain
               "bits_per_token": round(float(np.mean(run[-200:])) / np.log(2), 4),
+              # throughput, so the cost model reads a measurement instead of
+              # assuming 35% MFU as it did for the whole of v0.1 and v0.2
+              "padded_tokens": padded,
+              "padding_fraction": round(1 - seen / max(padded, 1), 4),
+              "peak_gib": (round(torch.cuda.max_memory_allocated() / 2**30, 1)
+                           if device.type == "cuda" else None),
+              "compiled": not args.no_compile,
+              "best_mfu": max((h.get("mfu", 0.0) for h in hist), default=0.0),
+              "best_tok_per_s": max((h.get("tok_per_s", 0.0) for h in hist), default=0.0),
               "history": hist}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"pretrain_{args.size}_results.json").write_text(json.dumps(report, indent=1))

@@ -102,6 +102,31 @@ def main() -> int:
         chk("v0.2 modified-residue fraction (raw PDB)",
             ir["modified_residues"]["frac"], 0.01005, abs_tol=0.00005)
 
+        # ---- v0.2a: the stage-1 packer was 42.9% padding -----------------
+        # The token budget was never a token budget. Sequences were appended in
+        # corpus order and cut when the batch would exceed the budget, so a
+        # 20-nt and a 1,024-nt sequence shared a batch and both padded to
+        # 1,024. Deterministic over the same 400,000 elDORS sequences.
+        pw = load("packing_waste.json")
+        chk("v0.2a packing: sequences measured", pw["n_sequences"], 400000)
+        chk("v0.2a packing: shipped stream-order padding",
+            pw["stream_order"]["padding_fraction"], 0.429, abs_tol=0.001)
+        chk("v0.2a packing: length-sorted padding is zero",
+            pw["length_sorted"]["padding_fraction"], 0.0, abs_tol=0.001)
+        chk("v0.2a packing: quantised-to-128 padding",
+            pw["quantised_128"]["padding_fraction"], 0.104, abs_tol=0.001)
+        # 8 widths is the whole point of quantising: the delta-rule chunk loop
+        # is a Python loop, so inductor specialises on the chunk count and 935
+        # distinct widths recompiles on nearly every batch.
+        chk("v0.2a packing: quantised distinct widths",
+            pw["quantised_128"]["distinct_widths"], 8)
+        chk("v0.2a packing: unquantised distinct widths",
+            pw["length_sorted"]["distinct_widths"], 935)
+        chk("v0.2a packing: steps saved vs shipped",
+            pw["steps_saved_fraction"], 0.346, abs_tol=0.002)
+        chk("v0.2a packing: useful tokens per step gain",
+            pw["useful_tokens_per_step_gain"], 1.53, abs_tol=0.02)
+
         ec = load("entry_composition_rawpdb.json")
         # ---- D9/D23: target_c, closed on raw chains ----------------------
         # The budget had never been measured on data containing modified
@@ -678,6 +703,7 @@ def main() -> int:
               ROOT / "src/pharos/physics/test_manning.py",
               ROOT / "src/pharos/data/test_mmcif_entities.py",
               ROOT / "src/pharos/data/test_chemistry.py",
+              ROOT / "src/pharos/data/test_chemistry_torch.py",
               ROOT / "src/pharos/model/test_attention.py",
               ROOT / "src/pharos/model/test_pharos.py",
               ROOT / "src/pharos/model/test_motif_bank.py",

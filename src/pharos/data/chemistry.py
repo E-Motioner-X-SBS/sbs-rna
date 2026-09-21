@@ -175,6 +175,52 @@ def chain_chemistry(comp_ids: Iterable[str], *, deoxy_mask: Sequence[bool] | Non
     return out
 
 
+# ---------------------------------------------------------------------------
+# Vectorised form: the per-residue vector is a lookup, so build the table
+# ---------------------------------------------------------------------------
+#
+# `chain_chemistry` is a Python loop calling `residue_chemistry` once per
+# residue, and in the training loop it ran on CPU for every sequence of every
+# batch -- twice, because `encode_batch` computed it from the original sequence
+# and `masked_chemistry` then recomputed it from the masked one and threw the
+# first away. At 26 sequences a step that is tens of thousands of Python calls
+# between two GPU kernels.
+#
+# Nothing about it needs to be a loop. Every dim except 23 is a pure function
+# of the symbol (and of two booleans), so the whole thing is a table indexed by
+# token id; dim 23's window is a cumulative sum. The tables below are built by
+# calling `residue_chemistry` itself rather than by restating its rules, so the
+# fast path cannot drift from the definition -- if the chemistry changes, the
+# table changes with it.
+
+
+def chemistry_tables(symbols: Sequence[str], *, deoxy: bool = False
+                     ) -> tuple[np.ndarray, np.ndarray]:
+    """`(S, 24)` interior and 5'-terminal rows, one per symbol.
+
+    Dim 23 is left at zero: it is the only dim that depends on neighbours, and
+    it is filled by the caller's windowed sum.
+    """
+    interior = np.stack([residue_chemistry(s, deoxy=deoxy) for s in symbols])
+    terminal = np.stack([residue_chemistry(s, five_prime_terminus=True, deoxy=deoxy)
+                         for s in symbols])
+    return interior, terminal
+
+
+def gc_lookups(symbols: Sequence[str]) -> tuple[np.ndarray, np.ndarray]:
+    """Per-symbol `(is G or C, parent is a standard base)` for dim 23.
+
+    The second is the denominator: a residue whose parent does not resolve to
+    A/C/G/U is excluded from the window rather than counted as not-GC, which is
+    what `chain_chemistry` does and is the reason a modified G still counts.
+    """
+    gc = np.array([1.0 if resolve(s)[0] in ("G", "C") else 0.0 for s in symbols],
+                  dtype=np.float32)
+    known = np.array([1.0 if resolve(s)[0] in BASES else 0.0 for s in symbols],
+                     dtype=np.float32)
+    return gc, known
+
+
 if __name__ == "__main__":
     tbl = _ccd_table()
     print(f"CCD table: {len(tbl):,} components"
