@@ -116,10 +116,17 @@ if [ ! -f "$LOGDIR/.done-scorer" ]; then
     # parameters, 34.4 GiB peak on the worst batch, 75% mean utilisation,
     # 520 s/epoch. The previous 4.4M / 16k-token configuration used 0.6 GiB and
     # left the GPU at 13%.
+    #
+    # LR and epoch count are raised WITH the batch, not left at the small-batch
+    # values. A 131k-token budget is ~14x the old one, which cut an epoch from
+    # 1,465 optimiser steps to 102; at lr=3e-4 / 8 epochs that is 816 steps for
+    # a 153M model, and the first epoch duly came out WORSE than the 4.4M run
+    # (val L2 recall 0.650 against 0.775). Bigger batches need a larger step and
+    # more of them: lr 1e-3, 24 epochs = 2,448 steps.
     if $PY -u scripts/train_block_scorer.py \
-            --device cuda --min-free-gib "$NEED_GIB" --epochs 8 \
+            --device cuda --min-free-gib "$NEED_GIB" \
             --d-model 1024 --d-block 768 --n-conv 12 --n-attn 8 \
-            --token-budget 131072 >> "$LOG" 2>&1; then
+            --token-budget 131072 --lr 1e-3 --epochs 24 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-scorer"
         note "block scorer finished"
         grep -E "sequence gain|recall" "$LOG" | tail -8 | tee -a "$LOG" >/dev/null
