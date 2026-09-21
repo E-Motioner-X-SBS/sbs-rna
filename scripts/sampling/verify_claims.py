@@ -152,6 +152,23 @@ def main() -> int:
         chk("chem pseudouridine residues", cl["pseudouridine"], 18458)
         chk("chem other residues", cl["other"], 14421)
 
+        # ---- §6.4: RMDB ionic titrations (open action 2) -----------------
+        import json as _jj
+        tf = ROOT / "data/benchmarks/rmdb/titrations.json"
+        if tf.exists():
+            ti = _jj.loads(tf.read_text())
+            chk("RMDB assets enumerated", ti["n_assets_total"], 1024)
+            chk("RMDB Mg titration files", ti["n_mg_titrations"], 24)
+            mgs = [v for v in ti["series"].values() if "MgCl2" in v["varying"]]
+            chk("RMDB Mg concentration points",
+                sum(v["ions"]["MgCl2"]["n_levels"] for v in mgs), 527)
+            # the property that makes them useful: the PDB cannot reach below
+            # ~5 mM because unfolded RNA is not deposited
+            chk("every Mg ladder crosses the sub-millimolar regime",
+                sum(1 for v in mgs if v["ions"]["MgCl2"]["min"] < 1.0), 24)
+        else:
+            chk("RMDB titrations acquired (scripts/acquire_rmdb_titrations.py)", 0, 1)
+
         # ---- §8: the motif bank is the atlas, not a subset ---------------
         import json as _j
         mb = ROOT / "data/derived/motif_bank/meta.json"

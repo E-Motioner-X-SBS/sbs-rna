@@ -456,17 +456,49 @@ The Mg-centric design is better supported than its own evidence claimed.
 | Debye pair bias | closed form | **no data needed** |
 | Mg²⁺ site head | ion coordinates | **available** (raw PDB, 816,270 Mg sites) |
 | Rigidity head | X-ray B-factors | **available** (3.86M nt) |
-| **[Mg²⁺] → structure *response*** | titration series | **NOT available** |
+| **[Mg²⁺] → structure *response*** | titration series | **available [v0.2]** — 24 RMDB ladders, 527 points |
 
 The PDB is survivorship-biased on ionic conditions: recorded Mg²⁺ spans only
 5–15 mM because nobody deposits unfolded RNA. So the closed-form terms and the
 site/rigidity heads are fully supervised, but the **learned response to changing
-ionic strength is not**, and needs RMDB titration ladders. RMDB exposes no bulk
-endpoint; acquisition is an open action, not a solved one.
+ionic strength cannot be learned from the PDB at all**, at any scale. It needs
+experiments where the concentration was deliberately varied.
 
-**Scope statement required:** PHAROS accepts ionic condition as an input and its
-*physics* terms respond to it correctly by construction. Claims that the
-*learned* prediction tracks a Mg²⁺ titration are unsupported until RMDB lands.
+#### Those experiments are acquired **[v0.2, open action 2 closed]**
+
+v0.1 recorded "RMDB exposes no bulk endpoint". That was the old Django site.
+RMDB is now a static site on GitHub Pages and its **1,024 RDATs are release
+assets** — 11.9 GB across five releases, `DasLab/rmdb.github.io`.
+
+Finding the ladders took one correction. Entry-level annotations record only
+**three** distinct Mg²⁺ levels across 712 entries — 0, 10 and 40 mM, with 682 at
+the standard 10 — and no series at all, because the entry-level `chemical` field
+records the condition *common to the whole experiment*. **A titration varies its
+concentration per data row**, inside the RDAT's `ANNOTATION_DATA` lines. So the
+ladders are found by reading the files, and the files worth reading are the
+small ones: a classic titration is one construct at tens of conditions, while
+the multi-gigabyte assets are Eterna and Ribonanza libraries at a single
+condition. 865 files under 2 MB, 202 MB fetched.
+
+| | |
+|---|---|
+| Mg²⁺ titration files | **24** |
+| total concentration points | **527** |
+| ladders with 32 levels | 14 |
+| widest range | 0 – 100 mM (TODS1/TODS7) |
+| deepest ladder | 32 levels over 0 – 50 mM (MTTR series, 12 files) |
+| **ladders reaching below 1 mM** | **24 of 24** |
+
+That last row is the one that matters. Every ladder crosses the sub-millimolar
+regime where RNA is unfolded — exactly the region the PDB cannot contain,
+because unfolded RNA is not deposited. The MTTR series alone gives 12
+constructs × 32 concentrations of the same folding transition. Four ATP
+titrations came with them, which supervise ligand response rather than ionic.
+
+**Scope statement, updated:** PHAROS accepts ionic condition as an input and its
+*physics* terms respond correctly by construction. The *learned* response is now
+supervisable — and the claim that it tracks a titration remains untested until
+stage 5 runs, which is a training result, not a data gap.
 
 ---
 
@@ -993,7 +1025,7 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 | # | Action | Blocks |
 |---|---|---|
 | ~~1~~ | ~~Re-derive `target_c` on raw PDB entries~~ | **CLOSED** — max 23.30 on 14,106 chains, 24 confirmed (§7.3) |
-| 2 | Acquire RMDB titration ladders | the learned ionic *response* |
+| ~~2~~ | ~~Acquire RMDB titration ladders~~ | **CLOSED** — 24 Mg²⁺ ladders, 527 points, all crossing sub-mM (§6.4) |
 | 3 | Complete Ribonanza — 335,616 of 2.1M acquired; the rest needs Kaggle credentials | head 7 coverage |
 | 4 | Train the block-detection scorer | §7.4, the largest unvalidated assumption |
 | ~~5~~ | ~~Re-measure G2/G3 on raw whole entries~~ | **CLOSED** — 97.15% / 85.94% on 10,520 entries (§11.2, §11.2a) |
@@ -1025,7 +1057,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **238** checks. Counting
+JSONs and fails the build on drift; it currently pins **242** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two
