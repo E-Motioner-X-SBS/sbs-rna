@@ -1,0 +1,12 @@
+{
+ "updated": "2026-09-21T12:31:26+05:30",
+ "state": "running",
+ "detail": "pipeline started",
+ "free_gib_at_check": 79,
+ "log": "run-20260921-122956.log",
+ "stages": {
+  "verify":  null,
+  "scorer":  null,
+  "stage5":  null
+ }
+}

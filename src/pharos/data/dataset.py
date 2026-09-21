@@ -285,17 +285,31 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
 
 
 class ShardReader:
-    """Random access to a shard without unpacking it.
+    """Random access to a shard, with the arrays decompressed exactly once.
 
-    `np.load` on an `.npz` is lazy per array, so a shard costs one decompress
-    per field on first touch and nothing thereafter.
+    **`np.load` on an `.npz` is not lazily indexable.** `NpzFile.__getitem__`
+    decompresses the *whole* named array on every access, so reading one chain's
+    slice costs a full-shard decompression -- and reading 512 chains costs 512 of
+    them. An earlier version of this class indexed `self._z[key][a:b]` directly
+    and its docstring claimed "one decompress per field on first touch and
+    nothing thereafter", which is exactly what NpzFile does not do. Measured
+    consequence: block-scorer training ran at **4 s/step with the GPU at 0%
+    utilisation** -- about 13 hours for 8 epochs, all of it in zlib.
+
+    So every field is materialised once, in `_load`, and sliced from memory
+    thereafter. A shard is ~25 MB expanded and the whole 33-shard set is under a
+    gigabyte, so the arrays are simply held.
     """
+
+    _FIELDS = ("tokens", "mod_ids", "chem", "contacts", "mg_site", "b_factor_z",
+               "unknown_base", "unobserved_seq_id", "unob_off")
 
     def __init__(self, path: Path, meta: Optional[Sequence[Dict]] = None):
         self.path = Path(path)
-        self._z = np.load(self.path)
-        self.res_off = self._z["res_off"]
-        self.con_off = self._z["con_off"]
+        with np.load(self.path) as z:
+            self._a = {k: z[k] for k in self._FIELDS if k in z.files}
+            self.res_off = z["res_off"]
+            self.con_off = z["con_off"]
         self.meta = list(meta) if meta is not None else []
 
     def __len__(self) -> int:
@@ -304,15 +318,16 @@ class ShardReader:
     def __getitem__(self, i: int) -> Dict:
         a, b = int(self.res_off[i]), int(self.res_off[i + 1])
         c, d = int(self.con_off[i]), int(self.con_off[i + 1])
-        out = {"tokens": self._z["tokens"][a:b], "mod_ids": self._z["mod_ids"][a:b],
-               "chem": self._z["chem"][a:b], "contacts": self._z["contacts"][c:d],
+        A = self._a
+        out = {"tokens": A["tokens"][a:b], "mod_ids": A["mod_ids"][a:b],
+               "chem": A["chem"][a:b], "contacts": A["contacts"][c:d],
                "length": b - a}
         for key in ("mg_site", "b_factor_z", "unknown_base"):
-            if key in self._z.files:
-                out[key] = self._z[key][a:b]
-        if "unob_off" in self._z.files:
-            uo = self._z["unob_off"]
-            out["unobserved_seq_id"] = self._z["unobserved_seq_id"][
+            if key in A:
+                out[key] = A[key][a:b]
+        if "unob_off" in A:
+            uo = A["unob_off"]
+            out["unobserved_seq_id"] = A["unobserved_seq_id"][
                 int(uo[i]):int(uo[i + 1])]
         if i < len(self.meta):
             out["meta"] = self.meta[i]

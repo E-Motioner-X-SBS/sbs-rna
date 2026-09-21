@@ -157,6 +157,36 @@ def main() -> int:
         chk("rigidity_mask never exceeds the residue mask",
             bool((b["rigidity_mask"] <= b["mask"]).all()), "")
 
+    print("\n== property 4b: the shard is decompressed once, not per access ==")
+    # np.load on an .npz returns a lazy ZIP handle whose __getitem__
+    # decompresses the WHOLE named array every call. Indexing it per chain made
+    # block-scorer training run at 4 s/step with the GPU at 0% -- 13 hours for
+    # 8 epochs, all of it in zlib. This is the guard against it coming back.
+    import time as _t
+    with tempfile.TemporaryDirectory() as d:
+        big = []
+        r2 = np.random.default_rng(7)
+        for i in range(64):
+            L = 200
+            big.append(ChainExample(
+                pdb=f"b{i}", chain="A", length=L,
+                tokens=r2.integers(0, 4, L).astype(np.int8),
+                mod_ids=np.zeros(L, np.int16),
+                chem=r2.random((L, 24)).astype(np.float16),
+                contacts=np.array([[0, L - 1]], dtype=np.int32)))
+        write_shard(Path(d) / "big.npz", big)
+        rd2 = ShardReader(Path(d) / "big.npz")
+        _ = rd2[0]                                  # warm
+        t0 = _t.perf_counter()
+        for i in range(len(rd2)):
+            _ = rd2[i]
+        per = (_t.perf_counter() - t0) / len(rd2) * 1e6
+        chk("a warm chain read is microseconds, not milliseconds", per < 500,
+            f"{per:.0f} us per chain over {len(rd2)} chains")
+        chk("arrays are materialised, not a lazy NpzFile",
+            hasattr(rd2, "_a") and isinstance(rd2._a.get("tokens"), np.ndarray),
+            "ShardReader._a holds real arrays")
+
     print("\n== property 5: disorder validity ==")
     chk("a fully-modelled chain is a valid disorder observation",
         disorder_is_meaningful(500, 520), "")
