@@ -254,11 +254,46 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
     return total, parts, out
 
 
+def average_precision(score: np.ndarray, label: np.ndarray) -> float:
+    """Area under the precision-recall curve, threshold-free.
+
+    The metric a rare-positive detection task needs. Its random baseline is the
+    positive base rate, so it is interpretable without a companion number.
+    """
+    if label.sum() == 0 or label.sum() == len(label):
+        return float("nan")
+    order = np.argsort(-score)
+    y = label[order].astype(np.float64)
+    tp = np.cumsum(y)
+    prec = tp / np.arange(1, len(y) + 1)
+    return float((prec * y).sum() / y.sum())
+
+
 @torch.no_grad()
 def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
              max_batches: Optional[int] = None, token_budget: int = 8192) -> Dict:
+    """Threshold-free where the task is imbalanced, pooled where it is thin.
+
+    Two corrections over the first version, both of which made a working head
+    look broken.
+
+    **The Mg head was scored at the wrong threshold.** It is trained with
+    `pos_weight = neg/pos` (~17.5 at a 5.41% base rate), and BCE with a positive
+    weight moves the decision boundary: the minimiser has `sigma(z) = w.p /
+    (w.p + 1 - p)`, so `p > 0.5` corresponds to `z > log(w)` -- about 2.86, not
+    0. Thresholding at 0 reported precision **0.026 against a 5.41% base rate**,
+    i.e. apparently worse than chance, for a head that had simply been asked to
+    over-predict. Average precision is reported instead, with the base rate
+    beside it, plus precision at the calibrated threshold.
+
+    **Correlations were averaged per batch.** A mean of per-batch Pearson `r`
+    is not the `r` of the split, and on batches where the rigidity target is a
+    handful of X-ray residues it is mostly noise. Scores are pooled across the
+    split and correlated once.
+    """
     model.eval()
     acc: Dict[str, List[float]] = {}
+    pool: Dict[str, List[np.ndarray]] = {}
     for bi, batch in enumerate(ds.iter_batches(token_budget=token_budget,
                                                shuffle=False)):
         if max_batches is not None and bi >= max_batches:
@@ -270,20 +305,42 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                         dynamics=bool(t["rigidity_mask"].any()))
         m = t["mask"]
         if m.any():
-            p = (out["mg_logit"][m].float() > 0)
-            y = t["mg_site"][m] > 0
-            tp = float((p & y).sum()); fp = float((p & ~y).sum())
-            fn = float((~p & y).sum())
-            acc.setdefault("mg_precision", []).append(tp / max(tp + fp, 1))
-            acc.setdefault("mg_recall", []).append(tp / max(tp + fn, 1))
+            pool.setdefault("mg_score", []).append(
+                out["mg_logit"][m].float().cpu().numpy())
+            pool.setdefault("mg_label", []).append(
+                (t["mg_site"][m] > 0).cpu().numpy())
         rm = t["rigidity_mask"]
         if rm.any():
-            pr = out["rigidity"][rm].float().cpu().numpy()
-            tg = t["b_factor_z"][rm].float().cpu().numpy()
-            if pr.std() > 1e-6 and tg.std() > 1e-6:
-                acc.setdefault("rigidity_r", []).append(
-                    float(np.corrcoef(pr, tg)[0, 1]))
-    return {k: round(float(np.mean(v)), 4) for k, v in acc.items()}
+            pool.setdefault("rig_pred", []).append(
+                out["rigidity"][rm].float().cpu().numpy())
+            pool.setdefault("rig_true", []).append(
+                t["b_factor_z"][rm].float().cpu().numpy())
+
+    res: Dict = {k: round(float(np.mean(v)), 4) for k, v in acc.items()}
+    if "mg_score" in pool:
+        sc = np.concatenate(pool["mg_score"])
+        yy = np.concatenate(pool["mg_label"])
+        base = float(yy.mean())
+        res["mg_base_rate"] = round(base, 4)
+        res["mg_average_precision"] = round(average_precision(sc, yy), 4)
+        # lift over chance is the number that says whether the head learned
+        res["mg_ap_lift"] = (round(res["mg_average_precision"] / base, 2)
+                             if base > 0 else None)
+        # and at the threshold the pos_weight actually implies
+        pw = (1 - base) / max(base, 1e-9)
+        thr = float(np.log(max(pw, 1.0)))
+        p = sc > thr
+        tp = float((p & yy).sum()); fp = float((p & ~yy).sum())
+        fn = float((~p & yy).sum())
+        res["mg_precision_at_calibrated_thr"] = round(tp / max(tp + fp, 1), 4)
+        res["mg_recall_at_calibrated_thr"] = round(tp / max(tp + fn, 1), 4)
+    if "rig_pred" in pool:
+        pr = np.concatenate(pool["rig_pred"])
+        tg = np.concatenate(pool["rig_true"])
+        res["rigidity_r_pooled"] = (round(float(np.corrcoef(pr, tg)[0, 1]), 4)
+                                    if pr.std() > 1e-6 and tg.std() > 1e-6 else None)
+        res["rigidity_n"] = int(len(pr))
+    return res
 
 
 def main() -> None:
