@@ -594,6 +594,26 @@ def main() -> int:
               f"{'' if not miss else ' MISSING from ' + ','.join(miss)}")
         if miss: fails.append(f"missing config {need}")
 
+    # A module map that names files which do not exist is worse than no map,
+    # and v0.1's named six that never got built. This keeps it honest.
+    print("\n== every module the README names exists ==")
+    import re as _re
+    rd = ROOT / "src/pharos/README.md"
+    if rd.exists():
+        txt = rd.read_text()
+        mods = sorted(set(_re.findall(r"\b(?:model|physics|data)/[a-z_]+\.py", txt)))
+        gone = [m for m in mods if not (ROOT / "src/pharos" / m).exists()]
+        print(f"  {'OK ' if not gone else 'FAIL'} README module map          "
+              f"{len(mods)} named, missing: {gone or 'none'}")
+        if gone:
+            fails.append("README names modules that do not exist")
+        scr = sorted(set(_re.findall(r"scripts/[a-z_/]+\.(?:py|sh)", txt)))
+        gone_s = [x for x in scr if not (ROOT / x).exists()]
+        print(f"  {'OK ' if not gone_s else 'FAIL'} README script map          "
+              f"{len(scr)} named, missing: {gone_s or 'none'}")
+        if gone_s:
+            fails.append("README names scripts that do not exist")
+
     print("\n== reference implementation correctness tests ==")
     import os
     import subprocess
