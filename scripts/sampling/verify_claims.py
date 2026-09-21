@@ -304,6 +304,23 @@ def main() -> int:
         chk("R1 the ablated prior costs almost nothing",
             int(abs(bt["learned"]["l2_recall"]
                     - bt["learned_noprior"]["l2_recall"]) < 0.01), 1)
+        # L1 at the same matched budget. The gain is real but much smaller than
+        # L2's, and the cascade measurement explains why that matters: L1 is
+        # what bounds the track end to end.
+        chk("R1 random L1 recall", bt["random"]["l1_recall"], 0.1353, abs_tol=0.0002)
+        chk("R1 separation-prior L1 recall", bt["separation"]["l1_recall"],
+            0.2313, abs_tol=0.0002)
+        chk("R1 learned L1 recall", bt["learned"]["l1_recall"], 0.2724, abs_tol=0.0002)
+        chk("R1 L1 sequence gain", bsr["l1_sequence_gain"], 0.0411, abs_tol=0.0002)
+        chk("R1 learned L2 precision", bt["learned"]["l2_precision"], 0.3377,
+            abs_tol=0.0002)
+        chk("R1 test chains", bsr["splits"]["test"], 1450)
+        chk("R1 parameters", bsr["n_parameters"], 61889798)
+        # S7.1 measures the flat separation prior at 0.377 on long chains at
+        # c=32. The learned scorer reaches 0.9972 in the same regime, which is
+        # the comparison the pair track was built to win.
+        chk("R1 beats S7.1's 0.377 long-chain prior by a wide margin",
+            int(lb["l2_>=1500"] > 2.5 * 0.377), 1)
 
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")

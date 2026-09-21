@@ -749,14 +749,20 @@ the assumption the entire pair track rests on. Trained on the family-disjoint
 split (11,723 train / 1,450 test chains), evaluated against three baselines at
 the **identical budget**:
 
-| scorer | L1 recall | L2 recall | L2 precision |
-|---|---|---|---|
-| random | 0.135 | 0.543 | 0.202 |
-| separation prior | 0.231 | 0.633 | 0.242 |
-| learned, prior ablated | 0.271 | 0.833 | 0.337 |
-| **learned** | **0.272** | **0.840** | 0.338 |
+| scorer | L1 recall | L1 precision | L2 recall | L2 precision |
+|---|---|---|---|---|
+| random | 0.1353 | 0.5687 | 0.5435 | 0.2020 |
+| separation prior | 0.2313 | 0.7692 | 0.6333 | 0.2415 |
+| learned, prior ablated | 0.2713 | 0.8340 | 0.8326 | 0.3370 |
+| **learned** | **0.2724** | **0.8361** | **0.8345** | 0.3377 |
 
-**Sequence gain over the separation prior: +0.207 at L2.** The answer to R1 is
+**Sequence gain over the separation prior: +0.2012 at L2, +0.0411 at L1.**
+61,889,798 parameters, best epoch 27, 1,450 held-out chains.
+
+The cleanest part of this is the ablation. `learned_noprior` does not receive
+the separation prior at all and scores **0.8326** against the full model's
+**0.8345** — a difference of 0.0019. So the +0.2012 is not the prior being
+handed to the model and read back out; it is the sequence. The answer to R1 is
 yes: the sequence carries real information about which blocks are occupied,
 beyond the fact that contacts cluster near the diagonal.
 

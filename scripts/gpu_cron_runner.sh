@@ -52,6 +52,18 @@ fi
 
 note() { echo "$(date -Is) $*" | tee -a "$LOG"; }
 
+# A killed run used to leave status.json saying "running" forever, because
+# nothing wrote a status on the way out. Checking on the pipeline then reported
+# a stage that had not been alive for half an hour. The trap fires on SIGTERM,
+# SIGINT and SIGHUP -- which is what a kill, a Ctrl-C and a closed terminal
+# send -- so the file says what is true.
+on_signal() {
+    note "received a signal; standing down"
+    write_status interrupted "stopped by a signal; resumes next fire" "${F2:-0}"
+    exit 143
+}
+trap on_signal TERM INT HUP
+
 free_gib() {
     nvidia-smi --id=0 --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null \
         | head -1 | awk '{printf "%d", $1/1024}'
