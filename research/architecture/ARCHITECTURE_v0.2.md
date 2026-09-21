@@ -536,12 +536,57 @@ a data gap.
 
 ## 7. Hierarchical Pair Track
 
-### 7.1 Why not flat top-K **[v0.1, measured]**
+### 7.1 Why not flat top-K — **re-derived at scale** **[v0.2]**
 
-A flat top-K proposer keeping K = 32L recovers **0.200** of true contacts on
-500–1200 nt chains, where a *random* scorer gets 0.746 across the same set. A
-banded fallback does not rescue it: at L 1500–3000 even ±512 misses ~15%
-**[v0.2: 0.8545 captured]**. Contacts must be selected as **blocks**, not pairs.
+This is the claim the whole pair track rests on, and v0.1 stated it from 43
+chains, incorrectly:
+
+> *"A flat top-K proposer keeping K = 32L recovers 0.200 of true contacts on
+> 500–1200 nt chains, where a random scorer gets 0.746 across the same set."*
+
+**The two figures are different populations.** 0.2003 is the 500–1200 nt bin —
+**five chains**. 0.7458 is the random baseline over all 43 chains, 29 of them
+32–100 nt, where K = 32L already covers **94%** of every valid pair and so a
+random scorer recovers nearly all of them by construction. "Across the same set"
+is not true, and as written the sentence says a learned scorer does worse than
+chance, which is backwards.
+
+Re-measured on **2,994 chains** with every scorer on the same chains at the same
+budgets. Recall at K = 32·L:
+
+| chain length | n | random | separation prior | complementarity | K/dense |
+|---|---|---|---|---|---|
+| 32–100 | 1,205 | 0.941 | 0.914 | 0.952 | 0.941 |
+| 100–200 | 766 | 0.530 | 0.703 | 0.617 | 0.530 |
+| 200–500 | 97 | 0.203 | 0.522 | 0.300 | 0.204 |
+| 500–1,200 | 66 | 0.084 | 0.452 | 0.220 | 0.083 |
+| **1,200–3,000** | **860** | **0.034** | **0.377** | **0.182** | 0.034 |
+
+Random recall tracks `K/dense` to three decimals in every bin, which is the
+check that the measurement is sound. It also explains v0.1's 0.746: on short
+chains a linear budget *is* most of the quadratic map, so every scorer looks
+good and the corpus average is meaningless.
+
+**The conclusion survives, and is now quantitative.** On the long chains the
+architecture exists for, flat pair ranking within a linear budget:
+
+| | budget | recall |
+|---|---|---|
+| separation prior | c = 32 | 0.377 |
+| separation prior | c = 64 | 0.504 |
+| **occupied b=4 blocks** | **c = 16.9** | **1.000** |
+
+**Block selection reaches total recall at c ≈ 17, while flat pair ranking at
+nearly four times that budget recovers half the contacts.** That is the
+argument, and it is an order-of-magnitude argument rather than the ~4× one v0.1
+was reaching for.
+
+Two further things fall out. **Sequence complementarity, applied flat, is worse
+than |i−j| alone** on long chains — 0.182 against 0.377 — so the baseline a
+learned selector must beat is the separation prior, not random; that is why
+`train_block_scorer.py` ablates it explicitly. And a banded fallback does not
+rescue flat ranking either: at L 1500–3000 even ±512 misses ~15%
+**[v0.2: 0.8545 captured]**.
 
 ### 7.2 Three-level coarse-to-fine
 
@@ -1061,7 +1106,7 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 | 3 | Complete Ribonanza — 335,616 of 2.1M acquired; the rest needs Kaggle credentials | head 7 coverage |
 | 4 | Train the block-detection scorer | §7.4, the largest unvalidated assumption |
 | ~~5~~ | ~~Re-measure G2/G3 on raw whole entries~~ | **CLOSED** — 97.15% / 85.94% on 10,520 entries (§11.2, §11.2a) |
-| 6 | Re-derive every remaining max/min at scale | five of six failed; the chain-length maximum is the one that held (D20) |
+| ~~6~~ | ~~Re-derive every remaining max/min at scale~~ | **CLOSED** — the last load-bearing one was §7.1's flat-top-K result, re-derived on 2,994 chains and corrected (it compared two different populations) |
 | ~~7~~ | ~~Restore sample structures to the server~~ | **CLOSED** — 8,043 present; all six test suites run under `verify_claims.py` |
 | ~~8~~ | ~~Ingest the 2,581 entries no derivative covers~~ | **CLOSED** — `build_dataset.py` reads raw entries directly, so all 10,520 are in the built set (§12.4) |
 | ~~9~~ | ~~Extract the disorder labels~~ | **CLOSED** — `residue_labels()` reads them, along with Mg sites, B-factors and `N_struct` (§9 note below) |
@@ -1089,7 +1134,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **249** checks. Counting
+JSONs and fails the build on drift; it currently pins **257** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

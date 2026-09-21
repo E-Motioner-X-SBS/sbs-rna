@@ -1,11 +1,11 @@
 graph TB
     subgraph FAIL["WHY THE FLAT TOP-K DESIGN WAS DISCARDED - MEASURED"]
         F1["Flat top-K, K = 32L, sequence-only proposer<br/>recall of true 3D contacts:"]
-        F2["L 32-100: 0.980 recall ... but K = 59 pct of dense"]
-        F3["L 100-200: 0.642 recall"]
-        F4["L 200-500: 0.307 recall"]
-        F5["L 500-1200: 0.200 recall = ONE CONTACT IN FIVE"]
-        F6["RANDOM scorer gets 0.746 mean recall at c=32<br/>because short chains dominate the average.<br/>The flat proposer is barely above chance."]
+        F2["L 32-100: 0.941 recall ... but K = 94 pct of dense<br/>every scorer looks good here"]
+        F3["L 100-200: 0.703 recall (separation prior)"]
+        F4["L 200-500: 0.522 recall"]
+        F5["L 1200-3000: 0.377 recall at c=32<br/>0.504 even at c=64<br/>HALF THE CONTACTS MISSED"]
+        F6["measured on 2994 chains, matched budgets<br/>random gets 0.034 on long chains<br/>= exactly K/dense, so the measure is sound<br/>v0.1 quoted 0.746: that was SHORT chains"]
         F1 --> F2 --> F3 --> F4 --> F5 --> F6
     end
 
@@ -29,7 +29,7 @@ graph TB
         L1 --> L2 --> L3
     end
 
-    TOTAL["TOTAL 2.202 pct of dense<br/><br/>vs flat top-K: 1.118 pct of dense<br/>but only ~20 pct recall.<br/><br/>~2x the cost buys a 100 pct recall CEILING<br/>instead of a hard 20 pct floor.<br/><br/>CLOSED on raw PDB: modified residues present<br/>at 0.476 pct vs the derivatives 0.025 pct.<br/>Max rose 21.14 -&gt; 23.30 as predicted.<br/>24 holds, with 2.9 pct headroom."]
+    TOTAL["TOTAL 2.202 pct of dense<br/><br/>BLOCK SELECTION REACHES RECALL 1.0 AT c = 16.9<br/>flat ranking at c = 64, four times the budget,<br/>recovers 0.504. Order of magnitude, not 2x.<br/><br/>CLOSED on raw PDB: modified residues present<br/>at 0.476 pct vs the derivatives 0.025 pct.<br/>Max rose 21.14 -&gt; 23.30 as predicted.<br/>24 holds, with 2.9 pct headroom."]
 
     EASY["WHY IT IS EASIER TO LEARN<br/>Deciding whether a 16x16 block contains ANY contact<br/>aggregates 256 pair-decisions into one.<br/>The model ranks 32k blocks, not 4.1M pairs."]
 

@@ -152,6 +152,30 @@ def main() -> int:
         chk("chem pseudouridine residues", cl["pseudouridine"], 18458)
         chk("chem other residues", cl["other"], 14421)
 
+        # ---- §7.1: flat top-K, re-derived on 2,994 chains ----------------
+        # The claim the pair track rests on. v0.1 stated it from 43 chains and
+        # compared two different populations; these pin the matched version.
+        pr = load("proposal_recall_fullcorpus.json")
+        chk("7.1 chains measured", pr["n_chains"], 2994)
+        lb = pr["by_length_bin"]["1200-3000"]
+        chk("7.1 long-chain random recall at c=32", lb["random"]["32"], 0.0339,
+            abs_tol=0.0002)
+        chk("7.1 long-chain separation recall at c=32", lb["separation"]["32"],
+            0.3767, abs_tol=0.0002)
+        chk("7.1 long-chain complementarity recall at c=32",
+            lb["complementary"]["32"], 0.1822, abs_tol=0.0002)
+        chk("7.1 even at c=64 flat ranking recovers only half",
+            int(lb["separation"]["64"] < 0.55), 1)
+        # the design's whole case: total recall at a THIRD of that budget
+        chk("7.1 block oracle reaches recall 1.0 at c", lb["block_oracle_c_mean"],
+            16.91, abs_tol=0.02)
+        # the sanity check that the measurement is sound
+        chk("7.1 random recall equals the dense fraction",
+            int(abs(lb["random"]["32"] - lb["frac_dense_c32"]) < 0.001), 1)
+        # complementarity applied flat is WORSE than |i-j| alone on long chains
+        chk("7.1 separation beats flat complementarity on long chains",
+            int(lb["separation"]["32"] > lb["complementary"]["32"]), 1)
+
         # ---- §6.4: RMDB ionic titrations (open action 2) -----------------
         import json as _jj
         tf = ROOT / "data/benchmarks/rmdb/titrations.json"

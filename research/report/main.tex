@@ -759,8 +759,53 @@ short chains. \textcolor{risk}{\textbf{On long chains, where sparsity actually
 matters, it recovers one contact in five}}---a silent and fatal accuracy
 ceiling.
 
-A banded fallback does not rescue it, because RNA contacts are not sufficiently
-local. The fraction of contacts within $|i-j| \leq$ band is $0.350$ at band 32,
+\paragraph{Re-derived on 2,994 chains.}
+The table above is $43$ chains, and the $500$--$1200$ row is five of them. The
+architecture's own summary later compressed these two facts into a single
+sentence comparing the $0.200$ against the $0.746$ ``across the same set'',
+which they are not. Re-measured with every scorer on the same chains at the same
+budgets:
+
+\begin{table}[h]
+\centering
+\caption{Recall at $K = 32L$ by chain length, $2{,}994$ chains, matched budgets.
+Random recall equals $K/\text{dense}$ to three decimals in every bin, which is
+the check that the measurement is sound. \meas}
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{length} & \textbf{$n$} & \textbf{random} & \textbf{separation} &
+\textbf{complementarity} & \textbf{$K$/dense} \\
+\midrule
+32--100      & $1{,}205$ & $0.941$ & $0.914$ & $0.952$ & $0.941$ \\
+100--200     & $766$     & $0.530$ & $0.703$ & $0.617$ & $0.530$ \\
+200--500     & $97$      & $0.203$ & $0.522$ & $0.300$ & $0.204$ \\
+500--1{,}200 & $66$      & $0.084$ & $0.452$ & $0.220$ & $0.083$ \\
+\textbf{1{,}200--3{,}000} & $\mathbf{860}$ & $\mathbf{0.034}$ &
+$\mathbf{0.377}$ & $\mathbf{0.182}$ & $0.034$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+The conclusion survives and becomes quantitative. On the long chains the design
+exists for, a flat separation prior recovers $0.377$ at $c=32$ and $0.504$ even
+at $c=64$, while keeping every occupied $b{=}4$ block reaches
+\textbf{recall $1.000$ at $c = 16.9$}. \textcolor{risk}{\textbf{Block selection
+attains total recall at a third of the budget at which flat ranking recovers
+half the contacts}}---an order-of-magnitude argument rather than the ${\sim}2\times$
+one v0.1 was reaching for.
+
+Two things fall out. Sequence complementarity applied \emph{flat} is worse than
+$|i-j|$ alone on long chains ($0.182$ against $0.377$), so the baseline a
+learned selector must beat is the separation prior and not random---which is why
+the block-scorer experiment ablates it explicitly. And v0.1's $0.746$ is now
+explained rather than merely doubted: on chains of $32$--$100$~nt a linear
+budget already covers $94\%$ of the quadratic map, so every scorer scores well
+there and a corpus average over a short-chain-dominated sample means nothing.
+
+A banded fallback does not rescue it either, because RNA contacts are not
+sufficiently local. The fraction of contacts within $|i-j| \leq$ band is $0.350$ at band 32,
 $0.479$ at 64, $0.597$ at 128, $0.706$ at 256 and $0.812$ at 512 for chains of
 1500--3000~nt; median contact separation is $78$~nt with a long tail. Even a
 $\pm512$ band, which would cost vastly more than the whole budget, misses $19\%$.
@@ -2615,8 +2660,8 @@ $3{,}254$ of $10{,}527$ entries; and the geometry resolver never read
 residue, giving 1ARJ $\mathbf{424}$ heavy atoms per residue against a
 nucleotide's ${\sim}21$.
 
-All of it is under \texttt{verify\_claims.py}, which now pins \textbf{249}
-checks and runs nine test suites.
+All of it is under \texttt{verify\_claims.py}, which now pins \textbf{257}
+checks and runs ten test suites.
 
 \section{Status}
 
@@ -2628,7 +2673,7 @@ non-redundant structures, then re-derived on $29{,}807$ chains and on the
 $10{,}520$ RNA-bearing entries of the entire PDB (\S\ref{sec:v02}). Every
 central estimate reproduced; five of six extreme quantiles did not, and the one
 that did---the $4{,}450$~nt longest chain---did so over a closed population and
-is therefore settled rather than merely confirmed. $214$ automated checks pin
+is therefore settled rather than merely confirmed. $257$ automated checks pin
 every quoted number to the JSON artefact it came from and fail the build on
 drift.
 
@@ -2637,7 +2682,7 @@ Since \S\ref{sec:v02} the specification has also been \emph{built}
 667-class motif bank, the harmonic ensemble and all ten heads, against a
 $16{,}604$-chain training set carrying contacts, Mg$^{2+}$ sites, X-ray
 B-factors, \texttt{N\_struct} and disorder, plus 24 ionic titration ladders.
-$249$ automated checks and nine test suites hold it in place.
+$257$ automated checks and ten test suites hold it in place.
 
 The next phase is to \textbf{train the block-detection scorer}. The reference
 implementation proves the sparse pair track's cost and structure; it does not
