@@ -29,6 +29,13 @@ against today's 331, 92.65% ribosomal residues against the corrected 85.94%,
 the superseded §5.4 sizing table. Those are not content to recover; they are
 the numbers the later work replaced.
 
+## The link inventory
+
+Every source URL is tabulated in [`data/catalog/SOURCES.md`](../../data/catalog/SOURCES.md),
+**generated** from `build_jobs()` so it cannot drift from the downloader: 147
+jobs, 69 with verified byte sizes totalling 646.34 GB, each with its host, URL
+or command, and destination path.
+
 ## Getting the datasets
 
 `scripts/acquire_all.py` is the provenance record and the downloader: **147

@@ -35,3 +35,6 @@ data/samples/structures/
 # Acquisition state: written by scripts/acquire_all.py on the host that did the
 # downloading. It is per-machine bookkeeping, not corpus content.
 data/acquisition/
+
+# pytest cache
+.pytest_cache/

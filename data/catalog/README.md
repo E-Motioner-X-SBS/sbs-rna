@@ -3,6 +3,11 @@
 Consolidated, verified, queryable catalog of the RNA/nucleic-acid training
 resources acquired for the future RNA foundation model. Built 2026-09/10.
 
+> **Where every file came from:** [`SOURCES.md`](SOURCES.md) — all 147
+> acquisition jobs with their URLs, verified sizes and destinations, generated
+> from `scripts/acquire_all.py` so it cannot drift from the downloader. This
+> README describes the corpus; that one says how to obtain it.
+
 ## Contents at a glance
 
 | Layer | Sources | Scale |
