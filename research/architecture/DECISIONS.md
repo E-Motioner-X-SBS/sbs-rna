@@ -502,3 +502,87 @@ numpy, filter `|i-j| >= 4`, dedup with one `np.unique` over a packed key — the
 same chain takes **0.4 s and 0.29 GB** instead of 28 GB and no completion. The
 vectorised output was checked bit-identical to the original on 26 chains before
 the old code was removed.
+
+## D24 — One MoE recipe for the whole family: 32 experts, top-4, 2 shared, `d_e = d/2`
+
+§5.4 quoted totals and active counts for three models and called the arithmetic
+"[v0.1 arithmetic, verified exact]". It is not verifiable: the two numbers it
+quotes are determined by `n_experts`, `d_expert`, `top_k` and `n_shared`, and
+the document states none of the four.
+
+Solving for them analytically (`scripts/sampling/solve_sizing.py`, with the
+formula validated against built models) each row is individually reachable
+within ~3% -- by **three incompatible recipes**:
+
+| row | implied recipe | active fraction |
+|---|---|---|
+| PHAROS-Small | 8 experts, top-1, 2 shared, d_e=512 | 40.9% |
+| PHAROS-Mini | 24 experts, top-8, 0 shared, d_e=160 | 44.8% |
+| Base-v2 | 64 experts, top-6, 3 shared, d_e=256 | 19.2% |
+
+A fixed recipe holds the active fraction roughly constant as `d` and depth
+scale. A 41% / 45% / 19% spread is the signature of three separate
+calculations, not one family. Two of the three are also barely sparse: top-1 of
+8 with 2 shared experts is a dense FFN with extra steps.
+
+**Decision: 32 experts, top-4, 2 shared, `d_expert = d_model/2`.** Fine-grained
+with shared-expert isolation -- both halves of the DeepSeek-MoE arrangement,
+where defect #21 had copied one ratio and not the other. Built sizes:
+
+| | total | active | active % |
+|---|---|---|---|
+| PHAROS-Small | **238.8M** | **62.7M** | 26.2% |
+| PHAROS-Mini | 102.1M | 27.8M | 27.2% |
+| Base-v2 | 1,060.6M | 267.9M | 25.3% |
+
+**Why this recipe and not another.** It reproduces v0.1's **active** column --
+62.7M against 61M for Small, 267.9M against 269M for Base-v2 -- and the active
+count is what training FLOPs and the ~78 A100-h estimate depend on. So the cost
+claims survive unchanged. The **totals** do not survive: Small is 1.6x and
+Base-v2 0.76x what was printed. Totals drive memory footprint, so any statement
+about fitting a model on a given card must be re-read against the new column.
+
+This also closes a smaller defect found by the same cross-check:
+`MoEFeedForward.n_active_params` omitted `expert_bias`, under-counting active
+parameters by `n_experts` per block. An analytic count and an implementation
+that were written independently disagreed by exactly 256 parameters, which is
+how it surfaced.
+
+## D25 — Splits: family-disjoint where possible, entry-disjoint where it is not
+
+D17 required family-disjoint splits. Building the set showed that a 90/5/5
+family-disjoint split of this corpus **cannot exist**:
+
+| family | residues | share |
+|---|---|---|
+| SSU_rRNA_bacteria | 3,678,386 | 27.9% |
+| LSU_rRNA_bacteria | 3,579,582 | 27.2% |
+| LSU_rRNA_eukarya | 2,278,889 | 17.3% |
+| SSU_rRNA_eukarya | 1,584,595 | 12.0% |
+
+Four families are **84.4%** of all 13,172,991 structural RNA residues, and a 5%
+quota is 658,650 -- so the smallest of the four is 2.4x an entire held-out
+bucket. Keeping families whole means each must go somewhere, and wherever it
+goes the target fractions are gone. A balanced greedy packing returned
+**55/27/17** for precisely this reason.
+
+**Decision: two splits, each answering a question it can answer.**
+
+* **Primary (family-disjoint).** Any family above 5% of the corpus is forced to
+  `train`; `val` and `test` are packed from the remaining 1,286 groups, 20% of
+  that remainder each. Result: train 11,723 chains / 10.09M residues, val 1,189
+  / 410,303, test 1,450 / 410,303 -- val and test balanced to the residue. This
+  measures generalisation **to unseen folds**, which is the question a
+  family-disjoint split exists to ask, and it is better asked on a set holding
+  no ribosomes than on one whose answer would be 84% ribosome.
+* **Secondary (`test_ribosomal`, entry-disjoint only).** Held-out *entries* from
+  the four giant families: 2,242 chains / 2.26M residues. Homologues of these
+  are in training by necessity, so it is reported under its own name and
+  **never averaged with `test`**. A single blended figure would be 84% a
+  homolog-leaking measurement wearing a family-disjoint name.
+
+**A trap worth recording**, because it was live for one iteration: the threshold
+for "too big to hold out" and the size of the held-out buckets are different
+quantities. Deriving the first from the second meant that raising the held-out
+fraction to 20% also raised the eligibility threshold to 2.63M residues, which
+let SSU_rRNA_eukarya (1.58M) become the entire validation set on its own.

@@ -355,13 +355,38 @@ conditioned on *what kind of RNA this is*, which is the point.
 features derived from the pair track are unavailable on the first pass. Current
 plan is a sequence-only router at recycle 0, switching at recycle ≥ 1.
 
-### 5.4 Sizing **[v0.1 arithmetic, verified exact]**
+### 5.4 Sizing **[v0.2 — built and counted; v0.1's table was not reproducible]**
 
-| Model | d | blocks | loops | eff. layers | total | active | A100-h @25B |
-|---|---|---|---|---|---|---|---|
-| **PHAROS-Small** (default) | 512 | 16 | 8 | 128 | **149M** | **61M** | **~78** |
-| PHAROS-Mini | 384 | 12 | 12 | 144 | 67M | 30M | — |
-| Base-v2 (scale-up path) | 768 | 32 | 3 | 96 | 1,401M | 269M | — |
+| Model | d | blocks | loops | eff. layers | total | active | active % | A100-h @25B |
+|---|---|---|---|---|---|---|---|---|
+| **PHAROS-Small** (default) | 512 | 16 | 8 | 128 | **238.8M** | **62.7M** | 26.2% | **~78** |
+| PHAROS-Mini | 384 | 12 | 12 | 144 | 102.1M | 27.8M | 27.2% | — |
+| Base-v2 (scale-up path) | 768 | 32 | 3 | 96 | 1,060.6M | 267.9M | 25.3% | — |
+
+MoE recipe, shared across the family: **32 experts, top-4, 2 shared,
+`d_expert = d_model/2`**. Counted from `pharos.model.Pharos`, pinned by
+`test_pharos.py`.
+
+> **v0.1 quoted 149M/61M, 67M/30M and 1,401M/269M and called the arithmetic
+> "verified exact". It could not have been.** The table gives `d_model`, block
+> count and loop count; the two numbers it quotes are determined by
+> `n_experts`, `d_expert`, `top_k` and `n_shared`, and it states none of them.
+>
+> Solving for them (`scripts/sampling/solve_sizing.py`, analytic counts
+> validated against built models) shows each row is individually reachable
+> within ~3% — but by **three mutually incompatible recipes**: Small implies
+> 8 experts / top-1, Mini implies 24 / top-8, Base-v2 implies 64 / top-6. That
+> is not a model family. The giveaway is the active fraction, which any fixed
+> recipe holds roughly constant as `d` and depth scale: v0.1's rows imply
+> **40.9%, 44.8% and 19.2%**, while the adopted recipe gives 26.2%, 27.2% and
+> 25.3%.
+>
+> **What survives is the active column**, and that is the column that matters:
+> active parameters drive training FLOPs and therefore the ~78 A100-h estimate.
+> The adopted recipe reproduces it to **2.8% (Small)** and **0.4% (Base-v2)**.
+> The totals were wrong — Small is 1.6x and Base-v2 0.76x what was printed —
+> and totals drive memory, not cost, so the cost claims stand and the
+> memory-footprint statements should be re-read against the new column.
 
 Small first: the structure task carries ~2.8 MB of information and is
 data-limited, not capacity-limited. The first informative checkpoint is about
@@ -802,21 +827,53 @@ measured optimum. Unscored entries take the 0.80 band.
 
 ### 12.4 Splits must be family-disjoint, and now can be
 
-A random split leaks. The corpus is rRNA-dominated — G3 measures **92.65%** of
-residues as ribosomal, and the five most common Rfam families in the
+A random split leaks. The corpus is rRNA-dominated — G3 measures **85.94%** of
+residues as ribosomal (§11.2a), and the five most common Rfam families in the
 pdb_hunter index are `LSU_rRNA_bacteria`, `SSU_rRNA_bacteria`,
 `LSU_rRNA_eukarya`, `SSU_rRNA_eukarya`, `tRNA` — so a random split puts close
 homologues of the test set into training and reports a number that means
 nothing.
 
 **6,316 entries carry an Rfam family label across 585 families**, which makes a
-family-disjoint split constructible for the first time. Combined with the
-mandatory isolated-vs-in-complex stratification (§11.2) and the blind sets
-(CASP15/16, RNA-Puzzles, never trained on), this is the evaluation protocol:
+family-disjoint split constructible for the first time.
 
-1. hold out whole **Rfam families**, never individual chains;
+#### But not at 90/5/5 — that split does not exist **[v0.2, measured on the built set]**
+
+Building the set (16,604 chains, 13,172,991 residues, 63,298,800 contacts) made
+the obstruction concrete. Four families are **84.4%** of all structural RNA:
+
+| family | residues | share |
+|---|---|---|
+| SSU_rRNA_bacteria | 3,678,386 | 27.9% |
+| LSU_rRNA_bacteria | 3,579,582 | 27.2% |
+| LSU_rRNA_eukarya | 2,278,889 | 17.3% |
+| SSU_rRNA_eukarya | 1,584,595 | 12.0% |
+
+A 5% quota is 658,650 residues, so the *smallest* of the four is 2.4× an entire
+held-out bucket. Keeping a family whole means placing it somewhere, and wherever
+it goes the target fractions are gone — a balanced greedy packing returned
+55/27/17. **The protocol is therefore two splits, not one** (D25):
+
+| split | chains | residues | disjointness | what it measures |
+|---|---|---|---|---|
+| train | 11,723 | 10,093,574 | — | — |
+| val | 1,189 | 410,303 | **family** | generalisation to unseen folds |
+| test | 1,450 | 410,303 | **family** | same, held back |
+| `test_ribosomal` | 2,242 | 2,258,811 | entry only | the corpus bulk, homolog-rich |
+
+`test_ribosomal` holds out whole *entries* from the four giant families.
+Homologues of them are in training by necessity, so it carries its own name and
+is **never averaged with `test`** — a single blended number would be 84% a
+homolog-leaking measurement wearing a family-disjoint label.
+
+Combined with the mandatory isolated-vs-in-complex stratification (§11.2) and
+the blind sets (CASP15/16, RNA-Puzzles, never trained on), the protocol is:
+
+1. hold out whole **Rfam families** wherever a family is small enough to hold
+   out, and say so explicitly wherever one is not;
 2. report **isolated vs in-complex** separately;
-3. report blind-set performance separately again.
+3. report `test_ribosomal` separately from `test`;
+4. report blind-set performance separately again.
 
 ### 12.5 Optimiser
 
@@ -861,7 +918,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **214** checks. Counting
+JSONs and fails the build on drift; it currently pins **226** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

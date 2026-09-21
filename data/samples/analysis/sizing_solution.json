@@ -1,0 +1,48 @@
+{
+ "PHAROS-Small": {
+  "d_model": 512,
+  "n_blocks": 16,
+  "n_loops": 8,
+  "spec_total": 149000000.0,
+  "spec_active": 61000000.0,
+  "n_experts": 8,
+  "d_expert": 512,
+  "top_k": 1,
+  "n_shared": 2,
+  "fit_total": 150566796,
+  "fit_active": 62486412,
+  "rel_err_total": 0.0105,
+  "rel_err_active": 0.0244
+ },
+ "PHAROS-Mini": {
+  "d_model": 384,
+  "n_blocks": 12,
+  "n_loops": 12,
+  "spec_total": 67000000.0,
+  "spec_active": 30000000.0,
+  "n_experts": 24,
+  "d_expert": 160,
+  "top_k": 8,
+  "n_shared": 0,
+  "fit_total": 64946146,
+  "fit_active": 29556706,
+  "rel_err_total": 0.0307,
+  "rel_err_active": 0.0148
+ },
+ "Base-v2": {
+  "d_model": 768,
+  "n_blocks": 32,
+  "n_loops": 3,
+  "spec_total": 1401000000.0,
+  "spec_active": 269000000.0,
+  "n_experts": 64,
+  "d_expert": 256,
+  "top_k": 6,
+  "n_shared": 3,
+  "fit_total": 1363440364,
+  "fit_active": 268727020,
+  "rel_err_total": 0.0268,
+  "rel_err_active": 0.001
+ },
+ "_verdict": "NOT reproducible: no configuration on the grid matches all three rows"
+}

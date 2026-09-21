@@ -152,6 +152,35 @@ def main() -> int:
         chk("chem pseudouridine residues", cl["pseudouridine"], 18458)
         chk("chem other residues", cl["other"], 14421)
 
+        # ---- §12.4 / D25: the built training set and its splits ----------
+        import json as _json
+        mf = ROOT / "data/derived/pharos3d/manifest.json"
+        if mf.exists():
+            ds = _json.loads(mf.read_text())
+            chk("dataset chains", ds["n_chains"], 16604)
+            chk("dataset residues", ds["n_residues"], 13172991)
+            chk("dataset contacts", ds["n_contacts"], 63298800)
+            chk("dataset longest chain", ds["length"]["max"], 4450)
+            sp = ds["split"]["by_residue"]
+            chk("split: train residues", sp["train"], 10093574)
+            # val and test are packed to the same residue budget on purpose;
+            # if they drift apart the packer has stopped balancing
+            chk("split: val and test balanced to the residue",
+                int(sp["val"] == sp["test"]), 1)
+            chk("split: val residues", sp["val"], 410303)
+            chk("split: test_ribosomal is separate and labelled",
+                int("test_ribosomal" in sp), 1)
+        else:
+            chk("dataset manifest present (scripts/build_dataset.py)", 0, 1)
+
+        # ---- §5.4 / D24: the sizing table is now countable ---------------
+        sz = load("sizing_solution.json")
+        chk("sizing: §5.4 is not reproducible from the document",
+            int(sz["_verdict"].startswith("NOT")), 1)
+        chk("sizing: its three rows imply three different recipes",
+            int(len({(sz[m]["n_experts"], sz[m]["top_k"]) for m in
+                     ("PHAROS-Small", "PHAROS-Mini", "Base-v2")}) == 3), 1)
+
         # ---- §11.4: the derivatives are not the archive ------------------
         # The finding that reframed D23: the derivative maximum is correct for
         # the population the derivatives hold, and every chain above it is one
@@ -484,7 +513,9 @@ def main() -> int:
     suites = [ROOT / "research/architecture/reference/test_hierarchical_pair_track.py",
               ROOT / "src/pharos/physics/test_manning.py",
               ROOT / "src/pharos/data/test_mmcif_entities.py",
-              ROOT / "src/pharos/data/test_chemistry.py"]
+              ROOT / "src/pharos/data/test_chemistry.py",
+              ROOT / "src/pharos/model/test_attention.py",
+              ROOT / "src/pharos/model/test_pharos.py"]
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's
