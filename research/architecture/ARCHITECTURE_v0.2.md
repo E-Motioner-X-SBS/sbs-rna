@@ -1031,10 +1031,27 @@ depositions, not a gap.
    > against the **log 13 = 2.565** a fresh model should start from. The run
    > would have opened by unlearning its own initialisation. With std-0.02 init
    > it starts at 2.43–2.53, and `test_pharos.py` pins that at two widths.
-2. **2D** on bpRNA + pdb_hunter dot-bracket.
+2. **2D** on bpRNA + pdb_hunter dot-bracket. **Implemented [v0.2]:**
+   `scripts/train_sequence_stages.py`, bpRNA-SPOT, 10,934 train sequences.
 3. **Probing** on Ribonanza — **335,616 profiles acquired** (2A3_MaP and
    DMS_MaP, 206 reactivity positions, ~177 nt sequences): **499× the 673 clean
    3D sequences**, and the largest labelled channel the model will see.
+   **Implemented [v0.2]**, co-trained with stage 2 rather than sequenced after
+   it — the curriculum orders them because the representation matures in that
+   order, not because the losses conflict.
+
+   > **Reactivity is a masked target, and the mask is most of it.** Profiles are
+   > 206 columns against sequences of median 177 nt, and positions outside the
+   > read-out window are `NaN`. Measured over 4,096 rows: **only 48.8% of
+   > reactivity cells are finite**. A zero in the other 51.2% is a claim that
+   > the base is unreactive, which is a different statement from "not
+   > measured", and training on it would teach the model that the ends of every
+   > construct are protected. Every reactivity loss is masked to the finite
+   > entries.
+
+   Because probing is 31× the size of the 2D set, the two losses carry explicit
+   weights (0.5 / 1.0). Summed unweighted, 2D would dominate the gradient by
+   being read more often per epoch rather than by carrying more information.
 4. **Physics** terms active throughout; they are closed-form and need no stage.
 5. **3D** last and briefest, on 673 clean sequences, with the ensemble head.
 6. **Function** heads (fitness, splicing) as auxiliary tasks, co-trained.
