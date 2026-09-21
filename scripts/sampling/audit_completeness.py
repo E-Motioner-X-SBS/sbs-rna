@@ -89,6 +89,24 @@ NOT_BUILT = {
 #: to the last, no warm-up and no decay, while the block scorer and stage 5 both
 #: ran OneCycleLR. The audit's own note is what made that absence look
 #: deliberate, so the entry is gone and this check replaces it.
+#: Every trainer must be able to stop and resume, and the audit checks the
+#: behaviour rather than the existence of a file.
+#:
+#: Only stage 1 could. The other three saved at EPOCH BOUNDARIES with no
+#: optimiser state and no path that read it back -- and because the cron runner
+#: passes `--init-from <previous stage>` on every fire, an interrupted stage
+#: restarted from the previous stage's weights and discarded everything it had
+#: done. An epoch of stages 2-3 is about 10,500 steps. That is the same defect
+#: stage 1 had and that its own docstring called out: "an unattended
+#: pretraining script that restarts from zero is not unattended, it is a loop
+#: that makes no progress."
+RESUMABLE = {
+    "scripts/pretrain_mlm.py":          "token/step counters, optimiser state",
+    "scripts/train_sequence_stages.py": "epoch/gstep, optimiser state",
+    "scripts/train_pharos.py":          "epoch/step, optimiser + OneCycleLR",
+    "scripts/train_block_scorer.py":    "epoch/step, optimiser + OneCycleLR",
+}
+
 SCHEDULED = {
     "scripts/pretrain_mlm.py":          ("lr_at", "cosine on token progress"),
     "scripts/train_sequence_stages.py": ("lr_at", "cosine on estimated steps"),
@@ -139,7 +157,30 @@ def main() -> None:
         if not has:
             missing.append(f"{script}: no learning-rate schedule")
 
+    print("\nstop and resume, per trainer")
+    resume_rows = []
+    for script, how in sorted(RESUMABLE.items()):
+        f = ROOT / script
+        src = f.read_text() if f.exists() else ""
+        checks = {
+            "loads optimiser state": "opt.load_state_dict" in src,
+            "saves optimiser state": '"opt": opt.state_dict()' in src,
+            "checkpoints mid-epoch": "ckpt_every" in src,
+            "survives an OOM": "OutOfMemoryError" in src,
+            "--restart is non-destructive": "superseded" in src,
+        }
+        ok = all(checks.values())
+        bad = [k for k, v in checks.items() if not v]
+        print(f"  {'OK  ' if ok else 'FAIL'} {script:38s} {how}"
+              + ("" if ok else f"  MISSING: {', '.join(bad)}"))
+        resume_rows.append({"script": script, "how": how, "resumable": ok,
+                            "missing": bad})
+        if not ok:
+            missing.append(f"{script}: cannot resume ({', '.join(bad)})")
+
     res = {"n_components": len(rows),
+           "n_resumable": sum(1 for r in resume_rows if r["resumable"]),
+           "resume": resume_rows,
            "n_scheduled": sum(1 for r in sched_rows if r["scheduled"]),
            "n_trainers": len(sched_rows), "schedules": sched_rows,
            "n_present": sum(1 for r in rows if r["present"]),
@@ -151,7 +192,8 @@ def main() -> None:
     out.write_text(json.dumps(res, indent=1))
     print(f"\ncomponents present: {res['n_present']}/{res['n_components']}   "
           f"curriculum stages: {res['n_stages_present']}/{res['n_stages']}   "
-          f"trainers scheduled: {res['n_scheduled']}/{res['n_trainers']}")
+          f"trainers scheduled: {res['n_scheduled']}/{res['n_trainers']}   "
+          f"resumable: {res['n_resumable']}/{res['n_trainers']}")
     print("MISSING: " + (", ".join(missing) if missing else "none"))
     print(f"\n-> {out}")
 

@@ -52,6 +52,11 @@ ROOT = Path(__file__).resolve().parents[1]
 BENCH = ROOT / "data/benchmarks"
 OUT = ROOT / "data/samples/analysis"
 CKPT = ROOT / "data/derived/checkpoints"
+
+#: See train_pharos.CKPT_FORMAT. A checkpoint without it predates resumable
+#: checkpoints and carries no optimiser state, so it is weights, not training
+#: state, and must not be resumed from.
+CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -296,13 +301,41 @@ def main() -> None:
     ap.add_argument("--init-from", type=Path, default=None,
                     help="a stage-1 pretraining checkpoint")
     ap.add_argument("--log-every", type=int, default=100)
+    ap.add_argument("--ckpt-every", type=int, default=200,
+                    help="steps between checkpoints. Epoch-end only was a "
+                         "latent full-restart: an epoch here is ~10,500 steps")
+    ap.add_argument("--restart", action="store_true",
+                    help="ignore an existing checkpoint; it is RENAMED, not "
+                         "overwritten")
+    ap.add_argument("--ckpt", type=Path, default=None,
+                    help="checkpoint path; defaults to "
+                         "data/derived/checkpoints/seqstages_<size>.pt")
     args = ap.parse_args()
 
     device = require_gpu(args)
     enable_gpu_fast_paths()
     cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
     model = Pharos(cfg).to(device)
-    if args.init_from and args.init_from.exists():
+    CKPT.mkdir(parents=True, exist_ok=True)
+    ck = args.ckpt or (CKPT / f"seqstages_{args.size}.pt")
+    if ck.exists() and args.restart:
+        keep = ck.with_suffix(".superseded.pt")
+        ck.replace(keep)
+        print(f"[seq] --restart: {ck.name} moved to {keep.name}", flush=True)
+    resume = torch.load(ck, map_location=device) if ck.exists() else None
+    if resume is not None and resume.get("format") != CKPT_FORMAT:
+        print(f"[seq] {ck.name} predates resumable checkpoints; ignoring it "
+              f"and honouring --init-from", flush=True)
+        resume = None
+    if resume is not None:
+        # RESUME BEATS --init-from. The cron runner passes --init-from on every
+        # fire, so without this an interrupted stage restarts from stage 1's
+        # weights and throws away everything it had done -- and an epoch here is
+        # about 10,500 steps.
+        model.load_state_dict(resume["model"])
+        print(f"[seq] resumed from {ck.name}: epoch {resume.get('epoch', 0)}, "
+              f"step {resume.get('gstep', 0):,}", flush=True)
+    elif args.init_from and args.init_from.exists():
         sd = torch.load(args.init_from, map_location=device)
         missing = model.load_state_dict(sd["model"], strict=False)
         print(f"[seq] initialised from {args.init_from.name} "
@@ -319,14 +352,34 @@ def main() -> None:
                           / b["mask"].sum(1, keepdim=True).clamp(min=1))[:, :5])
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    CKPT.mkdir(parents=True, exist_ok=True)
     hist: List[Dict] = []
     total_steps = max(1, estimate_steps(args))
     print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} steps "
           f"({args.epochs} epochs)", flush=True)
-    gstep = 0
+    gstep, start_ep, n_oom = 0, 0, 0
+    if resume is not None:
+        if "opt" in resume:
+            opt.load_state_dict(resume["opt"])
+        gstep = int(resume.get("gstep", 0))
+        hist = list(resume.get("history", []))
+        # A checkpoint written at the end of an epoch resumes at the next one;
+        # one written mid-epoch redoes that epoch from its start, with the
+        # weights and optimiser as saved. The data generators read files
+        # sequentially and cannot seek, so a little repetition is the price --
+        # far cheaper than the whole stage.
+        start_ep = int(resume.get("epoch", 0)) + (1 if resume.get("epoch_done") else 0)
+        if start_ep >= args.epochs:
+            print(f"[seq] all {args.epochs} epochs already done; nothing to do",
+                  flush=True)
+            return
 
-    for ep in range(args.epochs):
+    def save(ep: int, done: bool) -> None:
+        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+                    "model": model.state_dict(), "opt": opt.state_dict(),
+                    "epoch": ep, "epoch_done": done,
+                    "gstep": gstep, "history": hist}, ck)
+
+    for ep in range(start_ep, args.epochs):
         model.train()
         t0 = time.time()
         ss_loss, ss_acc, pr_loss, pr_r, step = [], [], [], [], 0
@@ -364,11 +417,25 @@ def main() -> None:
             for g in opt.param_groups:
                 g["lr"] = lr_now
             gstep += 1
-            opt.zero_grad(set_to_none=True)
-            total.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            try:
+                opt.zero_grad(set_to_none=True)
+                total.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
+            except torch.OutOfMemoryError:
+                # Same reasoning as stages 1 and 5: one batch is not worth the
+                # stage. `gstep` has already advanced, so the cosine keeps its
+                # place against the estimate rather than stretching.
+                n_oom += 1
+                opt.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
+                if n_oom <= 5 or n_oom % 50 == 0:
+                    print(f"[seq] OOM #{n_oom} at step {step}; batch skipped",
+                          flush=True)
+                continue
             step += 1
+            if step % args.ckpt_every == 0:
+                save(ep, False)
             if step % args.log_every == 0:
                 print(f"[seq] ep{ep} step{step} lr {lr_now:.2e}  2D loss "
                       f"{np.mean(ss_loss[-args.log_every:]):.4f} acc "
@@ -381,9 +448,14 @@ def main() -> None:
                      "probing_loss": float(np.mean(pr_loss)) if pr_loss else None,
                      "probing_pearson": float(np.mean(pr_r)) if pr_r else None})
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
-        torch.save({"cfg": cfg.__dict__, "model": model.state_dict(), "epoch": ep},
-                   CKPT / f"seqstages_{args.size}.pt")
+        save(ep, True)
 
+    if not hist:
+        # see train_pharos.py: a run that trained nothing must not clobber the
+        # last real results file
+        print("[seq] no epochs ran; leaving the existing results file alone",
+              flush=True)
+        return
     report = {"size": args.size, "params": pc, "stage_weights": STAGE_WEIGHTS,
               "history": hist}
     OUT.mkdir(parents=True, exist_ok=True)

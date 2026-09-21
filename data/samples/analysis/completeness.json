@@ -1,5 +1,32 @@
 {
  "n_components": 30,
+ "n_resumable": 4,
+ "resume": [
+  {
+   "script": "scripts/pretrain_mlm.py",
+   "how": "token/step counters, optimiser state",
+   "resumable": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_block_scorer.py",
+   "how": "epoch/step, optimiser + OneCycleLR",
+   "resumable": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_pharos.py",
+   "how": "epoch/step, optimiser + OneCycleLR",
+   "resumable": true,
+   "missing": []
+  },
+  {
+   "script": "scripts/train_sequence_stages.py",
+   "how": "epoch/gstep, optimiser state",
+   "resumable": true,
+   "missing": []
+  }
+ ],
  "n_scheduled": 4,
  "n_trainers": 4,
  "schedules": [

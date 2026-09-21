@@ -46,6 +46,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data/derived/pharos3d"
 OUT = ROOT / "data/samples/analysis"
 CKPT = ROOT / "data/derived/checkpoints"
+
+#: See train_pharos.CKPT_FORMAT. `block_scorer.pt` as it stands predates this
+#: and holds only the BEST epoch's weights -- no optimiser, no schedule, no
+#: step count -- so it is a result, not training state, and is not resumed from.
+CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                      # noqa: E402
@@ -246,24 +251,77 @@ def train(args) -> None:
     CKPT.mkdir(parents=True, exist_ok=True)
     best = -1.0
     history: List[Dict] = []
-    step = 0
-    for ep in range(args.epochs):
+    step, start_ep, n_oom = 0, 0, 0
+    # Resume state lives BESIDE the result. `block_scorer.pt` is written only
+    # when validation improves, so it is the best epoch and not the last one --
+    # resuming from it would silently rewind training to whenever that was.
+    state = args.ckpt.with_suffix(".state.pt")
+    if state.exists() and args.restart:
+        keep = state.with_suffix(".superseded.pt")
+        state.replace(keep)
+        print(f"[bs] --restart: {state.name} moved to {keep.name}", flush=True)
+    resume = torch.load(state, map_location=device) if state.exists() else None
+    if resume is not None and resume.get("format") != CKPT_FORMAT:
+        print(f"[bs] {state.name} predates resumable state; ignoring", flush=True)
+        resume = None
+    if resume is not None:
+        model.load_state_dict(resume["model"])
+        opt.load_state_dict(resume["opt"])
+        step = int(resume.get("step", 0))
+        best = float(resume.get("best", -1.0))
+        history = list(resume.get("history", []))
+        start_ep = int(resume.get("epoch", 0)) + (1 if resume.get("epoch_done") else 0)
+        if resume.get("total_steps") == total_steps and "sched" in resume:
+            sched.load_state_dict(resume["sched"])
+        else:
+            print(f"[bs] schedule changed ({resume.get('total_steps')} -> "
+                  f"{total_steps}); fast-forwarding a fresh one", flush=True)
+            for _ in range(min(step, total_steps - 1)):
+                sched.step()
+        print(f"[bs] resumed: epoch {resume.get('epoch')}, step {step:,}, "
+              f"best val L2 {best:.4f}", flush=True)
+        if start_ep >= args.epochs:
+            print(f"[bs] all {args.epochs} epochs already done", flush=True)
+
+    def save_state(ep: int, done: bool) -> None:
+        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+                    "model": model.state_dict(), "opt": opt.state_dict(),
+                    "sched": sched.state_dict(), "total_steps": total_steps,
+                    "epoch": ep, "epoch_done": done, "step": step,
+                    "best": best, "history": history}, state)
+
+    for ep in range(start_ep, args.epochs):
         model.train()
         t0, run = time.time(), []
         for bidx in epoch_batches[ep]:
             t = to_device(tr.collate(bidx), device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
-                out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"])
-                out = {k: (v.float() if v.dtype != torch.bool else v)
-                       for k, v in out.items()}
-                loss, parts = occupancy_loss(out, t["contacts"], t["lengths"], cfg)
-            opt.zero_grad(set_to_none=True)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            try:
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"])
+                    out = {k: (v.float() if v.dtype != torch.bool else v)
+                           for k, v in out.items()}
+                    loss, parts = occupancy_loss(out, t["contacts"],
+                                                 t["lengths"], cfg)
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
+            except torch.OutOfMemoryError:
+                n_oom += 1
+                opt.zero_grad(set_to_none=True)
+                del t
+                torch.cuda.empty_cache()
+                sched.step()       # keep the curve aligned with the batch count
+                step += 1
+                if n_oom <= 5 or n_oom % 50 == 0:
+                    print(f"[bs] OOM #{n_oom} at step {step}; batch skipped",
+                          flush=True)
+                continue
             sched.step()
             run.append(float(loss.detach()))
             step += 1
+            if step % args.ckpt_every == 0:
+                save_state(ep, False)
             if step % args.log_every == 0:
                 print(f"[bs] ep{ep} step{step} loss {np.mean(run[-args.log_every:]):.4f} "
                       f"lr {sched.get_last_lr()[0]:.2e}", flush=True)
@@ -276,13 +334,22 @@ def train(args) -> None:
         score = (ev["l2_recall"] or 0.0)
         if score > best:
             best = score
+            # the RESULT: best epoch only, and deliberately without optimiser
+            # state, because this is what evaluation and the cascade read
             torch.save({"cfg": cfg.__dict__, "model": model.state_dict(),
-                        "epoch": ep, "val": ev}, CKPT / "block_scorer.pt")
+                        "epoch": ep, "val": ev}, args.ckpt)
+        save_state(ep, True)          # the RESUME STATE: last epoch, always
 
     # ---- the comparison R1 is actually about --------------------------
     print("\n[bs] test-set comparison at the identical budget")
     sd = torch.load(CKPT / "block_scorer.pt", map_location=device)
     model.load_state_dict(sd["model"])
+    if not history:
+        # see train_pharos.py: a run that trained nothing must not clobber the
+        # last real results file
+        print("[bs] no epochs ran; leaving the existing results file alone",
+              flush=True)
+        return
     report = {"config": cfg.__dict__, "n_parameters": n_par,
               "best_epoch": sd["epoch"], "history": history,
               "splits": {"train": len(tr), "val": len(va), "test": len(te)},
@@ -329,6 +396,10 @@ def main() -> None:
     ap.add_argument("--eval-batches", type=int, default=None)
     ap.add_argument("--log-every", type=int, default=100)
     ap.add_argument("--eval-only", action="store_true")
+    ap.add_argument("--ckpt-every", type=int, default=200,
+                    help="steps between resume-state saves")
+    ap.add_argument("--restart", action="store_true",
+                    help="ignore existing resume state; it is RENAMED")
     ap.add_argument("--ckpt", type=Path, default=CKPT / "block_scorer.pt")
     args = ap.parse_args()
 

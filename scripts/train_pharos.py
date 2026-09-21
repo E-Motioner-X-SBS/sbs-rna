@@ -52,6 +52,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data/derived/pharos3d"
 OUT = ROOT / "data/samples/analysis"
 CKPT = ROOT / "data/derived/checkpoints"
+
+#: Bumped when the checkpoint gains fields a resume depends on. A file without
+#: it predates resumable checkpoints -- weights and an epoch number and nothing
+#: else -- and must not be read as training state.
+CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
@@ -357,6 +362,14 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
+    ap.add_argument("--ckpt-every", type=int, default=100,
+                    help="steps between checkpoints. Epoch-end only meant an "
+                         "interrupted epoch lost everything, and the next fire "
+                         "restarted from the PREVIOUS stage's weights")
+    ap.add_argument("--restart", action="store_true",
+                    help="ignore an existing checkpoint; it is RENAMED")
+    ap.add_argument("--ckpt", type=Path, default=None,
+                    help="checkpoint path; default pharos_<size>.pt")
     ap.add_argument("--init-from", type=Path, default=None,
                     help="a checkpoint from an earlier curriculum stage")
     ap.add_argument("--sample-loops", action="store_true", default=True,
@@ -385,7 +398,30 @@ def main() -> None:
     # representation to build on, which is what produced r = 0.049 on unseen
     # folds. Chaining is the difference between a curriculum and four unrelated
     # runs.
-    if args.init_from and Path(args.init_from).exists():
+    CKPT.mkdir(parents=True, exist_ok=True)
+    ck = args.ckpt or (CKPT / f"pharos_{args.size}.pt")
+    if ck.exists() and args.restart:
+        keep = ck.with_suffix(".superseded.pt")
+        ck.replace(keep)
+        print(f"[pharos] --restart: {ck.name} moved to {keep.name}", flush=True)
+    resume = torch.load(ck, map_location=device) if ck.exists() else None
+    if resume is not None and resume.get("format") != CKPT_FORMAT:
+        # A checkpoint written before resume existed carries weights and an
+        # epoch number and nothing else. `pharos_small.pt` on this machine is a
+        # COMPLETED 8-epoch run from the random-init experiment -- reading its
+        # epoch would either skip stage 5 or resume the experiment the
+        # curriculum was built to replace. Version the format and ignore what
+        # predates it.
+        print(f"[pharos] {ck.name} predates resumable checkpoints "
+              f"(no format tag); ignoring it and honouring --init-from",
+              flush=True)
+        resume = None
+    if resume is not None:
+        # RESUME BEATS --init-from: the runner passes --init-from every fire.
+        model.load_state_dict(resume["model"])
+        print(f"[pharos] resumed from {ck.name}: epoch {resume.get('epoch')}, "
+              f"step {resume.get('step', 0):,}", flush=True)
+    elif args.init_from and Path(args.init_from).exists():
         sd = torch.load(args.init_from, map_location=device)
         res = model.load_state_dict(sd["model"], strict=False)
         n_loaded = len(sd["model"]) - len(res.unexpected_keys)
@@ -400,7 +436,7 @@ def main() -> None:
                 f"tensors did not load -- that is a different architecture, not "
                 f"a checkpoint. Refusing to train on a mostly-random model that "
                 f"reports as initialised.")
-    elif args.init_from:
+    elif args.init_from and resume is None:
         raise SystemExit(f"--init-from {args.init_from} does not exist")
     pc = model.param_counts()
     print(f"[pharos] {args.size}: {pc['total']:,} total, {pc['active']:,} active")
@@ -420,10 +456,38 @@ def main() -> None:
           f"({[len(b) for b in epoch_batches]})", flush=True)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr,
                                                 total_steps=n_steps, pct_start=0.05)
-    CKPT.mkdir(parents=True, exist_ok=True)
     history: List[Dict] = []
-    step = 0
-    for ep in range(args.epochs):
+    step, start_ep, n_oom = 0, 0, 0
+    if resume is not None:
+        if "opt" in resume:
+            opt.load_state_dict(resume["opt"])
+        step = int(resume.get("step", 0))
+        history = list(resume.get("history", []))
+        start_ep = int(resume.get("epoch", 0)) + (1 if resume.get("epoch_done") else 0)
+        # OneCycleLR carries an internal step count, so it has to be restored
+        # rather than rebuilt -- and only if the schedule is the SAME schedule.
+        # `n_steps` depends on the epoch count and the token budget, so a run
+        # resumed with either changed would be stepping a different curve.
+        if resume.get("n_steps") == n_steps and "sched" in resume:
+            sched.load_state_dict(resume["sched"])
+        else:
+            print(f"[pharos] schedule changed ({resume.get('n_steps')} -> "
+                  f"{n_steps} steps); fast-forwarding a fresh one instead",
+                  flush=True)
+            for _ in range(min(step, n_steps - 1)):
+                sched.step()
+        if start_ep >= args.epochs:
+            print(f"[pharos] all {args.epochs} epochs already done", flush=True)
+            return
+
+    def save(ep: int, done: bool, val=None) -> None:
+        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+                    "model": model.state_dict(), "opt": opt.state_dict(),
+                    "sched": sched.state_dict(), "n_steps": n_steps,
+                    "epoch": ep, "epoch_done": done, "step": step,
+                    "history": history, "val": val}, ck)
+
+    for ep in range(start_ep, args.epochs):
         model.train()
         t0, run = time.time(), []
         for idxs in epoch_batches[ep]:
@@ -431,15 +495,37 @@ def main() -> None:
             # sampled recycling: 1..max_loops, uniform
             nl = int(rng.integers(1, cfg.n_loops + 1)) if args.sample_loops \
                 else cfg.n_loops
-            with torch.autocast("cuda", dtype=torch.bfloat16):
-                loss, parts, _ = step_losses(model, t, cfg, args.n_neg, n_loops=nl)
-            opt.zero_grad(set_to_none=True)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            try:
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    loss, parts, _ = step_losses(model, t, cfg, args.n_neg,
+                                                 n_loops=nl)
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step()
+            except torch.OutOfMemoryError:
+                # Chain length here runs to 4,298 and the batches are packed to
+                # a token budget, so one long-chain batch can cost several times
+                # the median. Skipping it costs one gradient; dying costs the
+                # epoch, and -- before resume existed -- the whole stage.
+                # `sched.step()` still runs, because OneCycleLR's total was
+                # computed from the batch COUNT and skipping a batch must not
+                # desynchronise the curve from it.
+                n_oom += 1
+                opt.zero_grad(set_to_none=True)
+                del t
+                torch.cuda.empty_cache()
+                sched.step()
+                step += 1
+                if n_oom <= 5 or n_oom % 50 == 0:
+                    print(f"[pharos] OOM #{n_oom} at step {step}; batch skipped",
+                          flush=True)
+                continue
             sched.step()
             run.append(float(loss.detach()))
             step += 1
+            if step % args.ckpt_every == 0:
+                save(ep, False)
             if step % args.log_every == 0:
                 print(f"[pharos] ep{ep} step{step} loss "
                       f"{np.mean(run[-args.log_every:]):.4f} "
@@ -449,9 +535,16 @@ def main() -> None:
         history.append({"epoch": ep, "loss": float(np.mean(run)), "val": ev})
         print(f"[pharos] epoch {ep}: loss {np.mean(run):.4f} val {ev} "
               f"({time.time()-t0:.0f}s)", flush=True)
-        torch.save({"cfg": cfg.__dict__, "model": model.state_dict(),
-                    "epoch": ep, "val": ev}, CKPT / f"pharos_{args.size}.pt")
+        save(ep, True, ev)
 
+    if not history:
+        # A run that trained no epochs has nothing to report, and writing the
+        # report anyway CLOBBERS the last real one. A guard test run with
+        # --epochs 0 overwrote eight epochs of pinned stage-5 results with an
+        # empty history, and four checks in verify_claims.py went red.
+        print("[pharos] no epochs ran; leaving the existing results file alone",
+              flush=True)
+        return
     report = {"size": args.size, "config": cfg.__dict__, "params": pc,
               "history": history,
               "splits": {"train": len(tr), "val": len(va), "test": len(te),
