@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -87,6 +88,50 @@ def enable_gpu_fast_paths() -> None:
 @lru_cache(maxsize=4)
 def _batch_chem(device_str: str) -> BatchChemistry:
     return BatchChemistry(SYMBOLS, torch.device(device_str))
+
+
+def lr_at(step: float, total: float, peak: float,
+          warmup_frac: float = 0.01, floor_frac: float = 0.1) -> float:
+    """Linear warm-up then cosine decay. Same rule stage 1 uses.
+
+    Stages 2 and 3 had no schedule either -- a constant 3e-4 throughout. The
+    block scorer and stage 5 both run `OneCycleLR`; these two were the gap.
+
+    This CLAMPS past `total` instead of raising, which `OneCycleLR` does not:
+    `estimate_steps` reads row counts from parquet metadata and a CSV, and the
+    loop drops malformed rows as it goes, so the estimate is close but not
+    exact. A schedule that throws on the step past its total is how stage 5's
+    off-by-N crashed a finished epoch.
+    """
+    x = min(max(step / max(total, 1.0), 0.0), 1.0)
+    if x < warmup_frac:
+        return peak * x / max(warmup_frac, 1e-9)
+    y = (x - warmup_frac) / max(1.0 - warmup_frac, 1e-9)
+    return peak * (floor_frac + (1.0 - floor_frac) * 0.5 * (1.0 + math.cos(math.pi * y)))
+
+
+def estimate_steps(args) -> int:
+    """Total optimiser steps, from row counts rather than by running an epoch.
+
+    The loop pulls one batch from each stage per step and continues until both
+    generators are exhausted, so an epoch is `max` of the two batch counts, not
+    the sum. Parquet carries its row count in the footer, so stage 2 is free;
+    stage 3 is a CSV and is counted by lines, once.
+    """
+    import pyarrow.parquet as pq
+    n_ss = 0
+    f = BENCH / "secondary_structure/bprna_spot/train.parquet"
+    if f.exists():
+        n_ss = pq.ParquetFile(f).metadata.num_rows
+    n_pr = 0
+    g = BENCH / "chemical_probing/ribonanza_train_quickstart.csv"
+    if g.exists():
+        with g.open() as fh:
+            n_pr = max(sum(1 for _ in fh) - 1, 0)
+    if args.probing_limit:
+        n_pr = min(n_pr, args.probing_limit)
+    per_epoch = max(-(-n_ss // args.batch), -(-n_pr // args.batch), 1)
+    return per_epoch * max(args.epochs, 1)
 
 
 def encode(seqs: List[str], device) -> Dict[str, torch.Tensor]:
@@ -276,6 +321,10 @@ def main() -> None:
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     CKPT.mkdir(parents=True, exist_ok=True)
     hist: List[Dict] = []
+    total_steps = max(1, estimate_steps(args))
+    print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} steps "
+          f"({args.epochs} epochs)", flush=True)
+    gstep = 0
 
     for ep in range(args.epochs):
         model.train()
@@ -311,13 +360,17 @@ def main() -> None:
                 done_pr = True
             if total is None:
                 continue
+            lr_now = lr_at(gstep, total_steps, args.lr)
+            for g in opt.param_groups:
+                g["lr"] = lr_now
+            gstep += 1
             opt.zero_grad(set_to_none=True)
             total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             step += 1
             if step % args.log_every == 0:
-                print(f"[seq] ep{ep} step{step}  2D loss "
+                print(f"[seq] ep{ep} step{step} lr {lr_now:.2e}  2D loss "
                       f"{np.mean(ss_loss[-args.log_every:]):.4f} acc "
                       f"{np.mean(ss_acc[-args.log_every:]):.4f}  |  probing loss "
                       f"{np.mean(pr_loss[-args.log_every:]):.4f} r "
