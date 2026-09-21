@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -253,6 +254,31 @@ def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
         yield from _pack_pool(buf, token_budget, max_batch, rng, quantum)
 
 
+def lr_at(seen: float, budget: float, peak: float,
+          warmup_frac: float = 0.01, floor_frac: float = 0.1) -> float:
+    """Linear warm-up then cosine decay, as a function of TOKENS seen.
+
+    Stage 1 had no schedule at all: a constant 6e-4 from the first step to the
+    last, no warm-up and no decay. Warm-up matters because AdamW's second
+    moment is meaningless for the first few hundred steps and a full-rate step
+    against it is how a transformer diverges early; decay matters because a
+    constant rate stops making progress long before the budget is spent, which
+    is what the loss curve flattening at ~1.45 while accuracy sat at 0.388 was
+    showing.
+
+    Keyed on tokens rather than optimiser steps on purpose. Greedy packing puts
+    a different number of sequences in every batch, so the step count for a
+    given token budget is not known in advance and is not even stable across
+    shuffles -- the same off-by-N that broke `OneCycleLR`'s `total_steps` in
+    stage 5. Token progress is exact, and it resumes correctly for free.
+    """
+    x = min(max(seen / max(budget, 1.0), 0.0), 1.0)
+    if x < warmup_frac:
+        return peak * x / warmup_frac
+    y = (x - warmup_frac) / max(1.0 - warmup_frac, 1e-9)
+    return peak * (floor_frac + (1.0 - floor_frac) * 0.5 * (1.0 + math.cos(math.pi * y)))
+
+
 def _clean_state(model) -> Dict[str, torch.Tensor]:
     """`state_dict` without `torch.compile`'s `_orig_mod.` prefix.
 
@@ -370,6 +396,7 @@ def main() -> None:
     seen_mark, padded_mark = seen, padded
     t0 = tmark = time.time()
     run: List[float] = []
+    bals: List[float] = []
     accs: List[float] = []
     hist: List[Dict] = []
     stop = False
@@ -408,12 +435,16 @@ def main() -> None:
                 length=n_real.float(),
                 chem_summary=(chem.sum(1)
                               / n_real.unsqueeze(1).clamp(min=1))[:, :5])
+            lr_now = lr_at(seen, budget, args.lr)
+            for g in opt.param_groups:
+                g["lr"] = lr_now
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 out = model(inp, torch.zeros_like(inp), chem, bmask,
                             feats=feats, n_loops=args.n_loops, mlm=True)
                 logits = out["mlm_logits"].float()
-                loss = F.cross_entropy(logits[sel], tgt[sel])
-                loss = loss + out["aux"]["balance_loss"]
+                ce = F.cross_entropy(logits[sel], tgt[sel])
+                bal = out["aux"]["balance_loss"]
+                loss = ce + bal
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -421,7 +452,15 @@ def main() -> None:
 
             with torch.no_grad():
                 acc = float((logits[sel].argmax(-1) == tgt[sel]).float().mean())
-            run.append(float(loss.detach()))
+            # CE and the balance term are tracked SEPARATELY. The Switch
+            # balance loss is `n_experts * sum(frac * pbar)`, which is 1.0 at
+            # perfect uniformity, not 0 -- so at `balance_weight` 0.01 across 16
+            # blocks it adds a floor of ~0.16 nats that never goes away.
+            # Reporting their sum as "loss" and dividing it by ln 2 inflated
+            # bits/token by ~0.23 bits and made a model that had gone BELOW the
+            # corpus entropy look as though it were still above it.
+            run.append(float(ce.detach()))
+            bals.append(float(bal.detach()))
             accs.append(acc)
             seen += int(lengths.sum())
             padded += int(tok_np.size)
@@ -446,12 +485,17 @@ def main() -> None:
                 mfu = FLOPS_PER_PARAM_TOKEN(args.n_loops) * pc["active"] \
                     * rate_p / A100_BF16_PEAK
                 print(f"[mlm] step {step} {seen/1e6:.1f}M tok "
-                      f"loss {np.mean(run[-args.log_every:]):.4f} "
+                      f"ce {np.mean(run[-args.log_every:]):.4f} "
+                      f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits) "
+                      f"bal {np.mean(bals[-args.log_every:]):.3f} "
+                      f"lr {lr_now:.2e} "
                       f"acc {np.mean(accs[-args.log_every:]):.4f} "
                       f"{rate_r/1e3:.1f}k tok/s "
                       f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
                       f"MFU {100*mfu:.1f}%", flush=True)
                 hist.append({"step": step, "tokens": seen, "padded": padded,
+                             "lr": lr_now,
+                             "balance": float(np.mean(bals[-args.log_every:])),
                              "tok_per_s": rate_r,
                              "padded_per_s": rate_p, "mfu": mfu,
                              "loss": float(np.mean(run[-args.log_every:])),
@@ -468,10 +512,13 @@ def main() -> None:
 
     report = {"size": args.size, "params": pc, "tokens": seen, "steps": step,
               "tokens_per_active_param": round(seen / max(pc["active"], 1), 1),
-              "final_loss": float(np.mean(run[-200:])),
+              "final_ce": float(np.mean(run[-200:])),
+              "final_balance": float(np.mean(bals[-200:])) if bals else None,
               "final_accuracy": float(np.mean(accs[-200:])),
               # RNA sequence entropy is 2.0165 bits/nt; a model that has learned
               # nothing sits at that, so bits/token below it is the real gain
+              # from CE ALONE. The balance term is a regulariser with a
+              # non-zero floor and has no business in a bits/token figure.
               "bits_per_token": round(float(np.mean(run[-200:])) / np.log(2), 4),
               # throughput, so the cost model reads a measurement instead of
               # assuming 35% MFU as it did for the whole of v0.1 and v0.2
@@ -485,9 +532,10 @@ def main() -> None:
               "history": hist}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"pretrain_{args.size}_results.json").write_text(json.dumps(report, indent=1))
-    print(f"\nfinal loss {report['final_loss']:.4f} = "
+    print(f"\nfinal CE {report['final_ce']:.4f} nats = "
           f"{report['bits_per_token']:.4f} bits/token against the corpus's "
-          f"2.0165 bits/nt")
+          f"2.0165 bits/nt (balance term {report['final_balance']:.3f}, "
+          f"excluded -- its floor is 0.01 x 16 blocks = 0.16)")
     print(f"masked-token accuracy {report['final_accuracy']:.4f}")
     print(f"\n[mlm] -> {OUT / f'pretrain_{args.size}_results.json'}")
 
