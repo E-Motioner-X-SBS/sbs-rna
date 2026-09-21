@@ -459,7 +459,7 @@ def residue_labels(path: Path, ion_cutoff: float = 3.0,
     * **head 10, base identity** -- which residues are `N_struct`: identity
       unassigned but ribose modelled, so their geometry trains normally and
       recovering the base is free supervision.
-    * **head 11, disorder** -- `_pdbx_unobs_or_zero_occ_residues` names every
+    * **the disorder head (§10)** -- `_pdbx_unobs_or_zero_occ_residues` names every
       residue too mobile or disordered to model. It is a direct per-residue
       flexibility label, present in every deposited structure, used by no RNA
       structure predictor. It is returned as `unobserved_seq_id` rather than as

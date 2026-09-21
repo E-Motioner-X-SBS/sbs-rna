@@ -184,6 +184,23 @@ def main() -> int:
             chk("split: val residues", sp["val"], 410303)
             chk("split: test_ribosomal is separate and labelled",
                 int("test_ribosomal" in sp), 1)
+            # the free supervision channels (§9): each must be present, and the
+            # disorder count must be the USABLE one, not the raw one
+            import sys as _s
+            _s.path.insert(0, str(ROOT / "src"))
+            from pharos.data.dataset import disorder_is_meaningful as _dm
+            rows = [c for sh in ds["shards"] for c in sh["chains"]]
+            chk("head 5: Mg-coordinated residues",
+                sum(c.get("n_mg_sites", 0) for c in rows), 712033)
+            chk("head 6: X-ray residues (rigidity-valid)",
+                sum(c["length"] for c in rows if c.get("rigidity_valid")), 4274596)
+            chk("head 10: N_struct residues",
+                sum(c.get("n_unknown_base", 0) for c in rows), 2586)
+            chk("disorder: raw unobserved positions",
+                sum(c.get("n_unobserved", 0) for c in rows), 1379892)
+            chk("disorder: usable after excluding truncated constructs",
+                sum(c.get("n_unobserved", 0) for c in rows
+                    if _dm(c["length"], c.get("n_polymer") or 0)), 907067)
         else:
             chk("dataset manifest present (scripts/build_dataset.py)", 0, 1)
 

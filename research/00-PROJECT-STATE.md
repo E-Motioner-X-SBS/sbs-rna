@@ -253,7 +253,7 @@ all of them are already on disk. 608 have a chain inside the 64-3,000 training
 window (693 have one at least 64 nt long) and **925 are protein-free**, which is precisely the stratum D21 showed
 is under-represented. `plans/13-sequence-structure-gap-strategy.md`.
 
-`verify_claims.py` now pins **233** checks and passes.
+`verify_claims.py` now pins **238** checks and passes.
 
 ## Reproducing everything
 

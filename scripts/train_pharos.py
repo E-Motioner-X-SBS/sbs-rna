@@ -10,7 +10,7 @@ come out of the deposited files themselves. It is the stage that uses everything
     head 5   Mg2+ sites       residues within 3 A of a magnesium
     head 6   rigidity         normalised B-factor -- X-RAY ONLY (D12)
     head 10  base identity    the N_struct residues
-    head 11  disorder         _pdbx_unobs_or_zero_occ_residues
+    disorder disorder        _pdbx_unobs_or_zero_occ_residues
     ensemble fluctuation      supervised through the rigidity target
 
 Three things the data forces, each of which is a way to get this wrong.

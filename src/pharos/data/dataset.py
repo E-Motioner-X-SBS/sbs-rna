@@ -77,7 +77,7 @@ class ChainExample:
     mg_site: Optional[np.ndarray] = None       # uint8 (L,)   head 5
     b_factor_z: Optional[np.ndarray] = None    # float16 (L,) head 6
     unknown_base: Optional[np.ndarray] = None  # uint8 (L,)   head 10
-    #: head 11's label is about the POLYMER, not the coordinates: an unobserved
+    #: the disorder label (§10) is about the POLYMER, not the coordinates: an unobserved
     #: residue has no atoms, so it cannot be a mask over the modelled residues
     unobserved_seq_id: Optional[np.ndarray] = None
     n_polymer: int = 0
@@ -132,6 +132,25 @@ class ChainExample:
         d["contacts_per_nt"] = round(self.contacts_per_nt, 4)
         d["effective_c_b4"] = round(self.effective_c(4), 2)
         return d
+
+
+#: A chain is a usable disorder observation only if most of its declared
+#: polymer was actually resolved. 7ANE chain 2 declares an 18,998-nt polymer and
+#: models 604 of it: the other 18,394 positions are not "disordered", they are
+#: the rest of a viral genome that was never in the crystal. 250 chains of
+#: 16,604 (1.5%) are fragments like this and they hold **472,825 of the
+#: 1,379,892** unobserved positions -- 34% of the signal, and all of it the
+#: wrong kind. Training a disorder head on them teaches it that RNA is mostly
+#: disordered.
+DISORDER_MAX_POLYMER_RATIO = 3.0
+DISORDER_MIN_POLYMER = 200
+
+
+def disorder_is_meaningful(length: int, n_polymer: int) -> bool:
+    """Whether this chain's unobserved positions are flexibility or truncation."""
+    if not n_polymer or n_polymer <= DISORDER_MIN_POLYMER:
+        return True
+    return n_polymer <= DISORDER_MAX_POLYMER_RATIO * max(length, 1)
 
 
 def contact_set(residue_atoms: Sequence[Sequence[Sequence[float]]],
@@ -329,6 +348,9 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             ub[i, :n] = x["unknown_base"]
     meta = [x.get("meta") or {} for x in items]
     rigid_ok = np.array([bool(m.get("rigidity_valid")) for m in meta], dtype=bool)
+    dis_ok = np.array([disorder_is_meaningful(int(m.get("length", 0)),
+                                              int(m.get("n_polymer", 0) or 0))
+                       for m in meta], dtype=bool)
     return {"tokens": tok, "mod_ids": mod, "chem": chem, "mask": mask,
             "contacts": [x["contacts"] for x in items],
             "lengths": np.array([int(x["length"]) for x in items], dtype=np.int32),
@@ -338,4 +360,9 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             "rigidity_mask": mask & rigid_ok[:, None],
             # head 10 recovers identity exactly where it was not assigned
             "base_mask": mask & (ub > 0),
-            "unobserved_seq_id": [x.get("unobserved_seq_id") for x in items]}
+            "unobserved_seq_id": [x.get("unobserved_seq_id") for x in items],
+            # a chain whose declared polymer dwarfs the modelled part is a
+            # truncation, not a disorder observation -- see the note above
+            "disorder_valid": dis_ok,
+            "n_polymer": np.array([int(m.get("n_polymer", 0) or 0) for m in meta],
+                                  dtype=np.int32)}

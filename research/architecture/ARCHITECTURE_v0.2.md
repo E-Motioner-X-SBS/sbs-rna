@@ -649,6 +649,54 @@ previously ignored.
 
 Plus the ensemble outputs of §10.
 
+#### The four that are free are now extracted **[v0.2]**
+
+Heads 5, 6 and 10, and §10's disorder output, are supervised by labels that are
+already inside every deposited mmCIF. `mmcif_entities.residue_labels()` reads
+all four in one pass and `build_dataset.py` stores them alongside the tokens:
+
+| head | label | source field |
+|---|---|---|
+| 5 Mg²⁺ sites | residue within 3 Å of a magnesium | `_atom_site` |
+| 6 rigidity | per-residue mean B, z-scored within the chain | `_atom_site.B_iso_or_equiv` |
+| 10 base identity | which residues are `N_struct` | `label_comp_id` |
+| §10 disorder | positions absent from the coordinates | `_pdbx_unobs_or_zero_occ_residues` |
+
+**D12 is now enforced by the data rather than by a note.** Every example carries
+`rigidity_valid`, and the batch builder turns it into a per-residue
+`rigidity_mask`. The reason is visible in the raw numbers: 7PAS (cryo-EM) has a
+mean B-factor of **987** against 1VY7's (X-ray) **72** — per-atom B in cryo-EM
+is a fitted display parameter, not a measured one. A training loop can no longer
+mix the two by accident.
+
+**The disorder label cannot be a mask over the modelled residues**, which is how
+it was first written. An unobserved residue has no atoms, so it never appears in
+`_atom_site` and a coordinate-aligned mask is necessarily all zeros. It is a
+statement about the *polymer*, so it travels as `unobserved_seq_id` against
+`n_polymer`: 1VY7 chain AA is 1,498 modelled of 1,521, with 23 unobserved —
+a real label the aligned version reported as none.
+
+**And a third of it is not disorder at all.** Over the built set the raw count
+is **1,379,892** unobserved positions, against the 46,448 v0.1 quoted. Most of
+the difference is scale, but not all of it: 7ANE chain 2 declares an 18,998-nt
+polymer and models 604 of it, and the other 18,394 positions are not disordered
+— they are the rest of a viral genome that was never in the crystal.
+**250 chains of 16,604 (1.5%) are truncations like this, and they hold 472,825
+positions — 34% of the signal, all of it the wrong kind.** A disorder head
+trained on them would learn that RNA is mostly disordered. `disorder_valid`
+excludes a chain whose declared polymer exceeds 3× its modelled length, leaving
+**907,067 usable positions in 16,354 chains**.
+
+Yields over the whole built set:
+
+| head | supervised residues | share |
+|---|---|---|
+| 1 contact | 63,298,800 pairs | — |
+| 5 Mg²⁺ sites | 712,033 | 5.41% |
+| 6 rigidity (X-ray only) | 4,274,596 in 5,808 chains | 32.4% |
+| 10 base identity | 2,586 | 0.02% |
+| §10 disorder | 907,067 usable of 1,379,892 raw | 6.9% |
+
 **Heads 8 and 9 are new.** Both sit on substantial supervised data already on
 disk and entirely unused by v0.1. Fitness in particular is the second-largest
 labelled channel after probing, and it is the one that speaks to *function* —
@@ -952,7 +1000,7 @@ precision regardless — this is what DeepSeek's own FP8 recipe does.
 | 6 | Re-derive every remaining max/min at scale | five of six failed; the chain-length maximum is the one that held (D20) |
 | ~~7~~ | ~~Restore sample structures to the server~~ | **CLOSED** — 8,043 present; all six test suites run under `verify_claims.py` |
 | ~~8~~ | ~~Ingest the 2,581 entries no derivative covers~~ | **CLOSED** — `build_dataset.py` reads raw entries directly, so all 10,520 are in the built set (§12.4) |
-| 9 | Train the disorder head's labels out of `_pdbx_unobs_or_zero_occ_residues` | head 11; 46,448 RNA records, not yet extracted |
+| ~~9~~ | ~~Extract the disorder labels~~ | **CLOSED** — `residue_labels()` reads them, along with Mg sites, B-factors and `N_struct` (§9 note below) |
 
 ---
 
@@ -977,7 +1025,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **233** checks. Counting
+JSONs and fails the build on drift; it currently pins **238** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

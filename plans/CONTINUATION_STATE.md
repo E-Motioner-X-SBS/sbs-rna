@@ -9,7 +9,7 @@
 | Errors | none outstanding (all downloads completed byte-exact; catalog rebuilt from new location) |
 | Next priorities | 1) **Train the block-detection scorer** -- now the largest unvalidated assumption by a clear margin; 2) ingest the 2,581 entries no derivative covers -- they hold the entire top-30 of the effective_c tail (608 with a chain in the 64-3,000 window, 925 protein-free); 3) acquire RMDB titrations (gates the learned ionic response); 4) complete Ribonanza beyond the 335,616 acquired |
 | Blockers | none |
-| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **233** checks. |
+| Audit status | v0.1 audited (28 defects, 11 cycles); v0.2 validated on 29,807 chains + 10,520 raw entries. Two further defects found and fixed in the raw pass: **C15** (entry counter keyed `label_asym_id` against auth-keyed entity declarations -- 3,254 entries silently read zero) and **C16** (NMR ensembles stacked 20 models into one residue -- 424 atoms/residue on 1ARJ). `verify_claims.py` pins **238** checks. |
 
 ## State of the data (all verified)
 - Sequences: 1,369,926,204 (elDORS 1,323,715,880 SHA256-verified + RNAcentral 46,210,324)
