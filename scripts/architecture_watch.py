@@ -301,6 +301,25 @@ def check_training() -> Dict:
     return out
 
 
+def substantive(old_head: Optional[str], new_head: Optional[str]) -> bool:
+    """Did anything change between these commits other than the changelog?
+
+    Committing the changelog moves HEAD, which the next tick records as a
+    change, which writes another entry, which has to be committed. Left alone
+    the loop emits an entry every thirty minutes forever, each one describing
+    the commit of the previous one. Only a commit that touched something else
+    earns a line.
+    """
+    if not old_head or not new_head:
+        return True
+    files = [f.strip() for f in
+             git("diff", "--name-only", f"{old_head}..{new_head}").splitlines()
+             if f.strip()]
+    if not files:
+        return True
+    return any(f != "research/architecture/CHANGELOG.md" for f in files)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -401,7 +420,7 @@ def main() -> int:
     if prev is not None:
         a, b = summary(prev), summary(snap)
         lines = [f"\n## {now:%Y-%m-%d %H:%M %Z}\n"]
-        if a["head"] != b["head"]:
+        if a["head"] != b["head"] and substantive(a["head"], b["head"]):
             lines.append(f"- **{snap['git_subject']}** (`{b['head']}`)")
         for k in ("claims_ok", "components", "stages", "scheduled", "resumable",
                   "telemetry", "tokens"):
