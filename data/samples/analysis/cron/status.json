@@ -1,12 +1,12 @@
 {
- "updated": "2026-09-21T12:31:26+05:30",
- "state": "running",
- "detail": "pipeline started",
- "free_gib_at_check": 79,
- "log": "run-20260921-122956.log",
+ "updated": "2026-09-21T13:03:50+05:30",
+ "state": "interrupted",
+ "detail": "stage 5 stopped; will retry next fire",
+ "free_gib_at_check": 77,
+ "log": "run-20260921-124638.log",
  "stages": {
-  "verify":  null,
-  "scorer":  null,
+  "verify":  "done",
+  "scorer":  "done",
   "stage5":  null
  }
 }

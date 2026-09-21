@@ -80,6 +80,19 @@ def _spd_from_cholesky(raw: torch.Tensor, floor: float) -> torch.Tensor:
     raises every eigenvalue by exactly `floor`, which is the guarantee that was
     wanted.
     """
+    # float32 throughout, regardless of the surrounding autocast. Two reasons,
+    # and the first is not stylistic: under bf16 autocast `F.softplus` returns
+    # float32 while `L` is bfloat16, and the index-put then raises
+    # "Index put requires the source and destination dtypes match" -- a failure
+    # that CPU float32/float64 tests cannot reach and that only appeared on the
+    # first GPU run. The second is that everything downstream of here is a
+    # Cholesky product, a triangular solve and an eigendecomposition, and those
+    # are not things to do in bfloat16.
+    # Upcast LOW precision; never downcast. float64 is used deliberately by the
+    # tests that check the selected inversion against a dense one, and forcing
+    # everything to float32 broke that at 1e-13.
+    if raw.dtype not in (torch.float32, torch.float64):
+        raw = raw.float()
     n = N_STEP_DOF
     idx = torch.tril_indices(n, n, device=raw.device)
     L = raw.new_zeros(*raw.shape[:-1], n, n)
@@ -125,7 +138,8 @@ class StiffnessField(nn.Module):
         if steps.shape[1] < 2:
             return Fd, Fd.new_zeros(B, 0, N_STEP_DOF, N_STEP_DOF)
         pair = torch.cat([steps[:, :-1], steps[:, 1:]], dim=-1)
-        raw = self.coupling(pair).view(B, -1, N_STEP_DOF, N_STEP_DOF)
+        # match Fd's dtype; see the note in `_spd_from_cholesky`
+        raw = self.coupling(pair).view(B, -1, N_STEP_DOF, N_STEP_DOF).to(Fd.dtype)
         # Bound the coupling so the ASSEMBLED matrix is positive definite.
         #
         # For a block-tridiagonal matrix with diagonal blocks A_i (smallest
@@ -230,7 +244,8 @@ class HarmonicEnsemble(nn.Module):
 
         cov = block_tridiagonal_variance(Fd, Fo)                 # B,S,6,6
         var = cov.diagonal(dim1=-2, dim2=-1).clamp_min(0.0)      # B,S,6
-        step_amp = self.amp(var).squeeze(-1)                     # B,S
+        # back to the ambient dtype for the rest of the graph
+        step_amp = self.amp(var.to(tok.dtype)).squeeze(-1)       # B,S
         # a nucleotide's amplitude is the mean of the steps it participates in;
         # the two chain ends belong to one step each
         nt = tok.new_zeros(B, L)

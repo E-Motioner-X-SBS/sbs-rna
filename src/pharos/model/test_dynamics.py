@@ -144,6 +144,35 @@ def main() -> int:
     chk("cost grows about linearly in L, not cubically",
         ratio < 12.0, f"4x length -> {ratio:.1f}x time (cubic would be ~64x)")
 
+    print("\n== property 5b: it survives bf16 autocast ==")
+    # The stiffness path does a Cholesky product, a triangular solve and an
+    # eigendecomposition. Under bf16 autocast `F.softplus` returns float32 while
+    # the factor is bfloat16, and the index-put raises "Index put requires the
+    # source and destination dtypes match" -- which no float32/float64 CPU test
+    # can reach. It took the first real GPU run to surface, mid-pipeline.
+    if torch.cuda.is_available():
+        try:
+            mm = HarmonicEnsemble(DynamicsConfig(d_model=48)).cuda()
+            tk = torch.randn(2, 40, 48, device="cuda")
+            mk = torch.ones(2, 40, dtype=torch.bool, device="cuda")
+            with torch.autocast("cuda", dtype=torch.bfloat16):
+                oo = mm(tk, mk)
+            ok = bool(torch.isfinite(oo["fluctuation"]).all())
+            chk("forward runs under bf16 autocast", ok,
+                f"fluctuation dtype {oo['fluctuation'].dtype}")
+            chk("the linear algebra stays in float32",
+                oo["stiffness_diag"].dtype == torch.float32,
+                str(oo["stiffness_diag"].dtype))
+            oo["fluctuation"].sum().backward()
+            chk("and backward works", True, "")
+        except Exception as e:                                   # noqa: BLE001
+            chk("forward runs under bf16 autocast", 0, f"{type(e).__name__}: {e}")
+    else:
+        # still assert the dtype discipline, which is what the GPU path needs
+        Fd = _spd_from_cholesky(torch.randn(2, 6, 21, dtype=torch.bfloat16), 1e-2)
+        chk("Cholesky output is float32 even from a bf16 factor",
+            Fd.dtype == torch.float32, str(Fd.dtype))
+
     print("\n== property 6: gradients reach the stiffness ==")
     m = HarmonicEnsemble(DynamicsConfig(d_model=32))
     out = m(torch.randn(1, 24, 32), torch.ones(1, 24, dtype=torch.bool))
