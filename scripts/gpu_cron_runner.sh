@@ -28,6 +28,13 @@ REPO=/store/shuvam/E-motioner-X-SBS/sbs-rna
 PY=/store/shuvam/.venv/bin/python
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
+# The batch width is quantised to 16 distinct values, so the caching allocator
+# cycles through 16 differently-shaped activation sets and fragments: an OOM at
+# 40,960 tokens reported 417 MiB free with 1.14 GiB "reserved but unallocated".
+# Expandable segments grow a single mapping instead of allocating a new block
+# per shape, which is the case this setting exists for. PyTorch's own OOM
+# message names it.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Free memory required, GiB. 40 was a guess and it was too low: stage 1 peaks
 # at 51.8 GiB measured, so a 40 GiB floor lets a run start on a card it will
