@@ -137,6 +137,13 @@ fi
 # unseen folds. It resumes from its own checkpoint, so interruption costs at
 # most `--ckpt-every` steps rather than the whole run.
 #
+# `--token-budget 0` sizes the batch from free VRAM rather than hardcoding it.
+# Measured, compiled, expandable segments: 24,576 tokens peaks at 50.9 GiB and
+# runs at 36.5k tok/s; 36,864 peaks at 74.1 and runs at 41.1k. The larger is
+# 13% faster and leaves five gigabytes on an 80 GiB card somebody else also
+# uses, so the budget is computed from what is free at start instead of chosen
+# once. Peak is linear at 2.01 GiB per 1,000 tokens to within 3%.
+#
 # 2e9 tokens, not the 5e8 this first ran with. 5e8 is 8 tokens per active
 # parameter -- 0.4x Chinchilla-optimal, an undertrained base for everything
 # downstream. 2e9 is 31.5 tok/param, and at the measured 36.1k tok/s it is
@@ -147,7 +154,7 @@ if [ ! -f "$LOGDIR/.done-stage1" ]; then
     note "=== pretrain_mlm.py (curriculum stage 1) ==="
     if $PY -u scripts/pretrain_mlm.py \
             --device cuda --min-free-gib "$NEED_GIB" --size small \
-            --tokens "${MLM_TOKENS:-2e9}" --token-budget 24576 \
+            --tokens "${MLM_TOKENS:-2e9}" --token-budget 0 \
             --n-loops 2 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"

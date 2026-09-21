@@ -286,6 +286,42 @@ def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
         yield from _pack_pool(buf, token_budget, max_batch, rng, quantum)
 
 
+#: Peak allocation per token of batch budget, GiB. Measured on PHAROS-Small,
+#: compiled, with expandable segments, on the corrected corpus:
+#:
+#:     budget    peak      GiB/token    tok/s    MFU
+#:     24,576   50.9 GiB   2.07e-3      36.5k    6.6%
+#:     32,768   65.9 GiB   2.01e-3      38.8k    7.1%
+#:     36,864   74.1 GiB   2.01e-3      41.1k    7.3%
+#:
+#: Linear to within 3%, which is what makes sizing the batch from free memory
+#: a calculation rather than a guess.
+GIB_PER_TOKEN = 2.01e-3
+
+
+def auto_token_budget(free_gib: float, reserve_gib: float = 6.0,
+                      lo: int = 8192, hi: int = 40960) -> int:
+    """The largest token budget that fits in `free_gib`, less a reserve.
+
+    Hardcoding the budget means picking between leaving a third of the card
+    unused and dying when a neighbour allocates. This card is shared: at 36,864
+    tokens the run holds 74.1 of 79.3 GiB, and five spare gigabytes is not a
+    margin on a machine where somebody else's job appears without warning.
+
+    So the budget is computed from what is actually free when the run starts.
+    An empty card gets ~36,800 tokens a step; a card with 20 GiB already taken
+    gets ~24,900; below the floor the trainer refuses to start rather than
+    thrash. `reserve_gib` covers the allocator's own slack and a small
+    neighbour.
+
+    This does not protect against a neighbour arriving MID-run. Nothing short
+    of a hard memory cap does, which is why the run checkpoints every 250 steps.
+    """
+    usable = max(free_gib - reserve_gib, 0.0)
+    b = int(usable / GIB_PER_TOKEN) // 1024 * 1024
+    return max(lo, min(hi, b))
+
+
 def lr_at(seen: float, budget: float, peak: float,
           warmup_frac: float = 0.01, floor_frac: float = 0.1) -> float:
     """Linear warm-up then cosine decay, as a function of TOKENS seen.
@@ -347,7 +383,13 @@ def main() -> None:
                     help="§12.2 stages 5B -> 25B; stop when metrics flatten")
     ap.add_argument("--size", default="small", choices=("mini", "small"))
     ap.add_argument("--lr", type=float, default=6e-4)
-    ap.add_argument("--token-budget", type=int, default=24576,
+    ap.add_argument("--token-budget", type=int, default=0,
+                    help="0 (the default) sizes it from free VRAM via "
+                         "`auto_token_budget`; a positive value overrides")
+    ap.add_argument("--token-budget-reserve", type=float, default=6.0,
+                    help="GiB held back from the automatic budget for the "
+                         "allocator's slack and a small neighbour")
+    ap.add_argument("--token-budget-fixed", type=int, default=24576,
                     help="padded tokens per step; PHAROS-Small peaks near 43 GiB "
                          "at 32k, so this leaves headroom on an 80 GiB card")
     ap.add_argument("--max-batch", type=int, default=512,
@@ -371,6 +413,13 @@ def main() -> None:
 
     device = require_gpu(args)
     enable_gpu_fast_paths()
+    if args.token_budget <= 0:
+        mem = gpu_free_gib()
+        free = mem[0] if mem else args.min_free_gib
+        args.token_budget = auto_token_budget(free, args.token_budget_reserve)
+        print(f"[mlm] {free:.1f} GiB free -> token budget {args.token_budget:,} "
+              f"(~{args.token_budget * GIB_PER_TOKEN:.1f} GiB predicted peak)",
+              flush=True)
     cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
     cfg.max_length = max(cfg.max_length, args.max_len)
     model = Pharos(cfg).to(device)

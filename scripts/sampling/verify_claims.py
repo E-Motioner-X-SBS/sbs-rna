@@ -186,7 +186,10 @@ def main() -> int:
         # The balance loss at its floor says the LOAD is even and nothing about
         # whether any token is routed sharply. Per-token entropy separates a
         # specialising router from a collapsed one; the mean cannot.
-        rs = load("router_specialisation.json")["history"][0]
+        # by token count, not by index: the history grows as the probe is
+        # re-run and an index silently points at a different measurement
+        _rsh = load("router_specialisation.json")["history"]
+        rs = next(h for h in _rsh if h["tokens"] == 55382967)
         chk("v0.2a router: experts", rs["n_experts"], 32)
         chk("v0.2a router: probe token count", rs["tokens"], 55382967)
         chk("v0.2a router: per-token entropy", rs["token_router_entropy"],

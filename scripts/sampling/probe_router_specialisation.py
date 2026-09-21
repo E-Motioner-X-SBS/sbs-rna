@@ -88,7 +88,11 @@ print(f"  per-block entropy spread    {np.min(ent):.3f} .. {np.max(ent):.3f}")
 
 import json
 OUT = ROOT / "data/samples/analysis"
+# The history can hold entries from DIFFERENT runs: `--restart` resets both the
+# token count and the step, so two runs collide on either. The checkpoint's
+# mtime does not, so it is what distinguishes them.
 rec = {"tokens": int(sd["tokens"]), "step": int(sd["step"]),
+       "checkpoint_mtime": int(ck.stat().st_mtime),
        "n_experts": E, "uniform_entropy": round(mx, 4),
        "token_router_entropy": round(float(np.mean(ent)), 4),
        "frac_of_uniform": round(float(np.mean(ent)) / mx, 4),
@@ -104,7 +108,9 @@ if f.exists():
         hist = json.loads(f.read_text()).get("history", [])
     except (OSError, ValueError):
         hist = []
-hist = [h for h in hist if h.get("tokens") != rec["tokens"]] + [rec]
+hist = [h for h in hist
+        if (h.get("tokens"), h.get("checkpoint_mtime"))
+        != (rec["tokens"], rec["checkpoint_mtime"])] + [rec]
 hist.sort(key=lambda h: h["tokens"])
 f.write_text(json.dumps({"history": hist}, indent=1))
 print(f"\n-> {f} ({len(hist)} probe(s) recorded)")
