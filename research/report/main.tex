@@ -2456,6 +2456,168 @@ subsection showed, this set contains the entire top $30$ of the effective-$c$
 distribution---so it is not a marginal $24.5\%$ but the part of the archive
 where the parameters are decided.
 
+\section{From specification to implementation}
+\label{sec:impl}
+
+\S\ref{sec:v02} settled what the data is. This section reports what happens when
+the specification is built, because several of its numbers turned out to be
+claims about an implementation that did not exist yet.
+
+\subsection{The sizing table was not reproducible}
+
+\S5.4 of the architecture quotes total and active parameter counts for three
+models and calls the arithmetic ``verified exact''. It cannot have been: the two
+numbers it quotes are determined by \texttt{n\_experts}, \texttt{d\_expert},
+\texttt{top\_k} and \texttt{n\_shared}, and it states none of the four.
+
+Solving for them analytically---with the formula validated against built
+models---each row is individually reachable within ${\sim}3\%$, but by
+\emph{three incompatible recipes}. The giveaway is the active fraction, which
+any fixed recipe holds roughly constant as $d$ and depth scale:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+& \textbf{implied recipe} & \textbf{active \%} & \textbf{built (adopted recipe)} \\
+\midrule
+PHAROS-Small & 8 experts, top-1  & $40.9\%$ & $26.2\%$ \\
+PHAROS-Mini  & 24 experts, top-8 & $44.8\%$ & $27.2\%$ \\
+Base-v2      & 64 experts, top-6 & $19.2\%$ & $25.3\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+A $41 / 45 / 19$ spread is three separate calculations, not one model family;
+two of the three are also barely sparse, since top-1 of 8 with 2 shared experts
+is a dense feed-forward with extra steps. The adopted recipe is \textbf{32
+experts, top-4, 2 shared, $d_e = d/2$}, giving Small $238.8$M total and
+$\mathbf{62.7}$M active.
+
+\textbf{What survives is the active column, and that is the column that
+matters.} Active parameters drive training FLOPs and therefore the ${\sim}78$
+A100-hour estimate; the recipe reproduces them to $2.8\%$ for Small and $0.4\%$
+for Base-v2, so the cost claims stand unchanged. The totals do not survive---
+Small is $1.6\times$ and Base-v2 $0.76\times$ what was printed---and totals
+drive memory, so footprint statements need re-reading against the new column.
+
+\subsection{A 90/5/5 family-disjoint split of this corpus does not exist}
+
+Splits must be family-disjoint or a rRNA-dominated corpus reports a number that
+means nothing. Building the set showed the requirement cannot be met at the
+usual ratios. Four families are $\mathbf{84.4\%}$ of all $13{,}172{,}991$
+structural RNA residues---SSU\_rRNA\_bacteria $27.9\%$, LSU\_rRNA\_bacteria
+$27.2\%$, LSU\_rRNA\_eukarya $17.3\%$, SSU\_rRNA\_eukarya $12.0\%$---and a $5\%$
+quota is $658{,}650$ residues, so the \emph{smallest} of the four is
+$2.4\times$ an entire held-out bucket. Each must be placed somewhere, and
+wherever it goes the target fractions are gone; a balanced greedy packing
+returned $55/27/17$.
+
+The protocol is therefore two splits, each answering a question it can answer.
+\textbf{Primary}: families above $5\%$ of the corpus are forced to train, and
+\texttt{val}/\texttt{test} are packed from the remaining $1{,}286$ groups
+($1{,}189$ and $1{,}450$ chains, $410{,}303$ residues each, balanced to the
+residue). This measures generalisation to unseen folds---better asked on a set
+holding no ribosomes than on one whose answer would be $84\%$ ribosome.
+\textbf{Secondary}: \texttt{test\_ribosomal}, $2{,}242$ chains held out by
+\emph{entry} from the four giant families, reported under its own name and
+never averaged with \texttt{test}, because homologues of it are in training by
+necessity.
+
+\subsection{The supervision the depositors already produced}
+
+Four heads are trained on labels that are already inside every deposited mmCIF
+and were not being read. Extracting them costs one pass:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{llr}
+\toprule
+\textbf{head} & \textbf{source field} & \textbf{residues} \\
+\midrule
+5 Mg$^{2+}$ sites   & within $3$~\AA{} of a magnesium & $712{,}033$ \\
+6 rigidity          & \texttt{B\_iso\_or\_equiv}, \textbf{X-ray only} & $4{,}274{,}596$ \\
+10 base identity    & \texttt{N\_struct} residues & $2{,}586$ \\
+disorder            & \texttt{\_pdbx\_unobs\_or\_zero\_occ\_residues} & $907{,}067$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two of those rows carry a correction. \textbf{The X-ray restriction is now
+enforced by the data} rather than by a note: every example carries
+\texttt{rigidity\_valid} and the batch builder turns it into a per-residue mask.
+The reason is visible in the raw numbers---7PAS (cryo-EM) has a mean B-factor of
+$\mathbf{987}$ against 1VY7's (X-ray) $\mathbf{72}$, because per-atom $B$ in
+cryo-EM is a fitted display parameter rather than a measured one.
+
+\textbf{And a third of the disorder signal is not disorder.} The raw count is
+$1{,}379{,}892$ unobserved positions, but 7ANE chain 2 declares an $18{,}998$-nt
+polymer and models $604$ of it: the other $18{,}394$ positions are the rest of a
+viral genome that was never in the crystal. $250$ chains of $16{,}604$
+($1.5\%$) are truncations like this and they hold $472{,}825$ positions---$34\%$
+of the signal, all of it the wrong kind. Excluding chains whose declared polymer
+exceeds $3\times$ the modelled length leaves $907{,}067$ usable positions.
+
+\subsection{The ionic response is now supervisable}
+
+The PDB's recorded Mg$^{2+}$ spans only $5$--$15$ mM because unfolded RNA is not
+deposited, so the $[\mathrm{Mg}^{2+}] \rightarrow$ structure \emph{response}
+cannot be learned from it at any corpus size. v0.1 recorded that RMDB ``exposes
+no bulk endpoint''; that was the old Django site, and RMDB now serves its
+$1{,}024$ RDATs as GitHub release assets.
+
+Entry-level annotations show only three distinct Mg$^{2+}$ levels across $712$
+entries, because a titration varies its concentration \emph{per data row}. Read
+from the files instead: \textbf{24 ladders, 527 concentration points, and all 24
+cross the sub-millimolar regime} where the folding transition happens---exactly
+the region the PDB cannot contain.
+
+The physics is measurably present before any training. As Mg$^{2+}$ rises RNA
+folds and becomes less reactive, so mean reactivity should fall along a ladder;
+Spearman(concentration, mean reactivity) is negative in $\mathbf{16}$ of $24$
+ladders, median $\mathbf{-0.65}$, strongest $\mathbf{-0.98}$ (MTTR5,
+$0.604 \rightarrow 0.180$). The eight that do not show it are kept and flagged
+rather than dropped: a construct that does not fold under Mg$^{2+}$ is a real
+negative, and discarding it would leave a corpus in which the effect is true by
+selection.
+
+\subsection{What the implementation caught}
+
+Building the model found errors that reading the specification could not,
+because each is a property of code rather than of prose.
+
+The chunked Gated DeltaNet was \emph{wrong} as first written---a test against a
+step-by-step recurrence found relative errors of $0.4$ to $1.0$, and a repeated
+token made the state grow $83{,}823\times$. Rederived through the UT transform
+it matches to $4.5\times10^{-16}$, and a repeated token now grows it
+$1.71\times$, which is the delta rule doing the thing it exists to do.
+
+The harmonic ensemble's fluctuations must be computed in $O(L)$, not $O(L^3)$:
+the assembled stiffness is $6(L-1)$ square, so at $L = 4{,}000$ a dense inverse
+is $24{,}000 \times 24{,}000$ per chain per step. Only the diagonal blocks of
+the inverse are needed, and a forward-backward recursion over Schur complements
+delivers them---measured, $4\times$ the length costs $4.6\times$ the time where
+cubic would cost ${\sim}64\times$. Guaranteeing positive-definiteness took two
+corrections: an eigenvalue floor placed on the Cholesky \emph{factor} bounds
+nothing about the eigenvalues (driving the raw factor to $-30$ gave a minimum
+eigenvalue of $0.0000$ against a nominal floor of $10^{-2}$), and a coupling
+bound on the blocks' \emph{diagonal entries} let the assembled matrix reach
+$-1.92$. Both are now bounds on the right quantity.
+
+Two more were the recurrence of an older defect---a second definition drifting
+from the canonical one. A private entry counter joined auth-keyed entity
+declarations on \texttt{label\_asym\_id} and reported zero polymer residues for
+$3{,}254$ of $10{,}527$ entries; and the geometry resolver never read
+\texttt{pdbx\_PDB\_model\_num}, so an NMR ensemble's 20 models stacked into one
+residue, giving 1ARJ $\mathbf{424}$ heavy atoms per residue against a
+nucleotide's ${\sim}21$.
+
+All of it is under \texttt{verify\_claims.py}, which now pins \textbf{249}
+checks and runs nine test suites.
+
 \section{Status}
 
 This is a design specification. No model has been trained and no predictive
@@ -2470,10 +2632,22 @@ is therefore settled rather than merely confirmed. $214$ automated checks pin
 every quoted number to the JSON artefact it came from and fail the build on
 drift.
 
+Since \S\ref{sec:v02} the specification has also been \emph{built}
+(\S\ref{sec:impl}): the hybrid trunk, the mixture-of-experts feed-forward, the
+667-class motif bank, the harmonic ensemble and all ten heads, against a
+$16{,}604$-chain training set carrying contacts, Mg$^{2+}$ sites, X-ray
+B-factors, \texttt{N\_struct} and disorder, plus 24 ionic titration ladders.
+$249$ automated checks and nine test suites hold it in place.
+
 The next phase is to \textbf{train the block-detection scorer}. The reference
 implementation proves the sparse pair track's cost and structure; it does not
 prove that a model can find the occupied blocks, and that is now the largest
-unvalidated assumption in the design by a clear margin.
+unvalidated assumption in the design by a clear margin. The trainer is written
+and GPU-only, and reports its result against three baselines at an identical
+budget---random, a separation-only prior, and the learned scorer with its
+separation prior ablated---because a selector that knows only that contacts
+cluster near the diagonal would already score well, and the quantity of interest
+is what the \emph{sequence} adds over the geometry of a chain.
 
 \appendix
 \section{Reproducing the measurements}
