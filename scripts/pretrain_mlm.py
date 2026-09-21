@@ -216,7 +216,10 @@ def main() -> None:
                     help="loops give structural refinement depth; MLM needs few")
     ap.add_argument("--shards", type=int, default=None)
     ap.add_argument("--log-every", type=int, default=100)
-    ap.add_argument("--ckpt-every", type=int, default=2000)
+    ap.add_argument("--ckpt-every", type=int, default=250,
+                    help="steps between checkpoints; at ~2 s/step the old 2000 "
+                         "meant losing up to 65 minutes to an interruption, on "
+                         "a card that gets taken back without warning")
     ap.add_argument("--restart", action="store_true",
                     help="ignore an existing checkpoint and start from scratch")
     args = ap.parse_args()

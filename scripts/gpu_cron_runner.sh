@@ -64,7 +64,9 @@ write_status() {
  "log": "$(basename "$LOG")",
  "stages": {
   "verify":  $([ -f "$LOGDIR/.done-verify" ]  && echo '"done"' || echo 'null'),
+  "stage1":  $([ -f "$LOGDIR/.done-stage1" ]  && echo '"done"' || echo 'null'),
   "scorer":  $([ -f "$LOGDIR/.done-scorer" ]  && echo '"done"' || echo 'null'),
+  "seqstages": $([ -f "$LOGDIR/.done-seqstages" ] && echo '"done"' || echo 'null'),
   "stage5":  $([ -f "$LOGDIR/.done-stage5" ]  && echo '"done"' || echo 'null')
  }
 }
@@ -106,67 +108,12 @@ if [ ! -f "$LOGDIR/.done-verify" ]; then
     fi
 fi
 
-# ---- 2. R1: can a model find the occupied blocks? --------------------------
-# The largest unvalidated assumption in the design. Reports against three
-# baselines at an identical budget, because a selector that knows only that
-# contacts cluster near the diagonal would already score well.
-if [ ! -f "$LOGDIR/.done-scorer" ]; then
-    note "=== train_block_scorer.py (R1) ==="
-    # Sized to the card, not to a laptop. Measured on this A100: 153.4M
-    # parameters, 34.4 GiB peak on the worst batch, 75% mean utilisation,
-    # 520 s/epoch. The previous 4.4M / 16k-token configuration used 0.6 GiB and
-    # left the GPU at 13%.
-    #
-    # Capacity and OPTIMISER STEPS both matter, and the first attempt at scaling
-    # traded the second away for the first. A 131k-token budget gives 102
-    # batches/epoch, so even 24 epochs is 2,448 steps for a 153M model against
-    # the original run's ~11,700 for 4.4M. Measured, and the answer was not
-    # subtle: the 153M model was worse at every epoch (val L2 0.664 / 0.671 /
-    # 0.666 against 0.775 / 0.821 / 0.845) and its loss barely moved
-    # (2.457 -> 2.372 against 1.55 -> 0.39). A step-count failure, not a
-    # capacity ceiling.
-    #
-    # So: 61.9M parameters -- 14x the original, 20.6 GiB peak -- at a 32k budget
-    # for 357 batches/epoch and 30 epochs = 10,710 steps, which is the step
-    # count the 4.4M run had. lr 5e-4 for the ~2x batch. Filling VRAM is not the
-    # objective; a better answer to R1 is, and steps buy that.
-    if $PY -u scripts/train_block_scorer.py \
-            --device cuda --min-free-gib "$NEED_GIB" \
-            --d-model 768 --d-block 512 --n-conv 10 --n-attn 6 \
-            --token-budget 32768 --lr 5e-4 --epochs 30 >> "$LOG" 2>&1; then
-        touch "$LOGDIR/.done-scorer"
-        note "block scorer finished"
-        grep -E "sequence gain|recall" "$LOG" | tail -8 | tee -a "$LOG" >/dev/null
-    else
-        note "block scorer did not finish (GPU taken back, or an error)"
-        write_status interrupted "block scorer stopped; will retry next fire" "$F2"
-        exit 1
-    fi
-fi
-
-# ---- 3. stage 5: the multi-task structural head ----------------------------
-if [ ! -f "$LOGDIR/.done-stage5" ]; then
-    note "=== train_pharos.py (curriculum stage 5) ==="
-    # PHAROS-Small, not Mini, and a 4x token budget: 43.1 GiB peak,
-    # 4.5 s/step, 2.9 min/epoch with sampled recycling. Mini at the old budget
-    # was 10.1 GiB and 8.0 s/step.
-    if $PY -u scripts/train_pharos.py \
-            --device cuda --min-free-gib "$NEED_GIB" \
-            --size small --epochs 8 --token-budget 32768 >> "$LOG" 2>&1; then
-        touch "$LOGDIR/.done-stage5"
-        note "stage 5 finished"
-    else
-        note "stage 5 did not finish; will retry next fire"
-        write_status interrupted "stage 5 stopped; will retry next fire" "$F2"
-        exit 1
-    fi
-fi
-
-# ---- 3b. stage 1: MLM pretraining, the longest job and the base of the ----
-# curriculum. It is last in this script because it is the one that can run for
-# days: the two experiments above answer specific questions and should not
-# queue behind it. It resumes from its own checkpoint, so an interrupted run
-# picks up rather than restarting.
+# ---- 2. stage 1: MLM pretraining, the base of the curriculum --------------
+# First, because everything after it is supposed to FINE-TUNE what it builds.
+# §12.1 is a curriculum; stages that do not pass weights are four unrelated
+# runs, and stage 5 run from random weights is what produced r = 0.049 on
+# unseen folds. It resumes from its own checkpoint, so interruption costs at
+# most `--ckpt-every` steps rather than the whole run.
 if [ ! -f "$LOGDIR/.done-stage1" ]; then
     note "=== pretrain_mlm.py (curriculum stage 1) ==="
     if $PY -u scripts/pretrain_mlm.py \
@@ -176,13 +123,78 @@ if [ ! -f "$LOGDIR/.done-stage1" ]; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"
     else
-        note "stage 1 did not finish; will retry next fire"
-        write_status interrupted "stage 1 stopped; will retry next fire" "$F2"
+        note "stage 1 did not finish; will retry next fire (it resumes)"
+        write_status interrupted "stage 1 stopped; resumes next fire" "$F2"
         exit 1
     fi
 fi
 
-# ---- 4. re-verify: training must not have moved a pinned claim -------------
+PRETRAIN=$REPO/data/derived/checkpoints/pretrain_small.pt
+INIT=""
+[ -f "$PRETRAIN" ] && INIT="--init-from $PRETRAIN"
+
+# ---- 3. stages 2 and 3: secondary structure and probing, co-trained -------
+if [ ! -f "$LOGDIR/.done-seqstages" ]; then
+    note "=== train_sequence_stages.py (curriculum stages 2-3) ==="
+    if $PY -u scripts/train_sequence_stages.py \
+            --device cuda --min-free-gib "$NEED_GIB" --size small \
+            --epochs 2 $INIT >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-seqstages"
+        note "stages 2-3 finished"
+    else
+        note "stages 2-3 did not finish; will retry next fire"
+        write_status interrupted "stages 2-3 stopped" "$F2"
+        exit 1
+    fi
+fi
+
+SEQCK=$REPO/data/derived/checkpoints/seqstages_small.pt
+[ -f "$SEQCK" ] && INIT="--init-from $SEQCK"
+
+# ---- 4. R1: can a model find the occupied blocks? -------------------------
+# The block scorer is a DIFFERENT architecture -- a convolutional residue
+# encoder, not the trunk -- so it does not chain from the curriculum and is
+# trained standalone. That is a property of the experiment, not an oversight.
+#
+# Sized to the card and to the STEP COUNT, which matters more: a 131k-token
+# budget gives 102 batches/epoch, and a 153M model at 2,448 steps came out
+# worse at every epoch than 4.4M at ~11,700. 61.9M at a 32k budget for 30
+# epochs is 10,710 steps, the count the small run had.
+if [ ! -f "$LOGDIR/.done-scorer" ]; then
+    note "=== train_block_scorer.py (R1) ==="
+    if $PY -u scripts/train_block_scorer.py \
+            --device cuda --min-free-gib "$NEED_GIB" \
+            --d-model 768 --d-block 512 --n-conv 10 --n-attn 6 \
+            --token-budget 32768 --lr 5e-4 --epochs 30 >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-scorer"
+        note "block scorer finished"
+    else
+        note "block scorer did not finish; will retry next fire"
+        write_status interrupted "block scorer stopped" "$F2"
+        exit 1
+    fi
+fi
+
+# ---- 5. stage 5: the multi-task structural head, chained off stages 1-3 ----
+# PHAROS-Small at a 32k budget: 43.1 GiB peak, sampled recycling. $INIT carries
+# whatever representation the curriculum has built so far, which is the whole
+# point of running the stages in order.
+if [ ! -f "$LOGDIR/.done-stage5" ]; then
+    note "=== train_pharos.py (curriculum stage 5) ==="
+    if $PY -u scripts/train_pharos.py \
+            --device cuda --min-free-gib "$NEED_GIB" \
+            --size small --epochs 8 --token-budget 32768 \
+            $INIT >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-stage5"
+        note "stage 5 finished"
+    else
+        note "stage 5 did not finish; will retry next fire"
+        write_status interrupted "stage 5 stopped" "$F2"
+        exit 1
+    fi
+fi
+
+# ---- 6. re-verify: training must not have moved a pinned claim -------------
 note "=== re-verifying after training ==="
 $PY scripts/sampling/verify_claims.py >> "$LOG" 2>&1 \
     && note "claims still reproduce" \

@@ -357,6 +357,8 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
+    ap.add_argument("--init-from", type=Path, default=None,
+                    help="a checkpoint from an earlier curriculum stage")
     ap.add_argument("--sample-loops", action="store_true", default=True,
                     help="sample the recycle count per step (default on)")
     ap.add_argument("--fixed-loops", dest="sample_loops", action="store_false")
@@ -377,6 +379,29 @@ def main() -> None:
     print(f"[pharos] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
 
     model = Pharos(cfg).to(device)
+    # §12.1 is a CURRICULUM: stage 5 is meant to fine-tune the representation
+    # stages 1-3 built, and it is explicitly "last and briefest". Run from
+    # random weights it is neither -- it is a short run on 7,653 chains with no
+    # representation to build on, which is what produced r = 0.049 on unseen
+    # folds. Chaining is the difference between a curriculum and four unrelated
+    # runs.
+    if args.init_from and Path(args.init_from).exists():
+        sd = torch.load(args.init_from, map_location=device)
+        res = model.load_state_dict(sd["model"], strict=False)
+        n_loaded = len(sd["model"]) - len(res.unexpected_keys)
+        print(f"[pharos] initialised from {Path(args.init_from).name}: "
+              f"{n_loaded:,} tensors loaded, {len(res.missing_keys)} fresh, "
+              f"{len(res.unexpected_keys)} ignored"
+              + (f", after {sd['tokens']/1e9:.3f}B pretraining tokens"
+                 if "tokens" in sd else ""), flush=True)
+        if len(res.missing_keys) > 0.5 * len(list(model.state_dict())):
+            raise SystemExit(
+                f"{len(res.missing_keys)} of {len(list(model.state_dict()))} "
+                f"tensors did not load -- that is a different architecture, not "
+                f"a checkpoint. Refusing to train on a mostly-random model that "
+                f"reports as initialised.")
+    elif args.init_from:
+        raise SystemExit(f"--init-from {args.init_from} does not exist")
     pc = model.param_counts()
     print(f"[pharos] {args.size}: {pc['total']:,} total, {pc['active']:,} active")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01,
