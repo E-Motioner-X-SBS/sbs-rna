@@ -15,3 +15,7 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-22 01:19 IST
 
 - **The 30-minute loop now works rather than only watching, and never stops** (`18315d0`)
+
+## 2026-09-22 02:04 IST
+
+- **The watcher was writing a changelog entry about committing the changelog** (`d29f573`)
