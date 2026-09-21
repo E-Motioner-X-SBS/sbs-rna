@@ -113,7 +113,10 @@ def fetch(pdb: str, retries: int = 3) -> Dict:
             # them failures hides a real property of the corpus.
             try:
                 with gzip.open(tmp, "rt", errors="ignore") as fh:
-                    head = fh.read(2_000_000)
+                    # Full stream, not a prefix: 9A0D carries its
+                    # `_ihm_sphere_obj_site` tag at 5.8 MB of 6.2 MB, so a
+                    # 2 MB window classified it as a failed download.
+                    head = fh.read()
                 is_ihm = "_ihm_sphere_obj_site" in head or "_ihm_model_list" in head
             except OSError:
                 is_ihm = False

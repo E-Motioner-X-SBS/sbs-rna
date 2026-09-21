@@ -238,18 +238,124 @@ Two fixes made during acquisition:
 
 ---
 
-## 9. How to reproduce
+## 9. Methods — how the 833 GB was acquired
+
+### 9.1 Environment
 
 ```bash
-uv sync                                    # creates .venv, installs pdb-hunter
-uv run python scripts/acquire_all.py --list
-uv run python scripts/acquire_all.py --group sequence   # elDORS, MARS, RNAcentral
-uv run python scripts/acquire_all.py --group catalog    # everything else
-uv run python scripts/acquire_all.py --group long       # harvest + raw PDB
-uv run python scripts/watch_downloads.py                # unattended completion
-uv run python scripts/verify_downloads.py               # archive integrity
-uv run python scripts/audit_data.py                     # record counts
+curl -LsSf https://astral.sh/uv/install.sh | sh          # uv 0.12.17
+git clone git@github.com:E-Motioner-X-SBS/pdb_hunter.git ../pdb_hunter
+uv sync                                                  # .venv + editable pdb-hunter
 ```
 
-Logs: `data/acquisition/logs/`; state markers:
-`data/acquisition/state/`; reports: `data/acquisition/{verification_report,data_audit}.json`.
+`pyproject.toml` pins the Python range (3.10–3.13) and lists `pdb-hunter`
+as an editable path dependency; `uv.lock` records the resolved graph.
+
+### 9.2 Orchestrator design (`scripts/acquire_all.py`)
+
+- Every source is a `Job`: `http` (resumable byte-range download), `git`
+  (shallow clone) or `cmd` (a script/CLI run whose directory output is
+  recorded by a marker).
+- Downloads write `<dest>.part` and rename only when the expected byte
+  size is reached, so the existence of `<dest>` means complete and
+  re-running costs one `stat`.
+- Transient failures retry with backoff; **any byte progress resets the
+  retry budget** (NGDC closes long connections every ~10–150 MB).
+- Jobs run in a thread pool; each has its own log under
+  `data/acquisition/logs/<job>.log`.
+
+```bash
+uv run python scripts/acquire_all.py --list                 # 147 jobs, sizes
+uv run python scripts/acquire_all.py --group sequence --workers 20
+uv run python scripts/acquire_all.py --group catalog  --workers 12
+uv run python scripts/acquire_all.py --group long     --workers 2
+uv run python scripts/acquire_all.py --only mars-04 --workers 1
+```
+
+`scripts/watch_downloads.py` is the unattended supervisor: every 3–5
+minutes it checks each group's process, restarts a group whose jobs are
+pending, and writes `data/acquisition/state/ALL_DONE` when nothing
+remains. Directory-producing `cmd` jobs get explicit `.done` markers
+(`rna-harvest`, `raw-pdb-entries`, `rmdb`, `rfam-full-alignments`).
+`scripts/download_status.py` prints per-job byte progress.
+
+### 9.3 Sequence corpora
+
+- elDORS: 20 chunks as individual jobs (S3 anonymous), then
+  `cd data/sequences/elDORS_v1 && sha256sum -c elDORS_v1_manifest.sha256`.
+- MARS: 30 parts interleaved with the elDORS jobs in the `sequence` group
+  so both made progress; sizes for 29 parts are pinned in the script,
+  part 04 was verified against its upstream `Content-Length` separately.
+- RNAcentral: active / inactive / species-specific as plain `http` jobs.
+- One deliberate restart: the first `sequence` run ordered elDORS before
+  MARS; it was killed and relaunched with the interleaved order (partial
+  `.part` files resumed).
+
+### 9.4 pdb_hunter steps
+
+```bash
+# 154 GB per-entry database (raw + clean + dbn/bpseq/xyz), resumable
+uv run pdb-hunter rna harvest --out ../pdb_hunter/RNA_Database \
+    --workers 12 --nr-release 4.57
+
+# annotation layer: RCSB validation (clashscore), RNA3DB chain metadata
+tar -xzf data/structures/databases/rna3db/rna3db-jsons.tar.gz \
+    -C data/structures/databases/rna3db/jsons
+uv run pdb-hunter rna enrich --out ../pdb_hunter/RNA_Database \
+    --jsons-dir data/structures/databases/rna3db/jsons/rna3db-jsons \
+    --workers 12
+
+# BGSU indices (7 nrlist cutoffs + IL/HL motif atlases)
+uv run pdb-hunter rna bgsu-nrlist --resolution 3.0A --format csv --out …
+uv run pdb-hunter rna motifs-download --type il --release 4.14 --out …
+```
+
+### 9.5 Raw-PDB union entry list
+
+`scripts/build_raw_pdb_entrylist.py` unions pdb_hunter's index, the fresh
+harvest, RNA3DB filenames and gRNASolo filenames into
+`data/structures/raw_pdb_entrylist.txt` (10,527 IDs), then
+
+```bash
+uv run python scripts/acquire_raw_pdb_entries.py --workers 12
+```
+
+fetches whatever is missing, validates every file by streaming to its
+`_atom_site` tag, and classifies integrative/hybrid models (9A0D) as
+`excluded_ihm` rather than failed.
+
+### 9.6 RMDB and Rfam full alignments
+
+- `scripts/acquire_rmdb.py` reads `https://rmdb.stanford.edu/manifest.json`,
+  enumerates all five `DasLab/rmdb.github.io` data releases via the GitHub
+  API, and downloads every `.rdat` with resume (1,024 files, 12.5 GB).
+- `scripts/acquire_rfam_full.py` parses the EBI FTP directory listing and
+  downloads all 4,077 `full_alignments/*.sto` files (3.25 GB).
+
+Both were smoke-tested with `--limit 3` before the full run, and both are
+wired into `acquire_all.py` as `cmd` jobs.
+
+### 9.7 Verification
+
+```bash
+uv run python scripts/verify_downloads.py --workers 12   # 10,488 archives
+uv run python scripts/audit_data.py                      # record counts
+cd data/sequences/elDORS_v1 && sha256sum -c elDORS_v1_manifest.sha256
+```
+
+Reports land in `data/acquisition/verification_report.json` and
+`data/acquisition/data_audit.json`; per-download logs in
+`data/acquisition/logs/`.
+
+### 9.8 Quick start
+
+```bash
+uv sync
+uv run python scripts/acquire_all.py --list
+uv run python scripts/acquire_all.py --group sequence
+uv run python scripts/acquire_all.py --group catalog
+uv run python scripts/acquire_all.py --group long
+uv run python scripts/watch_downloads.py
+uv run python scripts/verify_downloads.py
+uv run python scripts/audit_data.py
+```
