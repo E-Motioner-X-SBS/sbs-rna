@@ -28,7 +28,11 @@ ROOT = Path(__file__).resolve().parents[2]
 ORG = ROOT.parent
 OUT = ROOT / "data/samples/analysis/inventory_gap.json"
 
-GB = 1024 ** 3
+#: The inventory quotes DECIMAL GB, as `du --si` and most upstream pages do.
+#: Measuring in GiB and comparing against it makes every source look 7.4% short
+#: -- elDORS read 169.84 against a documented 182.36 and was flagged partial
+#: when 169.84 GiB IS 182.36 GB. Same number, two units, one spurious gap.
+GB = 1000 ** 3
 
 #: (name, documented GB, path relative to ORG, decision or None, note)
 INVENTORY = [
@@ -71,6 +75,7 @@ INVENTORY = [
 
 
 def du_gb(p: Path) -> float:
+    """Decimal GB on disk, matching the units the inventory quotes."""
     if not p.exists():
         return 0.0
     if p.is_file():

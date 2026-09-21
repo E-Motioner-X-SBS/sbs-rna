@@ -1,0 +1,58 @@
+{
+ "n": 10,
+ "n_ok": 9,
+ "total_bytes": 1245159900,
+ "files": [
+  {
+   "file": "bprna_1m_raw/dbnFiles.zip",
+   "status": "valid zip",
+   "bytes": 45237373
+  },
+  {
+   "file": "bprna_1m_raw/bpseqFiles.zip",
+   "status": "valid zip",
+   "bytes": 151325401
+  },
+  {
+   "file": "bprna_1m_raw/fastaFiles.zip",
+   "status": "valid zip",
+   "bytes": 41419529
+  },
+  {
+   "file": "bprna_1m_raw/ctFiles.zip",
+   "status": "valid zip",
+   "bytes": 327468904
+  },
+  {
+   "file": "bprna_1m_raw/stFiles.zip",
+   "status": "valid zip",
+   "bytes": 182483742
+  },
+  {
+   "file": "spot_rna_splits/bpRNA_dataset.zip",
+   "status": "valid zip",
+   "bytes": 11098220
+  },
+  {
+   "file": "spot_rna_splits/PDB_dataset.zip",
+   "status": "valid zip",
+   "bytes": 164657
+  },
+  {
+   "file": "archiveii/ArchiveII.tar.gz",
+   "status": "valid tar.gz",
+   "bytes": 161453730
+  },
+  {
+   "file": "bprna_full/bpRNA_1m.tar.gz",
+   "status": "valid tar.gz",
+   "bytes": 227462957
+  },
+  {
+   "file": "rnastralign/RNAStrAlign_bpseq.tar.gz",
+   "status": "NOT A TAR.GZ",
+   "bytes": 97045387,
+   "head": "PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000FUbV\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0012\u0000 \u0000RNAStrAlign_bpseq/UT\r\u0000\u0007\u0004\r\u0000d\ufffd\u0506d{q\ufffddux\u000b\u0000\u0001\u0004\ufffd\u0001\u0000\u0000\u0004\u0014\u0000\u0000\u0000"
+  }
+ ]
+}

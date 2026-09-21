@@ -1,0 +1,107 @@
+{
+ "all_ok": true,
+ "n_checks": 14,
+ "n_files_found": 15688,
+ "n_files_tested": 1144,
+ "n_bad": 0,
+ "checks": [
+  {
+   "check": "Rfam full alignments",
+   "found": 4077,
+   "tested": 300,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "Rfam core",
+   "found": 4,
+   "tested": 4,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "bpRNA-1m raw",
+   "found": 5,
+   "tested": 5,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "SPOT-RNA splits",
+   "found": 2,
+   "tested": 2,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "2D archives",
+   "found": 2,
+   "tested": 2,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "2D zips",
+   "found": 8,
+   "tested": 8,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "2D parquet",
+   "found": 5,
+   "tested": 5,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "EternaBench",
+   "found": 8,
+   "tested": 8,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "RMDB rdat",
+   "found": 1024,
+   "tested": 400,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "splicing archives",
+   "found": 2,
+   "tested": 2,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "RNAcentral",
+   "found": 3,
+   "tested": 3,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "elDORS",
+   "found": 20,
+   "tested": 4,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "raw PDB entries",
+   "found": 10527,
+   "tested": 400,
+   "bad": [],
+   "ok": true
+  },
+  {
+   "check": "CCD",
+   "found": 1,
+   "tested": 1,
+   "bad": [],
+   "ok": true
+  }
+ ]
+}

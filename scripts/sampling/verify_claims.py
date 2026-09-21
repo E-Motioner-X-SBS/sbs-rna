@@ -204,6 +204,14 @@ def main() -> int:
             int(abs(bt["learned"]["l2_recall"]
                     - bt["learned_noprior"]["l2_recall"]) < 0.01), 1)
 
+        # ---- the data: present, and readable ------------------------------
+        ig = load("inventory_gap.json")
+        chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
+        chk("the only absent source is absent by decision", ig["n_decided"], 1)
+        di = load("data_integrity.json")
+        chk("every sampled file opens as what it claims", di["n_bad"], 0)
+        chk("integrity sampled across every corpus", di["n_checks"], 14)
+
         # ---- stage 5: and why D25's two splits are never averaged --------
         ph = load("pharos_small_results.json")
         te, tr_ = ph["test"], ph["test_ribosomal"]
