@@ -666,6 +666,41 @@ amplitudes, and emit **K=3** states with weights.
 pathway**. The couplings are dinucleotide-level and the model does not traverse
 a barrier. Calling this "folding dynamics" would overstate it.
 
+### 10.1 Implemented **[v0.2]**
+
+`pharos.model.dynamics`, 21 properties in `test_dynamics.py`. Three decisions
+came out of building it rather than out of the spec.
+
+**Fluctuations are computed in O(L), not O(L³).** The assembled stiffness is
+`6(L-1)` square; at L = 4,000 a dense inverse is 24,000 × 24,000, per chain, per
+step. Only the *diagonal* blocks of the inverse are needed for the amplitudes,
+and those follow from a forward-backward recursion over Schur complements —
+one 6×6 solve per step. Measured: 4× the length costs **4.6×** the time, where
+cubic would cost ~64×. Checked against `torch.linalg.inv` to 1e-13.
+
+**Positive-definiteness is structural, and the obvious way to get it does not
+work.** A stiffness matrix that is not positive definite has imaginary normal
+modes and negative "variances". The first implementation put the eigenvalue
+floor on the diagonal of the Cholesky factor, which bounds the diagonal of
+`LLᵀ` and bounds nothing about its eigenvalues — driving the raw factor to −30
+gave a minimum eigenvalue of **0.0000** against a nominal floor of 1e-2. The fix
+is `LLᵀ + floor·I`, which raises every eigenvalue by exactly `floor`.
+
+**The coupling bound has to be on the spectral norm.** Scaling the
+nearest-neighbour block by the geometric mean of the two blocks' *diagonal
+entries* bounds the wrong quantity, and the assembled matrix reached a minimum
+eigenvalue of **−1.92**. For a block-tridiagonal matrix with
+‖C_i‖ ≤ γ·√(λ_min(A_i)·λ_min(A_{i+1})) and γ < ½,
+xᵀMx ≥ (1−2γ)·Σ λ_min(A_i)|x_i|², so the matrix is positive definite with
+margin. Each block is normalised by its Frobenius norm — which dominates the
+spectral norm — and scaled to γ = 0.45.
+
+Outputs: per-step 6×6 stiffness, per-nucleotide fluctuation amplitude,
+per-residue **disorder** (supervised by the 46,448 RNA
+`_pdbx_unobs_or_zero_occ_residues` records, a flexibility label present in every
+deposited structure and used by no RNA structure predictor), and K=3 state
+weights kept separate from the structure head's.
+
 ---
 
 ## 11. Coevolution, conservation, and generalisation limits
@@ -941,7 +976,7 @@ resolve_ccd_parents.py                -> ccd_parents.json                (§4.1)
 ```
 
 `scripts/sampling/verify_claims.py` re-derives every one of them from those
-JSONs and fails the build on drift; it currently pins **232** checks. Counting
+JSONs and fails the build on drift; it currently pins **233** checks. Counting
 rules for entries and chains live once, in
 `src/pharos/data/mmcif_entities.py`, and `test_mmcif_entities.py` asserts the
 entry counter and the geometry resolver agree on every sampled entry — the two

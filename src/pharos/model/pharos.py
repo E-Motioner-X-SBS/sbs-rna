@@ -35,6 +35,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .dynamics import DynamicsConfig, HarmonicEnsemble
 from .heads import HeadConfig, PharosHeads
 from .motif_bank import MotifBankConfig, load_bank
 from .moe import MoEConfig, RouterFeatures
@@ -167,6 +168,10 @@ class Pharos(nn.Module):
                                                 dropout=cfg.dropout))
         self.motif_mix = (nn.Linear(cfg.d_pair, cfg.d_pair)
                           if self.motifs is not None else None)
+        # §10: once a stiffness field exists the equilibrium ensemble is nearly
+        # free. Equilibrium breathing, not a folding pathway.
+        self.dynamics = HarmonicEnsemble(DynamicsConfig(d_model=cfg.d_model,
+                                                        dropout=cfg.dropout))
 
     def forward(self, tokens: torch.Tensor, mod_ids: torch.Tensor,
                 chem: torch.Tensor, mask: torch.Tensor,
@@ -192,6 +197,12 @@ class Pharos(nn.Module):
                 pair = pair + self.motif_mix(retrieved)
                 aux["motif_gate"] = minfo["gate_mean"]
         out = self.heads(h, mask, pair)
+        dyn = self.dynamics(h, mask)
+        # the structure head already emits K-state weights from the token
+        # track; the ensemble's are the physics-derived ones, so they are kept
+        # under their own name rather than silently overwriting
+        out["ensemble_state_logits"] = dyn.pop("state_logits")
+        out.update(dyn)
         out["hidden"] = h
         out["aux"] = aux
         if deep_supervision:

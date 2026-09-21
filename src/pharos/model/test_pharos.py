@@ -55,9 +55,9 @@ def chk(name: str, ok, detail: str = "") -> None:
 #: What the built family is, given the recipe in `PharosConfig`. Pinned so a
 #: change to the MoE numbers cannot silently move the cost model.
 EXPECTED = {
-    "PHAROS-Small": (238_897_870, 62_737_102, 128),
-    "PHAROS-Mini": (102_191_684, 27_873_860, 144),
-    "Base-v2": (1_060_697_006, 267_973_550, 96),
+    "PHAROS-Small": (239_607_570, 63_446_802, 128),
+    "PHAROS-Mini": (102_601_096, 28_283_272, 144),
+    "Base-v2": (1_062_253_042, 269_529_586, 96),
 }
 #: What §5.4 prints. Kept beside the built numbers deliberately: the active
 #: column is close (61 vs 62.7, 269 vs 267.9) and the total column is not.
@@ -169,6 +169,16 @@ def main() -> int:
     missing = [s["name"] for s in HEAD_SPEC if s["key"] not in o]
     chk("§9 lists ten heads and ten are produced",
         len(HEAD_SPEC) == 10 and not missing, f"missing: {missing or 'none'}")
+
+    print("\n== property 8: §10's ensemble outputs are present ==")
+    for key in ("fluctuation", "disorder_logit", "stiffness_diag",
+                "ensemble_state_logits"):
+        chk(f"{key} emitted", key in o, str(tuple(o[key].shape)) if key in o else "")
+    chk("the ensemble's state weights do not overwrite the structure head's",
+        "state_logits" in o and "ensemble_state_logits" in o,
+        "physics-derived and token-derived weights are different quantities")
+    chk("fluctuations are non-negative variances",
+        bool((o["fluctuation"] >= 0).all()), "")
 
     print()
     if fails:
