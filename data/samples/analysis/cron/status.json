@@ -1,14 +1,16 @@
 {
- "updated": "2026-09-21T23:07:41+05:30",
- "state": "interrupted",
- "detail": "stopped by a signal; resumes next fire",
- "free_gib_at_check": 79,
+ "updated": "2026-09-21T23:35:54+05:30",
+ "state": "stopped",
+ "detail": "stopped on request so the GPU could be handed over; cron is DISABLED, so there is no next fire. Stage 1 resumes from 188,601,237 tokens / step 7,500 when the crontab line is uncommented or gpu_cron_runner.sh is run by hand.",
+ "free_gib_at_check": null,
  "log": "run-20260921-213901.log",
  "stages": {
-  "verify":  "done",
-  "stage1":  null,
-  "scorer":  "done",
+  "verify": "done",
+  "stage1": null,
+  "scorer": "done",
   "seqstages": null,
-  "stage5":  null
- }
+  "stage5": null
+ },
+ "resume_tokens": 188601237,
+ "resume_step": 7500
 }
