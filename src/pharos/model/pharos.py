@@ -197,7 +197,8 @@ class Pharos(nn.Module):
                 feats: Optional[RouterFeatures] = None,
                 n_loops: Optional[int] = None,
                 deep_supervision: bool = False,
-                mlm: bool = False) -> Dict:
+                mlm: bool = False,
+                dynamics: bool = True) -> Dict:
         x = self.embed(tokens, mod_ids, chem)
         iterates = []
 
@@ -219,12 +220,18 @@ class Pharos(nn.Module):
         if mlm:
             out["mlm_logits"] = (self.mlm_norm(h) @ self.embed.tok.weight.T
                                  + self.mlm_bias)
-        dyn = self.dynamics(h, mask)
-        # the structure head already emits K-state weights from the token
-        # track; the ensemble's are the physics-derived ones, so they are kept
-        # under their own name rather than silently overwriting
-        out["ensemble_state_logits"] = dyn.pop("state_logits")
-        out.update(dyn)
+        # §10's ensemble is opt-in. Its selected inversion is O(L) SEQUENTIAL
+        # 6x6 solves -- 1,276 ms at L=981 -- and nothing supervises it unless
+        # the batch carries X-ray B-factors (D12). Computing it on every
+        # forward, including MLM pretraining where it can never be trained,
+        # was most of a second per step spent on an output nobody read.
+        if dynamics:
+            dyn = self.dynamics(h, mask)
+            # the structure head already emits K-state weights from the token
+            # track; the ensemble's are the physics-derived ones, so they are
+            # kept under their own name rather than silently overwriting
+            out["ensemble_state_logits"] = dyn.pop("state_logits")
+            out.update(dyn)
         out["hidden"] = h
         out["aux"] = aux
         if deep_supervision:

@@ -55,6 +55,23 @@ from pharos.model.block_scorer import (BlockScorer, ScorerConfig,   # noqa: E402
                                        valid_mask)
 
 
+def enable_gpu_fast_paths() -> None:
+    """A100 fast paths that are free and off by default.
+
+    TF32 gives the Ampere tensor cores a 10-bit mantissa on fp32 matmuls and
+    convolutions. For a model already training in bf16 autocast -- 8-bit
+    mantissa -- refusing TF32 on the fp32 residue is precision theatre that
+    costs real throughput. `high` keeps fp32 accumulation.
+    """
+    import torch as _t
+    if not _t.cuda.is_available():
+        return
+    _t.backends.cuda.matmul.allow_tf32 = True
+    _t.backends.cudnn.allow_tf32 = True
+    _t.backends.cudnn.benchmark = True
+    _t.set_float32_matmul_precision("high")
+
+
 def to_device(batch: Dict, device) -> Dict:
     t = {
         "tokens": torch.as_tensor(batch["tokens"], dtype=torch.long, device=device),
@@ -194,6 +211,7 @@ def require_gpu(args) -> torch.device:
 
 def train(args) -> None:
     device = require_gpu(args)
+    enable_gpu_fast_paths()
 
     cfg = ScorerConfig(d_model=args.d_model, d_block=args.d_block,
                        n_conv=args.n_conv, n_attn=args.n_attn,
@@ -202,6 +220,11 @@ def train(args) -> None:
     va = Pharos3DDataset(args.data, split="val")
     te = Pharos3DDataset(args.data, split="test")
     print(f"[bs] train {len(tr):,} | val {len(va):,} | test {len(te):,} chains")
+    # decompress every shard once up front; profiled at 53% of step time when
+    # left to happen inside the loop
+    for d in (tr, va, te):
+        d.prewarm()
+    print(f"[bs] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
 
     model = BlockScorer(cfg).to(device)
     n_par = sum(p.numel() for p in model.parameters())

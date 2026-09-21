@@ -75,6 +75,23 @@ def require_gpu(args) -> torch.device:
     return torch.device(args.device)
 
 
+def enable_gpu_fast_paths() -> None:
+    """A100 fast paths that are free and off by default.
+
+    TF32 gives the Ampere tensor cores a 10-bit mantissa on fp32 matmuls and
+    convolutions. For a model already training in bf16 autocast -- 8-bit
+    mantissa -- refusing TF32 on the fp32 residue is precision theatre that
+    costs real throughput. `high` keeps fp32 accumulation.
+    """
+    import torch as _t
+    if not _t.cuda.is_available():
+        return
+    _t.backends.cuda.matmul.allow_tf32 = True
+    _t.backends.cudnn.allow_tf32 = True
+    _t.backends.cudnn.benchmark = True
+    _t.set_float32_matmul_precision("high")
+
+
 def to_device(b: Dict, device) -> Dict:
     t = {k: torch.as_tensor(v, device=device)
          for k, v in b.items()
@@ -133,12 +150,30 @@ def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
     return ii, jj, y
 
 
-def step_losses(model: Pharos, t: Dict, cfg, n_neg: int) -> tuple:
-    """One forward pass and every head that this batch can supervise."""
+def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
+                n_loops: Optional[int] = None) -> tuple:
+    """One forward pass and every head that this batch can supervise.
+
+    Two throughput decisions live here, both measured.
+
+    **Recycling is sampled, not fixed.** The trunk at the configured 8 loops
+    costs 5,192 ms of an 8,029 ms step; one loop costs 635 ms, so the loops
+    *are* the step. Sampling the count per step is the standard recycling
+    recipe and it is better than a fixed 8 in two ways: the expected cost falls
+    to about half, and the model is trained to produce a usable answer at every
+    recycle count rather than only at the one it always saw.
+
+    **The ensemble is computed only when something supervises it.** §10's
+    selected inversion is O(L) sequential 6x6 solves -- 1,241 ms at L=981 --
+    and its only training signal is the X-ray B-factor target, which D12
+    restricts to 32% of chains. On a batch with no X-ray chain it was a second
+    of arithmetic nobody read.
+    """
     dev = t["tokens"].device
     B, L = t["tokens"].shape
+    want_dyn = bool(t["rigidity_mask"].any())
     out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
-                feats=router_features(t))
+                feats=router_features(t), n_loops=n_loops, dynamics=want_dyn)
     parts: Dict[str, float] = {}
     total = torch.zeros((), device=dev)
     w = t["weights"]
@@ -157,7 +192,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int) -> tuple:
 
     # head 6 -- rigidity. D12: X-ray only, and the mask is what enforces it.
     rm = t["rigidity_mask"]
-    if rm.any():
+    if want_dyn and rm.any():
         l = F.smooth_l1_loss(out["rigidity"][rm], t["b_factor_z"][rm].float())
         total = total + 0.3 * l
         parts["rigidity"] = float(l.detach())
@@ -177,23 +212,39 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int) -> tuple:
         total = total + 0.2 * l
         parts["base"] = float(l.detach())
 
-    # head 1 -- contacts, on sampled pairs
-    closs, n_pairs = [], 0
+    # head 1 -- contacts, on sampled pairs.
+    #
+    # ONE call, not one per chain. The per-chain version ran pair_proj, the
+    # motif bank and the contact head B times sequentially; with the batch cap
+    # lifted to 512 chains that is 512 sequential sub-forwards per step, each
+    # too small to fill the card, and it is why utilisation sat at 32% after
+    # the trunk was already fixed. Pairs from every chain are gathered into one
+    # flat tensor, scored together, and the per-chain quality weight is applied
+    # per pair -- which is what weighting the per-chain mean amounted to.
+    ii_all, jj_all, y_all, wt_all, bi_all = [], [], [], [], []
     for b in range(B):
         Lb = int(t["lengths"][b])
         ii, jj, y = sample_pairs(t["contacts"][b], Lb, n_neg, dev)
         if ii is None or len(ii) == 0:
             continue
-        h = out["hidden"][b]
-        pair = model.pair_proj(torch.cat([h[ii], h[jj]], dim=-1))
+        ii_all.append(ii)
+        jj_all.append(jj)
+        y_all.append(y)
+        wt_all.append(w[b].expand(len(ii)))
+        bi_all.append(torch.full((len(ii),), b, dtype=torch.long, device=dev))
+    n_pairs = 0
+    if ii_all:
+        ii = torch.cat(ii_all); jj = torch.cat(jj_all)
+        y = torch.cat(y_all); wt = torch.cat(wt_all); bidx = torch.cat(bi_all)
+        n_pairs = int(len(ii))
+        h = out["hidden"]
+        pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], dim=-1))
         if model.motifs is not None:
             r, _ = model.motifs(pair)
             pair = pair + model.motif_mix(r)
         logit = model.heads.pair.contact(pair).squeeze(-1)
-        closs.append(F.binary_cross_entropy_with_logits(logit, y) * w[b])
-        n_pairs += len(ii)
-    if closs:
-        l = torch.stack(closs).mean()
+        per = F.binary_cross_entropy_with_logits(logit, y, reduction="none")
+        l = (per * wt).sum() / wt.sum().clamp(min=1e-6)
         total = total + 1.0 * l
         parts["contact"] = float(l.detach())
 
@@ -215,7 +266,8 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
         t = to_device(batch, device)
         with torch.autocast("cuda", dtype=torch.bfloat16):
             out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
-                        feats=router_features(t))
+                        feats=router_features(t),
+                        dynamics=bool(t["rigidity_mask"].any()))
         m = t["mask"]
         if m.any():
             p = (out["mg_logit"][m].float() > 0)
@@ -248,9 +300,14 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
+    ap.add_argument("--sample-loops", action="store_true", default=True,
+                    help="sample the recycle count per step (default on)")
+    ap.add_argument("--fixed-loops", dest="sample_loops", action="store_false")
     args = ap.parse_args()
 
     device = require_gpu(args)
+    enable_gpu_fast_paths()
+    rng = np.random.default_rng(0)
     cfg = (PharosConfig.small() if args.size == "small" else PharosConfig.mini())
     tr = Pharos3DDataset(args.data, split="train", max_length=args.max_length)
     va = Pharos3DDataset(args.data, split="val", max_length=args.max_length)
@@ -258,6 +315,9 @@ def main() -> None:
     tb = Pharos3DDataset(args.data, split="test_ribosomal", max_length=args.max_length)
     print(f"[pharos] train {len(tr):,} | val {len(va):,} | test {len(te):,} "
           f"| test_ribosomal {len(tb):,}")
+    for d in (tr, va, te, tb):
+        d.prewarm()
+    print(f"[pharos] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
 
     model = Pharos(cfg).to(device)
     pc = model.param_counts()
@@ -275,8 +335,11 @@ def main() -> None:
         t0, run = time.time(), []
         for idxs in tr.length_batches(token_budget=args.token_budget, seed=ep):
             t = to_device(tr.collate(idxs), device)
+            # sampled recycling: 1..max_loops, uniform
+            nl = int(rng.integers(1, cfg.n_loops + 1)) if args.sample_loops \
+                else cfg.n_loops
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                loss, parts, _ = step_losses(model, t, cfg, args.n_neg)
+                loss, parts, _ = step_losses(model, t, cfg, args.n_neg, n_loops=nl)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

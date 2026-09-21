@@ -112,8 +112,14 @@ fi
 # contacts cluster near the diagonal would already score well.
 if [ ! -f "$LOGDIR/.done-scorer" ]; then
     note "=== train_block_scorer.py (R1) ==="
+    # Sized to the card, not to a laptop. Measured on this A100: 153.4M
+    # parameters, 34.4 GiB peak on the worst batch, 75% mean utilisation,
+    # 520 s/epoch. The previous 4.4M / 16k-token configuration used 0.6 GiB and
+    # left the GPU at 13%.
     if $PY -u scripts/train_block_scorer.py \
-            --device cuda --min-free-gib "$NEED_GIB" --epochs 8 >> "$LOG" 2>&1; then
+            --device cuda --min-free-gib "$NEED_GIB" --epochs 8 \
+            --d-model 1024 --d-block 768 --n-conv 12 --n-attn 8 \
+            --token-budget 131072 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-scorer"
         note "block scorer finished"
         grep -E "sequence gain|recall" "$LOG" | tail -8 | tee -a "$LOG" >/dev/null
@@ -127,9 +133,12 @@ fi
 # ---- 3. stage 5: the multi-task structural head ----------------------------
 if [ ! -f "$LOGDIR/.done-stage5" ]; then
     note "=== train_pharos.py (curriculum stage 5) ==="
+    # PHAROS-Small, not Mini, and a 4x token budget: 43.1 GiB peak,
+    # 4.5 s/step, 2.9 min/epoch with sampled recycling. Mini at the old budget
+    # was 10.1 GiB and 8.0 s/step.
     if $PY -u scripts/train_pharos.py \
             --device cuda --min-free-gib "$NEED_GIB" \
-            --size mini --epochs 4 >> "$LOG" 2>&1; then
+            --size small --epochs 8 --token-budget 32768 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage5"
         note "stage 5 finished"
     else

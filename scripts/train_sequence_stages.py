@@ -65,6 +65,23 @@ SS_INDEX = {c: i for i, c in enumerate(SS_SYMBOLS)}
 STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0, "fitness": 0.3}
 
 
+def enable_gpu_fast_paths() -> None:
+    """A100 fast paths that are free and off by default.
+
+    TF32 gives the Ampere tensor cores a 10-bit mantissa on fp32 matmuls and
+    convolutions. For a model already training in bf16 autocast -- 8-bit
+    mantissa -- refusing TF32 on the fp32 residue is precision theatre that
+    costs real throughput. `high` keeps fp32 accumulation.
+    """
+    import torch as _t
+    if not _t.cuda.is_available():
+        return
+    _t.backends.cuda.matmul.allow_tf32 = True
+    _t.backends.cudnn.allow_tf32 = True
+    _t.backends.cudnn.benchmark = True
+    _t.set_float32_matmul_precision("high")
+
+
 def encode(seqs: List[str], device) -> Dict[str, torch.Tensor]:
     L = max(len(s) for s in seqs)
     B = len(seqs)
@@ -220,6 +237,7 @@ def main() -> None:
     args = ap.parse_args()
 
     device = require_gpu(args)
+    enable_gpu_fast_paths()
     cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
     model = Pharos(cfg).to(device)
     if args.init_from and args.init_from.exists():

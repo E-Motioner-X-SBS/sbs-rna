@@ -66,6 +66,23 @@ MASK_FRAC = 0.15
 SPAN_MEAN = 3.0
 
 
+def enable_gpu_fast_paths() -> None:
+    """A100 fast paths that are free and off by default.
+
+    TF32 gives the Ampere tensor cores a 10-bit mantissa on fp32 matmuls and
+    convolutions. For a model already training in bf16 autocast -- 8-bit
+    mantissa -- refusing TF32 on the fp32 residue is precision theatre that
+    costs real throughput. `high` keeps fp32 accumulation.
+    """
+    import torch as _t
+    if not _t.cuda.is_available():
+        return
+    _t.backends.cuda.matmul.allow_tf32 = True
+    _t.backends.cudnn.allow_tf32 = True
+    _t.backends.cudnn.benchmark = True
+    _t.set_float32_matmul_precision("high")
+
+
 def iter_sequences(corpus: Path, min_len: int, max_len: int,
                    shards: Optional[int] = None) -> Iterator[str]:
     import pyarrow.parquet as pq
@@ -173,6 +190,7 @@ def main() -> None:
     args = ap.parse_args()
 
     device = require_gpu(args)
+    enable_gpu_fast_paths()
     cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
     cfg.max_length = max(cfg.max_length, args.max_len)
     model = Pharos(cfg).to(device)

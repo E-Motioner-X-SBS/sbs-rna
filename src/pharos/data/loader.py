@@ -51,6 +51,25 @@ class Pharos3DDataset:
     def __len__(self) -> int:
         return len(self._index)
 
+    def prewarm(self, verbose: bool = False) -> float:
+        """Decompress every shard up front; return the GiB now resident.
+
+        Shards are decompressed on first touch, and an epoch's batches are drawn
+        across all of them, so without this the first pass pays the
+        decompression inside the training loop. Profiled: `collate` was **53% of
+        step time** with the GPU at 13% utilisation, almost all of it zlib on
+        first touch. The whole set is 1.34 GiB expanded, so paying it once at
+        startup is strictly better than paying it scattered through epoch 0.
+        """
+        import resource
+        for si in range(len(self._files)):
+            self._reader(si)
+        gib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
+        if verbose:
+            print(f"[data] {len(self._files)} shards resident, {gib:.2f} GiB RSS",
+                  flush=True)
+        return gib
+
     def _reader(self, si: int) -> ShardReader:
         r = self._readers.get(si)
         if r is None:
@@ -65,14 +84,21 @@ class Pharos3DDataset:
         return item
 
     # -- batching ---------------------------------------------------------
-    def length_batches(self, token_budget: int = 16384, max_batch: int = 32,
+    def length_batches(self, token_budget: int = 16384, max_batch: int = 512,
                        shuffle: bool = True, seed: int = 0,
                        bucket_ratio: float = 1.5) -> List[List[int]]:
         """Indices grouped so each batch holds about `token_budget` residues.
 
         Buckets are geometric in length (`bucket_ratio`), so the padding waste
         inside a batch is bounded by that ratio regardless of where in the range
-        the chains sit. Within a bucket, order is shuffled; across buckets, the
+        the chains sit.
+
+        `max_batch` defaults to 512, not 32. At 32 the cap binds long before the
+        token budget does -- raising the budget from 16k to 131k left the worst
+        batch at 32 chains / 101k tokens, so the extra budget bought nothing and
+        an 80 GiB card ran at 13% utilisation. The token budget should be the
+        thing that binds; `max_batch` is a guard against a pathological batch of
+        thousands of 32-nt chains, not a tuning knob. Within a bucket, order is shuffled; across buckets, the
         batch order is shuffled too, so a step is not systematically short or
         long at any point in the epoch.
         """
