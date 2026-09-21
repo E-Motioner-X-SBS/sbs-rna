@@ -294,12 +294,25 @@ def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
 #:     32,768   65.9 GiB   2.01e-3      38.8k    7.1%
 #:     36,864   74.1 GiB   2.01e-3      41.1k    7.3%
 #:
-#: Linear to within 3%, which is what makes sizing the batch from free memory
-#: a calculation rather than a guess.
-GIB_PER_TOKEN = 2.01e-3
+#: Those three runs were ~350 steps each and they all UNDER-report, because
+#: peak memory is not a function of the token count alone. SWA and FULL both
+#: materialise a `(B, 1, L, L)` mask, so at a fixed token budget a batch of
+#: 35x1024 costs far more than one of 280x128 -- measured at 24,576 tokens,
+#: 61.2 GiB at L=1024 against 39.2 GiB at L=128. A short benchmark never draws
+#: the worst batch in the corpus; a long run does. At budget 35,840 the fitted
+#: 2.01e-3 predicted a 72.0 GiB peak and the run reached **79.14 GiB and OOMed**
+#: at 72.4M tokens.
+#:
+#: So the constant is the WORST observed cost per token (2.21e-3) plus margin,
+#: not the mean, and `auto_token_budget` holds back more. The principled fix is
+#: a cost model carrying the quadratic term -- allowed tokens at width w being
+#: `target / (a + b*w)` -- which needs per-width calibration this run has not
+#: done. Until then: a conservative constant, a bigger reserve, and a trainer
+#: that survives an OOM instead of dying of one.
+GIB_PER_TOKEN = 2.40e-3
 
 
-def auto_token_budget(free_gib: float, reserve_gib: float = 6.0,
+def auto_token_budget(free_gib: float, reserve_gib: float = 10.0,
                       lo: int = 8192, hi: int = 40960) -> int:
     """The largest token budget that fits in `free_gib`, less a reserve.
 
@@ -386,7 +399,7 @@ def main() -> None:
     ap.add_argument("--token-budget", type=int, default=0,
                     help="0 (the default) sizes it from free VRAM via "
                          "`auto_token_budget`; a positive value overrides")
-    ap.add_argument("--token-budget-reserve", type=float, default=6.0,
+    ap.add_argument("--token-budget-reserve", type=float, default=10.0,
                     help="GiB held back from the automatic budget for the "
                          "allocator's slack and a small neighbour")
     ap.add_argument("--token-budget-fixed", type=int, default=24576,
@@ -408,7 +421,13 @@ def main() -> None:
                     help="skip torch.compile on the trunk; it costs ~3 min of "
                          "warm-up for 8 graphs and returns 1.65x on step time")
     ap.add_argument("--restart", action="store_true",
-                    help="ignore an existing checkpoint and start from scratch")
+                    help="ignore an existing checkpoint and start from scratch; "
+                         "the existing one is RENAMED, not overwritten")
+    ap.add_argument("--ckpt", type=Path, default=None,
+                    help="checkpoint path; defaults to "
+                         "data/derived/checkpoints/pretrain_<size>.pt. Point a "
+                         "smoke test somewhere else and it cannot touch a real "
+                         "run's weights")
     args = ap.parse_args()
 
     device = require_gpu(args)
@@ -450,7 +469,16 @@ def main() -> None:
     # will be interrupted. Without it every interruption discards everything and
     # the run can never finish -- an unattended pretraining script that restarts
     # from zero is not unattended, it is a loop that makes no progress.
-    ck = CKPT / f"pretrain_{args.size}.pt"
+    ck = args.ckpt or (CKPT / f"pretrain_{args.size}.pt")
+    if ck.exists() and args.restart:
+        # --restart used to overwrite in place, silently. A smoke test run with
+        # it against the default path destroyed 70.8M tokens of stage 1 -- the
+        # flag did exactly what it said, and what it said was not recoverable.
+        # Renaming costs nothing and makes the mistake undoable.
+        keep = ck.with_suffix(".superseded.pt")
+        ck.replace(keep)
+        print(f"[mlm] --restart: existing checkpoint moved to {keep.name} "
+              f"rather than overwritten", flush=True)
     if ck.exists() and not args.restart:
         sd = torch.load(ck, map_location=device)
         want = set(model.state_dict())
@@ -481,6 +509,8 @@ def main() -> None:
     accs: List[float] = []
     hist: List[Dict] = []
     stop = False
+    budget_tokens = args.token_budget
+    n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
     # is a few hundred calls to `residue_chemistry`, done once.
     batch_chem = BatchChemistry(SYMBOLS, device)
@@ -491,103 +521,121 @@ def main() -> None:
         # tokens does not fit in 80 GiB. Bucketing is what makes the budget
         # honest: without it 42.9% of each "24,576-token" step was padding.
         for group in iter_batches(CORPUS, args.min_len, args.max_len,
-                                  args.token_budget, args.max_batch, rng,
+                                  budget_tokens, args.max_batch, rng,
                                   args.shards):
-            tok_np, mask_np, lengths = encode_batch(group)
-            inp_np, tgt_np, sel_np = apply_span_mask(tok_np, lengths, rng)
-            if not sel_np.any():
-                continue
-            inp = torch.as_tensor(inp_np, device=device)
-            tgt = torch.as_tensor(tgt_np, device=device)
-            sel = torch.as_tensor(sel_np, device=device)
-            bmask = torch.as_tensor(mask_np, device=device)
-            # THE CHEMISTRY MUST BE DERIVED FROM THE MASKED INPUT.
-            #
-            # `chain_chemistry` one-hot-encodes base identity in dims 0-4, so
-            # chemistry built from the ORIGINAL sequence leaves a masked
-            # position carrying its own answer, and the model reads it straight
-            # off. Measured when it did: masked-token accuracy 0.948 and loss
-            # 0.392 nats = 0.57 bits at step 100, against a corpus entropy of
-            # 2.0165 bits/nt. A number below the entropy of the data is not a
-            # good model, it is a leak. `inp` is the masked stream.
-            chem = batch_chem(inp, bmask)
-            n_real = bmask.sum(1)
-            feats = RouterFeatures(
-                length=n_real.float(),
-                chem_summary=(chem.sum(1)
-                              / n_real.unsqueeze(1).clamp(min=1))[:, :5])
-            lr_now = lr_at(seen, budget, args.lr)
-            for g in opt.param_groups:
-                g["lr"] = lr_now
-            with torch.autocast("cuda", dtype=torch.bfloat16):
-                out = model(inp, torch.zeros_like(inp), chem, bmask,
-                            feats=feats, n_loops=args.n_loops, mlm=True)
-                logits = out["mlm_logits"].float()
-                ce = F.cross_entropy(logits[sel], tgt[sel])
-                bal = out["aux"]["balance_loss"]
-                loss = ce + bal
+          try:
+              tok_np, mask_np, lengths = encode_batch(group)
+              inp_np, tgt_np, sel_np = apply_span_mask(tok_np, lengths, rng)
+              if not sel_np.any():
+                  continue
+              inp = torch.as_tensor(inp_np, device=device)
+              tgt = torch.as_tensor(tgt_np, device=device)
+              sel = torch.as_tensor(sel_np, device=device)
+              bmask = torch.as_tensor(mask_np, device=device)
+              # THE CHEMISTRY MUST BE DERIVED FROM THE MASKED INPUT.
+              #
+              # `chain_chemistry` one-hot-encodes base identity in dims 0-4, so
+              # chemistry built from the ORIGINAL sequence leaves a masked
+              # position carrying its own answer, and the model reads it straight
+              # off. Measured when it did: masked-token accuracy 0.948 and loss
+              # 0.392 nats = 0.57 bits at step 100, against a corpus entropy of
+              # 2.0165 bits/nt. A number below the entropy of the data is not a
+              # good model, it is a leak. `inp` is the masked stream.
+              chem = batch_chem(inp, bmask)
+              n_real = bmask.sum(1)
+              feats = RouterFeatures(
+                  length=n_real.float(),
+                  chem_summary=(chem.sum(1)
+                                / n_real.unsqueeze(1).clamp(min=1))[:, :5])
+              lr_now = lr_at(seen, budget, args.lr)
+              for g in opt.param_groups:
+                  g["lr"] = lr_now
+              with torch.autocast("cuda", dtype=torch.bfloat16):
+                  out = model(inp, torch.zeros_like(inp), chem, bmask,
+                              feats=feats, n_loops=args.n_loops, mlm=True)
+                  logits = out["mlm_logits"].float()
+                  ce = F.cross_entropy(logits[sel], tgt[sel])
+                  bal = out["aux"]["balance_loss"]
+                  loss = ce + bal
+              opt.zero_grad(set_to_none=True)
+              loss.backward()
+              torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+              opt.step()
+
+              with torch.no_grad():
+                  acc = float((logits[sel].argmax(-1) == tgt[sel]).float().mean())
+              # CE and the balance term are tracked SEPARATELY. The Switch
+              # balance loss is `n_experts * sum(frac * pbar)`, which is 1.0 at
+              # perfect uniformity, not 0 -- so at `balance_weight` 0.01 across 16
+              # blocks it adds a floor of ~0.16 nats that never goes away.
+              # Reporting their sum as "loss" and dividing it by ln 2 inflated
+              # bits/token by ~0.23 bits and made a model that had gone BELOW the
+              # corpus entropy look as though it were still above it.
+              run.append(float(ce.detach()))
+              bals.append(float(bal.detach()))
+              accs.append(acc)
+              seen += int(lengths.sum())
+              padded += int(tok_np.size)
+              step += 1
+
+              if step % args.log_every == 0:
+                  # PER-INTERVAL, not cumulative since t0. Averaging from the
+                  # start folds in `torch.compile`'s warm-up -- 8 quantised
+                  # widths, forward and backward -- so the reported rate climbs
+                  # for hundreds of steps and never reaches the steady state it
+                  # is supposed to report. The first interval after a resume or a
+                  # compile still carries warm-up; the ones after it do not.
+                  now = time.time()
+                  el = now - tmark
+                  tmark = now
+                  # MFU is spent on PADDED tokens, so it is padded throughput
+                  # that divides into the card's peak. Reporting only real tokens
+                  # hid a 42.9% padding tax behind a number that looked fine.
+                  rate_p = (padded - padded_mark) / max(el, 1e-9)
+                  rate_r = (seen - seen_mark) / max(el, 1e-9)
+                  seen_mark, padded_mark = seen, padded
+                  mfu = FLOPS_PER_PARAM_TOKEN(args.n_loops) * pc["active"] \
+                      * rate_p / A100_BF16_PEAK
+                  print(f"[mlm] step {step} {seen/1e6:.1f}M tok "
+                        f"ce {np.mean(run[-args.log_every:]):.4f} "
+                        f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits) "
+                        f"bal {np.mean(bals[-args.log_every:]):.3f} "
+                        f"lr {lr_now:.2e} "
+                        f"acc {np.mean(accs[-args.log_every:]):.4f} "
+                        f"{rate_r/1e3:.1f}k tok/s "
+                        f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
+                        f"MFU {100*mfu:.1f}%", flush=True)
+                  hist.append({"step": step, "tokens": seen, "padded": padded,
+                               "lr": lr_now,
+                               "balance": float(np.mean(bals[-args.log_every:])),
+                               "tok_per_s": rate_r,
+                               "padded_per_s": rate_p, "mfu": mfu,
+                               "loss": float(np.mean(run[-args.log_every:])),
+                               "acc": float(np.mean(accs[-args.log_every:]))})
+              if step % args.ckpt_every == 0 or seen >= budget:
+                  torch.save({"cfg": cfg.__dict__, "model": _clean_state(model),
+                              "opt": opt.state_dict(), "padded": padded,
+                              "tokens": seen, "step": step}, ck)
+              if seen >= budget:
+                  stop = True
+                  break
+          except torch.OutOfMemoryError:
+            # A run of this length must not die of one batch. Peak memory
+            # depends on the batch SHAPE and not only on its token count,
+            # so a budget safe for two thousand steps can still meet a pool
+            # of long sequences that it is not -- which is exactly how
+            # 72.4M tokens of stage 1 ended. Drop the batch, shrink the
+            # budget, keep the checkpoint, carry on. The iterator has to be
+            # rebuilt because the budget is baked into it at creation.
+            n_oom += 1
             opt.zero_grad(set_to_none=True)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            torch.cuda.empty_cache()
+            budget_tokens = max(8192, int(budget_tokens * 0.85) // 1024 * 1024)
+            print(f"[mlm] OOM #{n_oom} at step {step}; token budget "
+                  f"-> {budget_tokens:,}, rebuilding the stream and continuing",
+                  flush=True)
+            break
 
-            with torch.no_grad():
-                acc = float((logits[sel].argmax(-1) == tgt[sel]).float().mean())
-            # CE and the balance term are tracked SEPARATELY. The Switch
-            # balance loss is `n_experts * sum(frac * pbar)`, which is 1.0 at
-            # perfect uniformity, not 0 -- so at `balance_weight` 0.01 across 16
-            # blocks it adds a floor of ~0.16 nats that never goes away.
-            # Reporting their sum as "loss" and dividing it by ln 2 inflated
-            # bits/token by ~0.23 bits and made a model that had gone BELOW the
-            # corpus entropy look as though it were still above it.
-            run.append(float(ce.detach()))
-            bals.append(float(bal.detach()))
-            accs.append(acc)
-            seen += int(lengths.sum())
-            padded += int(tok_np.size)
-            step += 1
-
-            if step % args.log_every == 0:
-                # PER-INTERVAL, not cumulative since t0. Averaging from the
-                # start folds in `torch.compile`'s warm-up -- 8 quantised
-                # widths, forward and backward -- so the reported rate climbs
-                # for hundreds of steps and never reaches the steady state it
-                # is supposed to report. The first interval after a resume or a
-                # compile still carries warm-up; the ones after it do not.
-                now = time.time()
-                el = now - tmark
-                tmark = now
-                # MFU is spent on PADDED tokens, so it is padded throughput
-                # that divides into the card's peak. Reporting only real tokens
-                # hid a 42.9% padding tax behind a number that looked fine.
-                rate_p = (padded - padded_mark) / max(el, 1e-9)
-                rate_r = (seen - seen_mark) / max(el, 1e-9)
-                seen_mark, padded_mark = seen, padded
-                mfu = FLOPS_PER_PARAM_TOKEN(args.n_loops) * pc["active"] \
-                    * rate_p / A100_BF16_PEAK
-                print(f"[mlm] step {step} {seen/1e6:.1f}M tok "
-                      f"ce {np.mean(run[-args.log_every:]):.4f} "
-                      f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits) "
-                      f"bal {np.mean(bals[-args.log_every:]):.3f} "
-                      f"lr {lr_now:.2e} "
-                      f"acc {np.mean(accs[-args.log_every:]):.4f} "
-                      f"{rate_r/1e3:.1f}k tok/s "
-                      f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
-                      f"MFU {100*mfu:.1f}%", flush=True)
-                hist.append({"step": step, "tokens": seen, "padded": padded,
-                             "lr": lr_now,
-                             "balance": float(np.mean(bals[-args.log_every:])),
-                             "tok_per_s": rate_r,
-                             "padded_per_s": rate_p, "mfu": mfu,
-                             "loss": float(np.mean(run[-args.log_every:])),
-                             "acc": float(np.mean(accs[-args.log_every:]))})
-            if step % args.ckpt_every == 0 or seen >= budget:
-                torch.save({"cfg": cfg.__dict__, "model": _clean_state(model),
-                            "opt": opt.state_dict(), "padded": padded,
-                            "tokens": seen, "step": step}, ck)
-            if seen >= budget:
-                stop = True
-                break
         else:
             print("[mlm] corpus exhausted; looping", flush=True)
 
