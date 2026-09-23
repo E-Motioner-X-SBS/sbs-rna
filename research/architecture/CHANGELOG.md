@@ -19,3 +19,20 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-22 02:04 IST
 
 - **The watcher was writing a changelog entry about committing the changelog** (`d29f573`)
+
+## 2026-09-23 15:34 IST
+
+- **Training telemetry: stage 1 from the 188.6M resume onward** (`8f91948`)
+- tokens: 188601237 → **244695353**
+
+## 2026-09-23 16:04 IST
+
+- tokens: 244695353 → **295733186**
+
+## 2026-09-23 16:34 IST
+
+- tokens: 295733186 → **348598312**
+
+## 2026-09-23 17:04 IST
+
+- tokens: 348598312 → **402503125**
