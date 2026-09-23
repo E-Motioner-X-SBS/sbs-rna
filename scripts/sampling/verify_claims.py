@@ -208,9 +208,21 @@ def main() -> int:
         if _rs82 is not None:
             chk("v0.2a router: still uniform at 82.1M tokens",
                 _rs82["frac_of_uniform"], 0.9906, abs_tol=0.002)
-            chk("v0.2a router: no drift toward specialisation",
+            # Scoped to the early window ON PURPOSE. It was written when 82M
+            # was the last probe and read as a general claim; it is not one.
+            # The router does specialise later -- see the 573M checks below.
+            chk("v0.2a router: flat through the first 82M",
                 int(_rs82["frac_of_uniform"] >= rs["frac_of_uniform"]), 1)
         chk("v0.2a router: probes recorded", int(len(_rsh) >= 3), 1)
+        # ...and it does start. The flat reading through 82M was too early.
+        _rs573 = next((h for h in _rsh if h["tokens"] == 573278318), None)
+        if _rs573 is not None:
+            chk("v0.2a router: specialising by 573M tokens",
+                _rs573["frac_of_uniform"], 0.9679, abs_tol=0.002)
+            chk("v0.2a router: top-1 rises above chance",
+                _rs573["mean_top1_prob"], 0.0742, abs_tol=0.002)
+            chk("v0.2a router: sharper than at 82M",
+                int(_rs573["frac_of_uniform"] < _rs82["frac_of_uniform"]), 1)
         chk("v0.2a router: load is uniform to 3 decimals",
             round(rs["expert_load_max"] - rs["expert_load_min"], 4),
             0.0043, abs_tol=0.0005)

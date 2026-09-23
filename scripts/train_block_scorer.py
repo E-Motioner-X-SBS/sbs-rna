@@ -55,6 +55,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                      # noqa: E402
 from pharos.train.telemetry import RunLog
+from pharos.train.checkpoint import atomic_save
 from pharos.model.block_scorer import (BlockScorer, ScorerConfig,   # noqa: E402
                                        l1_budget, l2_budget, occupancy_labels,
                                        occupancy_loss, recall_at_budget,
@@ -300,7 +301,7 @@ def train(args) -> None:
         runlog.event("resumed", epoch=start_ep, step=step)
 
     def save_state(ep: int, done: bool) -> None:
-        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+        atomic_save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
                     "sched": sched.state_dict(), "total_steps": total_steps,
                     "epoch": ep, "epoch_done": done, "step": step,
@@ -363,7 +364,7 @@ def train(args) -> None:
             best = score
             # the RESULT: best epoch only, and deliberately without optimiser
             # state, because this is what evaluation and the cascade read
-            torch.save({"cfg": cfg.__dict__, "model": model.state_dict(),
+            atomic_save({"cfg": cfg.__dict__, "model": model.state_dict(),
                         "epoch": ep, "val": ev}, args.ckpt)
         save_state(ep, True)          # the RESUME STATE: last epoch, always
 

@@ -131,10 +131,34 @@ type-conditioned router collapsing onto the 85.94% of residues that are
 ribosomal.
 
 Load balance is measured and holds to three decimals. Whether the router
-*specialises* is a separate question, tracked by per-token routing entropy
-(`probe_router_specialisation.py`) rather than assumed from balance — the mean
-routing distribution is uniform by construction at balance and says nothing
-about individual tokens.
+*specialises* is a separate question, and balance cannot answer it: the mean
+routing distribution is uniform by construction at balance, whether every token
+picks a few experts or every token spreads across all of them. Per-token
+routing entropy separates the two, and `probe_router_specialisation.py` tracks
+it against the live checkpoint.
+
+**It specialises, and it starts late.** Measured on one run's checkpoints, with
+32 experts so uniform entropy is log 32 = 3.466:
+
+| tokens | per-token entropy | % of uniform | mean top-1 | sharpest block |
+|---|---|---|---|---|
+| 12.0M | 3.4094 | 98.4% | 0.0490 | 3.172 |
+| 55.4M | 3.4326 | 99.0% | 0.0466 | 3.178 |
+| 82.1M | 3.4331 | 99.1% | 0.0486 | 3.290 |
+| 188.6M | 3.4064 | 98.3% | 0.0587 | 3.260 |
+| **573.3M** | **3.3546** | **96.8%** | **0.0742** | **2.986** |
+
+Through the first 82M tokens the router is indistinguishable from uniform and
+the MoE is a dense feed-forward with 32× the parameters. From roughly 100M it
+begins to sharpen, and the movement is monotone across the last three points:
+top-1 probability rises from 0.049 to **0.074**, against 0.031 for a coin flip
+across 32 experts, and the sharpest of the 16 blocks falls from 3.29 to 2.99
+nats.
+
+It is still only 3.2% below uniform, so this is early specialisation rather
+than strong specialisation, and the question the architecture has to answer is
+whether it continues. What can be said is that the flat reading at 82M was a
+measurement taken too early, not a property of the design.
 
 ### 5.4 Sizing
 

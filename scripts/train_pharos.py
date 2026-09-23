@@ -62,7 +62,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
 from pharos.model.moe import RouterFeatures                       # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig
-from pharos.train.telemetry import RunLog              # noqa: E402
+from pharos.train.telemetry import RunLog
+from pharos.train.checkpoint import atomic_save              # noqa: E402
 
 sys.path.insert(0, str(ROOT / "scripts"))
 from train_block_scorer import gpu_free_gib                       # noqa: E402
@@ -499,7 +500,7 @@ def main() -> None:
         runlog.event("resumed", epoch=start_ep, step=step)
 
     def save(ep: int, done: bool, val=None) -> None:
-        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+        atomic_save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
                     "sched": sched.state_dict(), "n_steps": n_steps,
                     "epoch": ep, "epoch_done": done, "step": step,

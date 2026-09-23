@@ -65,6 +65,7 @@ from pharos.data.vocab import PAD_ID, SYMBOLS, encode_chain          # noqa: E40
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
+from pharos.train.checkpoint import atomic_save
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
 #: dot-bracket alphabet, matching HeadConfig.n_ss_symbols = 8
@@ -395,7 +396,7 @@ def main() -> None:
         runlog.event("resumed", epoch=start_ep, step=gstep, gstep=gstep)
 
     def save(ep: int, done: bool) -> None:
-        torch.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+        atomic_save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
                     "epoch": ep, "epoch_done": done,
                     "gstep": gstep, "history": hist}, ck)

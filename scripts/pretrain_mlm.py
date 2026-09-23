@@ -55,6 +55,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pharos.data.chemistry_torch import BatchChemistry               # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
+from pharos.train.checkpoint import atomic_save
 from pharos.data.vocab import PAD_ID, SYM2ID, SYMBOLS, encode_chain  # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
@@ -664,7 +665,7 @@ def main() -> None:
                                "loss": float(np.mean(run[-args.log_every:])),
                                "acc": float(np.mean(accs[-args.log_every:]))})
               if step % args.ckpt_every == 0 or seen >= budget:
-                  torch.save({"cfg": cfg.__dict__, "model": _clean_state(model),
+                  atomic_save({"cfg": cfg.__dict__, "model": _clean_state(model),
                               "opt": opt.state_dict(), "padded": padded,
                               "tokens": seen, "step": step,
                               "history": hist, "run_id": runlog.run_id}, ck)
