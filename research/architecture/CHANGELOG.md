@@ -41,3 +41,8 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 
 - **Stage 1 telemetry: 238M -> 447M tokens, 1.813 -> 1.773 bits** (`4023262`)
 - tokens: 402503125 → **457899328**
+
+## 2026-09-23 18:04 IST
+
+- **Stage 1 telemetry to 505M tokens; the curve has flattened** (`46c503d`)
+- tokens: 457899328 → **510639413**
