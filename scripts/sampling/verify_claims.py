@@ -349,7 +349,17 @@ def main() -> int:
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
-        chk("the only absent source is absent by decision", ig["n_decided"], 1)
+        # MARS was the one source absent by decision (D18, 427.29 GB for 0.17%
+        # diverse structured ncRNA). It is now being acquired on request, so it
+        # has moved from `decided` to `partial` and will end at `present`. All
+        # three are acceptable states for it and none of them is "missing",
+        # which is the invariant this guard is actually for.
+        _mars = next((s for s in ig["sources"] if s["source"] == "MARS"), None)
+        chk("MARS is the only source not fully present",
+            ig["n_present"] + (1 if _mars and _mars["state"] != "present" else 0),
+            ig["n_sources"])
+        chk("and its state is decided, partial or present",
+            int(bool(_mars) and _mars["state"] in ("decided", "partial", "present")), 1)
         di = load("data_integrity.json")
         chk("every sampled file opens as what it claims", di["n_bad"], 0)
         chk("integrity sampled across every corpus", di["n_checks"], 14)

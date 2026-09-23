@@ -1,18 +1,18 @@
 {
  "documented_total_gb": 833.3,
- "here_gb": 567.0,
+ "here_gb": 657.29,
  "n_sources": 18,
  "n_present": 17,
- "n_partial": 0,
+ "n_partial": 1,
  "n_missing": 0,
- "n_decided": 1,
+ "n_decided": 0,
  "missing_gb": 0,
  "sources": [
   {
    "source": "MARS",
    "documented_gb": 427.29,
-   "here_gb": 0.0,
-   "state": "decided",
+   "here_gb": 90.29,
+   "state": "partial",
    "decision": "D18",
    "path": "sbs-rna/data/sequences/mars",
    "note": "1.73B sequences; 0.17% diverse structured ncRNA yield for 413 GB"
