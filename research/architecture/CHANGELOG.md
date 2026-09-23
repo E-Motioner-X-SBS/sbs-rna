@@ -91,3 +91,8 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 
 - **Stage 1 to 934M tokens; MARS 5 archives converted** (`7005331`)
 - tokens: 889602990 → **945887893**
+
+## 2026-09-23 23:04 IST
+
+- **Halfway: 984.8M tokens, 1.746 bits, accuracy 0.4421 -- the plateau broke** (`2a81af8`)
+- tokens: 945887893 → **992472983**
