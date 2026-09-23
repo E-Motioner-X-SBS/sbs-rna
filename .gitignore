@@ -45,3 +45,6 @@ data/samples/analysis/architecture_watch.json
 
 # GPU permission sentinel: per-machine, deliberately not shared
 data/samples/analysis/cron/GPU_PERMITTED
+
+# MARS archives and their shards: bulk data, regenerable from acquire_all.py
+data/derived/parquet_mars/

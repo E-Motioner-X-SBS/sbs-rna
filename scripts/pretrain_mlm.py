@@ -99,7 +99,7 @@ def enable_gpu_fast_paths() -> None:
     _t.set_float32_matmul_precision("high")
 
 
-def iter_sequences(corpus: Path, min_len: int, max_len: int,
+def iter_sequences(corpus, min_len: int, max_len: int,
                    shards: Optional[int] = None,
                    rng: Optional[np.random.Generator] = None) -> Iterator[str]:
     """Sequences from the parquet corpus, optionally with the SHARD ORDER shuffled.
@@ -116,7 +116,11 @@ def iter_sequences(corpus: Path, min_len: int, max_len: int,
     that use it want a fixed, reproducible subset.
     """
     import pyarrow.parquet as pq
-    files = sorted(corpus.glob("*.parquet"))
+    # `corpus` may be one directory or several. MARS lands in its own
+    # directory rather than beside elDORS so the two stay separable -- turning
+    # MARS off is not passing it, and a shard's provenance is its path.
+    dirs = [corpus] if isinstance(corpus, (str, Path)) else list(corpus)
+    files = sorted(f for d in dirs for f in Path(d).glob("*.parquet"))
     if shards:
         files = files[:shards]
     elif rng is not None:
@@ -265,7 +269,7 @@ def _pack_pool(seqs: List[str], token_budget: int, max_batch: int,
     return batches
 
 
-def iter_batches(corpus: Path, min_len: int, max_len: int, token_budget: int,
+def iter_batches(corpus, min_len: int, max_len: int, token_budget: int,
                  max_batch: int, rng: np.random.Generator,
                  shards: Optional[int] = None, pool: int = 131072,
                  quantum: int = LEN_QUANTUM) -> Iterator[List[str]]:
@@ -413,6 +417,10 @@ def main() -> None:
     ap.add_argument("--n-loops", type=int, default=2,
                     help="loops give structural refinement depth; MLM needs few")
     ap.add_argument("--shards", type=int, default=None)
+    ap.add_argument("--corpus", type=Path, nargs="*", default=None,
+                    help="parquet directories to pretrain on. Default is "
+                         "elDORS alone; add data/derived/parquet_mars to "
+                         "include the filtered MARS structured-ncRNA shards")
     ap.add_argument("--log-every", type=int, default=100)
     ap.add_argument("--ckpt-every", type=int, default=250,
                     help="steps between checkpoints; at ~2 s/step the old 2000 "
@@ -433,6 +441,12 @@ def main() -> None:
 
     device = require_gpu(args)
     enable_gpu_fast_paths()
+    corpora = [Path(c) for c in (args.corpus or [CORPUS]) if Path(c).is_dir()]
+    if not corpora:
+        raise SystemExit(f"no corpus directory found in {args.corpus or [CORPUS]}")
+    _n = sum(1 for d in corpora for _ in d.glob("*.parquet"))
+    print(f"[mlm] corpus: {_n} shards across "
+          + ", ".join(str(d.relative_to(ROOT)) for d in corpora), flush=True)
     if args.token_budget <= 0:
         mem = gpu_free_gib()
         free = mem[0] if mem else args.min_free_gib
@@ -541,7 +555,7 @@ def main() -> None:
         # they are 20 nt and 65k if they are 1,024, and PHAROS-Small at 65k
         # tokens does not fit in 80 GiB. Bucketing is what makes the budget
         # honest: without it 42.9% of each "24,576-token" step was padding.
-        for group in iter_batches(CORPUS, args.min_len, args.max_len,
+        for group in iter_batches(corpora, args.min_len, args.max_len,
                                   budget_tokens, args.max_batch, rng,
                                   args.shards):
           try:
