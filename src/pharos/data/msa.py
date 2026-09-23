@@ -261,3 +261,77 @@ def coevolution_matrix(family: str, query: str,
     oi = np.where(ok)[0]
     out[np.ix_(oi, oi)] = sub
     return out
+
+
+# ---------------------------------------------------------------------------
+# The cached form: per-family couplings, mapped into a chain's own indices
+# ---------------------------------------------------------------------------
+#
+# `coevolution_matrix` recomputes the alignment's mutual information on every
+# call, which costs 26 s for SSU_rRNA_bacteria and would be paid once per chain
+# -- 14,593 times across the corpus for only 361 distinct families. The cache
+# `scripts/precompute_coevolution.py` writes pays it 361 times instead, and
+# stores the strongly-coupled pairs rather than the dense matrix, which for a
+# 1,980-column rRNA is the difference between 8k pairs and 3.9M mostly-noise
+# entries.
+
+CACHE = ROOT / "data/derived/coevolution"
+
+
+@lru_cache(maxsize=512)
+def _cached_family(family: str):
+    """`(pairs (n,2), score (n,))` in ALIGNMENT-column indices, or None."""
+    f = CACHE / f"{family.replace('/', '_')}.npz"
+    if not f.exists():
+        return None
+    try:
+        z = np.load(f)
+        return z["pairs"], z["score"]
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def coevolution_pairs(family: str, query: str, top_k: Optional[int] = None
+                      ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Cached couplings in THIS chain's residue indices: `(pairs, score)`.
+
+    The cache is keyed by family and indexed by alignment column; a chain has
+    its own gaps and its own length, so the columns have to be mapped back
+    through the seed row that best matches the chain's sequence. A pair whose
+    either end maps to a gap in this chain is dropped -- there is no residue to
+    attach the coupling to, and inventing one is how a feature ends up pointing
+    at the wrong nucleotide.
+
+    Returns None when the family has no cache or no seed row fits, which the
+    caller must treat as "no coevolution for this chain" rather than as zeros:
+    12% of the corpus has no Rfam family at all and the model has to work
+    without the feature anyway.
+    """
+    got = _cached_family(family)
+    if got is None:
+        return None
+    rows = alignment_for(family)
+    if not rows:
+        return None
+    cols = map_to_query(rows, query)          # (L,) alignment column per residue
+    if cols is None:
+        return None
+    pairs, score = got
+
+    # invert: alignment column -> residue index, -1 where this chain has a gap
+    n_cols = int(max(pairs.max(initial=0), cols.max(initial=0))) + 1
+    inv = np.full(n_cols, -1, dtype=np.int32)
+    ok = cols >= 0
+    inv[cols[ok]] = np.nonzero(ok)[0].astype(np.int32)
+
+    a = np.where(pairs[:, 0] < n_cols, inv[np.clip(pairs[:, 0], 0, n_cols - 1)], -1)
+    b = np.where(pairs[:, 1] < n_cols, inv[np.clip(pairs[:, 1], 0, n_cols - 1)], -1)
+    keep = (a >= 0) & (b >= 0)
+    if not keep.any():
+        return None
+    out = np.stack([a[keep], b[keep]], 1).astype(np.int32)
+    sc = score[keep].astype(np.float32)
+    if top_k is not None and len(sc) > top_k:
+        sel = np.argsort(sc)[::-1][:top_k]
+        out, sc = out[sel], sc[sel]
+    return out, sc

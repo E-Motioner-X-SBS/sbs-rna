@@ -83,6 +83,52 @@ def main() -> int:
     chk("50 identical rows weigh less each than the singleton",
         w[0] < w[-1], f"{w[0]:.4f} vs {w[-1]:.4f}")
 
+    print("\n== the cached couplings find real contacts in deposited structures ==")
+    # The claim coevolution has to earn: a pair the alignment says is coupled is
+    # a pair that touches in the crystal. Measured against the DEPOSITED contact
+    # set of real tRNA chains, with a random-pair baseline at the same sequence
+    # separation -- an enrichment figure with no baseline says nothing, because
+    # a short chain has a high contact density and any pair looks good.
+    import json
+    from pharos.data.dataset import ShardReader
+
+    ROOT = Path(__file__).resolve().parents[3]
+    man = ROOT / "data/derived/pharos3d/manifest.json"
+    cache = ROOT / "data/derived/coevolution/tRNA.npz"
+    if not (man.exists() and cache.exists()):
+        print("  (corpus or coevolution cache absent -- skipped)")
+    else:
+        m = json.loads(man.read_text())
+        hits = [(s["file"], i) for s in m["shards"]
+                for i, c in enumerate(s["chains"])
+                if c.get("rfam") == "tRNA" and 60 <= c["length"] <= 90][:8]
+        dec = {0: "A", 1: "C", 2: "G", 3: "U"}
+        tp = n = 0
+        base_hit = base_n = 0
+        rng = np.random.default_rng(0)
+        for fn, i in hits:
+            ex = ShardReader(ROOT / "data/derived/pharos3d" / fn)[i]
+            seq = "".join(dec.get(int(t), "N") for t in ex["tokens"])
+            con = set(map(tuple, ex["contacts"].tolist()))
+            got = M.coevolution_pairs("tRNA", seq)
+            if got is None:
+                continue
+            pairs, _sc = got
+            tp += sum(1 for a, b in pairs if (min(a, b), max(a, b)) in con)
+            n += len(pairs)
+            L = int(ex["length"])
+            a, b = rng.integers(0, L, 400), rng.integers(0, L, 400)
+            rp = [(min(x, y), max(x, y)) for x, y in zip(a, b) if abs(x - y) >= 4]
+            base_hit += sum(1 for q in rp if q in con)
+            base_n += len(rp)
+        prec = tp / max(n, 1)
+        base = base_hit / max(base_n, 1)
+        chk("couplings beat random pairs by a wide margin", prec > 3 * base,
+            f"{100*prec:.1f}% of {n} couplings are real contacts "
+            f"vs {100*base:.1f}% random ({prec/max(base,1e-9):.1f}x)")
+        chk("and the absolute precision is usable", prec > 0.30,
+            f"{100*prec:.1f}% -- from sequence alone, no structure")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
