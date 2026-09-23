@@ -51,3 +51,9 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 
 - **Stage 1 telemetry to 557M tokens** (`567da13`)
 - tokens: 510639413 → **563089954**
+
+## 2026-09-23 19:04 IST
+
+- **Stage 1 telemetry to 603M tokens** (`673c4f4`)
+- claims_ok: 330 → **333**
+- tokens: 563089954 → **611235903**
