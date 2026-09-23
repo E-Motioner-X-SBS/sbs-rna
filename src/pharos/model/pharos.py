@@ -118,6 +118,9 @@ class PharosConfig:
         # cap the width would be to force specialisation -- and the nucleus
         # threshold already does that, adaptively, per token.
         c.max_k, c.threshold_rel = 512, 1.0
+        # 12 MiB/token without it, 0.9 with; the recompute costs ~30% and buys
+        # 13x the batch, and on this card the bigger batch is worth more
+        c.grad_checkpoint = True
         return c
 
     @classmethod

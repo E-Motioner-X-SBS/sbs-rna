@@ -317,9 +317,20 @@ def iter_batches(corpus, min_len: int, max_len: int, token_budget: int,
 #: that survives an OOM instead of dying of one.
 GIB_PER_TOKEN = 2.40e-3
 
+#: Per size, when the architecture makes the constant above wrong. shared400
+#: runs the trunk under gradient checkpointing, so it stores one block's
+#: activations rather than eighteen: measured 12.0 GiB at 32,768 tokens with
+#: L=512, i.e. 3.66e-4 GiB/token, which is 6.6x cheaper than the dense-MoE
+#: constant. Using the shared constant for it would cap the budget at a
+#: seventh of what fits and leave the card three-quarters idle -- the opposite
+#: of the OOM the constant exists to prevent, and just as wasteful.
+#: The margin here is 25%, the same worst-case-over-mean logic as above.
+GIB_PER_TOKEN_BY_SIZE = {"shared400": 4.6e-4}
+
 
 def auto_token_budget(free_gib: float, reserve_gib: float = 10.0,
-                      lo: int = 8192, hi: int = 40960) -> int:
+                      lo: int = 8192, hi: int = 131072,
+                      size: str = "") -> int:
     """The largest token budget that fits in `free_gib`, less a reserve.
 
     Hardcoding the budget means picking between leaving a third of the card
@@ -328,16 +339,20 @@ def auto_token_budget(free_gib: float, reserve_gib: float = 10.0,
     margin on a machine where somebody else's job appears without warning.
 
     So the budget is computed from what is actually free when the run starts.
-    An empty card gets ~36,800 tokens a step; a card with 20 GiB already taken
-    gets ~24,900; below the floor the trainer refuses to start rather than
-    thrash. `reserve_gib` covers the allocator's own slack and a small
-    neighbour.
+    An empty card gets ~36,800 tokens a step at the dense-MoE cost, and
+    ~150,000 for a checkpointed shared400; a card with 20 GiB already taken
+    gets proportionally less; below the floor the trainer refuses to start
+    rather than thrash. `reserve_gib` covers the allocator's own slack and a
+    small neighbour. The ceiling is 131,072 rather than 40,960 because
+    gradient checkpointing moved the binding constraint from memory to
+    throughput, and capping at the old value would leave the card idle.
 
     This does not protect against a neighbour arriving MID-run. Nothing short
     of a hard memory cap does, which is why the run checkpoints every 250 steps.
     """
     usable = max(free_gib - reserve_gib, 0.0)
-    b = int(usable / GIB_PER_TOKEN) // 1024 * 1024
+    per = GIB_PER_TOKEN_BY_SIZE.get(size, GIB_PER_TOKEN)
+    b = int(usable / per) // 1024 * 1024
     return max(lo, min(hi, b))
 
 
@@ -470,9 +485,11 @@ def main() -> None:
     if args.token_budget <= 0:
         mem = gpu_free_gib()
         free = mem[0] if mem else args.min_free_gib
-        args.token_budget = auto_token_budget(free, args.token_budget_reserve)
+        args.token_budget = auto_token_budget(free, args.token_budget_reserve,
+                                              size=args.size)
         print(f"[mlm] {free:.1f} GiB free -> token budget {args.token_budget:,} "
-              f"(~{args.token_budget * GIB_PER_TOKEN:.1f} GiB predicted peak)",
+              f"(~{args.token_budget * GIB_PER_TOKEN_BY_SIZE.get(args.size, GIB_PER_TOKEN):.1f}"
+              " GiB predicted peak)",
               flush=True)
     cfg = {"small": PharosConfig.small, "mini": PharosConfig.mini,
            "base400": PharosConfig.base400,
@@ -487,9 +504,18 @@ def main() -> None:
     # and the MLM projection are a small tail and compiling them only adds
     # graphs. Verified equal to eager to 1e-6 relative in fp32.
     if not args.no_compile:
-        model.trunk = torch.compile(model.trunk, dynamic=True)
-        print(f"[mlm] trunk compiled (dynamic B, L quantised to {LEN_QUANTUM}); "
-              "first batch of each width pays the warm-up", flush=True)
+        # dynamic=False, not True. On shared400 the dynamic-shape compile of an
+        # 18-block checkpointed trunk did not finish in 25 minutes and produced
+        # no graph at all; static shapes compile a bucket in two to three and
+        # then run. Length quantisation already bounds the shape set to one
+        # (B, L) per bucket, so the cache limit is raised to cover them -- the
+        # default of 8 is what makes dynamo give up and fall back to eager.
+        torch._dynamo.config.cache_size_limit = 64
+        torch._dynamo.config.accumulated_cache_size_limit = 256
+        model.trunk = torch.compile(model.trunk, dynamic=False)
+        print(f"[mlm] trunk compiled (static shapes, L quantised to "
+              f"{LEN_QUANTUM}); first batch of each width pays the warm-up",
+              flush=True)
     budget = int(args.tokens)
     print(f"[mlm] {args.size}: {pc['total']:,} total / {pc['active']:,} active")
     print(f"[mlm] budget {budget/1e9:.1f}B tokens = "
@@ -743,7 +769,20 @@ def main() -> None:
             n_oom += 1
             opt.zero_grad(set_to_none=True)
             torch.cuda.empty_cache()
-            budget_tokens = max(8192, int(budget_tokens * 0.85) // 1024 * 1024)
+            floor = 1024
+            shrunk = max(floor, int(budget_tokens * 0.85) // 1024 * 1024)
+            if shrunk == budget_tokens:
+                # Already at the floor and still out of memory: shrinking
+                # again changes nothing and the loop spins. shared400 did
+                # exactly this -- 22 OOMs at step 0, each "recovering" to the
+                # same 8,192 it had just failed at, for as long as it was left
+                # running. Surviving a bad batch is right; pretending to
+                # survive an impossible configuration is not.
+                raise RuntimeError(
+                    f"out of memory at the minimum token budget ({floor:,}); "
+                    f"this configuration does not fit on this card. Reduce the "
+                    f"model, enable grad_checkpoint, or free GPU memory.")
+            budget_tokens = shrunk
             print(f"[mlm] OOM #{n_oom} at step {step}; token budget "
                   f"-> {budget_tokens:,}, rebuilding the stream and continuing",
                   flush=True)

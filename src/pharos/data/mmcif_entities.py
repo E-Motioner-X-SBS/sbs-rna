@@ -235,7 +235,8 @@ def rna_residues(path: Path):
     return chains, comp, types
 
 
-def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
+def rna_chain_coords(path: Path, drop_hydrogens: bool = True,
+                     with_atom_names: bool = False):
     """Canonical per-chain, per-residue heavy-atom coordinates.
 
     The single entry point for anything that needs RNA *geometry* rather than
@@ -323,9 +324,10 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True):
                 except (KeyError, ValueError):
                     continue
                 key = (ch, seq, r.get("pdbx_PDB_ins_code", "?"))
-                atoms[key].append(xyz)
+                aid = r.get("label_atom_id", "").strip('"')
+                atoms[key].append((aid, xyz) if with_atom_names else xyz)
                 names[key] = r["label_comp_id"].strip('"')
-                if r.get("label_atom_id", "").strip('"') == "O2'":
+                if aid == "O2'":
                     ribo.add(key)
     out: dict[str, list] = defaultdict(list)
     for key in sorted(atoms, key=lambda k: (k[0], k[1])):
