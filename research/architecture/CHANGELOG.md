@@ -77,3 +77,12 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 
 - claims_ok: 333 → **334**
 - tokens: 738483249 → **782435360**
+
+## 2026-09-23 21:34 IST
+
+- **First MARS archive converted; the length window does most of the filtering** (`054c950`)
+- tokens: 782435360 → **837784557**
+
+## 2026-09-23 22:04 IST
+
+- tokens: 837784557 → **889602990**
