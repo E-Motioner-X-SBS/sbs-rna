@@ -161,6 +161,36 @@ def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
     return ii, jj, y
 
 
+def assert_structure_supervision(ds, weight: float, n: int = 64) -> None:
+    """Refuse to train head 3 on a corpus that carries no coordinates.
+
+    The shards written before the diffusion head existed have no `coords`
+    array, and every layer below here degrades politely when it is missing:
+    `ShardReader` skips the field, `pad_batch` leaves the mask false, and
+    `step_losses` sees nothing to supervise. The result is a run that looks
+    healthy, reports a falling loss, and never trains the head that produces
+    the structure -- which is the failure this project has the least chance of
+    noticing, because the other nine heads keep improving.
+
+    So it is checked once, loudly, at startup.
+    """
+    if weight <= 0:
+        return
+    seen = 0
+    for i in range(min(n, len(ds))):
+        m = ds[i].get("coord_mask")
+        if m is not None and bool(np.asarray(m).all(-1).any()):
+            seen += 1
+    if seen == 0:
+        raise SystemExit(
+            f"[pharos] --structure-weight {weight} but none of the first {n} "
+            "chains carries backbone coordinates. The shards predate the "
+            "diffusion head; rebuild them with scripts/build_dataset.py, or "
+            "pass --structure-weight 0 to train the other heads only.")
+    print(f"[pharos] structure supervision: {seen}/{min(n, len(ds))} of the "
+          f"sampled chains carry backbone coordinates", flush=True)
+
+
 def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
                        jj: torch.Tensor, L: int) -> Optional[torch.Tensor]:
     """The coupling score at each sampled pair, 0 where there is none.
@@ -457,6 +487,7 @@ def main() -> None:
     for d in (tr, va, te, tb):
         d.prewarm()
     print(f"[pharos] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
+    assert_structure_supervision(tr, args.structure_weight)
 
     model = Pharos(cfg).to(device)
     # §12.1 is a CURRICULUM: stage 5 is meant to fine-tune the representation
