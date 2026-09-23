@@ -840,6 +840,8 @@ def main() -> int:
               ROOT / "src/pharos/data/test_chemistry.py",
               ROOT / "src/pharos/data/test_chemistry_torch.py",
               ROOT / "src/pharos/train/test_telemetry.py",
+              ROOT / "src/pharos/train/test_checkpoint.py",
+              ROOT / "src/pharos/data/test_msa.py",
               ROOT / "src/pharos/model/test_attention.py",
               ROOT / "src/pharos/model/test_pharos.py",
               ROOT / "src/pharos/model/test_motif_bank.py",

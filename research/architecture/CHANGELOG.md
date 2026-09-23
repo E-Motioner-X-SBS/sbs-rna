@@ -96,3 +96,7 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 
 - **Halfway: 984.8M tokens, 1.746 bits, accuracy 0.4421 -- the plateau broke** (`2a81af8`)
 - tokens: 945887893 → **992472983**
+
+## 2026-09-23 23:34 IST
+
+- tokens: 992472983 → **1025441062**

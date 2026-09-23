@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Coevolution features must recover structure that is already known.
+
+The test that matters is not that the matrix has the right shape. It is that
+APC-corrected mutual information over the Rfam tRNA seed reproduces the
+cloverleaf -- acceptor stem, T-arm, anticodon stem, D-arm -- with no training
+whatsoever. If it does not, the feature is noise and the model would be better
+off without it.
+
+Run: python3 src/pharos/data/test_msa.py
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from pharos.data import msa as M                                # noqa: E402
+
+fails: list[str] = []
+
+
+def chk(name: str, ok, detail: str = "") -> None:
+    print(f"  {'OK  ' if ok else 'FAIL'} {name:58s} {detail}")
+    if not ok:
+        fails.append(name)
+
+
+def main() -> int:
+    print("== the seed file covers the families the corpus is made of ==")
+    n2a = M.name_to_accession()
+    for fam, ac, floor in [("tRNA", "RF00005", 500),
+                           ("SSU_rRNA_bacteria", "RF00177", 50),
+                           ("LSU_rRNA_bacteria", "RF02541", 50),
+                           ("U2", "RF00004", 100)]:
+        rows = M.alignment_for(fam)
+        chk(f"{fam} present with depth", bool(rows) and len(rows) >= floor,
+            f"{len(rows) if rows else 0} rows, {n2a.get(fam)}")
+
+    print("\n== APC-MI recovers the tRNA cloverleaf, untrained ==")
+    rows = M.alignment_for("tRNA")
+    query = "".join(c for c in rows[0] if c != "-")
+    C = M.coevolution_matrix("tRNA", query)
+    chk("matrix is square and matches the query length",
+        C is not None and C.shape == (len(query), len(query)),
+        f"{None if C is None else C.shape} vs L={len(query)}")
+
+    L = C.shape[0]
+    iu = np.triu_indices(L, 4)                     # ignore the near-diagonal
+    order = np.argsort(C[iu])[::-1]
+    top = [(int(iu[0][k]), int(iu[1][k])) for k in order[:12]]
+
+    # The acceptor stem is a contiguous antidiagonal ladder: i + j is constant
+    # for consecutive pairs. Rather than hard-code alignment-dependent indices,
+    # assert the STRUCTURE -- a run of pairs whose index sum is shared.
+    sums = {}
+    for i, j in top:
+        sums.setdefault(i + j, []).append((i, j))
+    biggest = max(sums.values(), key=len)
+    chk("top pairs contain a stem: >=4 sharing one index sum",
+        len(biggest) >= 4, f"{len(biggest)} pairs at i+j={biggest[0][0]+biggest[0][1]}")
+
+    # a stem is a LADDER: consecutive i with consecutive decreasing j
+    ii = sorted(p[0] for p in biggest)
+    chk("and those pairs are consecutive (a real helix, not scatter)",
+        all(b - a == 1 for a, b in zip(ii, ii[1:])), f"i = {ii}")
+
+    chk("long-range coupling dominates", max(abs(i - j) for i, j in top) > 40,
+        f"max separation {max(abs(i-j) for i,j in top)}")
+    chk("APC leaves the diagonal at zero", float(np.abs(np.diag(C)).max()) == 0.0)
+
+    print("\n== degrades honestly rather than inventing signal ==")
+    chk("unknown family returns None", M.coevolution_matrix("NoSuchFamily", "ACGU") is None)
+    shallow = M.coevolution_matrix("tRNA", "ACGUACGUACGU")
+    chk("a query that does not belong returns None", shallow is None,
+        "no forced alignment")
+
+    print("\n== sequence weighting suppresses redundant clades ==")
+    msa = M.encode_msa(["ACGUACGU"] * 50 + ["GCAUGCAU"])
+    w = M.sequence_weights(msa)
+    chk("50 identical rows weigh less each than the singleton",
+        w[0] < w[-1], f"{w[0]:.4f} vs {w[-1]:.4f}")
+
+    print()
+    if fails:
+        print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
+        return 1
+    print("ALL TESTS PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
