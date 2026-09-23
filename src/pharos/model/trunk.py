@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
+import torch.utils.checkpoint
 import torch.nn as nn
 
 from .attention import BLOCK_PATTERN, make_mixer
@@ -53,6 +54,16 @@ class TrunkConfig:
     moe: MoEConfig = field(default_factory=lambda: MoEConfig(d_model=512))
     #: pattern is tiled to `n_blocks`; §5.1 specifies period 8, two cycles
     pattern: Tuple[str, ...] = BLOCK_PATTERN
+    #: Recompute each block in the backward pass instead of storing its
+    #: activations. The one-step gradient already keeps only the LAST loop's
+    #: activations, so what remains is one pass through `n_blocks` -- and at
+    #: 512 experts with d_expert 2304 that one pass is 12 MiB per token, which
+    #: fills an 80 GiB card at 6,700 tokens. Recomputing costs one extra
+    #: forward (~30% of step time) and returns roughly 8x the batch, and on
+    #: this hardware the larger batch more than pays for the recompute: the
+    #: bottleneck at small batch is kernel launch and memory bandwidth, not
+    #: arithmetic. Measured in `scripts/bench_memory.py`.
+    grad_checkpoint: bool = False
 
     def block_kinds(self) -> List[str]:
         return [self.pattern[i % len(self.pattern)] for i in range(self.n_blocks)]
@@ -101,8 +112,15 @@ class TokenTrunk(nn.Module):
                   feats: Optional[RouterFeatures]) -> Tuple[torch.Tensor, Dict]:
         aux_sum = {"balance_loss": x.new_zeros(())}
         usage: List[torch.Tensor] = []
+        ckpt = self.cfg.grad_checkpoint and torch.is_grad_enabled()
         for blk in self.blocks:
-            x, aux = blk(x, mask, pair_bias, feats)
+            if ckpt:
+                # use_reentrant=False so the block may return a dict and so
+                # that the no-grad recycle loops above are unaffected
+                x, aux = torch.utils.checkpoint.checkpoint(
+                    blk, x, mask, pair_bias, feats, use_reentrant=False)
+            else:
+                x, aux = blk(x, mask, pair_bias, feats)
             aux_sum["balance_loss"] = aux_sum["balance_loss"] + aux["balance_loss"]
             usage.append(aux["expert_usage"])
         aux_sum["expert_usage"] = torch.stack(usage).mean(0)

@@ -66,66 +66,61 @@ class SharedMoEConfig:
 
 
 class SharedAdapterExperts(nn.Module):
-    """One SwiGLU, E per-expert modulations, arbitrary (token, expert) pairs.
+    """One SwiGLU, E per-expert modulations, merged before the network runs.
 
-    **Why modulation and not a low-rank adapter.** A rank-r adapter gives each
-    expert a `(d, r)` matrix, and applying it needs that matrix contracted
-    against each pair's own token. Gathering per pair materialises `(M, d, r)`:
-    at 8,192 tokens routed eight ways that is (65536, 640, 16), gigabytes for a
-    single gather, four times per block. Padding the pairs into an `(E, cap, d)`
-    buffer avoids the gather but allocates `E * cap` rows for `M` pairs, and at
-    E=256 with uneven groups that is worse. Both OOMed an 80 GiB card at step 0
-    on the smallest batch available.
+    **Merge the experts, not their outputs.** The obvious way to run E experts
+    over a shared network is to build the (token, expert) pair list and push
+    every pair through: k times the tokens, k times the activations, and a pair
+    count that changes every step because nucleus routing is variable-width.
+    That last part is fatal for `torch.compile` -- it recompiled on eight
+    consecutive steps and then gave up -- and a profile of the eager version
+    put 70% of GPU time in gathers, scatters and elementwise multiplies against
+    19% in the matmuls that do the actual work.
 
-    Modulation has neither failure. Each expert owns a gain and a bias
-    **vector** over the shared hidden units, so the per-pair gather is
-    `(M, 2f)` -- exactly the size of the activation it multiplies, which has to
-    exist anyway. Peak memory becomes independent of E: 256 experts cost the
-    same per step as 8, and the FLOPs are those of one dense SwiGLU over M
-    pairs rather than over E*cap padded rows.
+    Because an expert here is a **vector**, not a network, the experts can be
+    merged first: take the router's convex combination of the selected experts'
+    gains and biases, then run the shared SwiGLU once on the merged modulation.
+    A token routed to eight experts costs exactly what a token routed to one
+    costs. Every shape is now a function of the token count alone, so the whole
+    block compiles, and the mixing is a dense matmul rather than a gather.
 
-    It is also the right capacity here. The experts share a SwiGLU because RNA
-    feed-forward computation is largely shared -- same chemistry, same backbone
-    -- and what separates a tRNA elbow from a ribosomal expansion segment is
-    which features get amplified, not a different function. A gain and a bias
-    per expert say exactly that, over 2f=1536 hidden units: the gain on the
-    SwiGLU's gate half changes *what the expert passes*, the gain on its value
-    half changes *what it carries*, and they are learned independently.
+    This is soft merging (Muqeeth et al., SMEAR), and it is not a compromise:
+    merging parameters by router weight gives an *exact* gradient to the router,
+    where discrete top-k needs a straight-through estimator and leaves the
+    unselected experts with no signal at all.
+
+    It is also what makes "1 to all experts" real rather than nominal. Firing
+    all 512 experts is now a denser weighted sum over the same matmul -- the
+    same cost as firing one -- so the cap exists for specialisation, not to
+    stop the step running out of memory.
     """
 
     def __init__(self, cfg: SharedMoEConfig):
         super().__init__()
         d, f, E = cfg.d_model, cfg.d_expert, cfg.n_experts
-        self.E, self.f = E, f
+        self.E, self.f, self.d = E, f, d
         self.w1 = nn.Parameter(torch.empty(d, 2 * f))
         self.w2 = nn.Parameter(torch.empty(f, d))
         nn.init.normal_(self.w1, std=d ** -0.5)
         nn.init.normal_(self.w2, std=f ** -0.5)
-        # Zero gain and zero bias: every expert starts as exactly the shared
-        # network and differentiates only as it learns. Random modulation at
-        # init hands the router E arbitrary functions and no reason to prefer
-        # any of them, which is a harder problem than the one we want solved.
-        self.gain = nn.Parameter(torch.zeros(E, 2 * f))
-        self.bias = nn.Parameter(torch.zeros(E, 2 * f))
-        self.out_gain = nn.Parameter(torch.zeros(E, d))
+        # gain | bias over the 2f hidden units, then a gain over the d outputs,
+        # in ONE matrix so merging is a single matmul instead of three.
+        # All zero: every expert starts as exactly the shared network and
+        # differentiates only as it learns. Random modulation at init hands the
+        # router E arbitrary functions and no reason to prefer any of them.
+        self.mod = nn.Parameter(torch.zeros(E, 4 * f + d))
         self.drop = nn.Dropout(cfg.dropout)
 
-    def forward(self, tokens: torch.Tensor, row: torch.Tensor,
-                expert_idx: torch.Tensor, weight: torch.Tensor,
-                n_out: int) -> torch.Tensor:
-        d = tokens.shape[-1]
-        out = tokens.new_zeros(n_out, d)
-        if int(row.shape[0]) == 0:
-            return out
-        # No sort and no permutation: every pair runs through the same shared
-        # matmul, so the only per-expert lookups are three vector gathers.
-        x = tokens[row]                                       # (M, d)
-        h = x @ self.w1                                       # (M, 2f) shared
-        h = h * (1.0 + self.gain[expert_idx]) + self.bias[expert_idx]
+    def forward(self, tokens: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
+        """`tokens` is `(N, d)`; `weights` is `(N, E)`, a convex row per token."""
+        f = self.f
+        mod = weights @ self.mod.to(weights.dtype)        # (N, 4f + d)
+        gain, bias, out_gain = mod.split([2 * f, 2 * f, self.d], dim=-1)
+        h = tokens @ self.w1                              # (N, 2f), shared
+        h = h * (1.0 + gain) + bias
         a, b = h.chunk(2, dim=-1)
-        y = (F.silu(a) * b) @ self.w2                         # (M, d) shared
-        y = y * (1.0 + self.out_gain[expert_idx])
-        return out.index_add_(0, row, self.drop(y) * weight.unsqueeze(-1))
+        y = (F.silu(a) * b) @ self.w2                     # (N, d), shared
+        return self.drop(y * (1.0 + out_gain))
 
 
 class SharedMoEFeedForward(nn.Module):
@@ -145,30 +140,31 @@ class SharedMoEFeedForward(nn.Module):
         self.norm = nn.LayerNorm(cfg.d_model)
         self.expert_bias = nn.Parameter(torch.zeros(cfg.n_experts))
 
-    def route(self, probs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor,
-                                                  torch.Tensor]:
-        """Nucleus selection -> (row, expert, weight) over a variable width.
+    def route(self, probs: torch.Tensor) -> torch.Tensor:
+        """Nucleus selection -> a dense `(N, E)` matrix of convex row weights.
 
-        Every expert above the threshold fires. The argmax is forced in so the
+        Every expert above the threshold fires; the argmax is forced in so the
         width is never zero, and `max_k` bounds it above. Weights renormalise
         over the chosen set, so a token firing one expert and a token firing
         twenty both contribute a convex combination.
+
+        Dense rather than a `(row, expert)` pair list, even though the rows are
+        mostly zero. The pair list has a length that changes with the routing
+        decisions, which makes every downstream shape dynamic and defeats
+        `torch.compile`; a dense mask is the same information at a fixed shape,
+        and it feeds a matmul instead of a gather.
         """
         cfg = self.cfg
-        N, E = probs.shape
+        E = probs.shape[-1]
         keep = probs >= cfg.threshold_rel / E
         top1 = probs.argmax(-1, keepdim=True)
         keep.scatter_(1, top1, True)
         if cfg.max_k < E:
-            # keep only the max_k largest among those above threshold
             kth = probs.topk(cfg.max_k, dim=-1).values[:, -1:]
-            keep &= probs >= kth
+            keep = keep & (probs >= kth)
             keep.scatter_(1, top1, True)
-        row, expert = keep.nonzero(as_tuple=True)
-        w = probs[row, expert]
-        denom = torch.zeros(N, device=probs.device, dtype=probs.dtype)
-        denom.index_add_(0, row, w)
-        return row, expert, w / denom[row].clamp_min(1e-9)
+        w = probs * keep
+        return w / w.sum(-1, keepdim=True).clamp_min(1e-9)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None,
                 feats: Optional[RouterFeatures] = None
@@ -184,10 +180,8 @@ class SharedMoEFeedForward(nn.Module):
         out = torch.zeros_like(x)
         for s in self.shared:
             out = out + s(h)
-        flat = h.reshape(-1, D)
-        row, expert, w = self.route(probs.reshape(-1, cfg.n_experts))
-        out = out + self.experts(flat, row, expert, w.to(x.dtype),
-                                 flat.shape[0]).view(B, L, D)
+        w = self.route(probs.reshape(-1, cfg.n_experts))
+        out = out + self.experts(h.reshape(-1, D), w.to(x.dtype)).view(B, L, D)
         if mask is not None:
             out = out * mask.unsqueeze(-1).to(out.dtype)
 
@@ -195,11 +189,10 @@ class SharedMoEFeedForward(nn.Module):
                                                      device=x.device)
         n_tok = m.sum().clamp(min=1)
         mf = m.reshape(-1).float()
-        frac = torch.zeros(cfg.n_experts, device=x.device)
-        frac.index_add_(0, expert, mf[row])
-        width = torch.zeros(flat.shape[0], device=x.device)
-        width.index_add_(0, row, torch.ones_like(w, dtype=torch.float32))
-        frac = frac / (n_tok * width.mean().clamp(min=1.0))
+        fired = (w > 0).float()
+        width = fired.sum(-1)
+        frac = (fired * mf.unsqueeze(-1)).sum(0) / (
+            n_tok * width.mean().clamp(min=1.0))
         pbar = (probs * m.unsqueeze(-1)).sum((0, 1)) / n_tok
         balance = cfg.n_experts * (frac * pbar).sum()
         return out + x, {
@@ -225,6 +218,6 @@ class SharedMoEFeedForward(nn.Module):
         shared = sum(p.numel() for e in self.shared for p in e.parameters())
         trunk = self.experts.w1.numel() + self.experts.w2.numel()
         per_adapter = 2 * 2 * cfg.d_expert + cfg.d_model   # gain, bias, out_gain
-        typical = max(1, cfg.max_k // 4)
+        typical = max(1, min(cfg.max_k, cfg.n_experts) // 4)
         gate = sum(p.numel() for p in self.gate.parameters())
         return shared + trunk + typical * per_adapter + gate + cfg.n_experts

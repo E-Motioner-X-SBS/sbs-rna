@@ -78,6 +78,7 @@ class PharosConfig:
     #: When set, the trunk uses shared-adapter experts with nucleus routing
     #: instead of independent experts with fixed top-k.
     shared_experts: bool = False
+    grad_checkpoint: bool = False
     rank: int = 16
     max_k: int = 32
     threshold_rel: float = 1.0
@@ -112,7 +113,11 @@ class PharosConfig:
         c = cls(d_model=768, n_blocks=18, n_loops=8, n_heads=12, window=128,
                 d_pair=160, n_experts=512, d_expert=2304, top_k=6, n_shared=1)
         c.shared_experts = True
-        c.max_k, c.threshold_rel = 8, 1.0
+        # max_k = n_experts: a token may genuinely fire all 512. Merging
+        # makes that the same matmul as firing one, so the only reason left to
+        # cap the width would be to force specialisation -- and the nucleus
+        # threshold already does that, adaptively, per token.
+        c.max_k, c.threshold_rel = 512, 1.0
         return c
 
     @classmethod
@@ -156,7 +161,7 @@ class PharosConfig:
         return cls(d_model=768, n_blocks=32, n_loops=3, d_expert=384, n_heads=12)
 
     def trunk(self) -> TrunkConfig:
-        return TrunkConfig(
+        return TrunkConfig(grad_checkpoint=self.grad_checkpoint, 
             d_model=self.d_model, n_blocks=self.n_blocks, n_loops=self.n_loops,
             n_heads=self.n_heads, window=self.window, dropout=self.dropout,
             moe=(SharedMoEConfig(

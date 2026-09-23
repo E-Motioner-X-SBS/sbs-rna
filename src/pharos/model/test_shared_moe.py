@@ -41,24 +41,54 @@ def main() -> int:
     chk("and it is 5x the expert count", 256 >= 5 * 48)
 
     print("\n== every expert starts as the shared network ==")
-    cfg = SharedMoEConfig(d_model=64, d_expert=48, n_experts=16, rank=4, max_k=8)
+    cfg = SharedMoEConfig(d_model=64, d_expert=48, n_experts=16, max_k=8)
     m = SharedMoEFeedForward(cfg).double()
     x = torch.randn(1, 6, 64, dtype=torch.double)
     e = m.experts
-    # gain and bias are zero at init, so the modulation is the identity and
-    # two different experts must compute exactly the same function
     flat = x.reshape(-1, 64)
-    row = torch.arange(flat.shape[0])
-    w = torch.ones(flat.shape[0], dtype=torch.double)
-    y0 = e(flat, row, torch.zeros_like(row), w, flat.shape[0])
-    y1 = e(flat, row, torch.full_like(row, 7), w, flat.shape[0])
+
+    def pure(idx):
+        """Route every token wholly to one expert."""
+        w = torch.zeros(flat.shape[0], cfg.n_experts, dtype=torch.double)
+        w[:, idx] = 1.0
+        return e(flat, w)
+
+    # the modulation is zero at init, so it is the identity and two different
+    # experts must compute exactly the same function
+    y0, y7 = pure(0), pure(7)
     chk("expert 0 == expert 7 at initialisation",
-        torch.allclose(y0, y1, atol=1e-12),
-        f"max dev {float((y0-y1).abs().max()):.2e} -- modulation starts at identity")
-    e.gain.data.normal_(0, 0.1)
-    y1b = e(flat, row, torch.full_like(row, 7), w, flat.shape[0])
+        torch.allclose(y0, y7, atol=1e-12),
+        f"max dev {float((y0-y7).abs().max()):.2e} -- modulation starts at identity")
+    e.mod.data.normal_(0, 0.1)
     chk("and they diverge once the modulation is non-zero",
-        not torch.allclose(y0, y1b, atol=1e-8))
+        not torch.allclose(pure(0), pure(7), atol=1e-8))
+
+    print("\n== merging is a blend of experts, not of their outputs ==")
+    # The rewrite merges modulations BEFORE the network runs, so a 50/50 route
+    # must equal the expert whose modulation is the average -- not the average
+    # of the two experts' outputs. Those differ, because the SwiGLU is not
+    # linear, and confusing them is the bug this test exists to catch.
+    half = torch.zeros(flat.shape[0], cfg.n_experts, dtype=torch.double)
+    half[:, 0] = half[:, 3] = 0.5
+    blended = e(flat, half)
+    saved = e.mod.data.clone()
+    e.mod.data[5] = 0.5 * saved[0] + 0.5 * saved[3]
+    chk("a 50/50 route == the expert at the averaged modulation",
+        torch.allclose(blended, pure(5), atol=1e-12),
+        f"max dev {float((blended - pure(5)).abs().max()):.2e}")
+    chk("and that is NOT the mean of the two outputs",
+        not torch.allclose(blended, 0.5 * (pure(0) + pure(3)), atol=1e-6),
+        "the SwiGLU is non-linear, so the two differ")
+    e.mod.data = saved
+
+    print("\n== cost is independent of routing width ==")
+    # the point of merging: one expert and all E cost the same forward
+    wide = torch.full((flat.shape[0], cfg.n_experts), 1.0 / cfg.n_experts,
+                      dtype=torch.double)
+    y_one, y_all = pure(0), e(flat, wide)
+    chk("width 1 and width E produce the same shape from one matmul",
+        y_one.shape == y_all.shape and not torch.allclose(y_one, y_all),
+        "different answers, identical cost")
 
     print("\n== the threshold is scale-free ==")
     widths = {}
@@ -109,7 +139,7 @@ def main() -> int:
         opt.zero_grad(); loss.backward(); opt.step()
     chk("loss falls", float(loss) < 0.6 * first, f"{first:.3f} -> {float(loss):.3f}")
     chk("gradients reach the per-expert modulation",
-        mm.experts.gain.grad is not None and float(mm.experts.gain.grad.abs().sum()) > 0,
+        mm.experts.mod.grad is not None and float(mm.experts.mod.grad.abs().sum()) > 0,
         "the experts are learning, not dead weight")
 
     print()
