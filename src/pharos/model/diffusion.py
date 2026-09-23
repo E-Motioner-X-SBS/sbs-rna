@@ -260,7 +260,17 @@ class DiffusionStructureHead(nn.Module):
 
         w = (sigma ** 2 + cfg.sigma_data ** 2) / (sigma * cfg.sigma_data) ** 2
         m = mask[..., None, None].to(pred.dtype)
-        se = (((pred - x0) ** 2) * m).sum((1, 2, 3)) / m.sum((1, 2, 3)).clamp(min=1)
+        # Divide by the number of VALUES summed, not the number of residues.
+        # `m` is (B, L, 1, 1) so `m.sum((1,2,3))` counts L while the numerator
+        # sums L * N_ATOM * 3 terms -- the loss came out exactly 9x too large.
+        # It still trained (a constant factor is absorbed by the learning rate)
+        # but it reported 8.98 where EDM's weighting is designed to give ~1.0 at
+        # initialisation, and it would have silently given head 3 nine times
+        # the weight of every other head in the stage-5 objective.
+        # This is the same mistake as the centroid in `random_rigid`, which is
+        # why the divisor there is spelled the same way.
+        den = m.expand_as(pred).sum((1, 2, 3)).clamp(min=1)
+        se = (((pred - x0) ** 2) * m).sum((1, 2, 3)) / den
         return {"loss": (w * se).mean(),
                 "mse": se.mean().detach(),
                 "sigma": sigma.mean().detach()}

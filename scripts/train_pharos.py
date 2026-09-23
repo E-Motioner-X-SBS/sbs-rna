@@ -103,10 +103,13 @@ def to_device(b: Dict, device) -> Dict:
     t = {k: torch.as_tensor(v, device=device)
          for k, v in b.items()
          if k in ("tokens", "mod_ids", "chem", "mask", "mg_site", "b_factor_z",
-                  "unknown_base", "rigidity_mask", "base_mask", "weights")}
+                  "unknown_base", "rigidity_mask", "base_mask", "weights",
+                  "coords", "coord_mask", "coord_residue_mask")}
     t["tokens"] = t["tokens"].long()
     t["mod_ids"] = t["mod_ids"].long()
     t["chem"] = t["chem"].float()
+    if "coords" in t:
+        t["coords"] = t["coords"].float()
     t["lengths"] = b["lengths"]
     t["contacts"] = [torch.as_tensor(c, dtype=torch.long, device=device)
                      for c in b["contacts"]]
@@ -158,7 +161,8 @@ def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
 
 
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
-                n_loops: Optional[int] = None) -> tuple:
+                n_loops: Optional[int] = None,
+                structure_weight: float = 1.0) -> tuple:
     """One forward pass and every head that this batch can supervise.
 
     Two throughput decisions live here, both measured.
@@ -254,6 +258,32 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         l = (per * wt).sum() / wt.sum().clamp(min=1e-6)
         total = total + 1.0 * l
         parts["contact"] = float(l.detach())
+
+    # head 3 -- the backbone itself, by denoising diffusion.
+    #
+    # This is the head that was missing. Everything above supervises a PROPERTY
+    # of the structure -- which residues touch, where the magnesium sits, how
+    # rigid a region is -- and none of it produces coordinates. A contact map is
+    # not a structure: many geometries satisfy the same contacts, and the
+    # ambiguity is exactly what the other heads cannot resolve.
+    #
+    # Diffusion rather than regressing coordinates directly, because a
+    # structure is defined only up to a rigid motion, so there is no single
+    # correct coordinate to regress towards; a squared error against one
+    # arbitrary frame trains the model towards the mean of the orbit, which is
+    # the centroid and not a structure. The denoiser is trained on randomly
+    # rotated copies (SO(3), never a reflection -- a mirrored RNA has a
+    # left-handed helix and preserves every distance, so a distance check
+    # cannot catch it), so the orbit is the thing it learns.
+    cm = t.get("coord_residue_mask")
+    if cm is not None and bool(cm.any()):
+        # per-chain quality weighting, the same weight the contact head uses:
+        # a 3.5 A structure is not evidence in the way a 1.9 A one is
+        dl = model.heads.structure.loss(
+            t["coords"].to(out["hidden"].dtype), out["hidden"], None, cm)
+        total = total + structure_weight * (dl["loss"] * w.mean())
+        parts["structure"] = float(dl["loss"].detach())
+        parts["structure_mse"] = float(dl["mse"])
 
     total = total + out["aux"]["balance_loss"]
     parts["balance"] = float(out["aux"]["balance_loss"].detach())
@@ -359,6 +389,11 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--token-budget", type=int, default=8192)
+    ap.add_argument("--structure-weight", type=float, default=1.0,
+                    help="weight on the diffusion backbone loss (head 3). The "
+                         "EDM sigma-weighting already normalises across noise "
+                         "scales, so this only trades head 3 against the "
+                         "property heads.")
     ap.add_argument("--n-neg", type=int, default=2048)
     ap.add_argument("--size", default="mini", choices=("mini", "small"))
     ap.add_argument("--max-length", type=int, default=1024)
@@ -516,8 +551,9 @@ def main() -> None:
                 else cfg.n_loops
             try:
                 with torch.autocast("cuda", dtype=torch.bfloat16):
-                    loss, parts, _ = step_losses(model, t, cfg, args.n_neg,
-                                                 n_loops=nl)
+                    loss, parts, _ = step_losses(
+                        model, t, cfg, args.n_neg, n_loops=nl,
+                        structure_weight=args.structure_weight)
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

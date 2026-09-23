@@ -38,7 +38,7 @@ from scipy.spatial import cKDTree
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from data.chemistry import N_DIMS, chain_chemistry           # noqa: E402
 from data.mmcif_entities import (residue_labels,             # noqa: E402
-                                 rna_chain_coords)
+                                 rna_chain_coords, rna_chain_backbone)
 from data.vocab import PAD_ID, encode_chain, is_deoxy        # noqa: E402
 
 #: Contact definition, identical to every measurement in the project so the
@@ -72,6 +72,14 @@ class ChainExample:
     mod_ids: np.ndarray           # int16  (L,)
     chem: np.ndarray              # float16 (L, 24)
     contacts: np.ndarray          # int32  (n, 2), i < j, j - i >= MIN_SEPARATION
+    #: The diffusion head's supervision: P / C4' / glycosidic-N per residue, in
+    #: `rna_chain_coords` order so index i is the same residue as `tokens[i]`.
+    #: Stored as float16 -- 0.002 A of quantisation against coordinates whose
+    #: own uncertainty is tenths of an Angstrom, for half the corpus size.
+    #: `coord_mask` is false where an atom was not resolved (every 5' terminus
+    #: has no phosphate); the loss skips those rather than fitting a guess.
+    coords: Optional[np.ndarray] = None        # float16 (L, 3, 3)
+    coord_mask: Optional[np.ndarray] = None    # bool    (L, 3)
     resolution: Optional[float] = None
     method: str = "?"
     clashscore: Optional[float] = None
@@ -128,7 +136,8 @@ class ChainExample:
     def meta(self) -> Dict:
         d = asdict(self)
         for k in ("tokens", "mod_ids", "chem", "contacts", "mg_site",
-                  "b_factor_z", "unknown_base", "unobserved_seq_id"):
+                  "b_factor_z", "unknown_base", "unobserved_seq_id",
+                  "coords", "coord_mask"):
             d.pop(k, None)
         d["n_mg_sites"] = int(self.mg_site.sum()) if self.mg_site is not None else 0
         d["n_unobserved"] = (len(self.unobserved_seq_id)
@@ -136,6 +145,9 @@ class ChainExample:
         d["n_unknown_base"] = (int(self.unknown_base.sum())
                                if self.unknown_base is not None else 0)
         d["n_contacts"] = int(len(self.contacts))
+        d["frac_backbone_resolved"] = (
+            round(float(self.coord_mask.all(1).mean()), 4)
+            if self.coord_mask is not None else None)
         d["contacts_per_nt"] = round(self.contacts_per_nt, 4)
         d["effective_c_b4"] = round(self.effective_c(4), 2)
         return d
@@ -204,6 +216,9 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
     em = entry_meta or {}
     try:
         chains = rna_chain_coords(path)
+        # Same parser, same residue order, so frame i is residue i. Parsed in
+        # the same call site as the contacts so the two cannot drift apart.
+        backbones = rna_chain_backbone(path)
     except Exception:                                        # noqa: BLE001
         return []
     try:
@@ -220,6 +235,12 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
         contacts = contact_set(atoms)
         if len(contacts) < min_contacts:
             continue
+        bb = backbones.get(ch)
+        if bb is None or len(bb[2]) != L:
+            # the two parses disagree about this chain; drop it rather than
+            # pair a frame with the wrong residue
+            continue
+        bb_xyz, bb_msk = bb[0].astype(np.float16), bb[1]
         tokens, mods = encode_chain(comps)
         chem = chain_chemistry(comps, deoxy_mask=is_deoxy(tokens))
         lab = labels.get(ch, {})
@@ -232,6 +253,7 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             pdb=path.stem.replace(".cif", ""), chain=ch, length=L,
             tokens=tokens, mod_ids=mods, chem=chem.astype(np.float16),
             contacts=contacts,
+            coords=bb_xyz, coord_mask=bb_msk,
             resolution=em.get("resolution"), method=em.get("method", "?"),
             clashscore=em.get("clashscore"),
             train_weight=float(em.get("train_weight", 1.0)),
@@ -279,13 +301,24 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
     unob_off = np.cumsum([0] + [0 if e.unobserved_seq_id is None else len(e.unobserved_seq_id)
                                 for e in examples]
                          ).astype(np.int64)
+    # (sum_L, 3, 3) and (sum_L, 3), concatenated on the residue axis so the
+    # same res_off slices them as slices every other per-residue field
+    xyz = (np.concatenate([e.coords if e.coords is not None
+                           else np.zeros((e.length, 3, 3), np.float16)
+                           for e in examples]).astype(np.float16)
+           if examples else np.empty((0, 3, 3), np.float16))
+    xyz_m = (np.concatenate([e.coord_mask if e.coord_mask is not None
+                             else np.zeros((e.length, 3), bool)
+                             for e in examples])
+             if examples else np.empty((0, 3), bool))
     res_off = np.cumsum([0] + [e.length for e in examples]).astype(np.int64)
     con_off = np.cumsum([0] + [len(e.contacts) for e in examples]).astype(np.int64)
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, tokens=tok, mod_ids=mod, chem=chem, contacts=con,
                         res_off=res_off, con_off=con_off,
                         mg_site=mg, b_factor_z=bz, unknown_base=ub,
-                        unobserved_seq_id=unob, unob_off=unob_off)
+                        unobserved_seq_id=unob, unob_off=unob_off,
+                        coords=xyz, coord_mask=xyz_m)
     return {"file": path.name, "n_chains": len(examples),
             "n_residues": int(res_off[-1]), "n_contacts": int(con_off[-1]),
             "chains": [e.meta() for e in examples]}
@@ -309,7 +342,8 @@ class ShardReader:
     """
 
     _FIELDS = ("tokens", "mod_ids", "chem", "contacts", "mg_site", "b_factor_z",
-               "unknown_base", "unobserved_seq_id", "unob_off")
+               "unknown_base", "unobserved_seq_id", "unob_off",
+               "coords", "coord_mask")
 
     def __init__(self, path: Path, meta: Optional[Sequence[Dict]] = None):
         self.path = Path(path)
@@ -329,7 +363,8 @@ class ShardReader:
         out = {"tokens": A["tokens"][a:b], "mod_ids": A["mod_ids"][a:b],
                "chem": A["chem"][a:b], "contacts": A["contacts"][c:d],
                "length": b - a}
-        for key in ("mg_site", "b_factor_z", "unknown_base"):
+        for key in ("mg_site", "b_factor_z", "unknown_base",
+                    "coords", "coord_mask"):
             if key in A:
                 out[key] = A[key][a:b]
         if "unob_off" in A:
@@ -356,6 +391,12 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
     mg = np.zeros((B, L), dtype=np.uint8)
     bz = np.zeros((B, L), dtype=np.float32)
     ub = np.zeros((B, L), dtype=np.uint8)
+    # The diffusion target. `coord_mask` is false for padding AND for atoms the
+    # depositor never resolved, and the two are indistinguishable downstream on
+    # purpose: both mean "there is no observation here", which is exactly the
+    # condition under which the loss must not contribute.
+    xyz = np.zeros((B, L, 3, 3), dtype=np.float32)
+    xyz_m = np.zeros((B, L, 3), dtype=bool)
     for i, x in enumerate(items):
         n = int(x["length"])
         tok[i, :n] = x["tokens"]
@@ -368,6 +409,9 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             bz[i, :n] = x["b_factor_z"]
         if "unknown_base" in x:
             ub[i, :n] = x["unknown_base"]
+        if x.get("coords") is not None and len(x["coords"]) == n:
+            xyz[i, :n] = x["coords"]
+            xyz_m[i, :n] = x["coord_mask"]
     meta = [x.get("meta") or {} for x in items]
     rigid_ok = np.array([bool(m.get("rigidity_valid")) for m in meta], dtype=bool)
     dis_ok = np.array([disorder_is_meaningful(int(m.get("length", 0)),
@@ -377,6 +421,10 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             "contacts": [x["contacts"] for x in items],
             "lengths": np.array([int(x["length"]) for x in items], dtype=np.int32),
             "mg_site": mg, "b_factor_z": bz, "unknown_base": ub,
+            "coords": xyz, "coord_mask": xyz_m,
+            #: a residue is usable by the structure loss only when all three of
+            #: its backbone atoms were resolved -- two points do not fix a frame
+            "coord_residue_mask": mask & xyz_m.all(-1),
             # D12: the rigidity target is valid only where the structure is
             # X-ray, so the mask is per-chain AND per-residue
             "rigidity_mask": mask & rigid_ok[:, None],

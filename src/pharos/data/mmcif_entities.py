@@ -674,3 +674,53 @@ if __name__ == "__main__":
     print(f"RNA residues (canonical)              : {tot:,}")
     print(f"  of which outside A/C/G/U            : {nonstd:,} = {100*nonstd/max(tot,1):.2f}%")
     print(f"declared entity types seen            : {dict(per_type.most_common())}")
+
+
+#: The three atoms `model.diffusion` predicts: phosphate, the C4' sugar anchor,
+#: and the glycosidic nitrogen. Three points fix a frame, which is the minimum
+#: for an orientation-aware backbone without modelling every atom.
+BACKBONE_ATOMS = ("P", "C4'", "N")
+_PURINE_PARENTS = {"A", "G"}
+
+
+def rna_chain_backbone(path: Path, drop_hydrogens: bool = True):
+    """`{chain: (coords (L, 3, 3), mask (L, 3), comps [L])}` for the diffusion head.
+
+    A thin wrapper over `rna_chain_coords`, deliberately: it consumes that
+    function's residue list in that function's order, so the frame at index i
+    belongs to the same residue as `tokens[i]`, `chem[i]` and every contact
+    index. A separate parser would be one refactor away from disagreeing about
+    which residues exist -- which, per that function's own docstring, has
+    already cost this project a 28% length error on individual chains.
+
+    **A missing atom is masked, never invented.** Terminal residues have no
+    phosphate, and disordered regions lose atoms anywhere; those entries are
+    reported false in `mask` and the diffusion loss skips them. Filling them
+    with a guess would train the model to reproduce the guess.
+
+    The glycosidic nitrogen is N9 on a purine and N1 on a pyrimidine, resolved
+    through the CCD so a modified guanosine still looks for N9.
+    """
+    import numpy as np
+
+    from .chemistry import resolve
+
+    out = {}
+    for ch, residues in rna_chain_coords(path, drop_hydrogens,
+                                         with_atom_names=True).items():
+        L = len(residues)
+        xyz = np.zeros((L, 3, 3), dtype=np.float32)
+        msk = np.zeros((L, 3), dtype=bool)
+        comps = []
+        for i, (_key, comp, atoms) in enumerate(residues):
+            parent = resolve(comp)[0]
+            glyco = "N9" if parent in _PURINE_PARENTS else "N1"
+            want = {"P": 0, "C4'": 1, glyco: 2}
+            for name, pos in atoms:
+                k = want.get(name)
+                if k is not None and not msk[i, k]:
+                    xyz[i, k] = pos
+                    msk[i, k] = True
+            comps.append(comp)
+        out[ch] = (xyz, msk, comps)
+    return out

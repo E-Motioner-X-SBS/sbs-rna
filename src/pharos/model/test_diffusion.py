@@ -156,6 +156,34 @@ def main() -> int:
         after[32.0] > after[8.0],
         f"sigma=32 {after[32.0]:.2f} (irreducible) vs sigma=8 {after[8.0]:.2f}")
 
+    print("\n== EDM's weighting is calibrated, and a wrong divisor breaks it ==")
+    # At initialisation `out` is zero-init, so D(x) = c_skip*x exactly, and the
+    # sigma-weighted loss is ~1.0 BY CONSTRUCTION at every noise scale -- that
+    # is the entire point of the weighting. Any constant offset is a
+    # normalisation error. This test exists because the divisor counted
+    # RESIDUES while the numerator summed residues x atoms x 3, so the loss
+    # read 8.98 instead of 1.0: harmless to training, where a constant is
+    # absorbed by the learning rate, but it would have given head 3 nine times
+    # its intended weight against every other head in the stage-5 objective.
+    # Save and restore the global RNG. Module init and `torch.randn` both draw
+    # from it, so a block added here silently re-seeds every test after it --
+    # which is what happened when this one was written: the sampling test below
+    # went from 6.17 to 15.16 RMSD without a line of its own changing.
+    _state = torch.get_rng_state()
+    cfgw = DiffusionConfig(d_model=64, n_layers=2, n_heads=4)
+    hw = DiffusionStructureHead(cfgw)
+    gw = torch.Generator().manual_seed(4242)
+    cw = torch.randn(4, 40, N_ATOM, 3, generator=gw) * cfgw.sigma_data
+    mw = torch.ones(4, 40, dtype=torch.bool)
+    sw = torch.zeros(4, 40, 64)
+    vals = [float(hw.loss(cw, sw, None, mw,
+                          generator=torch.Generator().manual_seed(k))["loss"])
+            for k in range(24)]
+    mean = sum(vals) / len(vals)
+    torch.set_rng_state(_state)
+    chk("the weighted loss sits at ~1.0 at initialisation", 0.5 < mean < 2.0,
+        f"mean {mean:.3f} over 24 draws (9.0 would be the residue-divisor bug)")
+
     print("\n== sampling produces a structure, not noise ==")
     g = torch.Generator().manual_seed(3)
     s = head.sample(s1, p1, m1, n_steps=32, generator=g)

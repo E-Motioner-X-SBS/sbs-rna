@@ -39,6 +39,11 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # Free memory required, GiB. 40 was a guess and it was too low: stage 1 peaks
 # at 51.8 GiB measured, so a 40 GiB floor lets a run start on a card it will
 # then OOM on -- which is the exact failure the floor exists to prevent.
+# Extra arguments for pretrain_mlm.py, e.g. MLM_EXTRA=--no-compile. shared400
+# spent 42 minutes in inductor autotuning without reaching step 0; the
+# autotune results are cached under /tmp/torchinductor_*, so the flag is how a
+# run gets moving while the cache is cold.
+MLM_EXTRA=${MLM_EXTRA:-}
 NEED_GIB=${NEED_GIB:-60}
 SETTLE=${SETTLE:-90}           # seconds between the two free-checks
 LOGDIR=$REPO/data/samples/analysis/cron
@@ -156,7 +161,7 @@ if [ ! -f "$LOGDIR/.done-stage1" ]; then
             --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
             --tokens "${MLM_TOKENS:-4e9}" --token-budget 0 \
             --corpus data/derived/parquet_starter data/derived/parquet_mars \
-            --n-loops 2 >> "$LOG" 2>&1; then
+            --n-loops 2 ${MLM_EXTRA:-} >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"
     else
