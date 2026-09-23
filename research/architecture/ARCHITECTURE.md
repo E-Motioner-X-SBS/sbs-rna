@@ -8,10 +8,11 @@ kept deliberately and in full.
 
 PHAROS predicts RNA structure from sequence. It is a hybrid-attention
 mixture-of-experts trunk with an explicit physics term, a hierarchical pair
-track for contacts, and ten output heads. The default configuration,
-**PHAROS-Small**, is **16 blocks at d=512** — **149M** total parameters,
-**61M** active per token, **128 effective** layers through eight refinement
-loops.
+track for contacts, and ten output heads whose third is a denoising diffusion
+decoder. The trained configuration, **shared400**, is **18 blocks at d=768**
+— **394M** total parameters, **302M active** per token, **144 effective**
+layers through eight refinement loops, and **512 experts that share one
+network**.
 
 ---
 
@@ -98,6 +99,70 @@ The whole vector is a table lookup indexed by symbol, plus one cumulative sum
 for the GC window — `data/chemistry_torch.py` computes it on device, asserted
 element-wise identical to the reference implementation.
 
+## 4A. Coevolution
+
+Two residues that base-pair are under joint selection: a mutation on one side
+is compensated on the other, so their alignment columns covary. That covariance
+is the single strongest structural signal available from sequence alone, and it
+is what MSA-based predictors are built on.
+
+**APC-corrected mutual information** over Rfam seed alignments, with Henikoff
+sequence weighting so a redundant clade does not count 50 times. The average
+product correction removes the column-wise background — highly variable columns
+covary with everything — which is what separates a coupling from a conservation
+artefact.
+
+Alignments come from `Rfam.seed`, not `Rfam.full`. The full-region set is
+deeper but is missing RF00005 (tRNA), RF00177, RF02541 and RF02543 (rRNA) —
+between them **84.4% of the structural residues in this corpus**.
+
+**Cached per family, not per chain.** 14,593 of the corpus's 16,604 chains
+carry an Rfam family, drawn from only **361 distinct families**; coevolution is
+a property of the alignment, so computing it per chain would do the same work
+forty times over. The cache stores the strongly-coupled pairs rather than the
+dense matrix — for a 1,980-column rRNA that is 8k pairs against 3.9M
+mostly-noise entries. Per chain, the alignment columns are mapped back through
+the seed row that best matches its sequence, and a pair whose either end falls
+in a gap is dropped.
+
+### 4A.1 What it is worth, measured
+
+Scored against the **deposited contact sets** of real tRNA chains:
+
+| | fraction that are real contacts |
+|---|---|
+| coevolution couplings | **45.5%** (708 of 1,555) |
+| random pairs, same separation cutoff | 9.4% |
+
+**4.8× enrichment, from sequence alone, with no structural input.** The random
+baseline is part of the test because a bare precision figure means nothing on
+short chains, where contact density is high and any pair looks good.
+
+The same couplings reconstruct the tRNA cloverleaf. Of the top 24, seven sit at
+i+j=115, five at 87, three at 42 and three at 136 — four antiparallel helices,
+which is the acceptor stem, the anticodon stem, the D-arm and the T-arm. The
+entire secondary structure, recovered from covariation.
+
+### 4A.2 How it enters the model
+
+Through the pair track, as one scalar per pair, via its **own zero-initialised
+projection** rather than extra width on `pair_proj`. Widening `pair_proj` would
+change its input shape and invalidate every checkpoint trained without
+coevolution; zero-init means the feature contributes exactly nothing at first,
+so enabling it cannot regress a model that already works — it has to earn its
+way in.
+
+A dense `(B, L, L)` coupling tensor is not an option: the longest chain in the
+corpus is 4,450 residues, so one batch element alone would be 79 MB. The batch
+carries a sorted flat key array and the model binary-searches it for the pairs
+actually sampled.
+
+**Absent reads as zero**, which is sound only because the projection is
+zero-initialised and the score is non-negative: "no coupling measured" and "a
+coupling of zero" enter the model identically, and neither can look like
+evidence *against* a contact. The 12% of the corpus with no Rfam family takes
+that path on every pair.
+
 ## 5. Token trunk
 
 ### 5.1 Hybrid attention, period 8
@@ -123,12 +188,57 @@ representation.
 
 ### 5.3 Mixture of experts
 
-Fine-grained: 32 routed experts at d_expert 256, 2 always-on shared experts,
-top-4 routing. The router is conditioned on **what kind of RNA this is** —
-length bin, coevolution depth (Neff/L), in-complex flag, pooled chemistry — and
-a Switch load-balance term keeps the load even, which is what stops a
+**512 experts that share one network, and a router that may fire 1 or all of
+them.** In a conventional MoE each expert owns a full feed-forward network, so
+an expert costs `3 · d · d_ff` and the expert count stays small — 48 experts at
+d=640 is already 17.7M parameters per block, and most of it is idle on any
+given token. Here every expert reads and writes through **one shared SwiGLU**
+and differs only by a gain and a bias over its hidden units: `4·d_ff + d`, or
+9.9k parameters against 5.3M. Experts stop being where the parameters live.
+
+That changes what "active" means. The previous configuration activated 61M of
+240M parameters; the rest sat in experts a given token never selected, paid for
+in memory and never used in a forward pass. shared400 activates **302M of
+394M**, because the parameters moved into the network every token runs through.
+The expert count rose at the same time — 48 to 512 — so specialisation gets
+*finer* while capacity gets *denser*.
+
+**Routing is nucleus, not top-k.** Every expert whose probability clears
+`1/E` fires, so the width is 1..E per token: a poly-U tract fires one expert, a
+four-way junction fires many. The argmax is always included, so the width is
+never zero. The threshold is relative to uniform rather than absolute, because
+an absolute threshold is not scale-free — 0.02 fires all 32 experts and none of
+256, making the initial width a property of E rather than of the router.
+Measured stable at 0.39–0.41 of E across E ∈ {32, 64, 128}.
+
+**The experts are merged before the network runs, not after.** The obvious
+implementation builds the (token, expert) pair list and pushes every pair
+through the shared network, which costs `width ×` the activations and produces
+a pair count that changes every step. Because an expert here is a *vector*, the
+router's convex combination of the selected gains and biases can be taken
+first, and the SwiGLU run once. A token routed to 512 experts then costs
+exactly what a token routed to one costs, which is what makes "1 or all" a real
+option rather than a nominal one. This is soft merging (SMEAR, Muqeeth et al.),
+and it also gives the router an *exact* gradient where discrete top-k needs a
+straight-through estimator and leaves unselected experts with no signal.
+
+Measured on an A100 80GB at 32,768 tokens:
+
+| layout | tok/s | peak memory | MFU |
+|---|---|---|---|
+| per-pair dispatch | 4,378 | 31.5 GiB | 3.4% |
+| merged | 17,458 | 12.0 GiB | 13.5% |
+| merged + `torch.compile` | **31,642** | **12.1 GiB** | **24.5%** |
+
+The per-pair version was not merely slower: a profile put **70% of GPU time in
+gathers, scatters and elementwise multiplies against 19% in the matmuls**, and
+`torch.compile` could not help because the pair count is data-dependent. Merging
+makes every shape a function of the token count alone.
+
+A Switch load-balance term keeps the load even, which is what stops a
 type-conditioned router collapsing onto the 85.94% of residues that are
-ribosomal.
+ribosomal. The router is conditioned on **what kind of RNA this is** — length
+bin, coevolution depth (Neff/L), in-complex flag, pooled chemistry.
 
 Load balance is measured and holds to three decimals. Whether the router
 *specialises* is a separate question, and balance cannot answer it: the mean
@@ -137,8 +247,8 @@ picks a few experts or every token spreads across all of them. Per-token
 routing entropy separates the two, and `probe_router_specialisation.py` tracks
 it against the live checkpoint.
 
-**It specialises, and it starts late.** Measured on one run's checkpoints, with
-32 experts so uniform entropy is log 32 = 3.466:
+**It specialises, and it starts late.** Measured on the 32-expert predecessor,
+where uniform entropy is log 32 = 3.466:
 
 | tokens | per-token entropy | % of uniform | mean top-1 | sharpest block |
 |---|---|---|---|---|
@@ -150,27 +260,38 @@ it against the live checkpoint.
 
 Through the first 82M tokens the router is indistinguishable from uniform and
 the MoE is a dense feed-forward with 32× the parameters. From roughly 100M it
-begins to sharpen, and the movement is monotone across the last three points:
-top-1 probability rises from 0.049 to **0.074**, against 0.031 for a coin flip
-across 32 experts, and the sharpest of the 16 blocks falls from 3.29 to 2.99
-nats.
-
-It is still only 3.2% below uniform, so this is early specialisation rather
-than strong specialisation, and the question the architecture has to answer is
-whether it continues. What can be said is that the flat reading at 82M was a
-measurement taken too early, not a property of the design.
+begins to sharpen, monotonically across the last three points: top-1 rises from
+0.049 to **0.074** against 0.031 for a coin flip, and the sharpest block falls
+from 3.29 to 2.99 nats. It is still only 3.2% below uniform, so this is early
+rather than strong specialisation. What can be said is that the flat reading at
+82M was a measurement taken too early, not a property of the design — and it is
+the direct motivation for the finer 512-expert granularity above, which gives
+the router more to distinguish between.
 
 ### 5.4 Sizing
 
-| model | d | blocks | loops | effective layers | total | active |
-|---|---|---|---|---|---|---|
-| **PHAROS-Small** (default) | **512** | **16** | 8 | **128 effective** | **149M** | **61M** |
-| PHAROS-Mini | 384 | 12 | 12 | 144 | 67M | 30M |
-| Base-v2 (scale-up path) | 768 | 32 | 3 | 96 | 1,401M | 269M |
+| model | d | blocks | loops | effective layers | experts | total | active |
+|---|---|---|---|---|---|---|---|
+| **shared400** (trained) | **768** | **18** | 8 | **144** | **512 shared** | **394M** | **302M** |
+| base400 (independent experts) | 640 | 18 | 8 | 144 | 48 | 405M | 126M |
+| PHAROS-Small (predecessor) | 512 | 16 | 8 | 128 | 32 | 149M | 61M |
+| PHAROS-Mini | 384 | 12 | 12 | 144 | 32 | 67M | 30M |
 
-Small is the default because the structure task is **data-limited, not
-capacity-limited** — evidenced directly in §7.4, where a 14× larger block
-scorer is no better on held-out data.
+Counted from the built model, not derived on paper. The two 400M rows are the
+same budget spent differently and the difference is the active column: sharing
+converts dormant expert parameters into active ones, 126M → 302M.
+
+**Wide beats deep at equal parameters on this hardware.** d_expert 2304 at 18
+blocks counts the same as 2048 at 20, but runs larger matmuls, and at d=512 the
+matmuls were too small to saturate an A100 at all — the predecessor measured
+6.6% MFU with only ~18% of GPU time in tensor-core GEMMs.
+
+The predecessor was small on the argument that the structure task is
+**data-limited, not capacity-limited** — evidenced in §7.4, where a 14× larger
+block scorer is no better on held-out data. That argument bounds the *structure*
+stage, which trains on 16,604 chains. It does not bound stage 1, which has
+billions of tokens of sequence, and the capacity added here is capacity for
+sequence.
 
 ## 6. Physics — an explicit Hamiltonian
 
@@ -250,12 +371,42 @@ reuse available without relearning it per family.
 
 ## 9. Heads
 
-1. contact map · 2. distance distribution · 3. 3D coordinates · 4. secondary
-structure · 5. per-residue reactivity · 6. Mg²⁺ site probability · 7. local
-rigidity · 8. disorder · 9. base-pair geometry class · 10. motif-class
-posterior.
+1. contact map · 2. distance distribution · **3. backbone coordinates, by
+denoising diffusion** · 4. secondary structure · 5. per-residue reactivity ·
+6. Mg²⁺ site probability · 7. local rigidity · 8. disorder · 9. base-pair
+geometry class · 10. motif-class posterior.
 
-Four of these are supervised **for free** from the structure files themselves —
+### 9.1 Head 3 is a diffusion decoder, not a coordinate regressor
+
+A structure is defined only **up to a rigid motion**, so there is no single
+correct coordinate to regress towards. A squared error against one arbitrary
+deposited frame trains the model towards the mean of the orbit under rotation,
+which is the centroid — not a structure. Regressing coordinates directly cannot
+work, and this is the reason.
+
+Head 3 is therefore an EDM-preconditioned denoiser
+(`D(x;σ) = c_skip·x + c_out·F(c_in·x, c_noise)`) over three backbone atoms per
+residue — phosphate, C4′, and the glycosidic nitrogen, which is the minimum that
+fixes a frame. Training samples a noise scale, corrupts a randomly rotated copy
+of the deposited backbone and asks the network to recover it; inference runs
+Heun sampling down the Karras schedule. The σ-weighting is calibrated so every
+noise scale contributes equally, which makes the weighted loss ≈1.0 at
+initialisation by construction — an invariant the tests assert, because a
+constant offset there is invisible in training and silently reweights head 3
+against the other nine.
+
+Augmentation is **SO(3), never O(3)**. A reflection preserves every pairwise
+distance, so it passes any distance-based check, and it mirrors chirality —
+a mirrored RNA has a left-handed helix and the wrong sugar pucker. Training on
+enantiomers that cannot exist is a failure mode with nothing in the loss to
+object to.
+
+Missing atoms are masked, never imputed: every 5′ terminus lacks a phosphate,
+and disordered regions lose atoms anywhere. Filling them with a plausible guess
+would train the model to reproduce the guess and would flatter every metric
+computed against it.
+
+Four of the remaining heads are supervised **for free** from the structure files themselves —
 Mg sites, X-ray B-factor z-scores, the number of deposited models, and
 unobserved residues — extracted during dataset construction rather than
 annotated separately.
@@ -307,10 +458,20 @@ learning anything about structure.
 
 ### 12.2 Budget
 
-**25B tokens, not 323B.** At 61M active, 323B is 5,295 tokens per parameter —
-265× Chinchilla, the worst corner of the quantisation-degradation curve, and for
-no information gain, because RNA sequence entropy is 2.0165 bits/nt and the
-corpus is redundant rather than rich.
+**Tokens per active parameter, not tokens.** At the predecessor's 61M active,
+323B tokens is 5,295 per parameter — 265× Chinchilla, the worst corner of the
+quantisation-degradation curve, and for no information gain, because RNA
+sequence entropy is 2.0165 bits/nt and the corpus is redundant rather than
+rich. At shared400's **302M active** the same reasoning gives a very different
+budget: 4B tokens is 13 per active parameter, under 1× Chinchilla, so the model
+is now under-trained rather than over-trained and the budget is bounded by wall
+clock rather than by diminishing returns.
+
+Perplexity is reported alongside cross-entropy, and cross-entropy is reported
+**separately from the MoE balance term** — the balance loss has a non-zero
+floor (0.01 × n_blocks × 1.0) and folding it into the reported loss puts a
+constant under every curve. The reference point is the corpus's own 2.0165
+bits/nt: a model at that number has learned base frequencies and nothing else.
 
 Cost is `6N + 2N(loops-1)` per token, not `6N × loops`: intermediate loops run
 under `no_grad` and cost a forward, not a forward and a backward.
@@ -373,6 +534,64 @@ Not yet established:
   4-residue ones — a retrain with the block diagonal admitted is owed;
 - stage 5 and stages 2-3 end-to-end on a chained curriculum;
 - Ribonanza beyond the 335,616 rows acquired.
+
+## 14A. Evaluation on blind tests
+
+The only honest test sets this project has are **RNA-Puzzles, CASP15 and
+CASP16** — 42 targets. Everything else is drawn from the PDB, and a structure
+held out by date is not a blind test when homologues leak; these targets were
+predicted by the field *before* their structures were public, which is what
+makes the published numbers a real baseline rather than a self-reported one.
+
+RNA-Puzzles also ships every group's submissions, so the benchmark is a
+**leaderboard rather than a score**: 885 competitor models across 17 targets.
+"PHAROS scores 0.52 TM" means nothing until you know the best submission on
+that target scored 0.61 and the median scored 0.34.
+
+### 14A.1 The metrics, and why four of them
+
+- **RMSD** after optimal superposition is the common currency and the one that
+  lies most: dominated by the worst-placed residue and growing with length, so
+  8 Å on a 30-mer is bad and 8 Å on a 700-mer is a result.
+- **TM-score** normalises that away with a length-dependent `d0`, using the RNA
+  formula `0.6·√(L−0.5) − 2.5` — the protein formula is calibrated on protein
+  compactness and inflates RNA scores by roughly 0.1. The superposition is found
+  by the Zhang–Skolnick fragment search, because the TM-optimal superposition is
+  not the RMSD-optimal one.
+- **lDDT** needs no superposition at all, so a model that gets every local
+  contact right but hinges one domain scores badly on RMSD and well here. For
+  RNA — modular, with hinging junctions — that distinction is the whole game.
+- **INF**, the RNA-Puzzles metric, is the Matthews correlation over the
+  base-pair set. A prediction can have a respectable TM-score with the wrong
+  secondary structure; this is what catches it.
+
+Plus a clash score, because a diffusion sampler with an undertrained denoiser
+produces self-intersecting chains and neither TM-score nor lDDT objects.
+
+The base-pair detector's geometric windows were **measured** from full-atom
+references rather than assumed (WC pairs sit at glycosidic N–N 8.63 ± 0.72 Å,
+C4′–C4′ 14.67 ± 0.98 Å), and its agreement with the full-atom criterion —
+precision 0.768, recall 0.812 — is re-derived by the tests, so an INF gap under
+about 0.1 is inside the detector's own error and must not be read as a
+difference between models.
+
+**The metrics are validated by reproducing published results**, not by internal
+consistency: scored against the real RNA-Puzzles round-1 submissions they
+recover the published ranking, Das first at 3.30 Å and Dokholyan last at
+7.26 Å.
+
+### 14A.2 The bar
+
+Over 17 RNA-Puzzles targets and all 885 submissions:
+
+| | mean TM | mean lDDT |
+|---|---|---|
+| best submission per target | **0.459** | **0.710** |
+| median submission per target | 0.301 | 0.575 |
+
+TM 0.45 is roughly where the field calls a fold correct. **The best submission
+clears it on 7 of 17 targets** — which is the honest measure of how hard this
+problem still is, and the number to beat.
 
 ## 15. Provenance
 

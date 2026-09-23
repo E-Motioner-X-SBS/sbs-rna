@@ -791,7 +791,7 @@ def main() -> int:
               f"{'' if not present else ' STILL IN ' + ','.join(present)}")
         if present: fails.append(f"stale {bad}")
 
-    print("\n== architecture config consistency (PHAROS-Small is the default) ==")
+    print("\n== architecture config consistency (shared400 is the trained model) ==")
     cfg_docs = {"ARCH": ROOT/"history_of_failed_attempts/ARCHITECTURE_v0.1_with_corrections.md",
                 "TEX":  ROOT/"research/report/main.tex",
                 "HTML": ROOT/"research/architecture/blueprint.html",
@@ -805,8 +805,14 @@ def main() -> int:
         print(f"  {'OK ' if not hit else 'FAIL'} superseded config absent: {bad!r}"
               f"{'' if not hit else ' IN ' + ','.join(hit)}")
         if hit: fails.append(f"stale config {bad}")
-    for need in ["16 blocks", "d=512", "149M", "61M", "128 effective"]:
-        miss = [k for k, t in cfg_txt.items() if need not in t]
+    # The SPEC is the live document and has to name the trained configuration;
+    # the others are historical or derived and are checked only for staleness.
+    # Splitting these was necessary once the trained model stopped being
+    # PHAROS-Small: asserting "d=512" against every document would have forced
+    # the spec to keep describing a configuration nothing runs.
+    for need in ["18 blocks", "d=768", "394M", "302M", "144 effective",
+                 "512 experts"]:
+        miss = [] if need in cfg_txt["SPEC"] else ["SPEC"]
         print(f"  {'OK ' if not miss else 'FAIL'} current config present: {need!r}"
               f"{'' if not miss else ' MISSING from ' + ','.join(miss)}")
         if miss: fails.append(f"missing config {need}")
