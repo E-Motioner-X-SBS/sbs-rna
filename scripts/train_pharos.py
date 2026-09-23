@@ -104,7 +104,8 @@ def to_device(b: Dict, device) -> Dict:
          for k, v in b.items()
          if k in ("tokens", "mod_ids", "chem", "mask", "mg_site", "b_factor_z",
                   "unknown_base", "rigidity_mask", "base_mask", "weights",
-                  "coords", "coord_mask", "coord_residue_mask")}
+                  "coords", "coord_mask", "coord_residue_mask",
+                  "coev_key", "coev_val")}
     t["tokens"] = t["tokens"].long()
     t["mod_ids"] = t["mod_ids"].long()
     t["chem"] = t["chem"].float()
@@ -158,6 +159,32 @@ def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
     y = torch.cat([torch.ones(len(pos), device=device),
                    torch.zeros(len(i), device=device)])
     return ii, jj, y
+
+
+def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
+                       jj: torch.Tensor, L: int) -> Optional[torch.Tensor]:
+    """The coupling score at each sampled pair, 0 where there is none.
+
+    A dense (B, L, L) coupling tensor would be 79 MB for the corpus's longest
+    chain alone, so the batch carries a SORTED flat key array instead and this
+    is a binary search into it -- one `searchsorted` for every pair in the
+    batch, on GPU, rather than a Python lookup per pair.
+
+    Absent is zero, which is only safe because `coev_proj` is zero-initialised
+    and the score is non-negative: "no coupling measured" and "a coupling of
+    zero" enter the model identically, and neither is allowed to look like
+    evidence against contact.
+    """
+    key = t.get("coev_key")
+    if key is None or key.numel() == 0:
+        return None
+    val = t["coev_val"]
+    lo = torch.minimum(ii, jj).to(torch.int64)
+    hi = torch.maximum(ii, jj).to(torch.int64)
+    want = bidx.to(torch.int64) * L * L + lo * L + hi
+    pos = torch.searchsorted(key, want).clamp(max=key.numel() - 1)
+    hit = key[pos] == want
+    return torch.where(hit, val[pos], torch.zeros_like(val[pos]))
 
 
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
@@ -250,6 +277,9 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         n_pairs = int(len(ii))
         h = out["hidden"]
         pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], dim=-1))
+        cv = lookup_coevolution(t, bidx, ii, jj, L)
+        if cv is not None:
+            pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))
         if model.motifs is not None:
             r, _ = model.motifs(pair)
             pair = pair + model.motif_mix(r)

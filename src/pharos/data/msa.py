@@ -291,6 +291,7 @@ def _cached_family(family: str):
         return None
 
 
+@lru_cache(maxsize=4096)
 def coevolution_pairs(family: str, query: str, top_k: Optional[int] = None
                       ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     """Cached couplings in THIS chain's residue indices: `(pairs, score)`.
@@ -306,6 +307,12 @@ def coevolution_pairs(family: str, query: str, top_k: Optional[int] = None
     caller must treat as "no coevolution for this chain" rather than as zeros:
     12% of the corpus has no Rfam family at all and the model has to work
     without the feature anyway.
+
+    Cached on `(family, query)`. `map_to_query` scans every seed row to find the
+    best match, which at a few hundred chains a batch would dominate the data
+    loader -- and the corpus is full of repeats, 444 tRNA chains among them,
+    so the hit rate is high. The returned arrays are shared, so callers must
+    not mutate them.
     """
     got = _cached_family(family)
     if got is None:

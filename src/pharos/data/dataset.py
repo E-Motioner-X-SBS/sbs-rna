@@ -376,6 +376,21 @@ class ShardReader:
         return out
 
 
+_DECODE = {0: "A", 1: "C", 2: "G", 3: "U"}
+
+
+def _coevolution_for(family: str, tokens: np.ndarray):
+    """Cached couplings for one chain, or None. Isolated so a missing or broken
+    coevolution cache degrades the batch to "no feature" rather than killing
+    the run -- it is an optional input, and 12% of the corpus lacks it anyway."""
+    try:
+        from .msa import coevolution_pairs
+        seq = "".join(_DECODE.get(int(t), "N") for t in tokens)
+        return coevolution_pairs(family, seq)
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarray]:
     """Right-pad a list of examples into rectangular arrays plus a mask."""
     B = len(items)
@@ -412,6 +427,39 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
         if x.get("coords") is not None and len(x["coords"]) == n:
             xyz[i, :n] = x["coords"]
             xyz_m[i, :n] = x["coord_mask"]
+    # ---- coevolution, as a sorted sparse map ------------------------------
+    #
+    # A dense (B, L, L) coupling tensor is not an option: the longest chain in
+    # the corpus is 4,450 residues, so one batch element alone would be 79 MB.
+    # The couplings are sparse by construction (a few per column), so the batch
+    # carries a flat sorted key array and the model looks pairs up by binary
+    # search. Key is `b * L * L + i * L + j` over the PADDED L, so one
+    # searchsorted serves the whole batch.
+    ck: List[np.ndarray] = []
+    cv: List[np.ndarray] = []
+    for i, x in enumerate(items):
+        m = x.get("meta") or {}
+        fam = m.get("rfam")
+        if not fam:
+            continue
+        got = _coevolution_for(fam, x["tokens"])
+        if got is None:
+            continue
+        pr, sc = got
+        a = np.minimum(pr[:, 0], pr[:, 1]).astype(np.int64)
+        b_ = np.maximum(pr[:, 0], pr[:, 1]).astype(np.int64)
+        ok = (b_ < L) & (a < L)
+        ck.append(i * L * L + a[ok] * L + b_[ok])
+        cv.append(sc[ok])
+    if ck:
+        key = np.concatenate(ck)
+        val = np.concatenate(cv)
+        order = np.argsort(key, kind="stable")
+        coev_key, coev_val = key[order], val[order].astype(np.float32)
+    else:
+        coev_key = np.empty(0, dtype=np.int64)
+        coev_val = np.empty(0, dtype=np.float32)
+
     meta = [x.get("meta") or {} for x in items]
     rigid_ok = np.array([bool(m.get("rigidity_valid")) for m in meta], dtype=bool)
     dis_ok = np.array([disorder_is_meaningful(int(m.get("length", 0)),
@@ -422,6 +470,7 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             "lengths": np.array([int(x["length"]) for x in items], dtype=np.int32),
             "mg_site": mg, "b_factor_z": bz, "unknown_base": ub,
             "coords": xyz, "coord_mask": xyz_m,
+            "coev_key": coev_key, "coev_val": coev_val,
             #: a residue is usable by the structure loss only when all three of
             #: its backbone atoms were resolved -- two points do not fix a frame
             "coord_residue_mask": mask & xyz_m.all(-1),

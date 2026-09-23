@@ -252,6 +252,19 @@ class Pharos(nn.Module):
         self.trunk = TokenTrunk(cfg.trunk())
         self.heads = PharosHeads(cfg.head_cfg())
         self.pair_proj = nn.Linear(2 * cfg.d_model, cfg.d_pair)
+        # Coevolution enters here and nowhere else. A pair carries one scalar --
+        # the APC-corrected mutual information of the two alignment columns --
+        # and it is projected in through its OWN zero-initialised layer rather
+        # than concatenated into `pair_proj`. Two reasons. Concatenating would
+        # change that layer's input width, so every checkpoint trained without
+        # coevolution would stop loading. And zero-init means the feature starts
+        # contributing exactly nothing, so a model that already works does not
+        # regress the moment the feature is switched on -- it has to earn its
+        # way in. 12% of the corpus has no Rfam family and passes zeros here,
+        # which is the same thing as "no information" only because the layer is
+        # zero-initialised and the scalar is non-negative.
+        self.coev_proj = nn.Linear(1, cfg.d_pair, bias=False)
+        nn.init.zeros_(self.coev_proj.weight)
         self.elec = ElectrostaticBias()
         # §8: retrieval, not memorisation. Queried from the PAIR features --
         # i.e. after pairing is estimated -- never from sequence, because the
