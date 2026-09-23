@@ -36,3 +36,8 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-23 17:04 IST
 
 - tokens: 348598312 → **402503125**
+
+## 2026-09-23 17:34 IST
+
+- **Stage 1 telemetry: 238M -> 447M tokens, 1.813 -> 1.773 bits** (`4023262`)
+- tokens: 402503125 → **457899328**
