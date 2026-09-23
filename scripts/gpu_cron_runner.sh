@@ -153,8 +153,9 @@ fi
 if [ ! -f "$LOGDIR/.done-stage1" ]; then
     note "=== pretrain_mlm.py (curriculum stage 1) ==="
     if $PY -u scripts/pretrain_mlm.py \
-            --device cuda --min-free-gib "$NEED_GIB" --size small \
-            --tokens "${MLM_TOKENS:-2e9}" --token-budget 0 \
+            --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
+            --tokens "${MLM_TOKENS:-4e9}" --token-budget 0 \
+            --corpus data/derived/parquet_starter data/derived/parquet_mars \
             --n-loops 2 >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"
@@ -173,7 +174,7 @@ INIT=""
 if [ ! -f "$LOGDIR/.done-seqstages" ]; then
     note "=== train_sequence_stages.py (curriculum stages 2-3) ==="
     if $PY -u scripts/train_sequence_stages.py \
-            --device cuda --min-free-gib "$NEED_GIB" --size small \
+            --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
             --epochs 2 $INIT >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-seqstages"
         note "stages 2-3 finished"

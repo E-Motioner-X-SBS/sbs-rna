@@ -39,6 +39,7 @@ import torch.nn as nn
 
 from .attention import BLOCK_PATTERN, make_mixer
 from .moe import MoEConfig, MoEFeedForward, RouterFeatures
+from .shared_moe import SharedMoEConfig, SharedMoEFeedForward
 
 
 @dataclass
@@ -65,7 +66,12 @@ class TrunkBlock(nn.Module):
         self.kind = kind
         self.norm = nn.LayerNorm(cfg.d_model)
         self.mixer = make_mixer(kind, cfg.d_model, cfg.n_heads, cfg.window, cfg.dropout)
-        self.ff = MoEFeedForward(cfg.moe)
+        # Either flavour, chosen by the config object's type rather than by a
+        # flag: a SharedMoEConfig can only mean shared-adapter experts, so there
+        # is no way to pass one and get the other.
+        self.ff = (SharedMoEFeedForward(cfg.moe)
+                   if isinstance(cfg.moe, SharedMoEConfig)
+                   else MoEFeedForward(cfg.moe))
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor,
                 pair_bias: Optional[torch.Tensor],
@@ -154,6 +160,8 @@ class TokenTrunk(nn.Module):
     # -- parameter accounting, checkable against §5.4 ----------------------
     def param_counts(self) -> Dict[str, int]:
         total = sum(p.numel() for p in self.parameters())
+        # `.experts` holds the routed parameters in both flavours: E full
+        # SwiGLUs in one, a shared trunk plus E adapters in the other.
         moe_total = sum(p.numel() for b in self.blocks for p in b.ff.experts.parameters())
         moe_active = sum(b.ff.n_active_params for b in self.blocks)
         moe_all = sum(p.numel() for b in self.blocks for p in b.ff.parameters())

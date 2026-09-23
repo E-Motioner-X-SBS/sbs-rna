@@ -400,11 +400,19 @@ def main() -> None:
     ap.add_argument("--min-free-gib", type=float, default=30.0)
     ap.add_argument("--tokens", type=float, default=5e9,
                     help="§12.2 stages 5B -> 25B; stop when metrics flatten")
-    ap.add_argument("--size", default="small", choices=("mini", "small"))
+    ap.add_argument("--size", default="small",
+                    choices=("mini", "small", "base400", "shared400"))
     ap.add_argument("--lr", type=float, default=6e-4)
     ap.add_argument("--token-budget", type=int, default=0,
                     help="0 (the default) sizes it from free VRAM via "
                          "`auto_token_budget`; a positive value overrides")
+    ap.add_argument("--vram-target", type=float, default=0.90,
+                    help="fraction of the card the batch should occupy. The "
+                         "budget grows toward it and shrinks off an OOM, so a "
+                         "mis-estimated cost per token self-corrects instead of "
+                         "leaving the card half empty or dying")
+    ap.add_argument("--adapt-every", type=int, default=200,
+                    help="steps between budget adjustments")
     ap.add_argument("--token-budget-reserve", type=float, default=10.0,
                     help="GiB held back from the automatic budget for the "
                          "allocator's slack and a small neighbour")
@@ -442,12 +450,23 @@ def main() -> None:
 
     device = require_gpu(args)
     enable_gpu_fast_paths()
-    corpora = [Path(c) for c in (args.corpus or [CORPUS]) if Path(c).is_dir()]
+    # resolve() first: a relative --corpus is the natural thing to type and
+    # `relative_to(ROOT)` throws on one, which turned a cosmetic log line into a
+    # crash before the first step
+    corpora = [Path(c).resolve() for c in (args.corpus or [CORPUS])]
+    corpora = [c for c in corpora if c.is_dir()]
     if not corpora:
         raise SystemExit(f"no corpus directory found in {args.corpus or [CORPUS]}")
+
+    def _rel(d: Path) -> str:
+        try:
+            return str(d.relative_to(ROOT))
+        except ValueError:
+            return str(d)
+
     _n = sum(1 for d in corpora for _ in d.glob("*.parquet"))
     print(f"[mlm] corpus: {_n} shards across "
-          + ", ".join(str(d.relative_to(ROOT)) for d in corpora), flush=True)
+          + ", ".join(_rel(d) for d in corpora), flush=True)
     if args.token_budget <= 0:
         mem = gpu_free_gib()
         free = mem[0] if mem else args.min_free_gib
@@ -455,7 +474,9 @@ def main() -> None:
         print(f"[mlm] {free:.1f} GiB free -> token budget {args.token_budget:,} "
               f"(~{args.token_budget * GIB_PER_TOKEN:.1f} GiB predicted peak)",
               flush=True)
-    cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
+    cfg = {"small": PharosConfig.small, "mini": PharosConfig.mini,
+           "base400": PharosConfig.base400,
+           "shared400": PharosConfig.shared400}[args.size]()
     cfg.max_length = max(cfg.max_length, args.max_len)
     model = Pharos(cfg).to(device)
     pc = model.param_counts()
@@ -529,6 +550,15 @@ def main() -> None:
         "tokens", "padded_tokens", "ce_nats", "bits_per_token", "balance",
         "total_loss", "lr", "masked_accuracy", "tok_per_s", "padded_per_s",
         "mfu", "pad_frac", "token_budget", "n_oom", "peak_gib", "note",
+        # Perplexity, exp(CE) over masked positions. Cross-entropy and bits are
+        # the same quantity on a log scale; perplexity is the same quantity
+        # again, as an effective branching factor -- "the model is as uncertain
+        # as if choosing uniformly among this many bases". On a 4-letter
+        # alphabet that makes the scale immediately legible: 4.0 is no
+        # knowledge, 1.0 is certainty, and the corpus entropy of 2.0165 bits is
+        # ppl 4.05. A 0.02-bit move looks like nothing and is a 1.4% change in
+        # branching factor.
+        "perplexity",
     ], manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
         "token_budget_requested": args.token_budget,
@@ -634,7 +664,8 @@ def main() -> None:
                       * rate_p / A100_BF16_PEAK
                   print(f"[mlm] step {step} {seen/1e6:.1f}M tok "
                         f"ce {np.mean(run[-args.log_every:]):.4f} "
-                        f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits) "
+                        f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits, "
+                        f"ppl {np.exp(np.mean(run[-args.log_every:])):.3f}) "
                         f"bal {np.mean(bals[-args.log_every:]):.3f} "
                         f"lr {lr_now:.2e} "
                         f"acc {np.mean(accs[-args.log_every:]):.4f} "
@@ -647,6 +678,7 @@ def main() -> None:
                              padded_tokens=padded,
                              ce_nats=round(_ce, 6),
                              bits_per_token=round(_ce / np.log(2), 6),
+                             perplexity=round(float(np.exp(_ce)), 6),
                              balance=round(_bal, 6),
                              total_loss=round(_ce + _bal, 6), lr=lr_now,
                              masked_accuracy=round(
@@ -664,6 +696,34 @@ def main() -> None:
                                "padded_per_s": rate_p, "mfu": mfu,
                                "loss": float(np.mean(run[-args.log_every:])),
                                "acc": float(np.mean(accs[-args.log_every:]))})
+                # ---- seek the VRAM ceiling -------------------------------
+              # GIB_PER_TOKEN was fitted on d_model 512; a wider model costs
+              # more per token and a hand-updated constant would be wrong again
+              # the next time the shape changes. Measure the peak instead and
+              # walk the budget toward the target: up when there is headroom,
+              # and the OOM handler already walks it down. Growth is capped at
+              # 10% a step so it approaches the ceiling rather than jumping
+              # over it, and it stops entirely once an OOM has been seen, since
+              # past that point the ceiling is known.
+              if (step % args.adapt_every == 0 and n_oom == 0
+                      and torch.cuda.is_available()):
+                  total_gib = torch.cuda.get_device_properties(0).total_memory / 2**30
+                  peak = torch.cuda.max_memory_allocated() / 2**30
+                  want = args.vram_target * total_gib
+                  if peak < 0.85 * want:
+                      grown = min(int(budget_tokens * 1.10),
+                                  int(budget_tokens * want / max(peak, 1e-6)))
+                      grown = max(8192, grown // 1024 * 1024)
+                      if grown > budget_tokens:
+                          print(f"[mlm] peak {peak:.1f} of {want:.1f} GiB target; "
+                                f"token budget {budget_tokens:,} -> {grown:,}",
+                                flush=True)
+                          runlog.event(f"budget grown to {grown}", step=step,
+                                       token_budget=grown, peak_gib=round(peak, 2))
+                          budget_tokens = grown
+                          torch.cuda.reset_peak_memory_stats()
+                          break        # rebuild the stream at the new budget
+
               if step % args.ckpt_every == 0 or seen >= budget:
                   atomic_save({"cfg": cfg.__dict__, "model": _clean_state(model),
                               "opt": opt.state_dict(), "padded": padded,
@@ -705,6 +765,7 @@ def main() -> None:
               # from CE ALONE. The balance term is a regulariser with a
               # non-zero floor and has no business in a bits/token figure.
               "bits_per_token": round(float(np.mean(run[-200:])) / np.log(2), 4),
+              "perplexity": round(float(np.exp(np.mean(run[-200:]))), 4),
               # throughput, so the cost model reads a measurement instead of
               # assuming 35% MFU as it did for the whole of v0.1 and v0.2
               "padded_tokens": padded,

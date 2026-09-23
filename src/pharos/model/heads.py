@@ -37,6 +37,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .diffusion import DiffusionConfig, DiffusionStructureHead
+
 
 @dataclass
 class HeadConfig:
@@ -157,7 +159,14 @@ class PharosHeads(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.pair = PairHeads(cfg)
-        self.structure = StructureHead(cfg)
+        # Head 3 is a diffusion decoder, not a coordinate regression. The old
+        # StructureHead is kept below for the ablation the architecture doc
+        # cites, and is not wired in.
+        self.structure = DiffusionStructureHead(DiffusionConfig(
+            d_model=cfg.d_model, d_pair=cfg.d_pair,
+            n_layers=getattr(cfg, "n_diff_layers", 6),
+            n_heads=getattr(cfg, "n_heads", 8),
+            dropout=cfg.dropout))
         self.residue = ResidueHeads(cfg)
         self.function = FunctionHeads(cfg)
 
@@ -165,7 +174,11 @@ class PharosHeads(nn.Module):
                 pair: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         out: Dict[str, torch.Tensor] = {}
         out.update(self.residue(tok))
-        out.update(self.structure(tok, mask.float()))
+        # The diffusion head does not emit coordinates in a forward pass: it
+        # denoises, so it needs either a target (training) or a sampling loop
+        # (inference). Both are driven by the trainer, which owns the noise
+        # schedule; a head that silently sampled 50 denoising steps inside
+        # every forward would make an MLM step 50x slower for nothing.
         out.update(self.function(tok, mask.float()))
         if pair is not None:
             out.update(self.pair(pair))

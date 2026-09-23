@@ -37,6 +37,7 @@ import torch.nn.functional as F
 
 from .dynamics import DynamicsConfig, HarmonicEnsemble
 from .heads import HeadConfig, PharosHeads
+from .shared_moe import SharedMoEConfig
 from .motif_bank import MotifBankConfig, load_bank
 from .moe import MoEConfig, RouterFeatures
 from .trunk import TokenTrunk, TrunkConfig
@@ -74,6 +75,74 @@ class PharosConfig:
     max_length: int = 4608        # D20: the longest RNA chain ever solved is 4,450
     dropout: float = 0.0
 
+    #: When set, the trunk uses shared-adapter experts with nucleus routing
+    #: instead of independent experts with fixed top-k.
+    shared_experts: bool = False
+    rank: int = 16
+    max_k: int = 32
+    threshold_rel: float = 1.0
+
+    @classmethod
+    def shared400(cls) -> "PharosConfig":
+        """~394M total, ~302M ACTIVE, with 512 experts that share one network.
+
+        The same budget as `base400` spent differently, and the difference is
+        in the active count. base400 buys 48 independent experts at d_expert
+        192 and activates 126M of its 405M parameters; this buys **512 experts
+        at d_expert 2304** and activates **302M of 394M**, because an expert
+        here is a gain-and-bias over a shared SwiGLU (4*d_ff + d = 9.9k
+        parameters) rather than its own network (3*d*d_ff = 5.3M). Experts stop
+        being where the parameters go, so the parameters go into the network
+        every token actually runs through.
+
+        That is the whole point. 61M active was the previous configuration's
+        real capacity; the rest sat idle in experts a given token never
+        selected. Sharing converts dormant expert parameters into active ones
+        and lets the count of experts grow at the same time -- 512 here against
+        48 -- so specialisation gets *finer* while capacity gets *denser*.
+
+        Routing is nucleus rather than top-k: width is 1..max_k per token, so a
+        poly-U tract fires one expert and a four-way junction fires eight. The
+        argmax always fires, so the width is never zero.
+
+        Wide beats deep for the same parameters on this hardware. d_expert 2304
+        at 18 blocks and d_model 768 counts the same as 2048 at 20 blocks but
+        runs larger matmuls, which is what actually keeps the CUDA cores busy.
+        """
+        c = cls(d_model=768, n_blocks=18, n_loops=8, n_heads=12, window=128,
+                d_pair=160, n_experts=512, d_expert=2304, top_k=6, n_shared=1)
+        c.shared_experts = True
+        c.max_k, c.threshold_rel = 8, 1.0
+        return c
+
+    @classmethod
+    def base400(cls) -> "PharosConfig":
+        """~400M total, ~126M active. The configuration the rebuild trains.
+
+        Small's MoE was 32 experts x d_expert 256 at d_model 512: 239.6M total,
+        63.4M active, and the router stayed within 3.2% of uniform for the first
+        500M tokens. Two changes, for two different reasons.
+
+        **Wider model, d_model 512 -> 640.** Measured MFU on Small was 6.6% with
+        only ~18% of GPU time in tensor-core GEMMs: at d=512 the matmuls are too
+        small to saturate an A100 and the stack is launch-bound. Width is the
+        lever that fixes that, and it raises active parameters where they do
+        the most work.
+
+        **More, narrower experts: 32 x 256 -> 64 x 192.** Finer granularity
+        gives the router more to distinguish and each token a smaller, more
+        specialised slice; top_k rises 4 -> 6 so active capacity grows with it.
+        This is the DeepSeek-MoE finding -- many narrow experts beat few wide
+        ones at equal active parameters -- and it directly targets the router
+        flatness measured at 96.8% of uniform.
+
+        Counted, not estimated: 404.8M total, 126.2M active (31.2%), against
+        Small's 258.5M / 82.3M. Active parameters -- which are what the FLOP
+        budget and the cost model actually depend on -- rise 1.53x.
+        """
+        return cls(d_model=640, n_blocks=18, n_loops=8, n_heads=10, window=128,
+                   d_pair=160, n_experts=48, d_expert=192, top_k=6, n_shared=2)
+
     @classmethod
     def small(cls) -> "PharosConfig":
         return cls()
@@ -90,9 +159,15 @@ class PharosConfig:
         return TrunkConfig(
             d_model=self.d_model, n_blocks=self.n_blocks, n_loops=self.n_loops,
             n_heads=self.n_heads, window=self.window, dropout=self.dropout,
-            moe=MoEConfig(d_model=self.d_model, d_expert=self.d_expert,
-                          n_experts=self.n_experts, n_shared=self.n_shared,
-                          top_k=self.top_k, dropout=self.dropout))
+            moe=(SharedMoEConfig(
+                    d_model=self.d_model, d_expert=self.d_expert,
+                    n_experts=self.n_experts, n_shared=self.n_shared,
+                    rank=self.rank, max_k=self.max_k,
+                    threshold_rel=self.threshold_rel, dropout=self.dropout)
+                 if self.shared_experts else
+                 MoEConfig(d_model=self.d_model, d_expert=self.d_expert,
+                           n_experts=self.n_experts, n_shared=self.n_shared,
+                           top_k=self.top_k, dropout=self.dropout)))
 
     def head_cfg(self) -> HeadConfig:
         return HeadConfig(d_model=self.d_model, d_pair=self.d_pair,
