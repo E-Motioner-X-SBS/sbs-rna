@@ -27,8 +27,10 @@ what to do with it.
 """
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import asdict, dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -209,6 +211,30 @@ def contact_set(residue_atoms: Sequence[Sequence[Sequence[float]]],
     return np.stack((uniq // n, uniq % n), axis=1).astype(np.int32)
 
 
+@lru_cache(maxsize=1)
+def _chain_rfam() -> Dict[str, Dict]:
+    """Per-CHAIN Rfam assignment from RNA3DB's cmscan, if it has been built.
+
+    The entry-level fallback in `build_entry` is wrong for any deposition
+    holding more than one kind of RNA, which is every ribosome: it gave a
+    76-nucleotide tRNA the same family as the 1,500-nucleotide small subunit it
+    is bound to. Measured over the 13,496 chains both sources label, the two
+    disagree on 59.1%, and it is the entry-level one that is wrong -- chains we
+    called `SSU_rRNA_bacteria` have a median length of 122.
+
+    The family chooses which alignment coevolution is computed from, so this is
+    not a cosmetic label. See `scripts/build_chain_rfam.py`.
+    """
+    f = (Path(__file__).resolve().parents[3]
+         / "data/derived/chain_rfam.json")
+    if not f.exists():
+        return {}
+    try:
+        return json.loads(f.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 def build_entry(path: Path, entry_meta: Optional[Dict] = None,
                 min_length: int = MIN_LENGTH, max_length: int = MAX_LENGTH,
                 min_contacts: int = MIN_CONTACTS) -> List[ChainExample]:
@@ -257,7 +283,9 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             resolution=em.get("resolution"), method=em.get("method", "?"),
             clashscore=em.get("clashscore"),
             train_weight=float(em.get("train_weight", 1.0)),
-            rfam=em.get("rfam_family"),
+            rfam=(_chain_rfam().get(f"{path.stem.replace('.cif','').lower()}_{ch}",
+                                    {}).get("family")
+                  or em.get("rfam_family")),
             has_protein=bool(em.get("has_protein", False)),
             ribosome_like=bool(em.get("ribosome_like", False)),
             n_modified=int((mods != 0).sum()),
