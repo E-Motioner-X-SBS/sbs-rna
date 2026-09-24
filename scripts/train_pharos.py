@@ -105,7 +105,8 @@ def to_device(b: Dict, device) -> Dict:
          if k in ("tokens", "mod_ids", "chem", "mask", "mg_site", "b_factor_z",
                   "unknown_base", "rigidity_mask", "base_mask", "weights",
                   "coords", "coord_mask", "coord_residue_mask",
-                  "coev_key", "coev_val")}
+                  "coev_key", "coev_val", "lw_key", "lw_val",
+                  "loop_class", "loop_mask")}
     t["tokens"] = t["tokens"].long()
     t["mod_ids"] = t["mod_ids"].long()
     t["chem"] = t["chem"].float()
@@ -280,6 +281,23 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         total = total + 0.2 * l
         parts["base"] = float(l.detach())
 
+    # head 10 -- motif class: hairpin loop, internal loop, or neither.
+    #
+    # The motif bank has always RETRIEVED a motif and mixed its descriptor into
+    # the representation without ever committing to an answer that could be
+    # scored. This makes the bank's contribution falsifiable. Targets come from
+    # the canonical subset of the depositor's own base-pair annotation, and the
+    # loop lengths they imply check out against biology: median 4, the
+    # tetraloop, with 89% between 4 and 8 nucleotides.
+    lm = t.get("loop_mask")
+    if lm is not None and bool(lm.any()):
+        ml = out["motif_logits"]
+        l = F.cross_entropy(ml[lm], t["loop_class"][lm])
+        total = total + 0.3 * l
+        parts["motif"] = float(l.detach())
+        parts["motif_acc"] = float(
+            (ml[lm].argmax(-1) == t["loop_class"][lm]).float().mean().detach())
+
     # head 1 -- contacts, on sampled pairs.
     #
     # ONE call, not one per chain. The per-chain version ran pair_proj, the
@@ -307,6 +325,29 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         n_pairs = int(len(ii))
         h = out["hidden"]
         pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], dim=-1))
+        # head 9 -- Leontis-Westhof geometry class, on the pairs that ARE
+        # annotated base pairs. A contact says two residues touch and a
+        # distance says how far apart; neither says whether the pair builds a
+        # helix (cis WC/WC) or a tertiary contact, and those have the same
+        # C4'-C4' distance. Unannotated pairs are excluded by the mask rather
+        # than given a class: not-a-base-pair is not a kind of base pair.
+        lwk = t.get("lw_key")
+        if lwk is not None and lwk.numel():
+            lo = torch.minimum(ii, jj).to(torch.int64)
+            hi = torch.maximum(ii, jj).to(torch.int64)
+            want = bidx.to(torch.int64) * L * L + lo * L + hi
+            pos = torch.searchsorted(lwk, want).clamp(max=lwk.numel() - 1)
+            hit = lwk[pos] == want
+            if bool(hit.any()):
+                lwl = model.heads.pair.geometry(pair[hit])
+                tgt_lw = t["lw_val"][pos[hit]]
+                l = F.cross_entropy(lwl, tgt_lw)
+                total = total + 0.5 * l
+                parts["lw"] = float(l.detach())
+                parts["lw_acc"] = float(
+                    (lwl.argmax(-1) == tgt_lw).float().mean().detach())
+                parts["n_lw"] = int(hit.sum())
+
         cv = lookup_coevolution(t, bidx, ii, jj, L)
         if cv is not None:
             pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))

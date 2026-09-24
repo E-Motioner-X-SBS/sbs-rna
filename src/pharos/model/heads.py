@@ -46,6 +46,19 @@ class HeadConfig:
     d_pair: int = 128
     #: distance bins: 2-40 A in 1 A steps plus an overflow bin, AlphaFold-style
     n_distance_bins: int = 40
+    #: Head 9. Leontis-Westhof pair families, `_ndb_struct_na_base_pair.
+    #: hbond_type_12` in every RNA mmCIF: 12 families (the three edges --
+    #: Watson-Crick, Hoogsteen, Sugar -- crossed with cis/trans orientation)
+    #: plus class 0 for "annotated but unclassified", which the archive writes
+    #: as `?` and which is 6.9% of the 103,965 annotated pairs on the sample.
+    #: A pair that is not base-paired at all is handled by the mask, not by a
+    #: class: absence of a pair is not a kind of pair.
+    n_lw_classes: int = 13
+    #: Head 10. Motif kind from the RNA 3D Motif Atlas bank on disk -- 413
+    #: internal loops and 254 hairpin loops over 667 entries -- plus a "neither"
+    #: class, because most pairs are in neither and a posterior that cannot say
+    #: so is forced to guess between two wrong answers.
+    n_motif_classes: int = 3
     #: dot-bracket alphabet: unpaired, open, close, and three pseudoknot levels
     n_ss_symbols: int = 8
     #: §10: the ensemble is K discrete states, not one structure
@@ -76,10 +89,20 @@ class PairHeads(nn.Module):
         super().__init__()
         self.contact = _mlp(cfg.d_pair, cfg.d_pair, 1, cfg.dropout)
         self.distance = _mlp(cfg.d_pair, cfg.d_pair, cfg.n_distance_bins, cfg.dropout)
-
+        # Head 9 -- Leontis-Westhof geometry class.
+        #
+        # A contact says two residues touch and a distance says how far apart.
+        # Neither says HOW they are paired, and for RNA that is most of the
+        # information: a cis Watson-Crick/Watson-Crick pair builds a helix, a
+        # trans Hoogsteen/Sugar-edge pair builds a tertiary contact, and the
+        # two have the same C4'-C4' distance. Predicting the family is what
+        # separates a model that knows RNA is double-stranded from one that
+        # knows RNA folds.
+        self.geometry = _mlp(cfg.d_pair, cfg.d_pair, cfg.n_lw_classes, cfg.dropout)
     def forward(self, pair: torch.Tensor) -> Dict[str, torch.Tensor]:
         return {"contact_logit": self.contact(pair).squeeze(-1),
-                "distance_logits": self.distance(pair)}
+                "distance_logits": self.distance(pair),
+                "lw_logits": self.geometry(pair)}
 
 
 class StructureHead(nn.Module):
@@ -118,7 +141,20 @@ class ResidueHeads(nn.Module):
         # 7: SHAPE and DMS are different chemistries probing different atoms,
         # so they get separate outputs rather than one "reactivity" scalar
         self.reactivity = _mlp(d, d, 2, cfg.dropout)
-        self.base_identity = _mlp(d, d // 2, cfg.n_bases, cfg.dropout)  # 10
+        self.base_identity = _mlp(d, d // 2, cfg.n_bases, cfg.dropout)
+        # Head 10 -- motif-class posterior, per RESIDUE.
+        #
+        # The motif bank has always RETRIEVED a motif and mixed its descriptor
+        # into the representation without ever committing to an answer that
+        # could be scored. This head commits: hairpin loop, internal loop, or
+        # neither. That makes the bank's contribution falsifiable rather than
+        # merely present.
+        #
+        # Per residue and not per pair, because loop membership is a property
+        # of a nucleotide. Putting it on the pair track would have forced a
+        # self-pair -- `pair_proj(cat(h, h))` -- which is a shape that
+        # typechecks and means nothing.
+        self.motif = _mlp(d, d, cfg.n_motif_classes, cfg.dropout)
 
     def forward(self, tok: torch.Tensor) -> Dict[str, torch.Tensor]:
         return {
@@ -127,6 +163,7 @@ class ResidueHeads(nn.Module):
             "rigidity": self.rigidity(tok).squeeze(-1),
             "reactivity": self.reactivity(tok),
             "base_logits": self.base_identity(tok),
+            "motif_logits": self.motif(tok),
         }
 
 

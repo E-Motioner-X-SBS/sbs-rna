@@ -40,7 +40,8 @@ from scipy.spatial import cKDTree
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from data.chemistry import N_DIMS, chain_chemistry           # noqa: E402
 from data.mmcif_entities import (residue_labels,             # noqa: E402
-                                 rna_chain_coords, rna_chain_backbone)
+                                 rna_chain_coords, rna_chain_backbone,
+                                 rna_base_pair_annotations, loop_classes)
 from data.vocab import PAD_ID, encode_chain, is_deoxy        # noqa: E402
 
 #: Contact definition, identical to every measurement in the project so the
@@ -82,6 +83,15 @@ class ChainExample:
     #: has no phosphate); the loss skips those rather than fitting a guess.
     coords: Optional[np.ndarray] = None        # float16 (L, 3, 3)
     coord_mask: Optional[np.ndarray] = None    # bool    (L, 3)
+    #: Head 9's target. `(n, 3)` of (i, j, Leontis-Westhof class), the
+    #: depositor's own `_ndb_struct_na_base_pair` annotation rather than
+    #: anything reconstructed from coordinates. Class 0 is "annotated but
+    #: unclassified"; a pair absent from this list is not a base pair and is
+    #: excluded by the mask rather than given a class.
+    lw_pairs: Optional[np.ndarray] = None      # int32 (n, 3)
+    #: Head 10's target, per residue: 0 neither, 1 hairpin loop, 2 internal
+    #: loop, derived from the canonical subset of the same annotation.
+    loop_class: Optional[np.ndarray] = None    # uint8 (L,)
     resolution: Optional[float] = None
     method: str = "?"
     clashscore: Optional[float] = None
@@ -147,6 +157,7 @@ class ChainExample:
         d["n_unknown_base"] = (int(self.unknown_base.sum())
                                if self.unknown_base is not None else 0)
         d["n_contacts"] = int(len(self.contacts))
+        d["n_lw_pairs"] = int(len(self.lw_pairs)) if self.lw_pairs is not None else 0
         d["frac_backbone_resolved"] = (
             round(float(self.coord_mask.all(1).mean()), 4)
             if self.coord_mask is not None else None)
@@ -245,6 +256,7 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
         # Same parser, same residue order, so frame i is residue i. Parsed in
         # the same call site as the contacts so the two cannot drift apart.
         backbones = rna_chain_backbone(path)
+        bp_ann = rna_base_pair_annotations(path)
     except Exception:                                        # noqa: BLE001
         return []
     try:
@@ -267,6 +279,20 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             # pair a frame with the wrong residue
             continue
         bb_xyz, bb_msk = bb[0].astype(np.float16), bb[1]
+        # heads 9 and 10, keyed through label_seq_id into this residue order
+        seq2idx = {int(key[1]): n for n, (key, _c, _a) in enumerate(residues)}
+        lw_rows, lw_map = [], {}
+        for (a, b), rec in (bp_ann.get(ch) or {}).items():
+            i2, j2 = seq2idx.get(a), seq2idx.get(b)
+            if i2 is None or j2 is None or i2 == j2:
+                continue
+            lo, hi = (i2, j2) if i2 < j2 else (j2, i2)
+            lw_rows.append((lo, hi, rec["lw"]))
+            lw_map[(lo, hi)] = rec["lw"]
+        lw_arr = (np.array(lw_rows, dtype=np.int32) if lw_rows
+                  else np.empty((0, 3), dtype=np.int32))
+        loops = loop_classes([(a, b) for a, b, _ in lw_rows], L,
+                             canonical_only=True, lw=lw_map)
         tokens, mods = encode_chain(comps)
         chem = chain_chemistry(comps, deoxy_mask=is_deoxy(tokens))
         lab = labels.get(ch, {})
@@ -280,6 +306,7 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             tokens=tokens, mod_ids=mods, chem=chem.astype(np.float16),
             contacts=contacts,
             coords=bb_xyz, coord_mask=bb_msk,
+            lw_pairs=lw_arr, loop_class=loops,
             resolution=em.get("resolution"), method=em.get("method", "?"),
             clashscore=em.get("clashscore"),
             train_weight=float(em.get("train_weight", 1.0)),
@@ -339,6 +366,17 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
                              else np.zeros((e.length, 3), bool)
                              for e in examples])
              if examples else np.empty((0, 3), bool))
+    # LW pairs are ragged like contacts, so they get their own offsets;
+    # loop_class is per-residue and rides on res_off like every other one
+    lwp = (np.concatenate([e.lw_pairs if e.lw_pairs is not None
+                           else np.empty((0, 3), np.int32) for e in examples])
+           if examples else np.empty((0, 3), np.int32))
+    lw_off = np.cumsum([0] + [0 if e.lw_pairs is None else len(e.lw_pairs)
+                              for e in examples]).astype(np.int64)
+    loopc = (np.concatenate([e.loop_class if e.loop_class is not None
+                             else np.zeros(e.length, np.uint8)
+                             for e in examples]).astype(np.uint8)
+             if examples else np.empty(0, np.uint8))
     res_off = np.cumsum([0] + [e.length for e in examples]).astype(np.int64)
     con_off = np.cumsum([0] + [len(e.contacts) for e in examples]).astype(np.int64)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -346,7 +384,8 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
                         res_off=res_off, con_off=con_off,
                         mg_site=mg, b_factor_z=bz, unknown_base=ub,
                         unobserved_seq_id=unob, unob_off=unob_off,
-                        coords=xyz, coord_mask=xyz_m)
+                        coords=xyz, coord_mask=xyz_m,
+                        lw_pairs=lwp, lw_off=lw_off, loop_class=loopc)
     return {"file": path.name, "n_chains": len(examples),
             "n_residues": int(res_off[-1]), "n_contacts": int(con_off[-1]),
             "chains": [e.meta() for e in examples]}
@@ -371,7 +410,7 @@ class ShardReader:
 
     _FIELDS = ("tokens", "mod_ids", "chem", "contacts", "mg_site", "b_factor_z",
                "unknown_base", "unobserved_seq_id", "unob_off",
-               "coords", "coord_mask")
+               "coords", "coord_mask", "lw_pairs", "lw_off", "loop_class")
 
     def __init__(self, path: Path, meta: Optional[Sequence[Dict]] = None):
         self.path = Path(path)
@@ -392,9 +431,12 @@ class ShardReader:
                "chem": A["chem"][a:b], "contacts": A["contacts"][c:d],
                "length": b - a}
         for key in ("mg_site", "b_factor_z", "unknown_base",
-                    "coords", "coord_mask"):
+                    "coords", "coord_mask", "loop_class"):
             if key in A:
                 out[key] = A[key][a:b]
+        if "lw_off" in A and "lw_pairs" in A:
+            lo = A["lw_off"]
+            out["lw_pairs"] = A["lw_pairs"][int(lo[i]):int(lo[i + 1])]
         if "unob_off" in A:
             uo = A["unob_off"]
             out["unobserved_seq_id"] = A["unobserved_seq_id"][
@@ -440,6 +482,15 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
     # condition under which the loss must not contribute.
     xyz = np.zeros((B, L, 3, 3), dtype=np.float32)
     xyz_m = np.zeros((B, L, 3), dtype=bool)
+    # head 10 is per-residue and pads with 0 ("neither"), which is also a real
+    # class -- so it carries its own validity mask rather than relying on the
+    # padding value being distinguishable
+    loopc = np.zeros((B, L), dtype=np.int64)
+    loop_ok = np.zeros((B, L), dtype=bool)
+    # head 9 is per-PAIR and ragged; a dense (B, L, L) label grid would be the
+    # same 79 MB mistake the coevolution map avoids, so it stays sparse and is
+    # looked up at the pairs the contact head samples
+    lw_key, lw_val = [], []
     for i, x in enumerate(items):
         n = int(x["length"])
         tok[i, :n] = x["tokens"]
@@ -455,6 +506,16 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
         if x.get("coords") is not None and len(x["coords"]) == n:
             xyz[i, :n] = x["coords"]
             xyz_m[i, :n] = x["coord_mask"]
+        lc = x.get("loop_class")
+        if lc is not None and len(lc) == n:
+            loopc[i, :n] = lc
+            loop_ok[i, :n] = True
+        lp = x.get("lw_pairs")
+        if lp is not None and len(lp):
+            keep = (lp[:, 0] < L) & (lp[:, 1] < L)
+            lw_key.append(i * L * L + lp[keep, 0].astype(np.int64) * L
+                          + lp[keep, 1].astype(np.int64))
+            lw_val.append(lp[keep, 2].astype(np.int64))
     # ---- coevolution, as a sorted sparse map ------------------------------
     #
     # A dense (B, L, L) coupling tensor is not an option: the longest chain in
@@ -488,6 +549,16 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
         coev_key = np.empty(0, dtype=np.int64)
         coev_val = np.empty(0, dtype=np.float32)
 
+    # sorted, so the model can binary-search it the way it does coevolution
+    if lw_key:
+        lw_k = np.concatenate(lw_key)
+        lw_v = np.concatenate(lw_val)
+        order = np.argsort(lw_k, kind="stable")
+        lw_k, lw_v = lw_k[order], lw_v[order]
+    else:
+        lw_k = np.empty(0, dtype=np.int64)
+        lw_v = np.empty(0, dtype=np.int64)
+
     meta = [x.get("meta") or {} for x in items]
     rigid_ok = np.array([bool(m.get("rigidity_valid")) for m in meta], dtype=bool)
     dis_ok = np.array([disorder_is_meaningful(int(m.get("length", 0)),
@@ -499,6 +570,8 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             "mg_site": mg, "b_factor_z": bz, "unknown_base": ub,
             "coords": xyz, "coord_mask": xyz_m,
             "coev_key": coev_key, "coev_val": coev_val,
+            "loop_class": loopc, "loop_mask": loop_ok & mask,
+            "lw_key": lw_k, "lw_val": lw_v,
             #: a residue is usable by the structure loss only when all three of
             #: its backbone atoms were resolved -- two points do not fix a frame
             "coord_residue_mask": mask & xyz_m.all(-1),
