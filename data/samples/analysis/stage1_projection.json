@@ -1,0 +1,36 @@
+{
+ "n": 24,
+ "tokens_min": 425150558.0,
+ "tokens_max": 1377307040.0,
+ "best_measured_bits": 1.60446,
+ "corpus_bits": 2.0165,
+ "power_law": {
+  "floor": 1.54,
+  "a": 3339632934.93143,
+  "alpha": 1.143494816345586,
+  "rms": 0.05359182171499442
+ },
+ "log_linear": {
+  "k": 7.029734151809958,
+  "m": -0.2557637785057256,
+  "rms": 0.05787361824208815
+ },
+ "projection": {
+  "2000000000": {
+   "power_law": 1.6173,
+   "log_linear": 1.5522,
+   "spread": 0.0651
+  },
+  "4000000000": {
+   "power_law": 1.575,
+   "log_linear": 1.3749,
+   "spread": 0.2001
+  },
+  "8000000000": {
+   "power_law": 1.5558,
+   "log_linear": 1.1976,
+   "spread": 0.3582
+  }
+ },
+ "verdict": "not identifiable: the two standard forms differ at 4B by more than the total improvement measured so far"
+}
