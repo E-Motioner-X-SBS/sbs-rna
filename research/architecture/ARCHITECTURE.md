@@ -409,10 +409,17 @@ reuse available without relearning it per family.
 
 ## 9. Heads
 
-1. contact map · 2. distance distribution · **3. backbone coordinates, by
-denoising diffusion** · 4. secondary structure · 5. per-residue reactivity ·
+1. contact map · **2. distance distribution (distogram)** · **3. backbone
+coordinates, by denoising diffusion** · 4. secondary structure · 5. per-residue reactivity ·
 6. Mg²⁺ site probability · 7. local rigidity · 8. disorder · 9. base-pair
 geometry class · 10. motif-class posterior.
+
+Head 2 is supervised over **40 bins, 2–40 Å plus overflow**, on the same
+sampled pairs as head 1. A binary contact says two residues are within a
+cutoff; a binned distance says how far apart, which is strictly more
+information from the same coordinates — it is what AlphaFold trains its pair
+track on. It was defined but had no target until the corpus carried
+coordinates.
 
 ### 9.1 Head 3 is a diffusion decoder, not a coordinate regressor
 
@@ -526,9 +533,48 @@ rRNA families forced to train and measured separately as described in §11.
 
 ### 12.5 Optimiser and schedule
 
-AdamW, bf16 autocast, TF32 enabled. Every stage warms up then decays —
-stage 1 and stages 2-3 on a cosine keyed to progress, stage 5 and the selector
-on OneCycleLR. Gradient clipping at 1.0.
+**Muon on the 2-D weights, AdamW on everything else.** AdamW rescales each
+gradient coordinate independently, which discards the fact that a weight
+*matrix* has a spectrum: a gradient concentrated in a few directions moves
+those far and the rest barely. Muon replaces the momentum buffer with the
+nearest semi-orthogonal matrix — every singular value set to 1 — through a
+quintic Newton–Schulz iteration, five matmuls rather than an SVD, so the update
+moves every direction equally.
+
+It applies to matrices only. Embeddings, LayerNorm gains, biases and the
+**per-expert modulation vectors** stay on AdamW, because orthogonalising a
+vector is meaningless. On shared400 that is Muon over 222 matrices (343M
+parameters) at lr 0.02 and AdamW over the rest at 6e-4. The two rates are not
+comparable: an orthogonal update has unit spectral norm by construction, so
+Muon's natural scale is ~50× AdamW's, and comparing them at one rate compares
+nothing.
+
+Chosen by measurement, not preference. Matched A/B — same model, same 240
+batches in the same order, same seed, held-out scored on genuinely masked
+positions:
+
+| optimiser | held-out bits | accuracy |
+|---|---|---|
+| AdamW, lr 6e-4 | 1.9681 | 0.3067 |
+| AdamW, lr 1.5e-3 | 1.9783 | 0.3018 |
+| Muon, lr 0.01 | 1.9609 | 0.3163 |
+| **Muon, lr 0.02** | **1.9603** | 0.3152 |
+| Muon, lr 0.04 | 1.9638 | 0.3114 |
+
+Muon wins at all three of its rates against the better of AdamW's two, and the
+result reproduces on a second model. The margin is small and 240 steps is
+short, so this is evidence rather than proof that it holds at 4B tokens.
+
+**Weight decay is split.** 0.01 on the matrices, **zero** on norms, biases and
+the per-expert modulation. Decaying a LayerNorm gain has no scale-invariance
+argument behind it, and decaying the zero-initialised expert modulation pulls
+the MoE's specialisation back toward the shared network it exists to differ
+from — the `mod` tensor whose measured std is 0.008 is precisely what that
+decay was fighting.
+
+bf16 autocast, TF32 enabled. Every stage warms up then decays — stage 1 and
+stages 2-3 on a cosine keyed to progress, stage 5 and the selector on
+OneCycleLR. Gradient clipping at 1.0.
 
 ## 13. Engineering properties
 
@@ -573,7 +619,56 @@ Not yet established:
 - stage 5 and stages 2-3 end-to-end on a chained curriculum;
 - Ribonanza beyond the 335,616 rows acquired.
 
-## 14A. Evaluation on blind tests
+## 14A. Does it understand RNA, or is the accuracy an artefact?
+
+Masked-token accuracy inflates easily, and a pooled figure hides how. Four
+mechanisms produce a respectable number with no understanding behind it, and
+all four are measured rather than dismissed.
+
+**BERT's corruption scores positions the model can see.** Of the selected
+positions, 10% are left unchanged and 10% replaced with a random base; both are
+scored by default. Split by what was actually visible:
+
+| what the model saw | accuracy | share |
+|---|---|---|
+| `[MASK]` — must infer | **0.3229** | 80.5% |
+| kept — answer visible | 0.9984 | 12.3% |
+| random — wrong base shown | 0.0068 | 7.2% |
+| pooled | 0.3829 | |
+
+The honest number is **0.3229, not 0.3829**. Every held-out metric in this
+project now scores hidden positions only.
+
+**Against trivial strategies**, on hidden positions: always the commonest base
+0.2774, copy the previous residue 0.2794, model **0.3229**. So +4.4 points over
+the best trivial strategy, not +10.
+
+**It leans on the input.** Where a *wrong* base is shown, accuracy is 0.0068 —
+far below the 0.25 of guessing. It echoes the corrupted input rather than
+overruling it.
+
+**It is skewed.** Predicted share A 42.2%, U 31.4%, C 14.7%, G 11.7%; recall
+A 0.477, U 0.385, C 0.218, G 0.173. G recall is *below chance*. Not a collapse,
+but not four-way competence, and a pooled figure cannot show it.
+
+### 14A.1 The one metric that cannot be faked
+
+Watson–Crick complementarity. One side of a real base pair — taken from a
+deposited structure, not proposed by a folding program — is masked under two
+conditions that differ **only** in whether the partner is readable. Same bases,
+same contexts, same model, same prior; the difference is pairing being used.
+
+| checkpoint | tokens | bits | accuracy | **WC gap** |
+|---|---|---|---|---|
+| step 1750 | 226M | 1.9877 | 0.2910 | **+0.0229** |
+| step 3000 | 395M | 1.9628 | 0.3158 | **+0.0857** |
+
+The gap has almost quadrupled. Loss and accuracy improved too, by amounts a
+composition shift could account for; the WC gap cannot be explained that way,
+and it is the evidence that the model is learning that G pairs with C. It is
+measured at every checkpoint.
+
+## 14B. Evaluation on blind tests
 
 The only honest test sets this project has are **RNA-Puzzles, CASP15 and
 CASP16** — 42 targets. Everything else is drawn from the PDB, and a structure
@@ -586,7 +681,7 @@ RNA-Puzzles also ships every group's submissions, so the benchmark is a
 "PHAROS scores 0.52 TM" means nothing until you know the best submission on
 that target scored 0.61 and the median scored 0.34.
 
-### 14A.1 The metrics, and why four of them
+### 14B.1 The metrics, and why four of them
 
 - **RMSD** after optimal superposition is the common currency and the one that
   lies most: dominated by the worst-placed residue and growing with length, so
@@ -618,7 +713,7 @@ consistency: scored against the real RNA-Puzzles round-1 submissions they
 recover the published ranking, Das first at 3.30 Å and Dokholyan last at
 7.26 Å.
 
-### 14A.2 The bar
+### 14B.2 The bar
 
 Over 17 RNA-Puzzles targets and all 885 submissions:
 
