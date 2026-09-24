@@ -249,6 +249,29 @@ an absolute threshold is not scale-free — 0.02 fires all 32 experts and none o
 256, making the initial width a property of E rather than of the router.
 Measured stable at 0.39–0.41 of E across E ∈ {32, 64, 128}.
 
+**Measured on the trained model, which it had never been.** The block reports
+`mean_width`, `max_width` and two router entropies at every one of 18 blocks at
+every step; the trunk discarded all four before the trainer could read them, so
+the paragraph above was an argument about initialisation and a claim about
+training with no measurement behind it, and "no router collapse" rested on the
+balance term alone with no threshold written down anywhere. At **step 7,000
+(992.8M tokens)**, on the reserved shards (`scripts/audit_router.py`):
+
+| | measured | reference |
+|---|---|---|
+| mean routing width | **15.28** | 512 = fixed top-k, 1 = argmax |
+| widest single token | **330** | `max_k` is 512 |
+| router entropy | **7.255 bits** | 9.000 = uniform over 512 |
+| balance, per block | **1.517** | 1.0 = uniform, 512 = collapsed |
+| dead experts (<0.1 of a uniform share) | **0.0%** | |
+| effective experts, `1/Σu²` | **288.5** | of 512 |
+
+The width is genuinely variable — the claim holds. Note that the trainer logs
+the balance term SUMMED over 18 blocks, so the logged 0.197 at
+`balance_weight` 0.01 is **1.09 per block, 9% above uniform**, not the 20×
+concentration the raw figure invites; that misreading is why the per-block
+figure is the one quoted here.
+
 **The experts are merged before the network runs, not after.** The obvious
 implementation builds the (token, expert) pair list and pushes every pair
 through the shared network, which costs `width ×` the activations and produces
