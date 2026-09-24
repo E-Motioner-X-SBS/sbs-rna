@@ -215,8 +215,19 @@ def main() -> int:
             all("train" in fam[f] for f in rib) if rib else True,
             f"{len(rib)} families appear in it, all also in train -- by design")
         sp = man["split"]["by_residue"]
-        chk("val and test are balanced to the residue", sp["val"] == sp["test"],
-            f"{sp['val']:,} vs {sp['test']:,}")
+        # Not exact equality. The splitter balances by assigning whole CHAINS,
+        # so a perfect tie is only ever available when the chain lengths happen
+        # to sum that way -- the v3 corpus lands on 531,547 against 531,546 and
+        # an equality test calls that a failure. The property worth holding is
+        # that neither side is materially larger; 1% of the smaller side is far
+        # tighter than any imbalance that could move a val/test comparison, and
+        # is not a coin flip on the last chain.
+        _lo = min(sp["val"], sp["test"])
+        chk("val and test are balanced by residue (within 1%)",
+            abs(sp["val"] - sp["test"]) <= max(1, 0.01 * _lo),
+            f"{sp['val']:,} vs {sp['test']:,} "
+            f"(delta {abs(sp['val'] - sp['test']):,} = "
+            f"{abs(sp['val'] - sp['test']) / max(_lo, 1):.4%})")
     else:
         chk("dataset manifest present", 0, "run scripts/build_dataset.py")
 

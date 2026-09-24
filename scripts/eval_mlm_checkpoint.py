@@ -51,8 +51,8 @@ def _trainer():
 
 
 def build_fixed_batches(pm, corpus: List[Path], n_seq: int, budget: int,
-                        seed: int, min_len: int = 20, max_len: int = 1024
-                        ) -> List:
+                        seed: int, min_len: int = 20, max_len: int = 1024,
+                        split: str = "legacy") -> List:
     """The same sequences, the same masking, every time.
 
     **Sequences must be normalised exactly as `iter_sequences` normalises
@@ -68,16 +68,31 @@ def build_fixed_batches(pm, corpus: List[Path], n_seq: int, budget: int,
     The length filter must match the trainer's for the same reason.
     """
     import pyarrow.parquet as pq
-    files: List[Path] = []
-    for d in corpus:
-        files += sorted(Path(d).glob("*.parquet"))
+    if split == "reserved":
+        # The shards the trainer's own `heldout_files` removes from the
+        # training stream -- the guarantee stated rather than inferred, and
+        # covering BOTH corpora, so the number speaks for the mixture the
+        # model is actually trained on.
+        files = list(pm.heldout_files(corpus))
+    else:
+        # LEGACY, kept so the accumulated curve stays one measurement.
+        # It walks the globally sorted shard list backwards and fills from the
+        # first shard with enough sequences, which on this corpus is
+        # `eldors_c020_shard0004` -- a shard the trainer does reserve, so the
+        # sample is in fact held out. It is held out by an accident of sort
+        # order rather than by construction: it is elDORS only, it is the
+        # SHORTEST chunk of a length-sorted corpus (mean 356 nt against 1,272
+        # in c001), and nothing here would have noticed if the ordering had put
+        # a trained-on shard last instead.
+        files = []
+        for d in corpus:
+            files += sorted(Path(d).glob("*.parquet"))
+        files = list(reversed(files))
     if not files:
         raise SystemExit("no parquet shards found")
-    # take from the END of the sorted list: the trainer shuffles shard order
-    # with its own rng, but at ~1% of the corpus most shards are still unread
     rng = np.random.default_rng(seed)
     seqs: List[str] = []
-    for f in reversed(files):
+    for f in files:
         t = pq.read_table(f, columns=["sequence"])
         col = t["sequence"].to_pylist()
         # exactly what iter_sequences does, and for the reason in the docstring
@@ -85,7 +100,13 @@ def build_fixed_batches(pm, corpus: List[Path], n_seq: int, budget: int,
         col = [s for s in col if min_len <= len(s) <= max_len]
         if not col:
             continue
-        take = min(len(col), n_seq - len(seqs))
+        # On the reserved split, an equal share from EACH reserved shard.
+        # Filling greedily from the first shard is what made the legacy sample
+        # one shard of one corpus: `heldout_files` returns MARS before elDORS,
+        # so a greedy fill would have swung the sample from all-elDORS to
+        # all-MARS and called that an improvement.
+        want = (-(-n_seq // len(files))) if split == "reserved" else n_seq
+        take = min(len(col), want, n_seq - len(seqs))
         idx = rng.choice(len(col), take, replace=False)
         seqs += [col[int(i)] for i in idx]
         if len(seqs) >= n_seq:
@@ -167,6 +188,45 @@ def score(model, pm, seqs, device, budget: int, n_loops: int, seed: int):
             "n_masked": tot_masked, "n_batches": len(groups)}
 
 
+
+#: Heads added to the model after a run started are legitimately absent from
+#: that run's checkpoints. Nothing else is.
+_MAY_BE_MISSING = ("heads.pair.geometry.", "heads.residue.motif.")
+
+
+def _check_load(model, sd, ck) -> None:
+    """`load_state_dict(strict=False)` and then LOOK at what it dropped.
+
+    The evaluator used to call `strict=False` and ignore the result. That is
+    the failure mode this file exists to catch, applied to itself: a load that
+    cannot fail, scoring a model whose weights may be partly random, reporting
+    a number with no marker that anything went wrong. A renamed trunk
+    parameter, a config mismatch, a half-written checkpoint -- each one gives a
+    plausible-looking bits figure that is simply wrong, and the curve absorbs
+    it.
+
+    So: tolerate exactly the heads that post-date the run, name anything else,
+    and refuse to score a model that is missing trunk weight.
+    """
+    r = model.load_state_dict(sd, strict=False)
+    full = model.state_dict()
+    unexpected = list(r.unexpected_keys)
+    bad = [k for k in r.missing_keys if not k.startswith(_MAY_BE_MISSING)]
+    ok = [k for k in r.missing_keys if k.startswith(_MAY_BE_MISSING)]
+    n_bad = sum(full[k].numel() for k in bad if k in full)
+    if ok:
+        print(f"[eval] {Path(ck).name}: {len(ok)} post-run head tensors absent "
+              f"(heads 9/10), not used by the MLM path")
+    if unexpected:
+        print(f"[eval] WARNING {len(unexpected)} unexpected keys, e.g. "
+              f"{unexpected[:3]}")
+    if bad:
+        raise SystemExit(
+            f"[eval] REFUSING to score {ck}: {len(bad)} tensors "
+            f"({n_bad:,} parameters) are missing from the checkpoint and would "
+            f"be scored at random initialisation -- {bad[:5]}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--ckpt", type=Path, action="append", required=True)
@@ -182,6 +242,13 @@ def main() -> int:
                     help="must match the trainer, or the model is scored "
                          "outside the distribution it was trained on")
     ap.add_argument("--seed", type=int, default=1234)
+    ap.add_argument("--split", choices=("legacy", "reserved"), default="legacy",
+                    help="which shards the fixed sample comes from. 'reserved' "
+                         "is the trainer's own held-out split across BOTH "
+                         "corpora; 'legacy' reproduces the sample the existing "
+                         "curve was measured on, and is the default so that "
+                         "curve stays one series. They are different samples "
+                         "and their numbers must not be plotted together.")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--append-csv", type=Path,
                     default=ROOT / "data/samples/analysis/runs/heldout_mlm.csv",
@@ -203,7 +270,7 @@ def main() -> int:
     device = torch.device(args.device)
     seqs = build_fixed_batches(pm, args.corpus, args.n_seq,
                                args.token_budget, args.seed,
-                               args.min_len, args.max_len)
+                               args.min_len, args.max_len, split=args.split)
     print(f"[eval] fixed sample: {len(seqs):,} sequences, "
           f"{sum(len(s) for s in seqs):,} nt, "
           f"len {args.min_len}-{args.max_len}, seed {args.seed}")
@@ -216,7 +283,7 @@ def main() -> int:
     for ck in args.ckpt:
         st = torch.load(ck, map_location=device, weights_only=False)
         sd = {k.replace("_orig_mod.", ""): v for k, v in st.get("model", st).items()}
-        model.load_state_dict(sd, strict=False)
+        _check_load(model, sd, ck)
         r = score(model, pm, seqs, device, args.token_budget, args.n_loops,
                   args.seed)
         r["comp_gap"] = float("nan")

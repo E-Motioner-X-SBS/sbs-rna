@@ -218,6 +218,44 @@ def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
     return torch.where(hit, val[pos], torch.zeros_like(val[pos]))
 
 
+
+def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
+                   n_classes: int) -> Dict[str, float]:
+    """Accuracy, the majority-class rate it must beat, and macro recall.
+
+    Heads 9 and 10 reported bare accuracy, and bare accuracy on these targets
+    is not a measurement. Over the corpus, 76.57% of annotated base pairs are
+    one Leontis-Westhof class (cis Watson-Crick) and 74.42% of residues carry
+    one loop class; a head that has learned nothing except the prior scores
+    those numbers and reads as a working head. This is the same failure the
+    rest of the audit has been chasing -- a component that exists, is measured,
+    and whose output is never checked for basic validity -- so the metric is
+    reported against its own floor.
+
+    `*_major` is the majority rate ON THIS BATCH, which is the honest floor:
+    the corpus figure would let a batch of unusual composition look good or
+    bad for reasons that have nothing to do with the head. `*_lift` is what the
+    head adds over it and is the number to watch; at or below zero the head is
+    predicting the prior. `*_macro` is unweighted mean recall over the classes
+    PRESENT in the batch, which collapses to 1/k for a prior-predicting head
+    and is the metric the rare tertiary geometries actually live in.
+    """
+    with torch.no_grad():
+        pred = logits.argmax(-1)
+        acc = (pred == target).float().mean()
+        cnt = torch.bincount(target, minlength=n_classes).float()
+        major = (cnt.max() / cnt.sum()) if cnt.sum() > 0 else cnt.new_zeros(())
+        present = cnt > 0
+        hit = torch.bincount(target[pred == target], minlength=n_classes).float()
+        macro = (hit[present] / cnt[present]).mean() if bool(present.any()) \
+            else cnt.new_zeros(())
+        return {f"{tag}_acc": float(acc),
+                f"{tag}_major": float(major),
+                f"{tag}_lift": float(acc - major),
+                f"{tag}_macro": float(macro),
+                f"{tag}_n_class": int(present.sum())}
+
+
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 n_loops: Optional[int] = None,
                 structure_weight: float = 1.0) -> tuple:
@@ -295,8 +333,8 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         l = F.cross_entropy(ml[lm], t["loop_class"][lm])
         total = total + 0.3 * l
         parts["motif"] = float(l.detach())
-        parts["motif_acc"] = float(
-            (ml[lm].argmax(-1) == t["loop_class"][lm]).float().mean().detach())
+        parts.update(_class_metrics(ml[lm], t["loop_class"][lm], "motif",
+                                    cfg.n_motif_classes))
 
     # head 1 -- contacts, on sampled pairs.
     #
@@ -344,8 +382,8 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 l = F.cross_entropy(lwl, tgt_lw)
                 total = total + 0.5 * l
                 parts["lw"] = float(l.detach())
-                parts["lw_acc"] = float(
-                    (lwl.argmax(-1) == tgt_lw).float().mean().detach())
+                parts.update(_class_metrics(lwl, tgt_lw, "lw",
+                                            cfg.n_lw_classes))
                 parts["n_lw"] = int(hit.sum())
 
         cv = lookup_coevolution(t, bidx, ii, jj, L)

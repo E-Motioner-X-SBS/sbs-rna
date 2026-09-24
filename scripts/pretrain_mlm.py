@@ -142,9 +142,32 @@ def _corpus_files(corpus) -> List[Path]:
 
 
 def heldout_files(corpus) -> List[Path]:
-    """The shards reserved for evaluation. Never read by training."""
+    """The shards reserved for evaluation, `N_HELDOUT_SHARDS` PER CORPUS.
+
+    Per corpus, not per run. `_corpus_files` returns one globally sorted list,
+    and `data/derived/parquet_mars/*` sorts before `data/derived/parquet_starter/*`,
+    so taking the last two of the combined list reserved
+    `eldors_c020_shard0003` and `eldors_c020_shard0004` and reserved **nothing
+    at all from MARS**: all 71 MARS shards were in the training stream and no
+    held-out number said anything about them. It also made the held-out set the
+    two shards of the SHORTEST chunk of a length-sorted corpus -- elDORS c020,
+    mean 356 nt against 1,272 in c001 -- so the evaluation distribution was not
+    the training distribution.
+
+    Grouping by parent directory fixes both: each corpus contributes its own
+    last shards, the mixture is represented, and the split is still a pure
+    function of the file names, so a resumed run computes the same one.
+    """
     files = _corpus_files(corpus)
-    return files[-N_HELDOUT_SHARDS:] if len(files) > N_HELDOUT_SHARDS else []
+    by_root: Dict[Path, List[Path]] = {}
+    for f in files:
+        by_root.setdefault(f.parent, []).append(f)
+    out: List[Path] = []
+    for root in sorted(by_root):
+        grp = by_root[root]
+        if len(grp) > N_HELDOUT_SHARDS:
+            out.extend(grp[-N_HELDOUT_SHARDS:])
+    return sorted(out)
 
 
 def iter_sequences(corpus, min_len: int, max_len: int,
@@ -749,17 +772,33 @@ def main() -> None:
         # from the training stream. Sampled across the whole reserved set
         # rather than as a prefix, so it is not one contiguous region of one
         # shard.
-        _pool = list(itertools.islice(
-            iter_sequences(heldout_files(corpora), args.min_len, args.max_len,
-                           shards=None, include_heldout=True),
-            args.heldout_seq * 20))
-        if len(_pool) > args.heldout_seq:
-            _pick = np.random.default_rng(args.heldout_seed).choice(
-                len(_pool), args.heldout_seq, replace=False)
-            _hs = [_pool[int(i)] for i in _pick]
-        else:
-            _hs = _pool
-        _groups = _pack_pool(_hs, args.token_budget // 4, args.max_batch,
+        # Reservoir sampling over the WHOLE reserved stream.
+        #
+        # This used to be `islice(..., heldout_seq * 20)` and then a choice
+        # from that, with a comment claiming it sampled "across the whole
+        # reserved set rather than as a prefix". islice IS a prefix:
+        # `iter_sequences` with no rng walks the shards in sorted order, so the
+        # pool was the first 10,240 sequences of one shard and the comment
+        # asserted the opposite of what the code did. A reservoir is O(1)
+        # memory, needs no second pass, and is uniform over every sequence in
+        # the reserved shards by construction.
+        _r = np.random.default_rng(args.heldout_seed)
+        _hs: List[str] = []
+        for _n, _seq in enumerate(iter_sequences(
+                heldout_files(corpora), args.min_len, args.max_len,
+                shards=None, include_heldout=True)):
+            if len(_hs) < args.heldout_seq:
+                _hs.append(_seq)
+            else:
+                _j = int(_r.integers(0, _n + 1))
+                if _j < args.heldout_seq:
+                    _hs[_j] = _seq
+        # A quarter of the training budget: evaluation runs under no_grad and
+        # could afford more, but the batches must stay small enough that a
+        # checkpoint evaluation never becomes the step that OOMs the run.
+        # `budget_tokens` rather than `args.token_budget` only because the two
+        # are the same object by this line and the local says so.
+        _groups = _pack_pool(_hs, max(4096, budget_tokens // 4), args.max_batch,
                              np.random.default_rng(args.heldout_seed))
         print(f"[mlm] held-out sample: {len(_hs):,} sequences in "
               f"{len(_groups)} fixed batches, drawn from "
