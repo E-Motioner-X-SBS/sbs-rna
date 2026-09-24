@@ -656,11 +656,17 @@ def main() -> None:
                     with torch.autocast("cuda", dtype=torch.bfloat16):
                         o = mdl(ip_t, torch.zeros_like(ip_t), cm, bm,
                                 feats=ft, n_loops=args.n_loops, mlm=True)
-                    lg = o["mlm_logits"].float()[sl_t]
-                    y = tg_t[sl_t]
+                    # genuinely hidden positions only: the 10% of selected
+                    # positions BERT leaves unchanged are copied with 99.84%
+                    # accuracy and inflate the figure by +0.060
+                    hd = sl_t & (ip_t == MASK_ID)
+                    if not bool(hd.any()):
+                        continue
+                    lg = o["mlm_logits"].float()[hd]
+                    y = tg_t[hd]
                     tc += float(F.cross_entropy(lg, y, reduction="sum"))
                     tk += float((lg.argmax(-1) == y).sum())
-                    nm += int(sl_t.sum())
+                    nm += int(hd.sum())
             mdl.train(was)
             ce = tc / max(nm, 1)
             return {"ce_nats": ce, "bits": ce / float(np.log(2)),

@@ -319,6 +319,34 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         total = total + 1.0 * l
         parts["contact"] = float(l.detach())
 
+        # head 2 -- the distogram. It existed, its loss existed, and nothing
+        # ever computed a target for it.
+        #
+        # A binary contact says "these two residues are within a cutoff". A
+        # binned distance says how far apart they are, which is strictly more
+        # information from the same coordinates and the same sampled pairs: it
+        # is what AlphaFold trains its pair track on, and it is the difference
+        # between a model that knows two residues touch and one that knows the
+        # geometry they touch with. The targets were unavailable until the
+        # corpus carried coordinates; now it does.
+        cmask = t.get("coord_residue_mask")
+        if cmask is not None and bool(cmask.any()):
+            xyz = t["coords"][:, :, 1]          # C4', one point per residue
+            ok = cmask[bidx, ii] & cmask[bidx, jj]
+            if bool(ok.any()):
+                dd = torch.linalg.norm(xyz[bidx, ii] - xyz[bidx, jj], dim=-1)
+                nb = model.heads.cfg.n_distance_bins
+                # 2-40 A in 1 A steps plus an overflow bin, the layout
+                # HeadConfig documents
+                b = torch.clamp(((dd - 2.0)).floor().long(), 0, nb - 1)
+                dl = model.heads.pair.distance(pair)
+                ld = (F.cross_entropy(dl[ok], b[ok], reduction="none")
+                      * wt[ok]).sum() / wt[ok].sum().clamp(min=1e-6)
+                total = total + 0.5 * ld
+                parts["distance"] = float(ld.detach())
+                parts["dist_acc"] = float(
+                    (dl[ok].argmax(-1) == b[ok]).float().mean().detach())
+
     # head 3 -- the backbone itself, by denoising diffusion.
     #
     # This is the head that was missing. Everything above supervises a PROPERTY

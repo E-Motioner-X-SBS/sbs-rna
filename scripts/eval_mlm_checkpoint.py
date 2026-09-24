@@ -127,24 +127,38 @@ def score(model, pm, seqs, device, budget: int, n_loops: int, seed: int):
         inp_np, tgt_np, sel_np = pm.apply_span_mask(tok_np, lengths, rng)
         if not sel_np.any():
             continue
-        inp = torch.as_tensor(inp_np, device=device)
-        tgt = torch.as_tensor(tgt_np, device=device)
-        sel = torch.as_tensor(sel_np, device=device)
+        inp_t = torch.as_tensor(inp_np, device=device)
+        tgt_t = torch.as_tensor(tgt_np, device=device)
+        sel_t = torch.as_tensor(sel_np, device=device)
+        inp, sel = inp_np, sel_np
         bmask = torch.as_tensor(mask_np, device=device)
-        chem = batch_chem(inp, bmask)
+        chem = batch_chem(inp_t, bmask)
         n_real = bmask.sum(1)
         feats = RouterFeatures(
             length=n_real.float(),
             chem_summary=(chem.sum(1) / n_real.unsqueeze(1).clamp(min=1))[:, :5])
         with torch.autocast(device.type, dtype=torch.bfloat16,
                             enabled=(device.type == "cuda")):
-            out = model(inp, torch.zeros_like(inp), chem, bmask,
+            out = model(inp_t, torch.zeros_like(inp_t), chem, bmask,
                         feats=feats, n_loops=n_loops, mlm=True)
-        lg = out["mlm_logits"].float()[sel]
-        y = tgt[sel]
+        # Score ONLY positions the model could not see.
+        #
+        # BERT's 80/10/10 leaves 10% of selected positions unchanged and
+        # replaces 10% with a random base; both are scored by default, and the
+        # model copies the unchanged ones with 99.84% accuracy. Measured on
+        # this corpus that inflates the headline by +0.060 -- 0.3829 pooled
+        # against 0.3229 on genuinely hidden positions. An evaluator whose job
+        # is to say whether the model is learning must not count the positions
+        # where it is only reading.
+        hidden = sel & (inp == pm.MASK_ID)
+        if not hidden.any():
+            continue
+        h = torch.as_tensor(hidden, device=device)
+        lg = out["mlm_logits"].float()[h]
+        y = tgt_t[h]
         tot_ce += float(F.cross_entropy(lg, y, reduction="sum"))
         tot_correct += float((lg.argmax(-1) == y).sum())
-        tot_masked += int(sel.sum())
+        tot_masked += int(h.sum())
 
     ce = tot_ce / max(tot_masked, 1)
     return {"ce_nats": ce, "bits": ce / float(np.log(2)),
@@ -186,6 +200,7 @@ def main() -> int:
           f"{sum(len(s) for s in seqs):,} nt, "
           f"len {args.min_len}-{args.max_len}, seed {args.seed}")
     print("[eval] corpus entropy reference: 2.0165 bits/nt")
+    print("[eval] scored on GENUINELY MASKED positions only (see score())")
 
     cfg = getattr(PharosConfig, args.size)()
     model = Pharos(cfg).to(device).eval()
