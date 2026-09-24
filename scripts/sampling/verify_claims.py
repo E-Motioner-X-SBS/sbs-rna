@@ -484,6 +484,30 @@ def main() -> int:
         else:
             chk("R6 batch-size effect measured", 0, 1)
 
+        # ---- R7: the model works at ONE recycle depth ----------------------
+        #
+        # Stage 1 fixes `--n-loops` and never varies it, so the recycle
+        # projection is trained for exactly one application. Stage 5 samples
+        # 1..cfg.n_loops. The configs advertise 8 loops and 144 effective
+        # layers; training exercises 2 and 36.
+        ld = ROOT / "data/samples/analysis/loop_depth_sweep.json"
+        if ld.exists():
+            lj = _rjson.loads(ld.read_text())
+            sw = lj["sweep"]
+            chk("R7 best at the depth it trained on",
+                int(min(sw, key=lambda k: sw[k]["bits"]) == "2"), 1)
+            chk("R7 bits at the trained depth (2 loops)", sw["2"]["bits"],
+                1.6632, abs_tol=0.0002)
+            chk("R7 bits at the CONFIGURED depth (8 loops)", sw["8"]["bits"],
+                2.0064, abs_tol=0.0002)
+            chk("R7 at 8 loops it is worse than the corpus unigram entropy",
+                int(sw["8"]["bits"] > lj["corpus_entropy_bits"]), 1)
+            chk("R7 advertised vs trained effective layers",
+                f'{lj["advertised_effective_layers"]}/'
+                f'{lj["actual_effective_layers_in_training"]}', "144/36")
+        else:
+            chk("R7 loop-depth sweep measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

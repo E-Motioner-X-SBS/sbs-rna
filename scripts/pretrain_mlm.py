@@ -483,6 +483,20 @@ def require_gpu(args) -> torch.device:
 
 
 
+
+def _n_loops(args, rng) -> int:
+    """The loop count for this step: fixed, or sampled from 1..n_loops.
+
+    Sampling is what stage 5 does, and stage 1 not doing it is why the
+    pretrained trunk works at exactly one depth. Kept as a function so the
+    held-out evaluation can keep using the FIXED count -- an evaluation whose
+    depth wandered would be measuring the sampler.
+    """
+    if not getattr(args, "sample_loops", False):
+        return args.n_loops
+    return int(rng.integers(1, args.n_loops + 1))
+
+
 def _router_str(deads, widths, wmaxes, n: int) -> str:
     """`dead=` and `w=` for the step line, empty when the model reports neither.
 
@@ -555,6 +569,20 @@ def main() -> None:
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--n-loops", type=int, default=2,
                     help="loops give structural refinement depth; MLM needs few")
+    ap.add_argument("--sample-loops", action="store_true",
+                    help="draw the loop count uniformly from 1..--n-loops each "
+                         "step instead of fixing it, the recipe stage 5 already "
+                         "uses. Stage 1 trains at ONE depth, and a model "
+                         "trained at one depth works at one depth: measured on "
+                         "step 8,750, which trained at 2 loops, the held-out "
+                         "sample reads 1.6632 bits at 2 loops, 1.9718 at 1, "
+                         "1.9711 at 4 and 2.0064 at 8 -- the last being WORSE "
+                         "than the 2.0165-bit corpus unigram entropy. The "
+                         "config advertises 8 loops and 144 effective layers; "
+                         "training exercises 2 and 36. Off by default because "
+                         "it is not free: the expected cost goes from "
+                         "6+2*(2-1)=8 to 6+2*(4.5-1)=13 FLOPs per active "
+                         "parameter per token, about 1.6x.")
     ap.add_argument("--shards", type=int, default=None)
     ap.add_argument("--corpus", type=Path, nargs="*", default=None,
                     help="parquet directories to pretrain on. Default is "
@@ -923,7 +951,7 @@ def main() -> None:
                       g["lr"] = lr_now * scale
               with torch.autocast("cuda", dtype=torch.bfloat16):
                   out = model(inp, torch.zeros_like(inp), chem, bmask,
-                              feats=feats, n_loops=args.n_loops, mlm=True)
+                              feats=feats, n_loops=_n_loops(args, rng), mlm=True)
                   logits = out["mlm_logits"].float()
                   ce = F.cross_entropy(logits[sel], tgt[sel])
                   bal = out["aux"]["balance_loss"]

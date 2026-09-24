@@ -1,0 +1,31 @@
+{
+ "checkpoint": "step8750.pt",
+ "step": 8750,
+ "trained_at_n_loops": 2,
+ "config_n_loops": 8,
+ "n_blocks": 18,
+ "advertised_effective_layers": 144,
+ "actual_effective_layers_in_training": 36,
+ "n_seq": 384,
+ "token_budget": 8192,
+ "corpus_entropy_bits": 2.0165,
+ "sweep": {
+  "1": {
+   "bits": 1.9718,
+   "acc": 0.3057
+  },
+  "2": {
+   "bits": 1.6632,
+   "acc": 0.4548
+  },
+  "4": {
+   "bits": 1.9711,
+   "acc": 0.3046
+  },
+  "8": {
+   "bits": 2.0064,
+   "acc": 0.2823
+  }
+ },
+ "note": "stage 1 trains at a FIXED n_loops and never varies it, so the recycle projection is trained for exactly one application; stage 5 samples 1..cfg.n_loops, so it would feed depths the trunk collapses at. At 8 loops the model is worse than the 2.0165-bit corpus unigram entropy."
+}
