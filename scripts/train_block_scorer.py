@@ -159,15 +159,33 @@ def evaluate(model: Optional[BlockScorer], ds: Pharos3DDataset, cfg: ScorerConfi
                     continue
                 acc[f"{lvl}_recall"].append(r)
                 acc[f"{lvl}_precision"].append(p)
-                acc[f"{lvl}_pos"].append(float((lab * v).sum()))
+                npos = float((lab * v).sum())
+                acc[f"{lvl}_pos"].append(npos)
                 acc[f"{lvl}_kept"].append(kk)
+                # Totals for the MICRO average. `np.mean` over per-chain
+                # recalls weights a 70-nucleotide tRNA with 11 positive blocks
+                # the same as a 4,450-nucleotide rRNA with 833, and 93.6% of
+                # the test split is under 128 nt -- where the 12% budget keeps
+                # about ONE block, so recall is capped near 0.1 whatever the
+                # scorer does. The macro average therefore reports the budget
+                # on short chains, not the model. Micro weights each positive
+                # block once, which is what a structure predictor cares about.
+                acc[f"{lvl}_recovered_total"].append(r * npos)
+                acc[f"{lvl}_pos_total"].append(npos)
                 band = ("<128" if L < 128 else "128-512" if L < 512
                         else "512-1500" if L < 1500 else ">=1500")
                 by_len.setdefault(f"{lvl}_{band}", []).append(r)
 
     res = {"mode": mode, "n_chains": n_chains}
     for k, v in acc.items():
+        if k.endswith("_total"):
+            continue
         res[k] = round(float(np.mean(v)), 4) if v else None
+    for lvl in ("l1", "l2"):
+        tot = sum(acc.get(f"{lvl}_pos_total", []))
+        rec = sum(acc.get(f"{lvl}_recovered_total", []))
+        res[f"{lvl}_recall_micro"] = round(rec / tot, 4) if tot else None
+        res[f"{lvl}_positives_total"] = int(tot)
     res["recall_by_length"] = {k: round(float(np.mean(v)), 4)
                                for k, v in sorted(by_len.items())}
     return res
