@@ -132,6 +132,18 @@ def muon_param_groups(model, muon_lr: float = 0.02, adamw_lr: float = 6e-4,
         is_head = "mlm_head" in lower or lower.startswith("heads.")
         if p.ndim >= 2 and not is_embed and not is_head:
             muon.append(p)
+        elif is_embed:
+            # No decay on embeddings. The MLM head has no weight matrix of its
+            # own -- it is TIED to the token embedding -- so the embedding's
+            # magnitude directly sets the logit scale, and decaying it works
+            # against the one quantity the model's confidence depends on.
+            # Measured at 395M tokens: mean top-1 probability 0.3307 against a
+            # uniform 0.25, predictive entropy 1.9446 of a possible 2.000, and
+            # not one masked position in a thousand predicted above p=0.9. The
+            # embedding is growing (per-row norm 0.554 -> 1.163, 2.3x) so decay
+            # is not winning, but it is pulling the wrong way, and not decaying
+            # embeddings is standard for exactly this reason.
+            no_decay.append(p)
         elif p.ndim >= 2:
             decay.append(p)
         else:
