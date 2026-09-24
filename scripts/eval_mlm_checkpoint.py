@@ -223,7 +223,12 @@ def main() -> int:
         if args.complementarity:
             try:
                 from probe_rna_understanding import complementarity, real_base_pairs
-                pd = real_base_pairs(limit_chains=12, max_len=300)
+                # n=350 pairs gives the gap a standard error of +/-0.033, at
+                # which every change measured across this run -- including one
+                # reported as "almost quadrupled" -- sits under 2 sigma. The
+                # gap being consistently POSITIVE is evidence; its movements at
+                # that sample size were not. More chains, longer chains.
+                pd = real_base_pairs(limit_chains=60, max_len=600)
                 if pd:
                     cr = complementarity(model, pm, pd, device, args.n_loops)
                     vh, vt = cr["partner_visible"]
@@ -232,11 +237,15 @@ def main() -> int:
                     r["comp_masked"] = mh / max(mt, 1)
                     r["comp_gap"] = r["comp_visible"] - r["comp_masked"]
                     r["comp_n"] = vt
+                    # the error bar travels with the number, so a reader
+                    # cannot mistake a 0.6-sigma wobble for a trend
+                    r["comp_se"] = float(
+                        np.sqrt(2 * 0.25 * 0.75 / max(vt, 1)))
             except Exception as e:                           # noqa: BLE001
                 print(f"  (complementarity unavailable: {e})")
         print(f"  {ck.name:38s} {st.get('step','?'):>7} {r['bits']:7.4f} "
               f"{r['perplexity']:7.4f} {r['accuracy']:7.4f}"
-              + (f"   WC-gap {r['comp_gap']:+.4f} "
+              + (f"   WC-gap {r['comp_gap']:+.4f}+/-{r.get('comp_se',0):.4f} "
                  f"({r.get('comp_visible',0):.3f} vs {r.get('comp_masked',0):.3f} "
                  f"on {r.get('comp_n',0)} pairs)"
                  if r["comp_gap"] == r["comp_gap"] else ""))
