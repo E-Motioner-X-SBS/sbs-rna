@@ -147,10 +147,18 @@ class ChainExample:
 
     def meta(self) -> Dict:
         d = asdict(self)
+        # Every array field must be listed here. `meta()` is JSON-serialised
+        # into the manifest, so a new ndarray field that is not popped kills
+        # the whole corpus build at the end -- after the shards are written,
+        # which is the most expensive place to fail. Adding `lw_pairs` and
+        # `loop_class` did exactly that.
         for k in ("tokens", "mod_ids", "chem", "contacts", "mg_site",
                   "b_factor_z", "unknown_base", "unobserved_seq_id",
-                  "coords", "coord_mask"):
+                  "coords", "coord_mask", "lw_pairs", "loop_class"):
             d.pop(k, None)
+        assert not any(isinstance(v, np.ndarray) for v in d.values()), (
+            "meta() still holds an ndarray: "
+            f"{[k for k, v in d.items() if isinstance(v, np.ndarray)]}")
         d["n_mg_sites"] = int(self.mg_site.sum()) if self.mg_site is not None else 0
         d["n_unobserved"] = (len(self.unobserved_seq_id)
                              if self.unobserved_seq_id is not None else 0)
