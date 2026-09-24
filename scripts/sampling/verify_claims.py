@@ -449,6 +449,26 @@ def main() -> int:
         else:
             chk("R5 router conditioning measured", 0, 1)
 
+        # ---- R6: the held-out scatter is the batch size, not noise ---------
+        #
+        # `_pack_pool` cuts on the padded token budget OR on the sequence
+        # COUNT, and at `--max-batch` 512 the count bound on short shards:
+        # c020 capped 92.5% of its batches at 83,899 real tokens against
+        # c001's 194,607. Joining the trainer's per-100-step token rate to the
+        # clean held-out readings, fewer tokens in the step predicts worse
+        # bits even after the training trend is partialled out.
+        be = ROOT / "data/samples/analysis/batch_size_effect.json"
+        if be.exists():
+            bj = _rjson.loads(be.read_text())
+            chk("R6 paired checkpoints", bj["n"], 21)
+            chk("R6 raw correlation", bj["r_raw"], -0.6414, abs_tol=0.0002)
+            chk("R6 partial correlation, step controlled",
+                bj["r_partial_step_controlled"], -0.5413, abs_tol=0.0002)
+            chk("R6 the effect survives the training trend",
+                int(abs(bj["t"]) > 2.0), 1)
+        else:
+            chk("R6 batch-size effect measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
