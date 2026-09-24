@@ -472,6 +472,10 @@ def main() -> None:
                     help="checkpoint path; default pharos_<size>.pt")
     ap.add_argument("--init-from", type=Path, default=None,
                     help="a checkpoint from an earlier curriculum stage")
+    ap.add_argument("--from-scratch", action="store_true",
+                    help="train stage 5 from random weights. This is a known "
+                         "bad configuration -- it produced r = 0.049 on unseen "
+                         "folds -- so it has to be asked for explicitly.")
     ap.add_argument("--sample-loops", action="store_true", default=True,
                     help="sample the recycle count per step (default on)")
     ap.add_argument("--fixed-loops", dest="sample_loops", action="store_false")
@@ -568,6 +572,27 @@ def main() -> None:
                 f"reports as initialised.")
     elif args.init_from and resume is None:
         raise SystemExit(f"--init-from {args.init_from} does not exist")
+    elif not args.from_scratch:
+        # NO RESUME AND NO PRETRAINED WEIGHTS. Stage 5 is the last step of a
+        # curriculum and this is the one configuration it must never take
+        # silently: this file's own §12.1 note records that stage 5 from random
+        # weights is what produced r = 0.049 on unseen folds.
+        #
+        # It is not hypothetical. The cron runner sets
+        #   PRETRAIN=.../pretrain_small.pt ; [ -f "$PRETRAIN" ] && INIT=...
+        # and stage 1 at --size shared400 writes pretrain_shared400.pt, so the
+        # test fails, INIT stays empty, and stage 5 starts from noise with no
+        # error at all -- discarding every token of pretraining while looking
+        # like it worked.
+        cand = sorted(CKPT.glob("pretrain_*.pt"),
+                      key=lambda f: f.stat().st_mtime, reverse=True)
+        cand = [c for c in cand if "superseded" not in c.name]
+        hint = (f"\n  the newest pretraining checkpoint is {cand[0]}"
+                if cand else "\n  no pretrain_*.pt checkpoint exists yet")
+        raise SystemExit(
+            "stage 5 has no weights to fine-tune: no resumable checkpoint and "
+            "no --init-from." + hint + "\n  pass --init-from <that file>, or "
+            "--from-scratch if training from noise is genuinely intended.")
     pc = model.param_counts()
     print(f"[pharos] {args.size}: {pc['total']:,} total, {pc['active']:,} active")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01,
