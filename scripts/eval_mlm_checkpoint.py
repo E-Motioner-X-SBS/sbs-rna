@@ -189,9 +189,24 @@ def score(model, pm, seqs, device, budget: int, n_loops: int, seed: int):
 
 
 
-#: Heads added to the model after a run started are legitimately absent from
-#: that run's checkpoints. Nothing else is.
-_MAY_BE_MISSING = ("heads.pair.geometry.", "heads.residue.motif.")
+#: Tensors legitimately absent from a checkpoint written before they existed.
+#:
+#: Two kinds, and both have to be named explicitly rather than waved through by
+#: a blanket rule, because the whole point of the check is that a MISSING TRUNK
+#: WEIGHT must stop the evaluation:
+#:
+#:  - heads added after a run started, which the MLM path does not touch;
+#:  - running-statistic BUFFERS that are defined to start uninitialised. The
+#:    motif bank's query mean is one: it is guarded by `query_mean_n == 0`, so
+#:    an absent buffer means "no estimate yet", which is exactly its value at
+#:    the start of any run.
+#:
+#: This list is the maintenance cost of the check and it is worth paying. It
+#: caught its own author: adding `query_mean`/`query_mean_n` to the bank made
+#: the evaluator refuse every checkpoint from step 8,250 on, and the held-out
+#: curve stopped until the two names were added here.
+_MAY_BE_MISSING = ("heads.pair.geometry.", "heads.residue.motif.",
+                   "motifs.query_mean")
 
 
 def _check_load(model, sd, ck) -> None:
