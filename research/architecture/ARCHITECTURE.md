@@ -201,6 +201,24 @@ coupling of zero" enter the model identically, and neither can look like
 evidence *against* a contact. The 12% of the corpus with no Rfam family takes
 that path on every pair.
 
+**And "absent reads as zero" is exactly why the reach has to be measured.**
+Three separate layers on this path degrade to *adds nothing* without raising:
+`_coevolution_for` wraps the whole lookup in a bare `except Exception: return
+None`, the `searchsorted` fills its misses with zeros, and `coev_proj` starts
+at zero. A missing cache, a renamed Rfam family or a typo inside that try block
+therefore produce precisely the arithmetic of a working feature that happens to
+contribute nothing, and the contact loss falls either way. Nothing printed a
+number, so §4A's claim that the pair track reads couplings rested on code that
+could not have said otherwise.
+
+Measured on the built corpus (`data/samples/analysis/coevolution_reach.json`,
+16 batches, 927,401 sampled pairs, train split): **3.461% of the pairs the
+contact head scores carry a non-zero coupling**, with 88% of sampled chains
+carrying an Rfam family and no batch at zero. The trainer now refuses to start
+if that rate is zero, and logs `coev_frac` and `coev_norm` — the latter being
+the projection's weight norm, so *whether the feature ever left zero* is
+observable rather than assumed.
+
 ## 5. Token trunk
 
 ### 5.1 Hybrid attention, period 8

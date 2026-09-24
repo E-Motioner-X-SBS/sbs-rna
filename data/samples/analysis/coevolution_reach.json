@@ -1,0 +1,10 @@
+{
+ "n_batches": 16,
+ "n_chains_per_batch": 12,
+ "pairs": 927401,
+ "coupled": 32100,
+ "hit_frac": 0.03461285894666924,
+ "corpus": "data/derived/pharos3d",
+ "split": "train",
+ "seed": 0
+}

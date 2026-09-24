@@ -377,6 +377,27 @@ def main() -> int:
         else:
             chk("R2 router audit run (scripts/audit_router.py)", 0, 1)
 
+        # ---- R3: coevolution actually reaches the contact head -------------
+        #
+        # §4A says the pair track reads coevolutionary couplings. The path from
+        # that sentence to the arithmetic runs through a bare
+        # `except Exception: return None`, a `searchsorted` whose misses are
+        # filled with zeros, and a zero-initialised `coev_proj`. All three
+        # degrade to "adds nothing" without raising, so a working feature and a
+        # totally absent one produce identical logs. Measured, so a drift to
+        # zero is visible.
+        cr = ROOT / "data/samples/analysis/coevolution_reach.json"
+        if cr.exists():
+            cj = _rjson.loads(cr.read_text())
+            chk("R3 sampled pairs measured", cj["pairs"], 927401)
+            chk("R3 pairs carrying a coupling", cj["coupled"], 32100)
+            chk("R3 coevolution reach", round(cj["hit_frac"], 5), 0.03461,
+                abs_tol=0.00002)
+            chk("R3 coevolution is not silently absent",
+                int(cj["hit_frac"] > 0.005), 1)
+        else:
+            chk("R3 coevolution reach measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

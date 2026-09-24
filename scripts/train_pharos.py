@@ -192,6 +192,57 @@ def assert_structure_supervision(ds, weight: float, n: int = 64) -> None:
           f"sampled chains carry backbone coordinates", flush=True)
 
 
+def assert_coevolution_reaches_the_model(tr, n_batches: int = 4,
+                                         n_chains: int = 12) -> None:
+    """Refuse to claim coevolution is an input when no pair ever receives one.
+
+    Same shape as `assert_structure_supervision`, for the feature with the
+    quietest failure of any in the model. §4A says the pair track reads
+    coevolutionary couplings; the path from that claim to the arithmetic runs
+    through a bare `except Exception: return None`, a `searchsorted` whose
+    misses are filled with zeros, and a zero-initialised projection. Every one
+    of those degrades to "adds nothing" without raising, so the only difference
+    between a working coevolution feature and a completely absent one is a
+    number nobody was printing.
+
+    Checked once at startup on real batches, and reported even when it passes,
+    because a rate that drifts from 3.5% to 0.3% is the same failure arriving
+    slowly.
+    """
+    rng = np.random.default_rng(0)
+    tot = hit = 0
+    for _ in range(n_batches):
+        idxs = rng.choice(len(tr), min(n_chains, len(tr)), replace=False).tolist()
+        t = to_device(tr.collate(idxs), torch.device("cpu"))
+        B, L = t["tokens"].shape
+        I, J, Bi = [], [], []
+        for b in range(B):
+            ii, jj, _ = sample_pairs(t["contacts"][b], int(t["lengths"][b]), 8,
+                                     torch.device("cpu"))
+            if ii is None or len(ii) == 0:
+                continue
+            I.append(ii)
+            J.append(jj)
+            Bi.append(torch.full((len(ii),), b, dtype=torch.long))
+        if not I:
+            continue
+        cv = lookup_coevolution(t, torch.cat(Bi), torch.cat(I), torch.cat(J), L)
+        tot += int(len(torch.cat(I)))
+        if cv is not None:
+            hit += int((cv != 0).sum())
+    frac = hit / max(tot, 1)
+    if hit == 0:
+        raise SystemExit(
+            f"[pharos] coevolution reaches NO sampled pair in {n_batches} "
+            f"batches ({tot:,} pairs). Either the cache under "
+            f"data/derived/coevolution is missing, the chains carry no Rfam "
+            f"family, or `_coevolution_for` is swallowing an exception. "
+            f"`coev_proj` is zero-initialised, so this trains silently and "
+            f"looks identical to a working feature.")
+    print(f"[pharos] coevolution: {hit:,} of {tot:,} sampled pairs carry a "
+          f"coupling ({100 * frac:.2f}%; 3.54% on the built corpus)", flush=True)
+
+
 def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
                        jj: torch.Tensor, L: int) -> Optional[torch.Tensor]:
     """The coupling score at each sampled pair, 0 where there is none.
@@ -387,8 +438,22 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 parts["n_lw"] = int(hit.sum())
 
         cv = lookup_coevolution(t, bidx, ii, jj, L)
+        # How often the lookup actually HITS, and whether the projection has
+        # left zero. Neither was reported, and both have to be, because the
+        # feature's failure mode is silence: `lookup_coevolution` returns zeros
+        # where it finds nothing, `_coevolution_for` swallows every exception
+        # and returns None, and `coev_proj` is zero-initialised -- so a broken
+        # cache, a renamed Rfam family or a typo inside that try block all
+        # produce exactly the same arithmetic as a working feature contributing
+        # nothing, and the contact loss falls either way. Measured on the built
+        # corpus the hit rate is 3.54% of sampled pairs; a run reading 0.00%
+        # has lost coevolution entirely and nothing else would say so.
         if cv is not None:
+            parts["coev_frac"] = float((cv != 0).float().mean().detach())
+            parts["coev_norm"] = float(model.coev_proj.weight.detach().norm())
             pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))
+        else:
+            parts["coev_frac"] = 0.0
         if model.motifs is not None:
             r, _ = model.motifs(pair)
             pair = pair + model.motif_mix(r)
@@ -649,6 +714,7 @@ def main() -> None:
         d.prewarm()
     print(f"[pharos] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
     assert_structure_supervision(tr, args.structure_weight)
+    assert_coevolution_reaches_the_model(tr)
 
     model = Pharos(cfg).to(device)
     # §12.1 is a CURRICULUM: stage 5 is meant to fine-tune the representation
