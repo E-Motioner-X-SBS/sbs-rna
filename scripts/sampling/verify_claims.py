@@ -508,6 +508,21 @@ def main() -> int:
         else:
             chk("R7 loop-depth sweep measured", 0, 1)
 
+        # ---- R8: how much of the 24-dim chemistry is live in stage 1 -------
+        cl = ROOT / "data/samples/analysis/chemistry_liveness.json"
+        if cl.exists():
+            cj = _rjson.loads(cl.read_text())
+            chk("R8 constant chemistry dims", cj["n_constant"], 7)
+            chk("R8 live chemistry dims", len(cj["live_dims"]), 17)
+            chk("R8 dim 13 (pKa shift) is among them",
+                int("13" in cj["constant_dims"]), 1)
+            chk("R8 standardised effective rank of the live block",
+                cj["standardised_effective_rank"], 3.28, abs_tol=0.02)
+            chk("R8 six dims carry 99% of the variance",
+                cj["dims_for_99pct_variance"], 6)
+        else:
+            chk("R8 chemistry liveness measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

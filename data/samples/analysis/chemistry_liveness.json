@@ -1,0 +1,37 @@
+{
+ "corpus": "stage 1 (elDORS + MARS, sequence only)",
+ "n_residues": 281149,
+ "n_dims": 24,
+ "constant_dims": {
+  "6": "wcD, 1.0 for all four standard bases",
+  "9": "hgA, 1.0 for all four",
+  "11": "sgA, 1.0 for all four",
+  "13": "pKa shift -- shifted_pka is never passed True by any production path",
+  "19": "2'OH, 1.0 for all RNA; cleared only for deoxy residues",
+  "20": "methylation class -- needs CCD-resolved modifications",
+  "21": "pseudouridine class -- same"
+ },
+ "n_constant": 7,
+ "live_dims": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  7,
+  8,
+  10,
+  12,
+  14,
+  15,
+  16,
+  17,
+  18,
+  22,
+  23
+ ],
+ "standardised_effective_rank": 3.28,
+ "dims_for_99pct_variance": 6,
+ "note": "not all a defect: 6/9/11/19 are constant BY CONSTRUCTION for standard RNA and would vary on modified or DNA residues, which a sequence-only corpus has none of. 20/21 are the same. Dim 13 is different -- it is a designed feature nothing wires, and test_chemistry.py:68 asserts it works by calling it directly."
+}
