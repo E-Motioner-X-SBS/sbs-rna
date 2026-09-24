@@ -189,6 +189,14 @@ def main() -> int:
                          "rather than isolated readings; the training loss "
                          "cannot provide one because it moves with the shard")
     ap.add_argument("--no-csv", action="store_true")
+    ap.add_argument("--complementarity", action="store_true", default=True,
+                    help="also measure whether a VISIBLE Watson-Crick partner "
+                         "improves the prediction. Accuracy can rise from "
+                         "base composition or from copying; this cannot -- the "
+                         "two conditions differ only in whether the partner is "
+                         "readable, so the gap is pairing being used.")
+    ap.add_argument("--no-complementarity", dest="complementarity",
+                    action="store_false")
     args = ap.parse_args()
 
     pm = _trainer()
@@ -211,8 +219,27 @@ def main() -> int:
         model.load_state_dict(sd, strict=False)
         r = score(model, pm, seqs, device, args.token_budget, args.n_loops,
                   args.seed)
+        r["comp_gap"] = float("nan")
+        if args.complementarity:
+            try:
+                from probe_rna_understanding import complementarity, real_base_pairs
+                pd = real_base_pairs(limit_chains=12, max_len=300)
+                if pd:
+                    cr = complementarity(model, pm, pd, device, args.n_loops)
+                    vh, vt = cr["partner_visible"]
+                    mh, mt = cr["partner_masked"]
+                    r["comp_visible"] = vh / max(vt, 1)
+                    r["comp_masked"] = mh / max(mt, 1)
+                    r["comp_gap"] = r["comp_visible"] - r["comp_masked"]
+                    r["comp_n"] = vt
+            except Exception as e:                           # noqa: BLE001
+                print(f"  (complementarity unavailable: {e})")
         print(f"  {ck.name:38s} {st.get('step','?'):>7} {r['bits']:7.4f} "
-              f"{r['perplexity']:7.4f} {r['accuracy']:7.4f}")
+              f"{r['perplexity']:7.4f} {r['accuracy']:7.4f}"
+              + (f"   WC-gap {r['comp_gap']:+.4f} "
+                 f"({r.get('comp_visible',0):.3f} vs {r.get('comp_masked',0):.3f} "
+                 f"on {r.get('comp_n',0)} pairs)"
+                 if r["comp_gap"] == r["comp_gap"] else ""))
         if not args.no_csv:
             import csv as _csv
             import datetime as _dt
@@ -223,7 +250,8 @@ def main() -> int:
                 if new:
                     w.writerow(["timestamp", "checkpoint", "step", "tokens",
                                 "bits", "perplexity", "accuracy", "n_masked",
-                                "n_seq", "seed", "min_len", "max_len"])
+                                "n_seq", "seed", "min_len", "max_len",
+                                "wc_gap", "wc_visible", "wc_masked", "wc_n"])
                 w.writerow([_dt.datetime.now().isoformat(timespec="seconds"),
                             ck.name, st.get("step", ""), st.get("tokens", ""),
                             round(r["bits"], 5), round(r["perplexity"], 5),
