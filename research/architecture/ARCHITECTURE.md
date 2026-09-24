@@ -116,8 +116,16 @@ Alignments come from `Rfam.seed`, not `Rfam.full`. The full-region set is
 deeper but is missing RF00005 (tRNA), RF00177, RF02541 and RF02543 (rRNA) —
 between them **84.4% of the structural residues in this corpus**.
 
-**Cached per family, not per chain.** 14,593 of the corpus's 16,604 chains
-carry an Rfam family, drawn from only **361 distinct families**; coevolution is
+**Assigned per chain, not per entry.** The corpus originally keyed its Rfam
+metadata by PDB id alone, so every chain in a deposition inherited one family
+— a 76-nucleotide tRNA bound to a ribosome was labelled `SSU_rRNA_bacteria`
+along with the 1,500-nucleotide subunit. Chain length settles it: chains we
+called `SSU_rRNA_bacteria` had a median length of 122. Families now come from
+RNA3DB's Infernal `cmscan`, per chain, which disagreed with the entry-level
+assignment on **59.1%** of the 13,496 chains both cover.
+
+**Cached per family, not per chain.** The corpus's chains draw on only a few
+hundred distinct families; coevolution is
 a property of the alignment, so computing it per chain would do the same work
 forty times over. The cache stores the strongly-coupled pairs rather than the
 dense matrix — for a 1,980-column rRNA that is 8k pairs against 3.9M
@@ -127,21 +135,51 @@ in a gap is dropped.
 
 ### 4A.1 What it is worth, measured
 
-Scored against the **deposited contact sets** of real tRNA chains:
+Scored against the **deposited contact sets** of real chains, per family, with
+a random-pair baseline at the same sequence-separation cutoff. The baseline is
+part of every row because a bare precision figure means nothing on its own:
+contact density falls with length, so 15% on a 120-mer and 15% on a 2,900-mer
+are not comparable claims.
 
-| | fraction that are real contacts |
-|---|---|
-| coevolution couplings | **45.5%** (708 of 1,555) |
-| random pairs, same separation cutoff | 9.4% |
+| family | Neff/L | coupling precision | random | enrichment |
+|---|---|---|---|---|
+| tRNA | 2.084 | **44.9%** | 8.9% | 5.0× |
+| 5_8S_rRNA | 0.080 | 9.2% | 2.6% | 3.5× |
+| 5S_rRNA | 0.053 | 15.6% | 6.3% | 2.5× |
+| SSU_rRNA_bacteria | 0.015 | 18.6% | 0.6% | 30.9× |
+| LSU_rRNA_bacteria | 0.002 | 52.6% | 0.5% | 104.9× |
 
-**4.8× enrichment, from sequence alone, with no structural input.** The random
-baseline is part of the test because a bare precision figure means nothing on
-short chains, where contact density is high and any pair looks good.
+Read the precision column, not the enrichment column: the rRNA ratios are large
+mostly because the random baseline on a long chain is near zero.
 
-The same couplings reconstruct the tRNA cloverleaf. Of the top 24, seven sit at
-i+j=115, five at 87, three at 42 and three at 136 — four antiparallel helices,
-which is the acceptor stem, the anticodon stem, the D-arm and the T-arm. The
-entire secondary structure, recovered from covariation.
+The tRNA couplings reconstruct the cloverleaf outright. Of the top 24, seven sit
+at i+j=115, five at 87, three at 42 and three at 136 — four antiparallel
+helices, which is the acceptor stem, the anticodon stem, the D-arm and the
+T-arm. The entire secondary structure, from covariation alone.
+
+**Two limits that travel with these numbers.**
+
+*Alignment depth.* Rfam **seed** alignments are shallow — SSU_rRNA_bacteria is
+99 rows, LSU_rRNA_bacteria 102 — and after Henikoff weighting the effective
+counts are 29.5 and 10.9. Only tRNA clears Neff/L ≥ 1. Eleven effective
+sequences cannot support pairwise statistics over 5,241 columns, so LSU scoring
+52.6% is a **surprise to be explained, not a result to lean on**. The likely
+explanation is that Rfam seeds are themselves structure-curated, so the
+covariation that survives at low depth is the curated pairing — which means it
+should not be assumed to generalise to a family whose alignment was built
+without structure. Deeper alignments, searched out of the 1.3-billion-sequence
+corpus with the Rfam covariance models, are the way to remove this caveat
+rather than argue around it.
+
+*What the earlier version of this section claimed.* It reported 45.5% on tRNA
+and nothing else, because `map_to_query` selected a seed row by walking two
+ungapped strings position by position. One indel decorrelates everything after
+it, so real 1,500-nucleotide SSU chains scored 0.36–0.46 against **their own
+family** and were rejected — SSU and LSU, 3,450 chains and the two largest
+families in the corpus, silently received no coevolution while the coverage
+figure counted them. The function fails closed, so this looked like success.
+Selection is now by k-mer overlap and the query is genuinely aligned to the
+chosen row before its positions are carried into alignment columns.
 
 ### 4A.2 How it enters the model
 
