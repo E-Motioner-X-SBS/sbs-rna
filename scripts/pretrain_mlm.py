@@ -102,9 +102,55 @@ def enable_gpu_fast_paths() -> None:
     _t.set_float32_matmul_precision("high")
 
 
+#: Shards reserved for evaluation and NEVER trained on.
+#:
+#: The held-out sample used to be drawn from the same stream the trainer reads,
+#: by taking the first 512 sequences of a shuffled shard ordering. Nothing
+#: excluded them from training, so the model trained on its own evaluation set
+#: and the number went to pieces in the most flattering direction: between
+#: steps 4750 and 5000 the in-loop "held-out" improved 1.4298 -> 0.9090 bits
+#: and 0.5767 -> 0.7491 accuracy, while a genuinely separate sample moved
+#: 1.8146 -> 1.8047 and 0.3997 -> 0.4064. A 0.9-bit gap, widening, entirely
+#: memorisation.
+#:
+#: The fix is exclusion at the source: the last `N_HELDOUT_SHARDS` shards in
+#: sorted order are removed from the training stream and are the ONLY place the
+#: evaluation sample is drawn from. Sorted, not shuffled, so the split is the
+#: same on every run and across restarts -- a held-out set that depends on a
+#: seed is one a resumed run can silently train on.
+N_HELDOUT_SHARDS = 2
+
+
+def _corpus_files(corpus) -> List[Path]:
+    """Every parquet shard under `corpus`, which may be dirs OR files.
+
+    Accepting files matters: `heldout_files` returns shards, and passing those
+    straight back in is how the evaluation pool is built. Globbing a file for
+    `*.parquet` returns nothing, so the first version of this silently produced
+    an EMPTY held-out set -- an evaluation that reports on zero sequences and
+    raises nothing.
+    """
+    items = [corpus] if isinstance(corpus, (str, Path)) else list(corpus)
+    out: List[Path] = []
+    for it in items:
+        q = Path(it)
+        if q.is_dir():
+            out.extend(q.glob("*.parquet"))
+        elif q.suffix == ".parquet":
+            out.append(q)
+    return sorted(out)
+
+
+def heldout_files(corpus) -> List[Path]:
+    """The shards reserved for evaluation. Never read by training."""
+    files = _corpus_files(corpus)
+    return files[-N_HELDOUT_SHARDS:] if len(files) > N_HELDOUT_SHARDS else []
+
+
 def iter_sequences(corpus, min_len: int, max_len: int,
                    shards: Optional[int] = None,
-                   rng: Optional[np.random.Generator] = None) -> Iterator[str]:
+                   rng: Optional[np.random.Generator] = None,
+                   include_heldout: bool = False) -> Iterator[str]:
     """Sequences from the parquet corpus, optionally with the SHARD ORDER shuffled.
 
     elDORS is sorted by length -- chunk 001 averages 1,252 nt and chunk 020
@@ -123,7 +169,10 @@ def iter_sequences(corpus, min_len: int, max_len: int,
     # directory rather than beside elDORS so the two stay separable -- turning
     # MARS off is not passing it, and a shard's provenance is its path.
     dirs = [corpus] if isinstance(corpus, (str, Path)) else list(corpus)
-    files = sorted(f for d in dirs for f in Path(d).glob("*.parquet"))
+    files = _corpus_files(corpus)
+    if not include_heldout:
+        reserved = set(heldout_files(corpus))
+        files = [f for f in files if f not in reserved]
     if shards:
         files = files[:shards]
     elif rng is not None:
@@ -696,14 +745,26 @@ def main() -> None:
         # and materialising it to draw 512 would exhaust the machine before
         # step 0. The shard order is shuffled by the seeded rng, so taking a
         # prefix still samples across the corpus rather than one chunk.
-        _hs = list(itertools.islice(
-            iter_sequences(corpora, args.min_len, args.max_len, shards=None,
-                           rng=np.random.default_rng(args.heldout_seed)),
-            args.heldout_seq))
+        # Drawn ONLY from the reserved shards, which `iter_sequences` removes
+        # from the training stream. Sampled across the whole reserved set
+        # rather than as a prefix, so it is not one contiguous region of one
+        # shard.
+        _pool = list(itertools.islice(
+            iter_sequences(heldout_files(corpora), args.min_len, args.max_len,
+                           shards=None, include_heldout=True),
+            args.heldout_seq * 20))
+        if len(_pool) > args.heldout_seq:
+            _pick = np.random.default_rng(args.heldout_seed).choice(
+                len(_pool), args.heldout_seq, replace=False)
+            _hs = [_pool[int(i)] for i in _pick]
+        else:
+            _hs = _pool
         _groups = _pack_pool(_hs, args.token_budget // 4, args.max_batch,
                              np.random.default_rng(args.heldout_seed))
         print(f"[mlm] held-out sample: {len(_hs):,} sequences in "
-              f"{len(_groups)} fixed batches", flush=True)
+              f"{len(_groups)} fixed batches, drawn from "
+              f"{len(heldout_files(corpora))} RESERVED shards that training "
+              f"never reads", flush=True)
 
         def heldout(mdl, _g=_groups, _bc=batch_chem):
             was = mdl.training
