@@ -1,0 +1,1 @@
+run_id,stage,kind,timestamp,elapsed_s,epoch,step,tokens,padded_tokens,ce_nats,bits_per_token,balance,total_loss,lr,masked_accuracy,tok_per_s,padded_per_s,mfu,pad_frac,token_budget,n_oom,peak_gib,note,perplexity

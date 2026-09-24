@@ -106,3 +106,35 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 - **Coevolution, for real: APC-MI that rebuilds the tRNA cloverleaf untrained** (`5ccb32a`)
 - claims_ok: 334 → **336**
 - tokens: 1025441062 → **1064647612**
+
+## 2026-09-24 00:34 IST
+
+- **Head 3 becomes a diffusion decoder; the coordinate MLP could not have worked** (`1664057`)
+- claims_ok: 336 → **321**
+- tokens: 1064647612 → **1103566302**
+
+## 2026-09-24 01:34 IST
+
+- claims_ok: 321 → **336**
+
+## 2026-09-24 02:34 IST
+
+- **512 experts sharing one network: 61M active parameters becomes 302M** (`bdc8bcc`)
+- claims_ok: 336 → **321**
+
+## 2026-09-24 03:34 IST
+
+- claims_ok: 321 → **336**
+
+## 2026-09-24 04:34 IST
+
+- **The blind-test field, and three fixes the trainer needed to run shared400** (`2b5ef1c`)
+
+## 2026-09-24 05:04 IST
+
+- **The spec describes what is actually running: shared400, diffusion, coevolution** (`81af0ed`)
+- claims_ok: 336 → **337**
+
+## 2026-09-24 06:04 IST
+
+- **A verification timeout was an uncaught exception that would block training** (`0a71379`)
