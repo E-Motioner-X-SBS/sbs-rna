@@ -455,7 +455,15 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         else:
             parts["coev_frac"] = 0.0
         if model.motifs is not None:
-            r, _ = model.motifs(pair)
+            r, minfo = model.motifs(pair)
+            # `r, _ = ...` is what this used to be. The bank computes its own
+            # gate and confidence every call and the only caller that trains it
+            # threw them away, so a bank that returned the same motif for every
+            # pair -- a bias term wearing 667 descriptors -- would have looked
+            # exactly like a working one.
+            parts["motif_eff"] = float(minfo["effective_motifs"])
+            parts["motif_top_share"] = float(minfo["top_motif_share"])
+            parts["motif_gate"] = float(minfo["gate_mean"])
             pair = pair + model.motif_mix(r)
         logit = model.heads.pair.contact(pair).squeeze(-1)
         per = F.binary_cross_entropy_with_logits(logit, y, reduction="none")

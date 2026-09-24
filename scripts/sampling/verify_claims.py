@@ -398,6 +398,32 @@ def main() -> int:
         else:
             chk("R3 coevolution reach measured", 0, 1)
 
+        # ---- R4: the motif bank retrieves more than one motif --------------
+        #
+        # `self.query` is bias-free, so it cannot subtract a shared offset from
+        # its input: for x = xbar + delta, W x = W xbar + W delta and W xbar is
+        # identical for every query. On real pair features the shared component
+        # is LARGER than the per-pair variation (norm 5.66 against 4.53), so
+        # retrieval collapsed onto a handful of keys -- and the two statistics
+        # the bank computes for exactly this were discarded by the only caller
+        # that trains it (`r, _ = model.motifs(pair)`).
+        mb = ROOT / "data/samples/analysis/motif_bank_retrieval.json"
+        if mb.exists():
+            mj = _rjson.loads(mb.read_text())
+            chk("R4 the shared component exceeds the per-pair variation",
+                int(mj["shared_component_norm"] > mj["per_pair_deviation"]), 1)
+            chk("R4 effective motifs WITHOUT centring",
+                round(mj["centre_off"]["effective_motifs"], 2), 2.98, abs_tol=0.02)
+            chk("R4 effective motifs WITH centring",
+                round(mj["centre_on"]["effective_motifs"], 2), 22.13, abs_tol=0.02)
+            chk("R4 top motif share falls from half the queries",
+                round(mj["centre_off"]["top_motif_share"], 4), 0.5194, abs_tol=0.0002)
+            chk("R4 centring is what makes the bank a bank, not a bias term",
+                int(mj["centre_on"]["effective_motifs"]
+                    > 5 * mj["centre_off"]["effective_motifs"]), 1)
+        else:
+            chk("R4 motif retrieval measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

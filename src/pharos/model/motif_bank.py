@@ -57,6 +57,12 @@ class MotifBankConfig:
     #: `reliability` buffer
     min_instances_full_trust: int = 5
     dropout: float = 0.0
+    #: Subtract a running mean from the query before retrieval. Measured on
+    #: real pair features at step 8,000: without it one motif takes 51.9% of
+    #: all queries and the bank has 3.0 effective motifs out of 667; with it,
+    #: 22.2. See `forward`.
+    centre_query: bool = True
+    centre_momentum: float = 0.01
 
 
 class MotifBank(nn.Module):
@@ -88,6 +94,25 @@ class MotifBank(nn.Module):
         self.query = nn.Linear(cfg.d_query, cfg.d_key, bias=False)
         self.gate = nn.Linear(cfg.d_query, 1)
         self.log_temp = nn.Parameter(torch.zeros(1))
+        # Running mean of the query input, subtracted before projection.
+        #
+        # `self.query` has no bias, so it CANNOT remove a shared offset: for
+        # `x = xbar + delta`, `W x = W xbar + W delta` and `W xbar` is the same
+        # vector for every query in the batch. Measured on real pair features
+        # from the step-8,000 trunk, that shared component has norm 5.67
+        # against a per-pair deviation of 4.53 -- it is larger than the signal
+        # -- and the dot-product retrieval is dominated by it: 39 distinct
+        # motifs of 667 reach top-1, one of them takes 51.9% of the queries,
+        # and the effective count is 3.0. Centring the query on the same
+        # features gives 120 distinct, a 13.1% top share and 22.2 effective.
+        #
+        # A running mean rather than the batch mean, because the batch mean is
+        # undefined at batch 1 and would make a single-chain prediction differ
+        # from the same chain inside a batch. A LayerNorm does NOT work here
+        # and was tried: it removes each row's own mean, not the direction
+        # shared across rows, and leaves the collapse at 37 distinct / 51.4%.
+        self.register_buffer("query_mean", torch.zeros(cfg.d_query))
+        self.register_buffer("query_mean_n", torch.zeros(()))
         self.drop = nn.Dropout(cfg.dropout)
         self.out_norm = nn.LayerNorm(cfg.d_value)
         # start closed: retrieval must earn its way in, so an untrained bank
@@ -105,7 +130,20 @@ class MotifBank(nn.Module):
         `pair_query` is `(N, d_query)` built from the pair track's estimated
         pairing -- never from sequence, see the module docstring.
         """
-        q = self.query(pair_query)                              # N, dk
+        x = pair_query
+        if self.cfg.centre_query:
+            if self.training and x.shape[0] > 1:
+                with torch.no_grad():
+                    bm = x.detach().mean(0)
+                    if float(self.query_mean_n) == 0.0:
+                        self.query_mean.copy_(bm)
+                    else:
+                        self.query_mean.mul_(1 - self.cfg.centre_momentum).add_(
+                            bm, alpha=self.cfg.centre_momentum)
+                    self.query_mean_n.add_(1)
+            if float(self.query_mean_n) > 0.0:
+                x = x - self.query_mean
+        q = self.query(x)                                       # N, dk
         k = self.key(self.descriptor)                           # M, dk
         v = self.value(self.descriptor)                         # M, dv
         logits = (q @ k.T) / (k.shape[-1] ** 0.5) * torch.exp(self.log_temp)
@@ -119,8 +157,25 @@ class MotifBank(nn.Module):
         retrieved = (w.unsqueeze(-1) * v[topi]).sum(1)          # N, dv
         gate = torch.sigmoid(self.gate(pair_query))
         out = self.out_norm(self.drop(retrieved)) * gate
+        # Retrieval DIVERSITY, which nothing reported.
+        #
+        # `gate_mean` and `top_weight` were already computed here and the one
+        # caller that matters -- `step_losses` -- discarded them with
+        # `r, _ = model.motifs(pair)`. Neither would have caught the failure
+        # that matters anyway: a bank that always returns the same motif adds a
+        # constant vector to every pair, which is a bias term wearing 667
+        # descriptors. `effective_motifs` is the participation ratio of the
+        # top-1 distribution over the batch, so 1.0 is total collapse and M is
+        # perfectly spread, and it is the number to watch.
+        with torch.no_grad():
+            t1 = topi[:, 0]
+            cnt = torch.bincount(t1, minlength=logits.shape[-1]).float()
+            pr = cnt / cnt.sum().clamp(min=1)
         info: Dict = {"gate_mean": gate.detach().mean(),
-                      "top_weight": w[:, 0].detach().mean()}
+                      "top_weight": w[:, 0].detach().mean(),
+                      "distinct_motifs": (cnt > 0).sum(),
+                      "top_motif_share": pr.max(),
+                      "effective_motifs": 1.0 / (pr ** 2).sum().clamp(min=1e-9)}
         if return_index:
             info["top_index"] = topi.detach()
             info["motif_ids"] = [self.meta["motifs"][int(i)]["motif_id"]

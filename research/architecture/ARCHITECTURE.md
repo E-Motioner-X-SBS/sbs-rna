@@ -448,6 +448,40 @@ else. On chains ≥1,500 nt the cascade delivers **0.902**.
 vocabulary of tertiary motifs across unrelated families; a bank makes that
 reuse available without relearning it per family.
 
+### 8.1 It was retrieving three of them
+
+The query projection is `nn.Linear(d_query, d_key, bias=False)`, and a bias-free
+projection **cannot remove a shared offset from its input**: for
+`x = x̄ + δ`, `Wx = Wx̄ + Wδ`, and `Wx̄` is the same vector for every query in the
+batch. Measured on real pair features from the step-8,000 trunk, that shared
+component is *larger than the signal* — norm **5.66** against a per-pair
+deviation of **4.53** — so the dot-product retrieval was dominated by it.
+
+| over 1,775 real sampled pairs | as shipped | query centred |
+|---|---|---|
+| distinct motifs reaching top-1 | 39 of 667 | **117** |
+| share taken by the single most-retrieved motif | **51.9%** | 13.1% |
+| effective motifs, `1/Σp²` | **2.98** | **22.13** |
+
+A bank that returns the same descriptor for every pair is a bias term wearing
+667 costumes. The two statistics that would have shown this — `gate_mean` and
+`top_weight` — were already computed inside `forward`, and the one caller that
+trains the bank discarded them (`r, _ = model.motifs(pair)`), so nothing could
+have reported it.
+
+The fix is a **running mean of the query input**, subtracted before projection
+and updated only in training, BatchNorm-style. Not the batch mean, which is
+undefined at batch 1 and would make a single-chain prediction differ from the
+same chain inside a batch. **A LayerNorm does not work and was tried**: it
+removes each row's own mean, not the direction shared across rows, and leaves
+the collapse at 37 distinct and 51.4%.
+
+`forward` now also returns `distinct_motifs`, `top_motif_share` and
+`effective_motifs`, and `step_losses` logs the last two. Caveat that travels
+with these numbers: the bank and `pair_proj` are **untrained** — stage 5 has
+never run — so this is the state stage 5 would have started from, not a trained
+result.
+
 ## 9. Heads
 
 1. contact map · **2. distance distribution (distogram)** · **3. backbone

@@ -1,0 +1,23 @@
+{
+ "checkpoint": "step8000.pt",
+ "step": 8000,
+ "n_pairs": 1775,
+ "n_motifs": 667,
+ "top_k": 4,
+ "shared_component_norm": 5.663873672485352,
+ "per_pair_deviation": 4.529933929443359,
+ "centre_off": {
+  "distinct_motifs": 39.0,
+  "top_motif_share": 0.5194365978240967,
+  "effective_motifs": 2.9828262329101562,
+  "gate_mean": 0.03743044659495354,
+  "top_weight": 0.26068443059921265
+ },
+ "centre_on": {
+  "distinct_motifs": 117.0,
+  "top_motif_share": 0.13126760721206665,
+  "effective_motifs": 22.13465690612793,
+  "gate_mean": 0.03743044659495354,
+  "top_weight": 0.25486433506011963
+ }
+}

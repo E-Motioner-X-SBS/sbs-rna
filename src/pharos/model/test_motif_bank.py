@@ -106,10 +106,27 @@ def main() -> int:
         f"mean |out| {float(out.abs().mean()):.3f}")
 
     print("\n== property 6: retrieval behaves ==")
+    # `.eval()`, which this never called. `nn.Module` starts in training mode,
+    # so a check named "deterministic in eval" was running the training path
+    # and only passed because nothing in the bank had training-mode state yet.
+    # The query-centring running mean does, and it caught this immediately.
+    bank.eval()
     with torch.no_grad():
         o1, i1 = bank(q, return_index=True)
         o2, i2 = bank(q, return_index=True)
     chk("deterministic in eval", bool(torch.equal(o1, o2)), "")
+    # and the running mean is a training-mode quantity, frozen in eval
+    before = bank.query_mean.clone()
+    with torch.no_grad():
+        bank(torch.randn(32, bank.cfg.d_query))
+    chk("eval does not move the query mean",
+        bool(torch.equal(before, bank.query_mean)), "")
+    bank.train()
+    with torch.no_grad():
+        bank(torch.randn(32, bank.cfg.d_query) + 5.0)
+    chk("training does move it", not bool(torch.equal(before, bank.query_mean)),
+        f"|delta| {float((bank.query_mean - before).norm()):.4f}")
+    bank.eval()
     chk("top-k is k", i1["top_index"].shape[1] == bank.cfg.top_k,
         str(tuple(i1["top_index"].shape)))
     chk("indices are in range",
