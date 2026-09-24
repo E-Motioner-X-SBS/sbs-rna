@@ -83,6 +83,29 @@ def main() -> int:
     chk("50 identical rows weigh less each than the singleton",
         w[0] < w[-1], f"{w[0]:.4f} vs {w[-1]:.4f}")
 
+    print("\n== mapping survives long chains with indels, not just tRNA ==")
+    # map_to_query used to score seed rows by walking two ungapped strings
+    # position by position, which decorrelates after the first indel. tRNA is
+    # 76 nt with almost none, so it passed; real 1,500-nt SSU rRNA chains
+    # scored 0.36-0.46 against their OWN family and were rejected, silently
+    # removing the two largest families in the corpus from coevolution. This
+    # asserts a long chain with an internal indel still maps.
+    rows_ = M.alignment_for("tRNA")
+    if rows_:
+        base = M._ungapped(rows_[0])
+        # delete an internal block: positional identity collapses after it,
+        # a real alignment does not
+        mutated = base[:20] + base[26:]
+        cols = M.map_to_query(rows_, mutated)
+        chk("a query with an internal deletion still maps",
+            cols is not None and int((cols >= 0).sum()) > 0.8 * len(mutated),
+            f"{int((cols >= 0).sum()) if cols is not None else 0}/{len(mutated)} "
+            "positions placed")
+        chk("and the mapping is monotone where it is defined",
+            cols is not None and bool(
+                (np.diff(cols[cols >= 0]) > 0).all()),
+            "alignment columns increase along the chain")
+
     print("\n== the cached couplings find real contacts in deposited structures ==")
     # The claim coevolution has to earn: a pair the alignment says is coupled is
     # a pair that touches in the crystal. Measured against the DEPOSITED contact

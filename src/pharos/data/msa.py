@@ -203,39 +203,100 @@ def _ungapped(row: str) -> str:
     return row.replace("-", "")
 
 
-def map_to_query(rows: Sequence[str], query: str) -> Optional[np.ndarray]:
-    """Alignment-column index for each query position, or None if no row fits.
+def _kmer_profile(s: str, k: int = 5) -> set:
+    return {s[i:i + k] for i in range(0, max(len(s) - k + 1, 0))}
 
-    The seed row whose ungapped sequence is closest to the query supplies the
-    gap pattern. Rfam seeds are curated so a family member is usually an
-    excellent match; when the best match is poor the caller gets None and falls
-    back to no coevolution rather than to a misaligned feature, which would be
-    worse than none.
+
+def _best_row(rows: Sequence[str], q: str) -> Optional[tuple]:
+    """The seed row most similar to `q`, by k-mer Jaccard.
+
+    Positional identity was used here and is wrong for anything long. It walks
+    two ungapped strings in lockstep, so a single indel decorrelates everything
+    after it: real 1,500-nucleotide SSU rRNA chains scored 0.36-0.46 against
+    their own family's seed rows and were rejected by the 0.5 threshold, which
+    silently removed the two largest families in the corpus -- 3,450 chains --
+    from coevolution entirely. K-mer overlap does not care where the indel is.
     """
-    q = _clean(query).replace("-", "")
-    if not rows or not q:
+    qk = _kmer_profile(q)
+    if not qk:
         return None
     best, best_score = None, -1.0
     for r in rows:
         u = _ungapped(r)
         if not u:
             continue
-        n = min(len(u), len(q))
-        if n < 0.5 * max(len(u), len(q)):
+        # length gate first: it is cheap and a 10x length mismatch is not the
+        # same molecule however many k-mers happen to coincide
+        lo, hi = min(len(u), len(q)), max(len(u), len(q))
+        if lo < 0.5 * hi:
             continue
-        score = sum(1 for a, b in zip(u[:n], q[:n]) if a == b) / max(n, 1)
-        if score > best_score:
-            best, best_score = r, score
-    if best is None or best_score < 0.5:
+        uk = _kmer_profile(u)
+        if not uk:
+            continue
+        j = len(qk & uk) / len(qk | uk)
+        if j > best_score:
+            best, best_score = r, j
+    return (best, best_score) if best is not None else None
+
+
+def map_to_query(rows: Sequence[str], query: str,
+                 min_similarity: float = 0.10) -> Optional[np.ndarray]:
+    """Alignment-column index for each query position, or None if no row fits.
+
+    Two steps, because one was not enough. The seed row closest to the query is
+    chosen by k-mer overlap, then the query is **actually aligned** to that
+    row's ungapped sequence and the alignment carries query positions through
+    the row's gap pattern into alignment columns.
+
+    The previous version did neither: it scored rows by walking two ungapped
+    strings position by position and then assumed query position i sat at the
+    row's i-th non-gap column. Both assumptions hold for tRNA, which is 76
+    nucleotides with almost no indels, and neither holds for rRNA. That is why
+    coevolution appeared to work -- it was validated on tRNA.
+
+    A query position with no counterpart in the seed row maps to -1 and the
+    caller drops it, which is the honest answer for an insertion the family's
+    alignment has no column for.
+    """
+    q = _clean(query).replace("-", "")
+    if not rows or not q:
         return None
-    cols = np.array([c for c, ch in enumerate(best) if ch != "-"], dtype=np.int32)
+    got = _best_row(rows, q)
+    if got is None:
+        return None
+    row, sim = got
+    if sim < min_similarity:
+        return None
+
+    # column index of each non-gap character of the chosen row
+    cols = np.array([c for c, ch in enumerate(row) if ch != "-"], dtype=np.int32)
+    u = _ungapped(row)
     if cols.size == 0:
         return None
-    L = len(q)
-    if cols.size >= L:
-        return cols[:L]
-    out = np.full(L, -1, dtype=np.int32)
-    out[:cols.size] = cols
+
+    out = np.full(len(q), -1, dtype=np.int32)
+    try:
+        from Bio import Align
+
+        aligner = Align.PairwiseAligner(mode="global", match_score=1,
+                                        mismatch_score=-1, open_gap_score=-5,
+                                        extend_gap_score=-0.5)
+        aln = aligner.align(u, q)[0]
+        # aligned blocks are ((u_start, u_end), ...) paired with the same for q
+        ub, qb = aln.aligned
+        for (us, ue), (qs, qe) in zip(ub, qb):
+            n = min(ue - us, qe - qs)
+            if n <= 0:
+                continue
+            out[qs:qs + n] = cols[us:us + n]
+    except Exception:                                        # noqa: BLE001
+        # Biopython absent or the alignment failed: fall back to the positional
+        # assumption, which is right for short indel-free families and is
+        # better than returning nothing for them
+        n = min(cols.size, len(q))
+        out[:n] = cols[:n]
+    if not (out >= 0).any():
+        return None
     return out
 
 
