@@ -307,6 +307,56 @@ def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
                 f"{tag}_n_class": int(present.sum())}
 
 
+
+def _binary_metrics(logit: torch.Tensor, target: torch.Tensor,
+                    tag: str) -> Dict[str, float]:
+    """AUROC and the positive rate, for a head whose loss has no floor.
+
+    A weighted BCE on a 4.7%-positive target is not a measurement on its own:
+    it falls when the head learns the prior, it falls again when `pos_weight`
+    changes, and neither movement says the head found an Mg site. AUROC is a
+    rank statistic -- chance is 0.5 whatever the imbalance and whatever the
+    weighting -- so it is the floor this head never had. Computed by the
+    Mann-Whitney identity rather than by sorting thresholds, which is one
+    argsort.
+    """
+    with torch.no_grad():
+        y = (target > 0.5)
+        npos = int(y.sum())
+        nneg = int((~y).sum())
+        if npos == 0 or nneg == 0:
+            return {f"{tag}_pos_rate": float(y.float().mean()),
+                    f"{tag}_auroc": float("nan")}
+        r = torch.empty_like(logit, dtype=torch.float)
+        r[logit.argsort()] = torch.arange(logit.numel(), device=logit.device,
+                                          dtype=torch.float) + 1.0
+        auc = (r[y].sum() - npos * (npos + 1) / 2.0) / (npos * nneg)
+        return {f"{tag}_pos_rate": float(y.float().mean()),
+                f"{tag}_auroc": float(auc)}
+
+
+def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
+                        tag: str) -> Dict[str, float]:
+    """Correlation, and the loss a constant predictor would have reached.
+
+    The rigidity target is a z-scored B-factor, so predicting zero everywhere
+    is already a respectable smooth-L1 and the reported loss cannot distinguish
+    that from a head that has learned something. `_r` is the Pearson
+    correlation, which is 0 for any constant prediction however well tuned, and
+    `_base` is the constant-mean predictor's loss so the reported figure has a
+    number to be better than.
+    """
+    with torch.no_grad():
+        p = pred.float().flatten()
+        y = target.float().flatten()
+        base = float(F.smooth_l1_loss(y.mean().expand_as(y), y))
+        pc = p - p.mean()
+        yc = y - y.mean()
+        den = pc.norm() * yc.norm()
+        r = float((pc * yc).sum() / den) if float(den) > 1e-12 else 0.0
+        return {f"{tag}_r": r, f"{tag}_base": base}
+
+
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 n_loops: Optional[int] = None,
                 structure_weight: float = 1.0) -> tuple:
@@ -347,6 +397,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                                                pos_weight=pw)
         total = total + 0.3 * l
         parts["mg"] = float(l.detach())
+        parts.update(_binary_metrics(out["mg_logit"][m].detach(), tgt[m], "mg"))
 
     # head 6 -- rigidity. D12: X-ray only, and the mask is what enforces it.
     rm = t["rigidity_mask"]
@@ -354,6 +405,8 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         l = F.smooth_l1_loss(out["rigidity"][rm], t["b_factor_z"][rm].float())
         total = total + 0.3 * l
         parts["rigidity"] = float(l.detach())
+        parts.update(_regression_metrics(out["rigidity"][rm].detach(),
+                                         t["b_factor_z"][rm], "rigidity"))
         # the ensemble's fluctuation amplitude predicts the same observable, so
         # it is supervised by it -- that is what makes the stiffness field
         # trainable without any measured stiffness
@@ -362,6 +415,10 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                                    t["b_factor_z"][rm].float().min()).clamp(min=0))
         total = total + 0.1 * l2
         parts["fluctuation"] = float(l2.detach())
+        parts.update(_regression_metrics(
+            fl.detach(),
+            (t["b_factor_z"][rm].float()
+             - t["b_factor_z"][rm].float().min()).clamp(min=0), "fluct"))
 
     # head 10 -- base identity, exactly where it was never assigned
     bm = t["base_mask"]
@@ -369,6 +426,9 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         l = F.cross_entropy(out["base_logits"][bm], t["tokens"][bm].clamp(max=3))
         total = total + 0.2 * l
         parts["base"] = float(l.detach())
+        parts.update(_class_metrics(out["base_logits"][bm].detach(),
+                                    t["tokens"][bm].clamp(max=3).long(),
+                                    "base", 4))
 
     # head 10 -- motif class: hairpin loop, internal loop, or neither.
     #
