@@ -211,10 +211,17 @@ def main() -> int:
               f"clash {min(clashes):.3f}-{max(clashes):.3f}, wrote best")
         done += 1
 
-    print(f"\n[predict] {done} written, {skipped} skipped -> "
-          f"{args.out.relative_to(ROOT)}")
+    # relative_to raises when --out is outside the repo, which is the normal
+    # case for a scratch directory; a summary line must not be able to kill a
+    # run whose real work has already succeeded
+    def _rel(q: Path) -> str:
+        try:
+            return str(q.relative_to(ROOT))
+        except ValueError:
+            return str(q)
+    print(f"\n[predict] {done} written, {skipped} skipped -> {_rel(args.out)}")
     print(f"[predict] score with: python scripts/eval_blind_tests.py "
-          f"--pred {args.out.relative_to(ROOT)}")
+          f"--pred {_rel(args.out)}")
     return 0
 
 
