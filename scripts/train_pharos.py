@@ -71,7 +71,22 @@ from train_block_scorer import gpu_free_gib                       # noqa: E402
 
 def require_gpu(args) -> torch.device:
     if not args.device.startswith("cuda"):
-        raise SystemExit("GPU only; pass --device cuda once one is free.")
+        # `--smoke` is the one exception, and it exists because stage 5 has
+        # NEVER RUN. Every startup check in this file -- the structure-
+        # supervision assertion, the coevolution-reach assertion, the config
+        # read out of the checkpoint, the ten heads finding their targets --
+        # is unexercised code guarding an unexercised path, and the only way
+        # to find out whether it starts has been to displace a multi-day
+        # pretraining run on the single card. A CPU smoke test that runs a
+        # handful of steps at a toy batch costs nothing and answers the
+        # question. It is not training: it refuses to write a checkpoint.
+        if getattr(args, "smoke", 0):
+            print("[pharos] SMOKE TEST on CPU: startup path only, "
+                  "no checkpoint will be written", flush=True)
+            return torch.device(args.device)
+        raise SystemExit("GPU only; pass --device cuda once one is free. "
+                         "For a startup check without a GPU use "
+                         "--smoke N --device cpu.")
     mem = gpu_free_gib()
     if mem is None:
         raise SystemExit("no GPU visible to nvidia-smi")
@@ -444,8 +459,14 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         l = F.cross_entropy(ml[lm], t["loop_class"][lm])
         total = total + 0.3 * l
         parts["motif"] = float(l.detach())
+        # `ml.shape[-1]`, not `cfg.n_motif_classes`. That attribute lives on
+        # HeadConfig, not on the PharosConfig this function is handed, so the
+        # first version of this raised AttributeError on the first step -- in a
+        # stage that has never run, so nothing caught it until `--smoke` did.
+        # The logits' own width is the class count by construction and cannot
+        # drift from the head.
         parts.update(_class_metrics(ml[lm], t["loop_class"][lm], "motif",
-                                    cfg.n_motif_classes))
+                                    ml.shape[-1]))
 
     # head 1 -- contacts, on sampled pairs.
     #
@@ -494,7 +515,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 total = total + 0.5 * l
                 parts["lw"] = float(l.detach())
                 parts.update(_class_metrics(lwl, tgt_lw, "lw",
-                                            cfg.n_lw_classes))
+                                            lwl.shape[-1]))
                 parts["n_lw"] = int(hit.sum())
 
         cv = lookup_coevolution(t, bidx, ii, jj, L)
@@ -730,6 +751,11 @@ def main() -> None:
                     help="checkpoint path; default pharos_<size>.pt")
     ap.add_argument("--init-from", type=Path, default=None,
                     help="a checkpoint from an earlier curriculum stage")
+    ap.add_argument("--smoke", type=int, default=0, metavar="N",
+                    help="run N steps and stop, writing no checkpoint. Works "
+                         "on CPU. For checking that stage 5 STARTS -- which "
+                         "has never been verified, because the only card is "
+                         "busy with stage 1.")
     ap.add_argument("--from-scratch", action="store_true",
                     help="train stage 5 from random weights. This is a known "
                          "bad configuration -- it produced r = 0.049 on unseen "
@@ -957,6 +983,19 @@ def main() -> None:
             sched.step()
             run.append(float(loss.detach()))
             step += 1
+            if args.smoke:
+                print(f"[pharos] smoke step {step}/{args.smoke} "
+                      f"loss {float(loss.detach()):.4f} "
+                      + " ".join(f"{k} {v:.4g}" if isinstance(v, float)
+                                 else f"{k} {v}" for k, v in sorted(parts.items())),
+                      flush=True)
+                if step >= args.smoke:
+                    print("[pharos] SMOKE TEST PASSED: stage 5 starts, every "
+                          "head this batch can supervise produced a loss, and "
+                          "the backward pass completes. No checkpoint written.",
+                          flush=True)
+                    return 0
+                continue
             if step % args.ckpt_every == 0:
                 save(ep, False)
             if step % args.log_every == 0:
