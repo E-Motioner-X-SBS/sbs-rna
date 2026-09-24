@@ -290,6 +290,32 @@ the balance term SUMMED over 18 blocks, so the logged 0.197 at
 concentration the raw figure invites; that misreading is why the per-block
 figure is the one quoted here.
 
+**The length bins saturate, and did so silently.** `floor(log2(L/32))` clamped
+to `n_bins - 1` gives bins 0–4 one octave each — 32–64, 64–128, … 512–1024 —
+and makes **bin 5 a catch-all for everything above 1,024**: 4.5 octaves, up to
+the corpus's 4,450, in one one-hot. Measured occupancy:
+
+| | bin 0 | 1 | 2 | 3 | 4 | 5 | entropy |
+|---|---|---|---|---|---|---|---|
+| stage 1, octave bins | 1.8% | 56.7% | 8.8% | 19.9% | 12.8% | **0.03%** | 1.724 |
+| stage 1, spread over [32, 1024] | 0.6% | 46.6% | 12.7% | 13.3% | 16.1% | 10.6% | **2.092** |
+| stage 5, octave bins | 12.5% | 36.0% | 9.4% | 1.4% | 0.8% | **40.0%** | 1.890 |
+| stage 5, spread over [32, 4608] | 15.7% | 39.9% | 3.0% | 1.2% | 21.7% | 18.6% | **2.100** |
+
+In stage 1 the 20–1,024 length filter leaves bin 5 reachable only by a chain of
+exactly 1,024, so a sixth of the length conditioning carries nothing. In stage 5
+that same bin takes **40% of chains** — the long-chain regime the pair track
+exists for, collapsed into a single indicator. `RouterFeatures.length_bin_max`
+spreads the bins evenly in log2 over the real range instead; it defaults to 0,
+the octave behaviour, so a run in flight is unaffected, and it should be set for
+stage 5 and the next stage-1 run.
+
+Two of the eight extra dims, `neff/L` and `in_complex`, are structurally zero
+throughout stage 1 — the MLM corpus carries neither MSA depth nor a complex
+flag. That is expected and is now recorded rather than left to be discovered.
+`recycle > 0` is *not* dead despite reading zero on the outer feature object:
+the trunk rebuilds it per loop, so it is 1 on the differentiated pass.
+
 **The experts are merged before the network runs, not after.** The obvious
 implementation builds the (token, expert) pair list and pushes every pair
 through the shared network, which costs `width ×` the activations and produces

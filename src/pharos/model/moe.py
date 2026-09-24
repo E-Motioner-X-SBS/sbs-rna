@@ -35,6 +35,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -70,6 +72,24 @@ class RouterFeatures:
     chem_summary: Optional[torch.Tensor] = None   # (B, k) pooled chemistry
     recycle: int = 0
 
+    #: Upper edge of the length binning, in nucleotides. 0 keeps the original
+    #: octave bins and is the default, so a run in flight is unaffected.
+    #:
+    #: The octave bins saturate. `floor(log2(L/32))` clamped to `n_bins - 1`
+    #: gives bins 0..4 one octave each (32-64, 64-128, ... 512-1024) and makes
+    #: bin 5 a catch-all for EVERYTHING above 1024 -- 4.5 octaves, 1,024 to the
+    #: corpus's 4,608, in a single one-hot. Two consequences, both measured:
+    #: in stage 1 the length filter is 20-1024, so bin 5 requires a chain of
+    #: exactly 1,024 and is dead -- one sixth of the length conditioning
+    #: carries no information, while bin 1 takes 58% of chains. In stage 5,
+    #: where chains run to 4,608, every long chain lands in one bin, which is
+    #: precisely the regime the pair track exists for.
+    #:
+    #: Set `length_bin_max` and the bins spread evenly in log2 over
+    #: [32, length_bin_max] instead: at 6 bins and 4,608 that is 1.195 octaves
+    #: each, edges 32/73/167/381/871/1989/4608, and the top bin is reachable.
+    length_bin_max: int = 0
+
     def vector(self, B: int, device, n_bins: int, d_extra: int) -> torch.Tensor:
         """(B, n_bins + d_extra) — one-hot length bin plus the scalar block."""
         bins = torch.zeros(B, n_bins, device=device)
@@ -77,6 +97,9 @@ class RouterFeatures:
             # geometric bins: chain length spans 32..4608 and the interesting
             # structure is multiplicative, not additive
             lg = torch.log2(self.length.to(device).float().clamp(min=32.0) / 32.0)
+            if self.length_bin_max > 32:
+                span = math.log2(self.length_bin_max / 32.0)
+                lg = lg * (n_bins / max(span, 1e-6))
             idx = lg.floor().clamp(0, n_bins - 1).long()
             bins.scatter_(1, idx.unsqueeze(1), 1.0)
         extra = torch.zeros(B, d_extra, device=device)

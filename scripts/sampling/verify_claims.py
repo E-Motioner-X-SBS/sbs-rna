@@ -424,6 +424,31 @@ def main() -> int:
         else:
             chk("R4 motif retrieval measured", 0, 1)
 
+        # ---- R5: the router's length conditioning is not saturated ---------
+        #
+        # `floor(log2(L/32))` clamped to `n_bins - 1` gives bins 0..4 one
+        # octave each and makes bin 5 a catch-all for everything above 1,024 --
+        # 4.5 octaves in one one-hot. In stage 1 the 20-1024 filter leaves that
+        # bin reachable only by a chain of exactly 1,024; in stage 5 it takes
+        # 40% of chains, which is the long-chain regime the pair track exists
+        # for. `length_bin_max` spreads the bins over the real range instead.
+        rc = ROOT / "data/samples/analysis/router_conditioning.json"
+        if rc.exists():
+            kj = _rjson.loads(rc.read_text())
+            chk("R5 stage-1 top octave bin is effectively unreachable",
+                int(kj["s1_octave"]["occupancy"][5] < 0.001), 1)
+            chk("R5 stage-5 top octave bin is a 4.5-octave catch-all",
+                round(kj["s5_octave"]["occupancy"][5], 4), 0.3995, abs_tol=0.0002)
+            chk("R5 spreading the bins raises stage-1 conditioning entropy",
+                int(kj["s1_spread"]["entropy_bits"]
+                    > kj["s1_octave"]["entropy_bits"] + 0.2), 1)
+            chk("R5 stage-1 entropy, octave bins",
+                kj["s1_octave"]["entropy_bits"], 1.7241, abs_tol=0.002)
+            chk("R5 stage-1 entropy, spread bins",
+                kj["s1_spread"]["entropy_bits"], 2.0924, abs_tol=0.002)
+        else:
+            chk("R5 router conditioning measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
