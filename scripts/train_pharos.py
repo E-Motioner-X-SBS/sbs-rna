@@ -455,7 +455,10 @@ def main() -> None:
                          "scales, so this only trades head 3 against the "
                          "property heads.")
     ap.add_argument("--n-neg", type=int, default=2048)
-    ap.add_argument("--size", default="mini", choices=("mini", "small"))
+    ap.add_argument("--size", default="mini",
+                    choices=("mini", "small", "base400", "shared400"),
+                    help="ignored when --init-from names a checkpoint that "
+                         "records its own config, which is the curriculum case")
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
@@ -477,7 +480,36 @@ def main() -> None:
     device = require_gpu(args)
     enable_gpu_fast_paths()
     rng = np.random.default_rng(0)
-    cfg = (PharosConfig.small() if args.size == "small" else PharosConfig.mini())
+    # THE ARCHITECTURE COMES FROM THE CHECKPOINT WE ARE FINE-TUNING.
+    #
+    # Stage 5 is the last step of a curriculum: it is supposed to refine what
+    # stage 1 built, so its architecture is not a free choice. Hardcoding
+    # `small` here while stage 1 trained `shared400` meant --init-from could
+    # only ever fail -- 149M/61M against 394M/302M, every shape different --
+    # and the cron runner passes `--size small` on every fire. The existing
+    # guard would have caught it as "too many missing keys", loudly and
+    # uselessly, at the start of a job queued behind sixty hours of stage 1.
+    #
+    # Stage 1 records `cfg` in its checkpoint. That is the authority.
+    cfg = getattr(PharosConfig, args.size)()
+    if args.init_from and Path(args.init_from).exists():
+        try:
+            _saved = torch.load(args.init_from, map_location="cpu",
+                                weights_only=False).get("cfg")
+        except Exception:                                    # noqa: BLE001
+            _saved = None
+        if isinstance(_saved, dict):
+            _from_ckpt = PharosConfig(**{k: v for k, v in _saved.items()
+                                         if k in PharosConfig.__dataclass_fields__})
+            for k, v in _saved.items():                      # non-field attrs
+                if not hasattr(_from_ckpt, k):
+                    setattr(_from_ckpt, k, v)
+            if _from_ckpt.__dict__ != cfg.__dict__:
+                print(f"[pharos] --size {args.size} overridden by the config in "
+                      f"{Path(args.init_from).name}: d_model {_from_ckpt.d_model}, "
+                      f"{_from_ckpt.n_blocks} blocks, {_from_ckpt.n_experts} experts",
+                      flush=True)
+            cfg = _from_ckpt
     tr = Pharos3DDataset(args.data, split="train", max_length=args.max_length)
     va = Pharos3DDataset(args.data, split="val", max_length=args.max_length)
     te = Pharos3DDataset(args.data, split="test", max_length=args.max_length)
