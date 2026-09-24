@@ -22,6 +22,13 @@ drawn from c020 and is SHORT (mean 185 nt). If content were the mechanism,
 training on short-sequence shards should help on a short-sequence evaluation.
 It hurts.
 
+What this does NOT support is explaining any single reading. Step 8,500 dropped
+to 1.8224 bits on a 134,000-token mean batch and was attributed to exactly this
+mechanism; step 8,750 then ran on a SMALLER batch, 123,500, and recovered to
+1.6602. The aggregate correlation survives that -- it is an ensemble effect at
+t = -2.8 -- but the per-point story does not, and step 8,500 has no established
+cause.
+
 Run: python3 scripts/sampling/measure_batch_effect.py
 """
 from __future__ import annotations
@@ -90,9 +97,14 @@ def main() -> int:
            "bits": y, "r_raw": round(r_raw, 4),
            "r_partial_step_controlled": round(r_par, 4),
            "t": round(float(t), 3), "df": df,
-           "note": "observational, n=21; mechanism is gradient noise ~ "
+           "note": "observational; mechanism is gradient noise ~ "
                    "1/sqrt(batch); the content confound is argued against by "
-                   "the held-out sample itself being short-sequence"}
+                   "the held-out sample itself being short-sequence. AGGREGATE "
+                   "ONLY: it does not explain individual excursions. Step "
+                   "8,500 (134,000 tok/step, 1.8224 bits) was attributed to "
+                   "it and step 8,750 then ran on a SMALLER batch (123,500) "
+                   "and recovered to 1.6602, so that attribution is withdrawn "
+                   "and 8,500 has no established cause."}
     OUT.write_text(json.dumps(res, indent=1))
     print(f"[batch] wrote {OUT}")
     return 0

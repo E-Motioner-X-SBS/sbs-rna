@@ -460,12 +460,27 @@ def main() -> int:
         be = ROOT / "data/samples/analysis/batch_size_effect.json"
         if be.exists():
             bj = _rjson.loads(be.read_text())
-            chk("R6 paired checkpoints", bj["n"], 21)
-            chk("R6 raw correlation", bj["r_raw"], -0.6414, abs_tol=0.0002)
-            chk("R6 partial correlation, step controlled",
-                bj["r_partial_step_controlled"], -0.5413, abs_tol=0.0002)
+            # BOUNDS, not exact values. This statistic is recomputed over
+            # every clean reading so far, so it moves each time the watcher
+            # scores a checkpoint; pinning -0.5413 exactly would fail on the
+            # next eval and teach everyone to ignore the failure.
+            chk("R6 at least 20 paired checkpoints", int(bj["n"] >= 20), 1)
+            chk("R6 fewer tokens in the step, worse bits",
+                int(bj["r_partial_step_controlled"] < -0.3), 1)
             chk("R6 the effect survives the training trend",
                 int(abs(bj["t"]) > 2.0), 1)
+            # ... and the thing it does NOT establish. The step-8,500
+            # excursion was attributed to this mechanism and the attribution
+            # did not survive: step 8,750 ran on a SMALLER mean batch
+            # (123,500 tokens against 134,000) and recovered to 1.6602 from
+            # 1.8224 anyway. The aggregate effect is real; it does not explain
+            # individual points, and this check exists so nobody reinstates
+            # that claim from the correlation alone.
+            chk("R6 does not explain step 8,500: 8,750 was smaller and better",
+                int(bj["tokens_per_step"][bj["steps"].index(8750)]
+                    < bj["tokens_per_step"][bj["steps"].index(8500)]
+                    and bj["bits"][bj["steps"].index(8750)]
+                    < bj["bits"][bj["steps"].index(8500)]), 1)
         else:
             chk("R6 batch-size effect measured", 0, 1)
 
