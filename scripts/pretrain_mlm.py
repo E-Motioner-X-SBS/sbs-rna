@@ -57,6 +57,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from pharos.data.chemistry_torch import BatchChemistry               # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
 from pharos.train.checkpoint import atomic_save
+from pharos.train.muon import Muon, muon_param_groups
 from pharos.data.vocab import PAD_ID, SYM2ID, SYMBOLS, encode_chain  # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
@@ -419,6 +420,14 @@ def main() -> None:
     ap.add_argument("--size", default="small",
                     choices=("mini", "small", "base400", "shared400"))
     ap.add_argument("--lr", type=float, default=6e-4)
+    ap.add_argument("--optimizer", default="adamw", choices=("adamw", "muon"),
+                    help="muon orthogonalises the update for 2-D weights and "
+                         "leaves embeddings, norms, biases and the per-expert "
+                         "modulation vectors on AdamW")
+    ap.add_argument("--muon-lr", type=float, default=0.01,
+                    help="Muon's rate is NOT comparable to AdamW's: an "
+                         "orthogonal update has unit spectral norm, so its "
+                         "natural scale is ~0.02 against AdamW's ~6e-4")
     ap.add_argument("--token-budget", type=int, default=0,
                     help="0 (the default) sizes it from free VRAM via "
                          "`auto_token_budget`; a positive value overrides")
@@ -527,8 +536,34 @@ def main() -> None:
           f"{budget/max(pc['active'],1):.0f} tokens per active parameter "
           f"(~{budget/max(pc['active'],1)/20:.0f}x Chinchilla)")
 
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01,
-                            betas=(0.9, 0.95))
+    # Two optimisers, and the weight-decay split neither of them had before.
+    #
+    # Every trainer here passed `weight_decay=0.01` to `model.parameters()`
+    # undifferentiated. Decaying a LayerNorm gain has no scale-invariance
+    # argument behind it, and decaying the zero-initialised per-expert
+    # modulation actively pulls the MoE's specialisation back toward the shared
+    # network it is trying to differ from -- the `mod` tensor whose measured std
+    # is 0.008 is what that decay was fighting. `muon_param_groups` does the
+    # split for both paths.
+    if args.optimizer == "muon":
+        mp, ag = muon_param_groups(model, args.muon_lr, args.lr)
+        opts = [Muon(mp, lr=args.muon_lr, momentum=0.95),
+                torch.optim.AdamW(ag, lr=args.lr, betas=(0.9, 0.95))]
+        print(f"[mlm] Muon on {len(mp)} matrices "
+              f"({sum(p.numel() for p in mp)/1e6:.0f}M params) at lr "
+              f"{args.muon_lr:g}; AdamW on the rest at {args.lr:g}", flush=True)
+    else:
+        mp, ag = muon_param_groups(model, args.muon_lr, args.lr)
+        # AdamW over everything, but with decay only where it belongs: the
+        # matrices Muon would have taken join the decay group, the norms and
+        # biases stay at zero decay.
+        groups = [{"params": mp, "weight_decay": 0.01}] + ag
+        opts = [torch.optim.AdamW(groups, lr=args.lr, betas=(0.9, 0.95))]
+        n_nd = sum(len(g["params"]) for g in ag if g["weight_decay"] == 0.0)
+        print(f"[mlm] AdamW, weight decay on {len(mp) + len(ag[0]['params'])} "
+              f"tensors and OFF for {n_nd} norms/biases/expert vectors",
+              flush=True)
+    opt = opts[0]
     rng = np.random.default_rng(0)
     CKPT.mkdir(parents=True, exist_ok=True)
 
@@ -557,7 +592,18 @@ def main() -> None:
                    if k.startswith("trunk.") and k not in want else k: v
                    for k, v in got.items()}
         model.load_state_dict(got)
-        if "opt" in sd:
+        # Restore EVERY optimiser, and refuse to restore across a change of
+        # optimiser: AdamW's moments mean nothing to Muon, and loading them
+        # would resume a run whose optimiser state is silently garbage.
+        saved_kind = sd.get("optimizer", "adamw")
+        if saved_kind != args.optimizer:
+            print(f"[mlm] checkpoint was written with --optimizer {saved_kind} "
+                  f"and this run is {args.optimizer}; keeping the WEIGHTS and "
+                  f"starting fresh optimiser state", flush=True)
+        elif "opts" in sd and len(sd["opts"]) == len(opts):
+            for o, st in zip(opts, sd["opts"]):
+                o.load_state_dict(st)
+        elif "opt" in sd:
             opt.load_state_dict(sd["opt"])
         seen, step = int(sd.get("tokens", 0)), int(sd.get("step", 0))
         hist_resumed = list(sd.get("history", []))
@@ -706,8 +752,11 @@ def main() -> None:
                   chem_summary=(chem.sum(1)
                                 / n_real.unsqueeze(1).clamp(min=1))[:, :5])
               lr_now = lr_at(seen, budget, args.lr)
-              for g in opt.param_groups:
-                  g["lr"] = lr_now
+              for _o in opts:
+                  scale = (args.muon_lr / max(args.lr, 1e-12)
+                           if isinstance(_o, Muon) else 1.0)
+                  for g in _o.param_groups:
+                      g["lr"] = lr_now * scale
               with torch.autocast("cuda", dtype=torch.bfloat16):
                   out = model(inp, torch.zeros_like(inp), chem, bmask,
                               feats=feats, n_loops=args.n_loops, mlm=True)
@@ -715,7 +764,8 @@ def main() -> None:
                   ce = F.cross_entropy(logits[sel], tgt[sel])
                   bal = out["aux"]["balance_loss"]
                   loss = ce + bal
-              opt.zero_grad(set_to_none=True)
+              for _o in opts:
+                _o.zero_grad(set_to_none=True)
               loss.backward()
               torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
               opt.step()
@@ -818,7 +868,11 @@ def main() -> None:
 
               if step % args.ckpt_every == 0 or seen >= budget:
                   atomic_save({"cfg": cfg.__dict__, "model": _clean_state(model),
-                              "opt": opt.state_dict(), "padded": padded,
+                              "opt": opt.state_dict(),
+                              # every optimiser, or a Muon resume silently
+                              # drops the AdamW moments for the embeddings
+                              "opts": [o.state_dict() for o in opts],
+                              "optimizer": args.optimizer, "padded": padded,
                               "tokens": seen, "step": step,
                               "history": hist, "run_id": runlog.run_id}, ck)
                   # Held-out evaluation, at every checkpoint.
@@ -855,7 +909,8 @@ def main() -> None:
             # budget, keep the checkpoint, carry on. The iterator has to be
             # rebuilt because the budget is baked into it at creation.
             n_oom += 1
-            opt.zero_grad(set_to_none=True)
+            for _o in opts:
+                _o.zero_grad(set_to_none=True)
             torch.cuda.empty_cache()
             floor = 1024
             shrunk = max(floor, int(budget_tokens * 0.85) // 1024 * 1024)
