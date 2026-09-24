@@ -1,0 +1,3 @@
+timestamp,checkpoint,step,tokens,bits,perplexity,accuracy,n_masked,n_seq,seed,min_len,max_len
+2026-09-24T09:32:26,shared400_step1750_best.pt,1750,226144700,1.88027,3.68143,0.36698,27955,1024,1234,20,1024
+2026-09-24T09:33:00,shared400_step2000_postdip.pt,2000,273884567,1.86355,3.63901,0.37721,27955,1024,1234,20,1024

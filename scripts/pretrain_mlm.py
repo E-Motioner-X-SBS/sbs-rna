@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import itertools
 import math
 import sys
 import time
@@ -446,6 +447,10 @@ def main() -> None:
                          "elDORS alone; add data/derived/parquet_mars to "
                          "include the filtered MARS structured-ncRNA shards")
     ap.add_argument("--log-every", type=int, default=100)
+    ap.add_argument("--heldout-seq", type=int, default=512,
+                    help="sequences in the fixed held-out sample scored at "
+                         "every checkpoint; 0 disables it")
+    ap.add_argument("--heldout-seed", type=int, default=1234)
     ap.add_argument("--ckpt-every", type=int, default=250,
                     help="steps between checkpoints; at ~2 s/step the old 2000 "
                          "meant losing up to 65 minutes to an interruption, on "
@@ -606,6 +611,61 @@ def main() -> None:
     # The chemistry tables live on the device for the whole run; building them
     # is a few hundred calls to `residue_chemistry`, done once.
     batch_chem = BatchChemistry(SYMBOLS, device)
+
+    # A fixed held-out sample, drawn once and reused for every checkpoint.
+    # Built here rather than imported so the trainer has no dependency on the
+    # standalone evaluator, and normalised the same way `iter_sequences`
+    # normalises: the corpus is DNA-alphabet and an un-normalised sample scores
+    # a healthy model at 3.42 bits against a 1.9964-bit unigram baseline.
+    heldout = None
+    if args.heldout_seq > 0:
+        # islice, NOT list(): the corpus is 40.9M sequences and 20.1B tokens,
+        # and materialising it to draw 512 would exhaust the machine before
+        # step 0. The shard order is shuffled by the seeded rng, so taking a
+        # prefix still samples across the corpus rather than one chunk.
+        _hs = list(itertools.islice(
+            iter_sequences(corpora, args.min_len, args.max_len, shards=None,
+                           rng=np.random.default_rng(args.heldout_seed)),
+            args.heldout_seq))
+        _groups = _pack_pool(_hs, args.token_budget // 4, args.max_batch,
+                             np.random.default_rng(args.heldout_seed))
+        print(f"[mlm] held-out sample: {len(_hs):,} sequences in "
+              f"{len(_groups)} fixed batches", flush=True)
+
+        def heldout(mdl, _g=_groups, _bc=batch_chem):
+            was = mdl.training
+            mdl.eval()
+            r = np.random.default_rng(args.heldout_seed)
+            tc = tk = 0.0
+            nm = 0
+            with torch.no_grad():
+                for grp in _g:
+                    tn, mn, ln = encode_batch(grp)
+                    ip, tg, sl = apply_span_mask(tn, ln, r)
+                    if not sl.any():
+                        continue
+                    ip_t = torch.as_tensor(ip, device=device)
+                    tg_t = torch.as_tensor(tg, device=device)
+                    sl_t = torch.as_tensor(sl, device=device)
+                    bm = torch.as_tensor(mn, device=device)
+                    cm = _bc(ip_t, bm)
+                    nr = bm.sum(1)
+                    ft = RouterFeatures(
+                        length=nr.float(),
+                        chem_summary=(cm.sum(1) / nr.unsqueeze(1).clamp(min=1))[:, :5])
+                    with torch.autocast("cuda", dtype=torch.bfloat16):
+                        o = mdl(ip_t, torch.zeros_like(ip_t), cm, bm,
+                                feats=ft, n_loops=args.n_loops, mlm=True)
+                    lg = o["mlm_logits"].float()[sl_t]
+                    y = tg_t[sl_t]
+                    tc += float(F.cross_entropy(lg, y, reduction="sum"))
+                    tk += float((lg.argmax(-1) == y).sum())
+                    nm += int(sl_t.sum())
+            mdl.train(was)
+            ce = tc / max(nm, 1)
+            return {"ce_nats": ce, "bits": ce / float(np.log(2)),
+                    "perplexity": float(np.exp(ce)),
+                    "accuracy": tk / max(nm, 1), "n_masked": nm}
     while not stop:
         # Batches are length-bucketed and budgeted by TOKENS, not by sequence
         # count. A fixed count is a latent OOM -- 64 sequences is 1.3k tokens if
@@ -755,6 +815,28 @@ def main() -> None:
                               "opt": opt.state_dict(), "padded": padded,
                               "tokens": seen, "step": step,
                               "history": hist, "run_id": runlog.run_id}, ck)
+                  # Held-out evaluation, at every checkpoint.
+                  #
+                  # The loss printed above is a rolling mean over whatever
+                  # shard is streaming, and shard order is shuffled once and
+                  # then read through, so a 100-step window at 228k tokens a
+                  # step sits largely inside ONE shard. That number moved from
+                  # 1.488 bits to 1.863 and back over 300 steps of this run
+                  # with the model improving monotonically the whole time --
+                  # it was measuring the data. A fixed sample, fixed masking
+                  # and the same batches every time is the only way the run
+                  # can tell its own progress from its corpus's variance.
+                  if heldout is not None:
+                      hv = heldout(model)
+                      print(f"[mlm] held-out {hv['bits']:.4f} bits "
+                            f"ppl {hv['perplexity']:.3f} acc {hv['accuracy']:.4f} "
+                            f"(fixed {hv['n_masked']:,} masked positions)",
+                            flush=True)
+                      runlog.log(kind="eval", step=step, tokens=seen,
+                                 ce_nats=round(hv["ce_nats"], 6),
+                                 bits_per_token=round(hv["bits"], 6),
+                                 masked_accuracy=round(hv["accuracy"], 6),
+                                 note="held-out fixed sample")
               if seen >= budget:
                   stop = True
                   break

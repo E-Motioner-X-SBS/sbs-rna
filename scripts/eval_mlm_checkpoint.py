@@ -169,6 +169,12 @@ def main() -> int:
                          "outside the distribution it was trained on")
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--append-csv", type=Path,
+                    default=ROOT / "data/samples/analysis/runs/heldout_mlm.csv",
+                    help="accumulate results so the run has a validation CURVE "
+                         "rather than isolated readings; the training loss "
+                         "cannot provide one because it moves with the shard")
+    ap.add_argument("--no-csv", action="store_true")
     args = ap.parse_args()
 
     pm = _trainer()
@@ -192,6 +198,24 @@ def main() -> int:
                   args.seed)
         print(f"  {ck.name:38s} {st.get('step','?'):>7} {r['bits']:7.4f} "
               f"{r['perplexity']:7.4f} {r['accuracy']:7.4f}")
+        if not args.no_csv:
+            import csv as _csv
+            import datetime as _dt
+            args.append_csv.parent.mkdir(parents=True, exist_ok=True)
+            new = not args.append_csv.exists()
+            with args.append_csv.open("a", newline="") as fh:
+                w = _csv.writer(fh)
+                if new:
+                    w.writerow(["timestamp", "checkpoint", "step", "tokens",
+                                "bits", "perplexity", "accuracy", "n_masked",
+                                "n_seq", "seed", "min_len", "max_len"])
+                w.writerow([_dt.datetime.now().isoformat(timespec="seconds"),
+                            ck.name, st.get("step", ""), st.get("tokens", ""),
+                            round(r["bits"], 5), round(r["perplexity"], 5),
+                            round(r["accuracy"], 5), r["n_masked"],
+                            len(seqs), args.seed, args.min_len, args.max_len])
+    if not args.no_csv:
+        print(f"\n[eval] appended to {args.append_csv.relative_to(ROOT)}")
     return 0
 
 
