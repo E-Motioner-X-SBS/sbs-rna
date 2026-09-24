@@ -523,6 +523,30 @@ def main() -> int:
         else:
             chk("R8 chemistry liveness measured", 0, 1)
 
+        # ---- R9: a training pool is half of one length-sorted shard --------
+        #
+        # `iter_batches` claimed a 131,072-sequence pool was "large enough that
+        # the length histogram inside a pool matches the corpus". Shards hold
+        # ~241,000 sequences and elDORS is length-sorted into chunks, so a pool
+        # is 0.54 of ONE chunk and its histogram sits 0.342 in total variation
+        # from the corpus. Shuffling the shard order, which the reader already
+        # did, only changes which band each pool gets.
+        pc2 = ROOT / "data/samples/analysis/pool_composition.json"
+        if pc2.exists():
+            pj = _rjson.loads(pc2.read_text())
+            chk("R9 one shard per pool is far from the corpus",
+                pj["pools"]["1"]["tv"], 0.342, abs_tol=0.002)
+            chk("R9 interleaving 8 shards is three times closer",
+                pj["pools"]["8"]["tv"], 0.112, abs_tol=0.002)
+            chk("R9 and it is the measured optimum",
+                int(pj["pools"]["8"]["tv"] < min(pj["pools"][k]["tv"]
+                    for k in ("1", "4", "16", "32"))), 1)
+            chk("R9 pool mean length, one shard", pj["pools"]["1"]["mean"],
+                201.0, abs_tol=1.0)
+            chk("R9 corpus mean length", pj["corpus_mean"], 320.0, abs_tol=1.0)
+        else:
+            chk("R9 pool composition measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

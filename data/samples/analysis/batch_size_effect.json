@@ -1,5 +1,5 @@
 {
- "n": 22,
+ "n": 24,
  "steps": [
   3250,
   3500,
@@ -22,7 +22,9 @@
   8000,
   8250,
   8500,
-  8750
+  8750,
+  9000,
+  9250
  ],
  "tokens_per_step": [
   121000.0,
@@ -46,7 +48,9 @@
   206000.0,
   176000.0,
   134000.0,
-  123500.0
+  123500.0,
+  162333.3,
+  158500.0
  ],
  "bits": [
   1.97999,
@@ -70,11 +74,13 @@
   1.60446,
   1.62933,
   1.82238,
-  1.66019
+  1.66019,
+  1.64953,
+  1.78863
  ],
- "r_raw": -0.5527,
- "r_partial_step_controlled": -0.5459,
- "t": -2.84,
- "df": 19,
+ "r_raw": -0.5449,
+ "r_partial_step_controlled": -0.519,
+ "t": -2.783,
+ "df": 21,
  "note": "observational; mechanism is gradient noise ~ 1/sqrt(batch); the content confound is argued against by the held-out sample itself being short-sequence. AGGREGATE ONLY: it does not explain individual excursions. Step 8,500 (134,000 tok/step, 1.8224 bits) was attributed to it and step 8,750 then ran on a SMALLER batch (123,500) and recovered to 1.6602, so that attribution is withdrawn and 8,500 has no established cause."
 }
