@@ -26,6 +26,18 @@ LOG=data/samples/analysis/runs/heldout_watch.log
 mkdir -p "$KEEP" "$(dirname "$LOG")"
 last=""
 lastmt=""
+tries=0
+pending=""
+
+# Score one saved checkpoint. Returns the evaluator's exit status, which the
+# caller MUST look at -- see the note at the call site.
+score_ckpt() {
+    local f="$1" st="$2"
+    echo "$(date -Is) scoring step $st" >> "$LOG"
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+      timeout 900 $PY -u scripts/eval_mlm_checkpoint.py \
+        --ckpt "$f" --device cuda --n-seq 1024 --token-budget 8192 >> "$LOG" 2>&1
+}
 while [ ! -f "$STOP" ]; do
     if [ -f "$CKPT" ]; then
         # mtime first. Reading the step means loading a 4.3 GB checkpoint, and
@@ -48,16 +60,51 @@ PYEOF
         else
             step=""
         fi
+        # A step whose eval failed is retried from the SAVED COPY before
+        # anything else, while that copy still exists. Without this, not
+        # advancing `last` achieves nothing: the mtime guard means `step` is
+        # only recomputed when the trainer writes a NEW checkpoint, so the
+        # failed step would still never be scored again.
+        if [ -n "$pending" ] && [ -f "$KEEP/step${pending}.pt" ]; then
+            score_ckpt "$KEEP/step${pending}.pt" "$pending"
+            if [ $? -eq 0 ]; then
+                echo "$(date -Is) recovered step $pending" >> "$LOG"
+                pending=""
+                tries=0
+            else
+                tries=$((tries + 1))
+                if [ "$tries" -ge 3 ]; then
+                    echo "$(date -Is) giving up on step $pending after $tries attempts; the curve has a GAP here" >> "$LOG"
+                    pending=""
+                    tries=0
+                fi
+            fi
+        fi
         if [ -n "$step" ] && [ "$step" != "$last" ]; then
             cp -f "$CKPT" "$KEEP/step${step}.pt" 2>/dev/null
-            echo "$(date -Is) scoring step $step" >> "$LOG"
-            PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-              timeout 900 $PY -u scripts/eval_mlm_checkpoint.py \
-                --ckpt "$KEEP/step${step}.pt" --device cuda \
-                --n-seq 1024 --token-budget 8192 >> "$LOG" 2>&1
+            score_ckpt "$KEEP/step${step}.pt" "$step"
+            rc=$?
             # keep only the newest few: each is 4.3 GB and the disk is at 92%
             ls -1t "$KEEP"/step*.pt 2>/dev/null | tail -n +4 | xargs -r rm -f
+            # Advance ONLY on success.
+            #
+            # `last="$step"` used to run unconditionally, so a failed eval
+            # retired that step for good and the curve simply lost the point.
+            # That is what happened at step 8,250: the evaluator's load guard
+            # refused a checkpoint carrying two new buffers, the loop recorded
+            # the step as done, and the next reading would have been 8,500 --
+            # an hour of coverage gone with nothing in the CSV to show a gap
+            # had occurred. Same shape as everything else this audit has found:
+            # a command ran, it failed, and its exit status was discarded.
+            #
+            # Retries are capped so a permanently broken evaluator polls every
+            # five minutes rather than spinning, and gives up loudly.
             last="$step"
+            if [ "$rc" -ne 0 ]; then
+                echo "$(date -Is) eval FAILED for step $step (rc=$rc); queued for retry" >> "$LOG"
+                pending="$step"
+                tries=0
+            fi
         fi
     fi
     sleep 300
