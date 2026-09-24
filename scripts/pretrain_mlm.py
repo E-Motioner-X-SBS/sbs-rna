@@ -591,7 +591,34 @@ def main() -> None:
             got = {k.replace("trunk.", "trunk._orig_mod.", 1)
                    if k.startswith("trunk.") and k not in want else k: v
                    for k, v in got.items()}
-        model.load_state_dict(got)
+        # Tolerate parameters that did not exist when the checkpoint was
+        # written, and nothing else.
+        #
+        # The architecture grows between runs -- `diff_pair` and `coev_proj`
+        # were added after this run started -- and a strict load turns every
+        # such addition into a refusal to resume a job with hundreds of
+        # millions of tokens in it. But strict=False on its own would also
+        # accept loading a shared400 checkpoint into a `small` model and
+        # training a mostly-random network that reports as resumed, so the
+        # tolerance is bounded: new tensors are allowed, and more than 5% of
+        # the model missing is an error.
+        res = model.load_state_dict(got, strict=False)
+        if res.unexpected_keys:
+            raise SystemExit(
+                f"{len(res.unexpected_keys)} tensors in the checkpoint have no "
+                f"home in this model, e.g. {res.unexpected_keys[:3]} -- that is "
+                f"a different architecture, not a resume.")
+        if res.missing_keys:
+            frac = len(res.missing_keys) / max(len(model.state_dict()), 1)
+            if frac > 0.05:
+                raise SystemExit(
+                    f"{len(res.missing_keys)} of {len(model.state_dict())} "
+                    f"tensors ({100*frac:.0f}%) are absent from the checkpoint. "
+                    f"Refusing to resume a mostly-random model.")
+            print(f"[mlm] {len(res.missing_keys)} tensor(s) postdate this "
+                  f"checkpoint and start fresh: "
+                  f"{', '.join(res.missing_keys[:4])}"
+                  f"{' ...' if len(res.missing_keys) > 4 else ''}", flush=True)
         # Restore EVERY optimiser, and refuse to restore across a change of
         # optimiser: AdamW's moments mean nothing to Muon, and loading them
         # would resume a run whose optimiser state is silently garbage.

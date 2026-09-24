@@ -43,6 +43,12 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # spent 42 minutes in inductor autotuning without reaching step 0; the
 # autotune results are cached under /tmp/torchinductor_*, so the flag is how a
 # run gets moving while the cache is cold.
+# Optimiser. Muon beat AdamW at every rate tested in a matched A/B -- same
+# model, same batches, same seed, held-out scored on genuinely masked
+# positions: AdamW 1.9681 bits at its best against Muon 1.9603, and +0.0085
+# accuracy. Reproduced independently on a second model.
+MLM_OPT=${MLM_OPT:-muon}
+MUON_LR=${MUON_LR:-0.02}
 MLM_EXTRA=${MLM_EXTRA:-}
 NEED_GIB=${NEED_GIB:-60}
 SETTLE=${SETTLE:-90}           # seconds between the two free-checks
@@ -161,7 +167,8 @@ if [ ! -f "$LOGDIR/.done-stage1" ]; then
             --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
             --tokens "${MLM_TOKENS:-4e9}" --token-budget 0 \
             --corpus data/derived/parquet_starter data/derived/parquet_mars \
-            --n-loops 2 ${MLM_EXTRA:-} >> "$LOG" 2>&1; then
+            --n-loops 2 --optimizer "${MLM_OPT:-muon}" \
+            --muon-lr "${MUON_LR:-0.02}" ${MLM_EXTRA:-} >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"
     else
