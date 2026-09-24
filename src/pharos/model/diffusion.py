@@ -55,6 +55,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+#: Measured over deposited RNA backbones (RNA-Puzzles reference structures):
+#: the intra-residue C4'-N bond is 3.38 +/- 0.07 A, and consecutive phosphates
+#: sit at 6.01 +/- 1.70 A -- the wide spread is chain breaks, not flexibility,
+#: which is why the violation term below is flat-bottomed rather than harmonic.
+BOND_C4_N = (3.38, 0.25)
+BOND_P_P = (6.01, 1.50)
+
 #: Backbone atoms per residue: phosphate, C4' sugar anchor, glycosidic N.
 #: Three points fix a frame, which is the minimum for an orientation-aware
 #: backbone without modelling every atom.
@@ -78,6 +85,10 @@ class DiffusionConfig:
     sigma_max: float = 160.0
     rho: float = 7.0              # sampling schedule curvature
     n_steps: int = 50             # inference denoising steps
+    #: weight on the flat-bottomed bond-geometry violation. Small: it is a
+    #: constraint, not an objective, and it must not outrun the denoising loss
+    #: it is protecting.
+    violation_weight: float = 0.1
 
 
 def _timestep_embedding(t: torch.Tensor, dim: int) -> torch.Tensor:
@@ -258,6 +269,32 @@ class DiffusionStructureHead(nn.Module):
         x = x0 + sigma.view(-1, 1, 1, 1) * noise
         pred = self.denoise(x, sigma, single, pair, mask)
 
+        # ---- geometry violation, on the DENOISED prediction ----------------
+        #
+        # The EDM loss is an MSE against the true coordinates, which supervises
+        # bond lengths only implicitly and, at a sampled structure, not at all:
+        # the first real predictions came out with consecutive phosphates 36 A
+        # apart against a true 6.01, and C4'-N at 36 A against 3.38. That is
+        # not a backbone, it is a gas of points -- and NOTHING caught it. Clash
+        # score sees only atoms too close; TM-score and lDDT are superposition
+        # metrics that never ask whether the chain is bonded.
+        #
+        # Flat-bottomed, not harmonic. Real P-P has a standard deviation of
+        # 1.70 A almost entirely from chain breaks rather than from flexibility,
+        # so a quadratic penalty would spend most of its gradient forcing
+        # genuine discontinuities closed. Inside the tolerance the term is
+        # exactly zero and the EDM loss is left alone.
+        def _flat(d, target, tol):
+            return (d - target).abs().sub(tol).clamp(min=0.0)
+
+        m2 = mask.to(pred.dtype)
+        cn = torch.linalg.norm(pred[:, :, 1] - pred[:, :, 2], dim=-1)
+        v_cn = (_flat(cn, *BOND_C4_N) * m2).sum() / m2.sum().clamp(min=1)
+        pp = torch.linalg.norm(pred[:, 1:, 0] - pred[:, :-1, 0], dim=-1)
+        mpp = (mask[:, 1:] & mask[:, :-1]).to(pred.dtype)
+        v_pp = (_flat(pp, *BOND_P_P) * mpp).sum() / mpp.sum().clamp(min=1)
+        violation = v_cn + v_pp
+
         w = (sigma ** 2 + cfg.sigma_data ** 2) / (sigma * cfg.sigma_data) ** 2
         m = mask[..., None, None].to(pred.dtype)
         # Divide by the number of VALUES summed, not the number of residues.
@@ -271,8 +308,11 @@ class DiffusionStructureHead(nn.Module):
         # why the divisor there is spelled the same way.
         den = m.expand_as(pred).sum((1, 2, 3)).clamp(min=1)
         se = (((pred - x0) ** 2) * m).sum((1, 2, 3)) / den
-        return {"loss": (w * se).mean(),
+        return {"loss": (w * se).mean() + cfg.violation_weight * violation,
                 "mse": se.mean().detach(),
+                "violation": violation.detach(),
+                "bond_cn": v_cn.detach(),
+                "bond_pp": v_pp.detach(),
                 "sigma": sigma.mean().detach()}
 
     # ---- sampling -------------------------------------------------------

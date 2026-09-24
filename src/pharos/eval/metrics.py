@@ -258,3 +258,48 @@ def clash_score(coords: np.ndarray, *, min_dist: float = 2.0,
     sep = np.abs(res[:, None] - res[None, :])
     off = ~np.eye(n, dtype=bool) & (sep > exclude_neighbours)
     return float(((d < min_dist) & off).sum() / max(off.sum(), 1))
+
+
+#: Bond geometry of deposited RNA backbones, measured over the RNA-Puzzles
+#: reference structures rather than taken from a table: the intra-residue
+#: C4'-N bond is 3.38 +/- 0.07 A and consecutive phosphates sit at
+#: 6.01 +/- 1.70 A, the wide spread being chain breaks rather than flexibility.
+BOND_GEOMETRY = {"c4_n": (3.38, 0.25), "p_p": (6.01, 1.50)}
+
+
+def geometry_validity(coords: np.ndarray,
+                      mask: Optional[np.ndarray] = None) -> Dict[str, float]:
+    """Is this a bonded chain, or a cloud of points that superimposes well?
+
+    None of the other metrics can tell. `clash_score` only looks for atoms too
+    CLOSE. TM-score, lDDT and GDT all compare a prediction to a reference after
+    superposition and never ask whether consecutive residues are joined. A
+    model that emits independent points scores badly on all of them, but it
+    scores badly in the same way a merely inaccurate model does, and the two
+    failures need completely different fixes.
+
+    The first real predictions off this pipeline had consecutive phosphates
+    36.15 A apart against a deposited 6.01, and C4'-N at 36.35 against 3.38 --
+    six and eleven times too long -- with a clash score of exactly 0.000 and no
+    other metric objecting. This is the check that would have said so.
+
+    Returns the fraction of each bond within tolerance and the median length,
+    so a report can distinguish "wrong shape" from "not a molecule".
+    """
+    out: Dict[str, float] = {}
+    if coords.ndim != 3 or coords.shape[0] < 2:
+        return {"c4_n_ok": float("nan"), "p_p_ok": float("nan"),
+                "c4_n_median": float("nan"), "p_p_median": float("nan")}
+    m = np.ones(len(coords), bool) if mask is None else np.asarray(mask, bool)
+
+    cn = np.linalg.norm(coords[:, 1] - coords[:, 2], axis=-1)[m]
+    tgt, tol = BOND_GEOMETRY["c4_n"]
+    out["c4_n_ok"] = float(np.mean(np.abs(cn - tgt) <= tol)) if cn.size else float("nan")
+    out["c4_n_median"] = float(np.median(cn)) if cn.size else float("nan")
+
+    link = m[1:] & m[:-1]
+    pp = np.linalg.norm(coords[1:, 0] - coords[:-1, 0], axis=-1)[link]
+    tgt, tol = BOND_GEOMETRY["p_p"]
+    out["p_p_ok"] = float(np.mean(np.abs(pp - tgt) <= tol)) if pp.size else float("nan")
+    out["p_p_median"] = float(np.median(pp)) if pp.size else float("nan")
+    return out

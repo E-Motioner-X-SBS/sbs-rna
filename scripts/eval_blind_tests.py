@@ -35,8 +35,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from pharos.eval.base_pairs import full_atom_pairs, geometric_pairs  # noqa: E402
 from pharos.eval.blind_tests import (Target, all_targets,  # noqa: E402
                                      competitor_label)
-from pharos.eval.metrics import (clash_score, gdt_ts, inf, lddt,  # noqa: E402
-                                 rmsd, tm_score)
+from pharos.eval.metrics import (clash_score, gdt_ts, geometry_validity,  # noqa: E402
+                                 inf, lddt, rmsd, tm_score)
 from pharos.eval.structure import align_by_resnum, read_structure  # noqa: E402
 
 OUT = ROOT / "data/samples/analysis/blind_tests.json"
@@ -73,6 +73,12 @@ def score_one(ref_path: Path, pred_path: Path,
         "lddt": lddt(B, A),
         "gdt_ts": gdt_ts(Br, Ar),
         "clash": clash_score(b.coords[keep]),
+        # Is it a bonded chain at all? Every other metric here compares shapes
+        # after superposition and would rank a cloud of unconnected points the
+        # same way it ranks a merely inaccurate fold. The first predictions off
+        # this pipeline had bonds six to eleven times too long with a clash
+        # score of 0.000 and nothing objected.
+        **geometry_validity(b.coords[keep]),
     }
     if ref_pairs is not None:
         got = geometric_pairs(pred.coords, pred.seq, mask=pred.residue_mask,
@@ -153,13 +159,21 @@ def report(data: Dict, show_field: bool) -> None:
 
     ours = [r for r in rows if r.get("pharos")]
     if ours:
-        print(f"\n{'target':12s} {'our TM':>7s} {'rank':>10s} {'our lDDT':>9s} {'our RMSD':>9s}")
-        print("  " + "-" * 52)
+        print(f"\n{'target':12s} {'our TM':>7s} {'rank':>10s} {'our lDDT':>9s} "
+              f"{'our RMSD':>9s} {'bonds ok':>9s}")
+        print("  " + "-" * 64)
         for r in ours:
             p = r["pharos"]
             rk = f"{r.get('tm_rank','?')}/{r.get('tm_of','?')}"
+            bo = 0.5 * (p.get("c4_n_ok", 0.0) + p.get("p_p_ok", 0.0))
             print(f"  {r['target']:10s} {p['tm']:7.3f} {rk:>10s} "
-                  f"{p['lddt']:9.3f} {p['rmsd']:9.2f}")
+                  f"{p['lddt']:9.3f} {p['rmsd']:9.2f} {bo:9.3f}")
+        bo_all = [0.5 * (r["pharos"].get("c4_n_ok", 0.0)
+                         + r["pharos"].get("p_p_ok", 0.0)) for r in ours]
+        if bo_all and np.nanmean(bo_all) < 0.5:
+            print(f"\n  WARNING: mean bond validity {np.nanmean(bo_all):.3f}. These are not")
+            print("  bonded chains, so the TM and lDDT above measure the shape of a point")
+            print("  cloud. Fix the geometry before reading anything into the ranking.")
     if show_field:
         for r in rp:
             print(f"\n  {r['target']}:")
