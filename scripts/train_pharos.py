@@ -339,8 +339,26 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
     if cm is not None and bool(cm.any()):
         # per-chain quality weighting, the same weight the contact head uses:
         # a 3.5 A structure is not evidence in the way a 1.9 A one is
+        # A dense (L, L) coupling map for the pair features. The contact head
+        # reads coevolution at sampled pairs only; the denoiser attends over
+        # everything, so it needs the full map. O(L^2) floats is affordable
+        # here because stage 5 caps chains at --max-length, where the pair
+        # tensor itself is already O(L^2 * d_pair).
+        cv_dense = None
+        key = t.get("coev_key")
+        if key is not None and key.numel():
+            cv_dense = torch.zeros(B, L, L, device=dev, dtype=out["hidden"].dtype)
+            bb = torch.div(key, L * L, rounding_mode="floor")
+            rem = key - bb * L * L
+            ii2 = torch.div(rem, L, rounding_mode="floor")
+            jj2 = rem - ii2 * L
+            ok = (bb < B) & (ii2 < L) & (jj2 < L)
+            v = t["coev_val"].to(cv_dense.dtype)
+            cv_dense[bb[ok], ii2[ok], jj2[ok]] = v[ok]
+            cv_dense = cv_dense + cv_dense.transpose(1, 2)   # couplings are symmetric
+        pair_feat = model.diff_pair(out["hidden"], cv_dense)
         dl = model.heads.structure.loss(
-            t["coords"].to(out["hidden"].dtype), out["hidden"], None, cm)
+            t["coords"].to(out["hidden"].dtype), out["hidden"], pair_feat, cm)
         total = total + structure_weight * (dl["loss"] * w.mean())
         parts["structure"] = float(dl["loss"].detach())
         parts["structure_mse"] = float(dl["mse"])

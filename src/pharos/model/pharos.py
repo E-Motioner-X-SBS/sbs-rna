@@ -36,6 +36,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .dynamics import DynamicsConfig, HarmonicEnsemble
+from .diffusion import DiffusionPairFeatures
 from .heads import HeadConfig, PharosHeads
 from .shared_moe import SharedMoEConfig
 from .motif_bank import MotifBankConfig, load_bank
@@ -265,6 +266,10 @@ class Pharos(nn.Module):
         # zero-initialised and the scalar is non-negative.
         self.coev_proj = nn.Linear(1, cfg.d_pair, bias=False)
         nn.init.zeros_(self.coev_proj.weight)
+        # The pair representation head 3 reads as an attention bias. Built here
+        # rather than inside the head because it is a function of the TRUNK's
+        # output, which is what the rest of the pair track is built from too.
+        self.diff_pair = DiffusionPairFeatures(cfg.d_model, cfg.d_pair)
         self.elec = ElectrostaticBias()
         # §8: retrieval, not memorisation. Queried from the PAIR features --
         # i.e. after pairing is estimated -- never from sequence, because the

@@ -307,3 +307,57 @@ class DiffusionStructureHead(nn.Module):
                 x_next = x + (s_next - s) * 0.5 * (d + dn)
             x = x_next
         return x * mask[..., None, None].to(x.dtype)
+
+
+class DiffusionPairFeatures(nn.Module):
+    """The pair representation head 3 was being denied.
+
+    `DenoiseBlock` takes a `(B, L, L, d_pair)` tensor and turns it into an
+    attention bias -- that is how a structure decoder is told which residues
+    belong near each other. Stage 5 passed `None`, so the denoiser saw only
+    per-residue embeddings and had to infer every geometric relationship from
+    them. A decoder with no pair channel cannot be told that residue 12 pairs
+    with residue 64; it can only be told what residue 12 and residue 64 are.
+
+    Three sources, summed:
+
+    **An outer sum, not an outer concatenation.** `proj(cat(h_i, h_j))` is the
+    obvious construction and costs `O(L^2 * d_model * d_pair)` -- 64 GFLOP for
+    one 512-residue chain. `a_i + b_j` gives each pair a learned function of
+    both endpoints for `O(L * d_model * d_pair)` of projection and an
+    `O(L^2 * d_pair)` broadcast, which is the difference between affordable and
+    not. It cannot represent interactions between the two endpoints that are
+    not additive, and the attention layers above it exist to supply those.
+
+    **Relative position**, clamped to +/- `max_rel`. Without it the decoder has
+    no notion of chain connectivity at all: nothing in a bag of residue
+    embeddings says residue i and residue i+1 are covalently bonded, and a
+    backbone that does not know that is a point cloud.
+
+    **Coevolution**, through a zero-initialised projection, so the feature
+    starts contributing exactly nothing and has to earn its way in -- the same
+    discipline `coev_proj` uses on the contact path, and for the same reason:
+    a model that already works must not regress the moment a feature is
+    switched on.
+    """
+
+    def __init__(self, d_model: int, d_pair: int, max_rel: int = 32):
+        super().__init__()
+        self.max_rel = max_rel
+        self.a = nn.Linear(d_model, d_pair, bias=False)
+        self.b = nn.Linear(d_model, d_pair, bias=False)
+        self.rel = nn.Embedding(2 * max_rel + 2, d_pair)
+        self.coev = nn.Linear(1, d_pair, bias=False)
+        nn.init.zeros_(self.coev.weight)
+        self.norm = nn.LayerNorm(d_pair)
+
+    def forward(self, single: torch.Tensor,
+                coev: Optional[torch.Tensor] = None) -> torch.Tensor:
+        B, L, _ = single.shape
+        p = self.a(single).unsqueeze(2) + self.b(single).unsqueeze(1)
+        idx = torch.arange(L, device=single.device)
+        d = (idx[None, :] - idx[:, None]).clamp(-self.max_rel, self.max_rel)
+        p = p + self.rel(d + self.max_rel)[None]
+        if coev is not None:
+            p = p + self.coev(coev.unsqueeze(-1).to(p.dtype))
+        return self.norm(p)
