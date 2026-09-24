@@ -1,0 +1,20 @@
+{
+ "checkpoint": "data/derived/checkpoints/heldout/step7000.pt",
+ "step": 7000,
+ "tokens": 992782286,
+ "n_experts": 512,
+ "max_k": 512,
+ "n_blocks": 18,
+ "threshold_rel": 1.0,
+ "tokens_scored": 4130,
+ "mean_width": 15.275046348571777,
+ "max_width": 330.0,
+ "router_entropy_bits": 7.255244286894566,
+ "max_entropy_bits": 9.0,
+ "token_router_entropy_bits": 1.3879766967251506,
+ "balance_per_block": 1.5166469746165805,
+ "dead_expert_frac": 0.0,
+ "top_decile_share": 0.15046042203903198,
+ "effective_experts": 288.4643469120815,
+ "warnings": []
+}

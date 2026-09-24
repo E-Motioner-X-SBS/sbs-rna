@@ -283,15 +283,38 @@ class PharosHeads(nn.Module):
 
 
 #: §9's table, as data, so a test can assert the implementation matches it.
+#:
+#: It had stopped being §9's table. §9 renumbered when the diffusion decoder and
+#: the two base-pair heads arrived -- it now reads 5 reactivity, 6 Mg, 7
+#: rigidity, 8 disorder, 9 base-pair geometry, 10 motif-class posterior -- and
+#: this list still carried the old 5 Mg, 6 rigidity, 7 reactivity, 8 fitness, 9
+#: splicing, 10 base_identity. So the one test whose job is to assert that the
+#: implementation matches the specification was comparing it against a stale
+#: private copy, and neither of the two newest heads was in it to be checked at
+#: all. The same failure as the rest of the audit: the check existed, it ran,
+#: and it could not have caught the thing it was for.
+#:
+#: `forward` is False for head 3, whose output is coordinates: the diffusion
+#: decoder produces them from `sample()` and scores them in `loss()`, and a
+#: plain forward pass never emits a `coords` key. Asserting one does is how
+#: this entry failed for as long as the diffusion head has existed.
 HEAD_SPEC: List[Dict] = [
     {"n": 1, "name": "contact", "output": "L x L binary", "key": "contact_logit"},
     {"n": 2, "name": "distance", "output": "L x L binned", "key": "distance_logits"},
-    {"n": 3, "name": "structure", "output": "coordinates, K states", "key": "coords"},
+    {"n": 3, "name": "structure", "output": "coordinates, K states",
+     "key": "coords", "forward": False},
     {"n": 4, "name": "secondary", "output": "dot-bracket", "key": "ss_logits"},
-    {"n": 5, "name": "mg_sites", "output": "per-residue", "key": "mg_logit"},
-    {"n": 6, "name": "rigidity", "output": "normalised B", "key": "rigidity"},
-    {"n": 7, "name": "reactivity", "output": "SHAPE/DMS", "key": "reactivity"},
-    {"n": 8, "name": "fitness", "output": "mutation effect", "key": "fitness"},
-    {"n": 9, "name": "splicing", "output": "site / outcome", "key": "splice_logits"},
-    {"n": 10, "name": "base_identity", "output": "recover N_struct", "key": "base_logits"},
+    {"n": 5, "name": "reactivity", "output": "SHAPE/DMS", "key": "reactivity"},
+    {"n": 6, "name": "mg_sites", "output": "per-residue", "key": "mg_logit"},
+    {"n": 7, "name": "rigidity", "output": "normalised B", "key": "rigidity"},
+    {"n": 8, "name": "disorder", "output": "per-residue", "key": "disorder_logit"},
+    {"n": 9, "name": "geometry", "output": "Leontis-Westhof class, per pair",
+     "key": "lw_logits"},
+    {"n": 10, "name": "motif", "output": "motif class, per residue",
+     "key": "motif_logits"},
 ]
+
+#: Heads the model produces that §9 no longer numbers. Listed rather than left
+#: out: an output nothing names is an output nothing checks, and these three
+#: were exactly that once §9 renumbered past them.
+EXTRA_HEAD_KEYS: List[str] = ["fitness", "splice_logits", "base_logits"]

@@ -15,7 +15,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from pharos.model.diffusion import (DiffusionConfig, DiffusionStructureHead,  # noqa: E402
+from pharos.model.diffusion import (BOND_C4_N, BOND_P_P,           # noqa: E402
+                                    DiffusionConfig, DiffusionStructureHead,
                                     N_ATOM, random_rigid)
 
 fails: list[str] = []
@@ -176,13 +177,44 @@ def main() -> int:
     cw = torch.randn(4, 40, N_ATOM, 3, generator=gw) * cfgw.sigma_data
     mw = torch.ones(4, 40, dtype=torch.bool)
     sw = torch.zeros(4, 40, 64)
-    vals = [float(hw.loss(cw, sw, None, mw,
-                          generator=torch.Generator().manual_seed(k))["loss"])
+    # The EDM TERM, not `["loss"]`. The flat-bottomed geometry penalty was
+    # added to `["loss"]` after this test was written, and on `cw` -- which is
+    # Gaussian noise scaled by sigma_data, not a backbone -- it reports 62 A of
+    # bond error and 86% of the total. The test then failed at 7.237 and looked
+    # like a regression in the divisor it was written to guard, which was
+    # intact at 0.994 the whole time. Subtracting the violation back out keeps
+    # this assertion on the quantity its own comment describes.
+    runs = [hw.loss(cw, sw, None, mw,
+                    generator=torch.Generator().manual_seed(k))
             for k in range(24)]
+    vals = [float(r["loss"]) - cfgw.violation_weight * float(r["violation"])
+            for r in runs]
     mean = sum(vals) / len(vals)
-    torch.set_rng_state(_state)
-    chk("the weighted loss sits at ~1.0 at initialisation", 0.5 < mean < 2.0,
+    chk("the weighted EDM loss sits at ~1.0 at initialisation", 0.5 < mean < 2.0,
         f"mean {mean:.3f} over 24 draws (9.0 would be the residue-divisor bug)")
+
+    # And the geometry term's own validity check, which it never had: on a
+    # chain that IS bonded correctly it must be a minority of the objective.
+    # A violation weight that dominates would spend head 3's gradient making
+    # the backbone self-consistent instead of making it right, and nothing
+    # downstream would say so -- `["loss"]` is one number and `TM-score` never
+    # asks whether the chain is bonded.
+    ch = torch.zeros(2, 32, N_ATOM, 3)
+    step = torch.tensor([BOND_P_P[0], 0.0, 0.0])
+    for i in range(32):
+        ch[:, i, 0] = step * i                       # P, spaced at 6.01 A
+        ch[:, i, 1] = step * i + torch.tensor([0.0, 4.0, 0.0])          # C4'
+        ch[:, i, 2] = step * i + torch.tensor([0.0, 4.0 + BOND_C4_N[0], 0.0])  # N
+    mc = torch.ones(2, 32, dtype=torch.bool)
+    sc = torch.zeros(2, 32, 64)
+    rc = [hw.loss(ch, sc, None, mc,
+                  generator=torch.Generator().manual_seed(k)) for k in range(12)]
+    share = (sum(cfgw.violation_weight * float(r["violation"]) for r in rc)
+             / max(sum(float(r["loss"]) for r in rc), 1e-9))
+    torch.set_rng_state(_state)
+    chk("on a correctly bonded chain the geometry term is a minority term",
+        share < 0.5,
+        f"{share:.1%} of the objective at weight {cfgw.violation_weight}")
 
     print("\n== sampling produces a structure, not noise ==")
     g = torch.Generator().manual_seed(3)

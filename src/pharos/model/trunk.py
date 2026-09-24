@@ -112,6 +112,21 @@ class TokenTrunk(nn.Module):
                   feats: Optional[RouterFeatures]) -> Tuple[torch.Tensor, Dict]:
         aux_sum = {"balance_loss": x.new_zeros(())}
         usage: List[torch.Tensor] = []
+        #: Scalars the MoE block computes and this loop used to throw away.
+        #:
+        #: `SharedMoEFeedForward` reports `mean_width`, `max_width` and two
+        #: router entropies at every block of every step, with a comment saying
+        #: they are "what the fixed-k version could not report". They were
+        #: computed 18 times a step for the whole run and never left this
+        #: function: only `balance_loss` and `expert_usage` were kept, and the
+        #: trainer reads only the first of those. So the central claim about
+        #: nucleus routing -- that a confident token fires one expert and an
+        #: ambiguous one fires many -- had never been measured, and "no router
+        #: collapse" rested on a single aggregate with no stated threshold.
+        #: Averaging four more scalars over the blocks costs nothing.
+        SCALARS = ("mean_width", "max_width", "router_entropy",
+                   "token_router_entropy")
+        scal: Dict[str, List[torch.Tensor]] = {k: [] for k in SCALARS}
         ckpt = self.cfg.grad_checkpoint and torch.is_grad_enabled()
         for blk in self.blocks:
             if ckpt:
@@ -123,7 +138,15 @@ class TokenTrunk(nn.Module):
                 x, aux = blk(x, mask, pair_bias, feats)
             aux_sum["balance_loss"] = aux_sum["balance_loss"] + aux["balance_loss"]
             usage.append(aux["expert_usage"])
+            for k in SCALARS:
+                if k in aux:
+                    scal[k].append(aux[k])
         aux_sum["expert_usage"] = torch.stack(usage).mean(0)
+        for k in SCALARS:
+            if scal[k]:
+                v = torch.stack(scal[k])
+                # the widest block, not the mean of the widest, for max_width
+                aux_sum[k] = v.max() if k == "max_width" else v.mean()
         return self.norm_out(x), aux_sum
 
     def forward(self, x0: torch.Tensor, mask: torch.Tensor,

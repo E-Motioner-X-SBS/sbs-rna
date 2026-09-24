@@ -347,6 +347,36 @@ def main() -> int:
         chk("R1 beats S7.1's 0.377 long-chain prior by a wide margin",
             int(lb["l2_>=1500"] > 2.5 * 0.377), 1)
 
+        # ---- R2: the router actually routes (scripts/audit_router.py) ------
+        #
+        # The MoE block computes `mean_width`, `max_width` and two router
+        # entropies at every block of every step; the trunk discarded all four
+        # before the trainer could see them, so "no router collapse" rested on
+        # the balance term alone with no stated threshold, and nucleus
+        # routing's central claim -- variable width -- had never been measured
+        # on a trained model. Measured at step 7,000 (992.8M tokens).
+        import json as _rjson
+        ra = ROOT / "data/samples/analysis/router_audit.json"
+        if ra.exists():
+            rj = _rjson.loads(ra.read_text())
+            chk("R2 routing width is variable, not pinned at max_k",
+                int(1.0 < rj["mean_width"] < rj["max_k"]), 1)
+            chk("R2 mean routing width", round(rj["mean_width"], 2), 15.28,
+                abs_tol=0.01)
+            chk("R2 widest token", int(rj["max_width"]), 330)
+            chk("R2 no dead experts", rj["dead_expert_frac"], 0.0, abs_tol=1e-9)
+            chk("R2 effective experts of 512", round(rj["effective_experts"], 1),
+                288.5, abs_tol=0.1)
+            # 1.0 is uniform and 512 is total collapse; the run sits just above
+            # uniform, which is the opposite of collapse
+            chk("R2 balance per block is near uniform",
+                int(rj["balance_per_block"] < 2.0), 1)
+            chk("R2 router entropy of the 9.000 available",
+                round(rj["router_entropy_bits"], 3), 7.255, abs_tol=0.002)
+            chk("R2 the audit raised no warnings", len(rj["warnings"]), 0)
+        else:
+            chk("R2 router audit run (scripts/audit_router.py)", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
@@ -442,12 +472,25 @@ def main() -> int:
             chk("dataset contacts", ds["n_contacts"], 63298800)
             chk("dataset longest chain", ds["length"]["max"], 4450)
             sp = ds["split"]["by_residue"]
-            chk("split: train residues", sp["train"], 10093574)
+            chk("split: train residues", sp["train"], 10010363)
             # val and test are packed to the same residue budget on purpose;
-            # if they drift apart the packer has stopped balancing
-            chk("split: val and test balanced to the residue",
-                int(sp["val"] == sp["test"]), 1)
-            chk("split: val residues", sp["val"], 410303)
+            # if they drift apart the packer has stopped balancing. NOT exact
+            # equality: the packer assigns whole CHAINS, so a perfect tie is
+            # only available when the lengths happen to sum that way, and the
+            # v3 corpus lands one residue apart. An equality test called that a
+            # failure for as long as v3 has existed.
+            chk("split: val and test balanced by residue (within 1%)",
+                int(abs(sp["val"] - sp["test"]) <= max(1, 0.01 * min(sp["val"], sp["test"]))), 1)
+            chk("split: val residues", sp["val"], 531547)
+            chk("split: test residues", sp["test"], 531546)
+            # v3 added coordinates, per-chain Rfam, and the two base-pair
+            # targets. Heads 9 and 10 have real, non-degenerate supervision:
+            # all 13 Leontis-Westhof classes and all 3 motif classes occur.
+            _rows = [c for sh in ds["shards"] for c in sh["chains"]]
+            chk("head 9: Leontis-Westhof annotated pairs",
+                sum(c.get("n_lw_pairs", 0) for c in _rows), 3472712)
+            chk("head 9: chains carrying at least one annotated pair",
+                sum(1 for c in _rows if c.get("n_lw_pairs", 0)), 12644)
             chk("split: test_ribosomal is separate and labelled",
                 int("test_ribosomal" in sp), 1)
             # the free supervision channels (§9): each must be present, and the
