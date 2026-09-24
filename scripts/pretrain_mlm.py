@@ -482,6 +482,23 @@ def require_gpu(args) -> torch.device:
     return torch.device(args.device)
 
 
+
+def _router_str(deads, widths, wmaxes, n: int) -> str:
+    """`dead=` and `w=` for the step line, empty when the model reports neither.
+
+    Kept short because it sits in a line that is already long, and kept
+    unconditional because a router figure that appears only when something
+    looks wrong is a figure nobody calibrates.
+    """
+    out = ""
+    if deads:
+        out += f"dead {100 * float(np.mean(deads[-n:])):.1f}% "
+    if widths:
+        out += (f"w {float(np.mean(widths[-n:])):.1f}/"
+                f"{float(np.max(wmaxes[-n:])):.0f} ")
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -516,8 +533,24 @@ def main() -> None:
     ap.add_argument("--token-budget-fixed", type=int, default=24576,
                     help="padded tokens per step; PHAROS-Small peaks near 43 GiB "
                          "at 32k, so this leaves headroom on an 80 GiB card")
-    ap.add_argument("--max-batch", type=int, default=512,
-                    help="guard against a batch of thousands of 20-nt sequences")
+    ap.add_argument("--max-batch", type=int, default=2048,
+                    help="guard against a batch of thousands of 20-nt "
+                         "sequences. 512 was too tight and it BOUND: on "
+                         "elDORS c020 (mean 168 nt) 92.5% of batches hit the "
+                         "cap instead of the token budget, and the step "
+                         "carried 83,899 real tokens against 194,607 on c001 "
+                         "-- a 2.3x swing in effective batch size driven by "
+                         "nothing but which shard was streaming. At 2048 the "
+                         "budget binds instead: 167,798 real tokens and "
+                         "224,144 padded of the 228,352 available, 0% capped. "
+                         "Memory-safe not because attention gets cheaper -- "
+                         "it does not, B*L^2 goes 29.9M to 60.9M as the batch "
+                         "stops under-filling -- but because the token budget "
+                         "is the quantity the trainer already sized against "
+                         "the card, and it was measured at 57.9 of a 71.3 GiB "
+                         "target at this budget on long shards. Short shards "
+                         "were simply running below the budget they were "
+                         "allowed.")
     ap.add_argument("--min-len", type=int, default=20)
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--n-loops", type=int, default=2,
@@ -748,6 +781,10 @@ def main() -> None:
         runlog.event("resumed", step=step, tokens=seen, padded_tokens=padded)
     run: List[float] = []
     bals: List[float] = []
+    btoks: List[int] = []
+    deads: List[float] = []
+    widths: List[float] = []
+    wmaxes: List[float] = []
     accs: List[float] = []
     hist: List[Dict] = list(hist_resumed)
     stop = False
@@ -909,6 +946,32 @@ def main() -> None:
               run.append(float(ce.detach()))
               bals.append(float(bal.detach()))
               accs.append(acc)
+              # Router telemetry, which the block computes at every layer and
+              # nothing ever read. `bal` alone cannot distinguish "specialised"
+              # from "collapsed": it is 1.0 at uniform routing and n_experts at
+              # a single live expert, and nobody had written down where between
+              # those the run was supposed to sit. `dead` (experts taking under
+              # a tenth of their uniform share) and `width` (how many experts a
+              # token actually fires) say it directly -- and `width` is the
+              # nucleus-routing claim itself, which had never been measured.
+              _ax = out["aux"]
+              if "expert_usage" in _ax:
+                  _u = _ax["expert_usage"].detach().float()
+                  deads.append(float((_u < 0.1 / _u.numel()).float().mean()))
+              if "mean_width" in _ax:
+                  widths.append(float(_ax["mean_width"].detach()))
+                  wmaxes.append(float(_ax["max_width"].detach()))
+              # Real tokens in THIS batch. The step used to report only a
+              # running rate, which averages over the shard and hides that the
+              # effective batch size swings 2.3x with sequence length: at
+              # `max_batch` 512 a short-sequence shard caps 92.5% of its
+              # batches on the COUNT rather than the token budget, so the step
+              # carries 83,899 tokens where a long-sequence shard carries
+              # 194,607. Gradient noise scales with 1/sqrt(batch), so that is a
+              # different optimisation regime arriving unannounced -- and it
+              # lines up with the step-8,500 held-out regression, where tokens
+              # per 100 steps had fallen from 20.2M to 10.8M.
+              btoks.append(int(lengths.sum()))
               seen += int(lengths.sum())
               padded += int(tok_np.size)
               step += 1
@@ -936,6 +999,8 @@ def main() -> None:
                         f"({np.mean(run[-args.log_every:])/np.log(2):.3f} bits, "
                         f"ppl {np.exp(np.mean(run[-args.log_every:])):.3f}) "
                         f"bal {np.mean(bals[-args.log_every:]):.3f} "
+                        f"{_router_str(deads, widths, wmaxes, args.log_every)}"
+                        f"btok {int(np.mean(btoks[-args.log_every:])):,} "
                         f"lr {lr_now:.2e} "
                         f"acc {np.mean(accs[-args.log_every:]):.4f} "
                         f"{rate_r/1e3:.1f}k tok/s "
