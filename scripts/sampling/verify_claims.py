@@ -683,6 +683,39 @@ def main() -> int:
         else:
             chk("R13 coevolution assignment measured", 0, 1)
 
+        # ---- R14: stages 2-3 have a validation split, and it is disjoint ---
+        #
+        # bpRNA-SPOT ships train, validation AND test parquets and the trainer
+        # read only `train`, so head 4's published accuracy was its TRAINING
+        # accuracy -- on 10,934 examples the balanced loop recycles about 31
+        # times per pass over Ribonanza's 335,616 profiles. A split that is
+        # never read is not a split, and one that overlaps training is worse
+        # than none because it reports a number that looks like generalisation.
+        import importlib.util as _ilu
+        _sp = _ilu.spec_from_file_location(
+            "_ts", ROOT / "scripts/train_sequence_stages.py")
+        try:
+            _ts = _ilu.module_from_spec(_sp)
+            _sp.loader.exec_module(_ts)
+        except Exception as _e:                                  # noqa: BLE001
+            chk("R14 stages 2-3 importable", 0, 1)
+            _ts = None
+        if _ts is not None:
+            _got = {}
+            for _split in ("train", "validation", "test"):
+                _seqs = []
+                for _i, (_s, _d) in enumerate(_ts.iter_ss(_split, 32)):
+                    _seqs += _s
+                    if _i >= 40:
+                        break
+                _got[_split] = _seqs
+            chk("R14 the validation split loads",
+                int(len(_got["validation"]) > 0), 1)
+            chk("R14 the test split loads", int(len(_got["test"]) > 0), 1)
+            _tr, _va = set(_got["train"]), set(_got["validation"])
+            chk("R14 validation is disjoint from train",
+                len(_tr & _va), 0)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
