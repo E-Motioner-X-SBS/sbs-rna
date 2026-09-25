@@ -39,9 +39,22 @@ cd "$REPO"
 : "${NEED_GIB:=60}"
 : "${MLM_OPT:=muon}"
 : "${MUON_LR:=0.02}"
+# Fixed budget and a vram target that keeps the auto-tune from growing into
+# the OOM that cost run 2 half its batch. 0 restores auto-tuning.
+#
+# The auto-tune grew to 228,352 (peak 58.8 GiB), then took one more 10% step
+# and peak went past 79 -- memory is not linear in the budget, because
+# attention is B*L^2 and the pool composition moves. Four OOMs at one step
+# followed, each cutting 15%, ending at 117,760. 180,224 is 79% of the level
+# that survived; at an estimated 46.4 GiB peak it sits above
+# 0.85 * 0.65 * 79.3 = 43.8, so the growth check never fires.
+: "${MLM_TOKEN_BUDGET:=180224}"
+: "${MLM_VRAM_TARGET:=0.65}"
 exec /store/shuvam/.venv/bin/python -u scripts/pretrain_mlm.py \
     --device cuda --min-free-gib "${NEED_GIB:-60}" --size "${MLM_SIZE:-shared400}" \
-    --tokens "${MLM_TOKENS:-8e9}" --token-budget 0 \
+    --tokens "${MLM_TOKENS:-8e9}" \
+    --token-budget "${MLM_TOKEN_BUDGET:-180224}" \
+    --vram-target "${MLM_VRAM_TARGET:-0.65}" \
     --corpus data/derived/parquet_starter data/derived/parquet_mars \
     --n-loops 3 --sample-loops \
     --interleave 8 --max-batch 2048 \
