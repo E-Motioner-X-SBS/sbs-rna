@@ -378,7 +378,11 @@ def main() -> int:
                     w.writerow(["timestamp", "checkpoint", "step", "tokens",
                                 "bits", "perplexity", "accuracy", "n_masked",
                                 "n_seq", "seed", "min_len", "max_len",
-                                "wc_gap", "wc_visible", "wc_masked", "wc_n"])
+                                "wc_gap", "wc_visible", "wc_masked", "wc_n",
+                                # bf16 autocast on cuda, fp32 on cpu: the two
+                                # are not the same numeric path and a series
+                                # that mixes them silently is not one series
+                                "device", "split"])
                 # All SIXTEEN columns the header declares.
                 #
                 # The row wrote twelve. The four Watson-Crick complementarity
@@ -400,7 +404,8 @@ def main() -> int:
                             round(_g, 5) if _ok else "",
                             round(r.get("comp_visible", 0.0), 5) if _ok else "",
                             round(r.get("comp_masked", 0.0), 5) if _ok else "",
-                            r.get("comp_n", "") if _ok else ""])
+                            r.get("comp_n", "") if _ok else "",
+                            device.type, args.split])
     if not args.no_csv:
         print(f"\n[eval] appended to {args.append_csv.relative_to(ROOT)}")
     return 0

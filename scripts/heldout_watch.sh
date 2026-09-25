@@ -32,11 +32,32 @@ pending=""
 # Score one saved checkpoint. Returns the evaluator's exit status, which the
 # caller MUST look at -- see the note at the call site.
 score_ckpt() {
-    local f="$1" st="$2"
-    echo "$(date -Is) scoring step $st" >> "$LOG"
-    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-      timeout 900 $PY -u scripts/eval_mlm_checkpoint.py \
-        --ckpt "$f" --device cuda --n-seq 1024 --token-budget 8192 \
+    local f="$1" st="$2" b
+    # Halving backoff on the token budget.
+    #
+    # The stratified sample has a mean length of 324 nt against the legacy
+    # sample's 185, and attention is B*L^2 at a fixed B*L, so at the same
+    # budget it costs about 1.75x the memory and its worst batch -- 1,024-nt
+    # sequences -- costs five times more. Against a trainer that has grown to
+    # 73.4 GiB plus an unrelated 1.7 GiB service on the same card, 8,192
+    # OOMed three times and the curve lost step 10,000. The budget only sets
+    # how the fixed sample is packed, so a smaller one scores the SAME
+    # sequences; it is slower and otherwise identical.
+    # CPU, not CUDA. The backoff below is kept, but it was treating the
+    # wrong problem: the trainer has grown to 71.6 GiB, an unrelated service
+    # holds 1.7 more, and the card has about 3 GiB free -- not enough for
+    # 394M parameters plus activations at ANY token budget. 8,192 OOMed three
+    # times and lost step 10,000; 3,072 and 1,536 then OOMed too, and one of
+    # those retries collided with a manual eval I was running at the same
+    # time. There is no GPU-side budget that fits.
+    #
+    # On CPU it takes about 35 minutes at 512 sequences against a checkpoint
+    # every 40, so it keeps up, and it cannot compete with the trainer. The
+    # numeric path differs -- fp32 here, bf16 autocast on cuda -- so the csv
+    # now carries a `device` column and a series must not mix them.
+    echo "$(date -Is) scoring step $st on cpu" >> "$LOG"
+    timeout 3000 $PY -u scripts/eval_mlm_checkpoint.py \
+        --ckpt "$f" --device cpu --n-seq 512 --token-budget 4096 \
         --split stratified \
         --append-csv data/samples/analysis/runs/heldout_stratified.csv \
         >> "$LOG" 2>&1
