@@ -28,6 +28,7 @@ last=""
 lastmt=""
 tries=0
 pending=""
+EVERY_N=1000
 
 # Score one saved checkpoint. Returns the evaluator's exit status, which the
 # caller MUST look at -- see the note at the call site.
@@ -56,8 +57,17 @@ score_ckpt() {
     # numeric path differs -- fp32 here, bf16 autocast on cuda -- so the csv
     # now carries a `device` column and a series must not mix them.
     echo "$(date -Is) scoring step $st on cpu" >> "$LOG"
-    timeout 3000 $PY -u scripts/eval_mlm_checkpoint.py \
-        --ckpt "$f" --device cpu --n-seq 512 --token-budget 4096 \
+    # 8 threads of 24, and a 90-minute ceiling.
+    #
+    # Unthrottled this took 11 cores and 26+ minutes for 512 sequences, and the
+    # trainer's throughput fell from 15.9k to 14.7k tok/s -- it needs CPU of its
+    # own for parquet decode and masking, so an evaluation that takes half the
+    # machine is charged to the run it is measuring. Capped at 8 threads and
+    # 384 sequences, and gated to every 1,000 steps by the caller, the cost is
+    # roughly one reading every 2.7 hours for a few percent of throughput.
+    OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 \
+    timeout 5400 $PY -u scripts/eval_mlm_checkpoint.py \
+        --ckpt "$f" --device cpu --n-seq 384 --token-budget 4096 \
         --split stratified \
         --append-csv data/samples/analysis/runs/heldout_stratified.csv \
         >> "$LOG" 2>&1
@@ -114,6 +124,17 @@ PYEOF
                     tries=0
                 fi
             fi
+        fi
+        # Only every EVERY_N steps. A CPU evaluation costs about 40 minutes
+        # and some of the trainer's own cores; at one per checkpoint that is a
+        # permanent tax for a curve whose points are 250 steps apart and
+        # 0.05 bits noisy. Every 1,000 steps is four times cheaper and loses
+        # nothing that the noise was not already hiding.
+        if [ -n "$step" ] && [ "$step" != "$last" ] \
+           && [ $((step % EVERY_N)) -ne 0 ]; then
+            echo "$(date -Is) skipping step $step (not a multiple of $EVERY_N)" >> "$LOG"
+            last="$step"
+            step=""
         fi
         if [ -n "$step" ] && [ "$step" != "$last" ]; then
             cp -f "$CKPT" "$KEEP/step${step}.pt" 2>/dev/null
