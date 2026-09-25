@@ -120,6 +120,12 @@ def enable_gpu_fast_paths() -> None:
 #: seed is one a resumed run can silently train on.
 N_HELDOUT_SHARDS = 2
 
+#: Token budget used to pack the in-loop held-out sample into batches. Fixed,
+#: and deliberately NOT tied to the training budget -- see the note where it is
+#: used. Changing this value invalidates comparison with every reading taken
+#: before the change.
+HELDOUT_PACK_TOKENS = 32768
+
 
 def _corpus_files(corpus) -> List[Path]:
     """Every parquet shard under `corpus`, which may be dirs OR files.
@@ -940,6 +946,7 @@ def main() -> None:
     oom_ceiling = 0
     last_oom_step = -10**9
     ckpt_fails = 0
+    heldout_n_masked = None
     budget_tokens = args.token_budget
     n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
@@ -982,12 +989,24 @@ def main() -> None:
                 _j = int(_r.integers(0, _n + 1))
                 if _j < args.heldout_seq:
                     _hs[_j] = _seq
-        # A quarter of the training budget: evaluation runs under no_grad and
-        # could afford more, but the batches must stay small enough that a
-        # checkpoint evaluation never becomes the step that OOMs the run.
-        # `budget_tokens` rather than `args.token_budget` only because the two
-        # are the same object by this line and the local says so.
-        _groups = _pack_pool(_hs, max(4096, budget_tokens // 4), args.max_batch,
+        # A CONSTANT, not a quarter of the training budget.
+        #
+        # It was `budget_tokens // 4`, which makes the "fixed sample" depend on
+        # the training budget -- and the training budget changes with the card,
+        # with `--token-budget`, and with every OOM. The same 512 sequences
+        # then pack into a different number of batches, pad differently, and
+        # draw different positions out of the shared masking rng:
+        #
+        #     budget 131,072 -> 6 batches, 13,476 masked positions
+        #     budget 180,224 -> 5 batches, 13,403 masked positions
+        #
+        # So the number moved 1.8537 -> 1.8444 across a restart and part of
+        # that was the sample, not the model. A fixed sample whose fixity
+        # depends on an unrelated parameter is not a fixed sample.
+        #
+        # 32,768 is what the default start produced, so runs before this change
+        # that began at the default budget remain comparable.
+        _groups = _pack_pool(_hs, HELDOUT_PACK_TOKENS, args.max_batch,
                              np.random.default_rng(args.heldout_seed))
         print(f"[mlm] held-out sample: {len(_hs):,} sequences in "
               f"{len(_groups)} fixed batches, drawn from "
@@ -1373,6 +1392,17 @@ def main() -> None:
                   # can tell its own progress from its corpus's variance.
                   if heldout is not None:
                       hv = heldout(model)
+                      # the masked-position count is an INVARIANT of a fixed
+                      # sample; if it moves, the sample moved and the series is
+                      # not one series
+                      if heldout_n_masked is None:
+                          heldout_n_masked = hv["n_masked"]
+                      elif hv["n_masked"] != heldout_n_masked:
+                          print(f"[mlm] WARNING held-out sample changed: "
+                                f"{heldout_n_masked:,} -> {hv['n_masked']:,} "
+                                f"masked positions. Readings before and after "
+                                f"this point are not comparable.", flush=True)
+                          heldout_n_masked = hv["n_masked"]
                       print(f"[mlm] held-out {hv['bits']:.4f} bits "
                             f"ppl {hv['perplexity']:.3f} acc {hv['accuracy']:.4f} "
                             f"(fixed {hv['n_masked']:,} masked positions)",
