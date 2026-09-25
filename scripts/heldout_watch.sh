@@ -29,6 +29,7 @@ lastmt=""
 tries=0
 pending=""
 EVERY_N=1000
+scored_at=0
 
 # Score one saved checkpoint. Returns the evaluator's exit status, which the
 # caller MUST look at -- see the note at the call site.
@@ -137,9 +138,19 @@ PYEOF
         # permanent tax for a curve whose points are 250 steps apart and
         # 0.05 bits noisy. Every 1,000 steps is four times cheaper and loses
         # nothing that the noise was not already hiding.
+        # First checkpoint AT OR AFTER each boundary, not exact equality.
+        #
+        # `step % EVERY_N -ne 0` looked equivalent and was not. `adapt_every`
+        # 200 against `ckpt_every` 250 makes the trainer's budget-growth check
+        # land on the same step as the checkpoint every 1,000 steps, and the
+        # growth used to `break` before the save -- so the checkpoints on
+        # 1,000-step boundaries were exactly the ones being skipped, and this
+        # gate wanted exactly those. Two correct-looking rules that starve the
+        # curve when composed. The trainer side is fixed; this side no longer
+        # depends on it.
         if [ -n "$step" ] && [ "$step" != "$last" ] \
-           && [ $((step % EVERY_N)) -ne 0 ]; then
-            echo "$(date -Is) skipping step $step (not a multiple of $EVERY_N)" >> "$LOG"
+           && [ "$step" -lt $((scored_at + EVERY_N)) ]; then
+            echo "$(date -Is) skipping step $step (next due at $((scored_at + EVERY_N)))" >> "$LOG"
             last="$step"
             step=""
         fi
@@ -163,6 +174,7 @@ PYEOF
             # Retries are capped so a permanently broken evaluator polls every
             # five minutes rather than spinning, and gives up loudly.
             last="$step"
+            [ "$rc" -eq 0 ] && scored_at="$step"
             if [ "$rc" -ne 0 ]; then
                 echo "$(date -Is) eval FAILED for step $step (rc=$rc); queued for retry" >> "$LOG"
                 pending="$step"

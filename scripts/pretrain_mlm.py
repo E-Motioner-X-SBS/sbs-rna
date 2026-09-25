@@ -899,6 +899,9 @@ def main() -> None:
     accs: List[float] = []
     hist: List[Dict] = list(hist_resumed)
     stop = False
+    #: set by the budget-growth check, consumed after the checkpoint block, so
+    #: growing the budget can never skip a save. See the note at the call site.
+    rebuild_stream = False
     budget_tokens = args.token_budget
     n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
@@ -1170,9 +1173,21 @@ def main() -> None:
                                        token_budget=grown, peak_gib=round(peak, 2))
                           budget_tokens = grown
                           torch.cuda.reset_peak_memory_stats()
-                          break        # rebuild the stream at the new budget
+                          # DEFERRED break. Breaking here skipped the
+                          # checkpoint block below on the same iteration, and
+                          # `adapt_every` 200 against `ckpt_every` 250 means
+                          # the two coincide every 1,000 steps -- so every
+                          # thousandth checkpoint was dropped whenever the
+                          # budget was still growing, which is exactly the
+                          # phase right after a restart. Observed: run 2
+                          # resumed at step 10,750, grew the budget at 11,000,
+                          # and had written no checkpoint 350 steps later.
+                          # Worse, the held-out watcher scores on 1,000-step
+                          # boundaries, so the only checkpoints it wants were
+                          # the only ones being skipped.
+                          rebuild_stream = True
 
-              if step % args.ckpt_every == 0 or seen >= budget:
+              if step % args.ckpt_every == 0 or seen >= budget or rebuild_stream:
                   atomic_save({"cfg": cfg.__dict__, "model": _clean_state(model),
                               "opt": opt.state_dict(),
                               # every optimiser, or a Muon resume silently
@@ -1205,6 +1220,11 @@ def main() -> None:
                                  note="held-out fixed sample")
               if seen >= budget:
                   stop = True
+                  break
+              if rebuild_stream:
+                  # the deferred break: the checkpoint above has been written,
+                  # so the stream can now be rebuilt at the new budget
+                  rebuild_stream = False
                   break
           except torch.OutOfMemoryError:
             # A run of this length must not die of one batch. Peak memory
