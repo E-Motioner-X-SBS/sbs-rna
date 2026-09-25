@@ -600,6 +600,13 @@ def main() -> None:
                          "(partial r -0.52). Freezing trades gradient quality "
                          "for headroom, so the gain is REPORTED at every "
                          "growth and the policy is left to a human.")
+    ap.add_argument("--oom-recover-steps", type=int, default=1000,
+                    help="OOM-free steps before the token budget may climb "
+                         "back toward 90%% of the level that failed. Without "
+                         "recovery a single OOM burst is permanent: run 2 took "
+                         "four at one step, fell from 228,352 to 117,760, and "
+                         "would have finished 6.2B tokens at 52%% of its batch "
+                         "with nothing re-testing that.")
     ap.add_argument("--adapt-every", type=int, default=200,
                     help="steps between budget adjustments")
     ap.add_argument("--token-budget-reserve", type=float, default=10.0,
@@ -920,6 +927,11 @@ def main() -> None:
     tps_at_budget: List[float] = []
     prev_rate = 0.0
     budget_frozen = False
+    #: the budget that first OOMed, and when the last OOM was. The budget may
+    #: climb back toward 90% of the ceiling after a quiet period, but never to
+    #: the level that failed. See the note at the growth site.
+    oom_ceiling = 0
+    last_oom_step = -10**9
     budget_tokens = args.token_budget
     n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
@@ -1231,7 +1243,45 @@ def main() -> None:
                                    tok_per_s=round(_rate, 1),
                                    gain=round(_gain, 4))
                       budget_frozen = True
-                  if peak < 0.85 * want and not budget_frozen:
+                  # RECOVERY, and a ceiling learned from the OOM.
+                  #
+                  # The budget was a one-way ratchet. `n_oom == 0` in the
+                  # condition below meant a single OOM disabled growth for the
+                  # rest of the run, and the shrink is multiplicative, so a
+                  # burst of them compounds. Run 2 took four at ONE step --
+                  # 228,352 -> 193,536 -> 163,840 -> 139,264 -> 117,760, each a
+                  # 15% cut of the last -- and would then have trained its
+                  # remaining 6.2B tokens at 52% of the batch it had, with
+                  # nothing ever re-testing whether that was necessary. Batch
+                  # size is what correlates with held-out bits here
+                  # (partial r -0.52), so that is not a free safety margin.
+                  #
+                  # What actually failed is the growth model. It extrapolates
+                  # memory LINEARLY in the token budget -- `budget * want/peak`
+                  # -- and memory is not linear: attention is B*L^2 and the
+                  # pool composition changes underneath. A 10% budget rise took
+                  # peak from 58.8 GiB to over 79. So the level that OOMed is
+                  # now remembered and never approached again.
+                  if n_oom > 0 and oom_ceiling == 0:
+                      oom_ceiling = budget_tokens
+                  ok_since_oom = step - last_oom_step
+                  may_recover = (n_oom > 0 and oom_ceiling > 0
+                                 and ok_since_oom >= args.oom_recover_steps)
+                  if may_recover and budget_tokens < int(oom_ceiling * 0.9):
+                      _back = min(int(budget_tokens * 1.10),
+                                  int(oom_ceiling * 0.9)) // 1024 * 1024
+                      if _back > budget_tokens:
+                          print(f"[mlm] {ok_since_oom} steps without an OOM; "
+                                f"token budget {budget_tokens:,} -> {_back:,} "
+                                f"(ceiling {int(oom_ceiling * 0.9):,}, 90% of "
+                                f"the {oom_ceiling:,} that failed)", flush=True)
+                          runlog.event("budget recovered", step=step,
+                                       token_budget=_back,
+                                       oom_ceiling=oom_ceiling)
+                          budget_tokens = _back
+                          torch.cuda.reset_peak_memory_stats()
+                          rebuild_stream = True
+                  if peak < 0.85 * want and n_oom == 0 and not budget_frozen:
                       grown = min(int(budget_tokens * 1.10),
                                   int(budget_tokens * want / max(peak, 1e-6)))
                       grown = max(8192, grown // 1024 * 1024)
@@ -1327,6 +1377,9 @@ def main() -> None:
                     f"out of memory at the minimum token budget ({floor:,}); "
                     f"this configuration does not fit on this card. Reduce the "
                     f"model, enable grad_checkpoint, or free GPU memory.")
+            if oom_ceiling == 0:
+                oom_ceiling = budget_tokens
+            last_oom_step = step
             budget_tokens = shrunk
             print(f"[mlm] OOM #{n_oom} at step {step}; token budget "
                   f"-> {budget_tokens:,}, rebuilding the stream and continuing",
