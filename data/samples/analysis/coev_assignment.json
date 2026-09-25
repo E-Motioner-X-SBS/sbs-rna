@@ -1,0 +1,13 @@
+{
+ "chains_sampled": 600,
+ "with_rfam": 507,
+ "with_couplings": 414,
+ "with_lw": 337,
+ "scored": 337,
+ "prec_topL_5": 0.6356,
+ "prec_topL": 0.1828,
+ "rec_topL": 0.5237,
+ "random_baseline": 0.0064,
+ "enrichment": 28.42,
+ "note": "tests the ASSIGNMENT end to end -- family -> alignment -> map_to_query -> this chain's coordinates -- against the depositor's own base-pair annotation, which is independent of Rfam. coevolution_signal.json validates the MI computation against Rfam SS_cons and cannot see a misassigned family."
+}

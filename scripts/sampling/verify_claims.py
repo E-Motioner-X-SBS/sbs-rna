@@ -655,6 +655,34 @@ def main() -> int:
         else:
             chk("R12 WC-gap history recovered", 0, 1)
 
+        # ---- R13: coevolution is attached to the RIGHT chain ---------------
+        #
+        # `coevolution_signal.json` validates the MI computation against Rfam's
+        # own SS_cons: it says the couplings are right FOR THEIR FAMILY. It
+        # cannot see a misassigned family, a broken alignment or a wrong
+        # `map_to_query`, because all three leave the family's couplings intact
+        # and merely attach them to the wrong chain or the wrong columns. And
+        # the reach measurement (R3) cannot see it either -- a wrong coupling
+        # still matches a key and still counts as reached.
+        #
+        # So: the depositor's own base-pair annotation, which owes nothing to
+        # Rfam, scored against each chain's top couplings.
+        ca = ROOT / "data/samples/analysis/coev_assignment.json"
+        if ca.exists():
+            aj = _rjson.loads(ca.read_text())
+            chk("R13 chains scored", aj["scored"], 337)
+            chk("R13 precision at top-L/5 on the chain's OWN pairs",
+                aj["prec_topL_5"], 0.6356, abs_tol=0.0002)
+            chk("R13 recall at top-L", aj["rec_topL"], 0.5237, abs_tol=0.0002)
+            chk("R13 random-pair baseline", aj["random_baseline"], 0.0064,
+                abs_tol=0.0002)
+            chk("R13 enrichment over random", aj["enrichment"], 28.42,
+                abs_tol=0.02)
+            chk("R13 the assignment path is not chance",
+                int(aj["enrichment"] > 10.0), 1)
+        else:
+            chk("R13 coevolution assignment measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
