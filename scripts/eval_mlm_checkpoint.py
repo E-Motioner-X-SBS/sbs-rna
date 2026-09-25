@@ -379,11 +379,28 @@ def main() -> int:
                                 "bits", "perplexity", "accuracy", "n_masked",
                                 "n_seq", "seed", "min_len", "max_len",
                                 "wc_gap", "wc_visible", "wc_masked", "wc_n"])
+                # All SIXTEEN columns the header declares.
+                #
+                # The row wrote twelve. The four Watson-Crick complementarity
+                # columns were declared in the header, computed in full, and
+                # printed to stdout -- and then dropped on the way to the file,
+                # so every row was ragged against its own header and
+                # `csv.DictReader` returned None for exactly the measurement
+                # that distinguishes "the model learned base composition" from
+                # "the model learned pairing". The legacy file predates those
+                # columns and is self-consistent at twelve; the mismatch
+                # appeared the moment a fresh csv was created.
+                _g = r.get("comp_gap", float("nan"))
+                _ok = _g == _g                      # NaN when unavailable
                 w.writerow([_dt.datetime.now().isoformat(timespec="seconds"),
                             ck.name, st.get("step", ""), st.get("tokens", ""),
                             round(r["bits"], 5), round(r["perplexity"], 5),
                             round(r["accuracy"], 5), r["n_masked"],
-                            len(seqs), args.seed, args.min_len, args.max_len])
+                            len(seqs), args.seed, args.min_len, args.max_len,
+                            round(_g, 5) if _ok else "",
+                            round(r.get("comp_visible", 0.0), 5) if _ok else "",
+                            round(r.get("comp_masked", 0.0), 5) if _ok else "",
+                            r.get("comp_n", "") if _ok else ""])
     if not args.no_csv:
         print(f"\n[eval] appended to {args.append_csv.relative_to(ROOT)}")
     return 0

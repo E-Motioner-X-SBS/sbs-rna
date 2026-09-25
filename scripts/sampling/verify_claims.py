@@ -633,6 +633,28 @@ def main() -> int:
         else:
             chk("R11 per-length-band held-out measured", 0, 1)
 
+        # ---- R12: the Watson-Crick gap, recovered from a log ---------------
+        #
+        # The csv writer declared 16 columns and wrote 12: `wc_gap`,
+        # `wc_visible`, `wc_masked` and `wc_n` were computed, printed, and
+        # dropped, so every row was ragged against its own header and a
+        # DictReader returned None for exactly the measurement that separates
+        # "learned base composition" from "learned pairing". 19 readings
+        # recovered from the watcher's stdout.
+        wg = ROOT / "data/samples/analysis/wc_gap_history.json"
+        if wg.exists():
+            wj = _rjson.loads(wg.read_text())
+            chk("R12 readings recovered", wj["n"], 19)
+            chk("R12 every reading is positive", int(wj["all_positive"]), 1)
+            chk("R12 mean gap", wj["mean_gap"], 0.0926, abs_tol=0.0002)
+            # it is FLAT: the pairing signal was there by step 5,000 and has
+            # not grown since, which is a different statement from "the model
+            # is learning" and must not be conflated with the bits curve
+            chk("R12 the gap is flat over 4,750 steps",
+                int(abs(wj["trend_sigma"]) < 2.0), 1)
+        else:
+            chk("R12 WC-gap history recovered", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

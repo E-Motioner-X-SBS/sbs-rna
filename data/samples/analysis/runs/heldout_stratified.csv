@@ -1,0 +1,2 @@
+timestamp,checkpoint,step,tokens,bits,perplexity,accuracy,n_masked,n_seq,seed,min_len,max_len,wc_gap,wc_visible,wc_masked,wc_n
+2026-09-25T06:51:40,step9750.pt,9750,1442694866,1.9221,3.78973,0.34857,39444,1026,1234,20,1024,+0.1069,0.314,0.207,449
