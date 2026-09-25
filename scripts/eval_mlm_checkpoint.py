@@ -298,8 +298,8 @@ def main() -> int:
                          "HISTOGRAM MATCHED TO THE CORPUS, because 'legacy' "
                          "is one shard of one band (mean 185 nt) and measured "
                          "the model 0.19 bits better than a corpus-weighted "
-                         "sample does -- 18.2% better than unigram against a "
-                         "true 8.8% at step 9,000.")
+                         "sample does -- 18.2%% better than unigram against a "
+                         "true 8.8%% at step 9,000.")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--append-csv", type=Path,
                     default=ROOT / "data/samples/analysis/runs/heldout_mlm.csv",

@@ -588,6 +588,18 @@ def main() -> None:
                          "budget grows toward it and shrinks off an OOM, so a "
                          "mis-estimated cost per token self-corrects instead of "
                          "leaving the card half empty or dying")
+    ap.add_argument("--min-budget-gain", type=float, default=0.0,
+                    help="fractional throughput gain a budget growth must "
+                         "deliver for the next to be attempted; 0 never "
+                         "freezes, which is the default. Measured on run 2 a "
+                         "59%% budget increase moved throughput under 3%%, "
+                         "inside the noise, while driving the allocator to "
+                         "within 995 MiB of the card -- but a larger budget "
+                         "also buys a larger effective BATCH, and batch size "
+                         "is what correlates with held-out bits here "
+                         "(partial r -0.52). Freezing trades gradient quality "
+                         "for headroom, so the gain is REPORTED at every "
+                         "growth and the policy is left to a human.")
     ap.add_argument("--adapt-every", type=int, default=200,
                     help="steps between budget adjustments")
     ap.add_argument("--token-budget-reserve", type=float, default=10.0,
@@ -601,7 +613,7 @@ def main() -> None:
                          "pool. 1 is the old behaviour and it was wrong: a "
                          "131,072-sequence pool is 0.54 of one length-sorted "
                          "shard, so every pool saw a narrow length band "
-                         "(80-159 nt at 64.7% against the corpus's 30.5%) and "
+                         "(80-159 nt at 64.7%% against the corpus's 30.5%%) and "
                          "the band jumped discontinuously at each pool "
                          "boundary. Shuffling the shard ORDER only changes "
                          "which band you get; it cannot mix them. 8 is the "
@@ -612,13 +624,13 @@ def main() -> None:
     ap.add_argument("--max-batch", type=int, default=2048,
                     help="guard against a batch of thousands of 20-nt "
                          "sequences. 512 was too tight and it BOUND: on "
-                         "elDORS c020 (mean 168 nt) 92.5% of batches hit the "
+                         "elDORS c020 (mean 168 nt) 92.5%% of batches hit the "
                          "cap instead of the token budget, and the step "
                          "carried 83,899 real tokens against 194,607 on c001 "
                          "-- a 2.3x swing in effective batch size driven by "
                          "nothing but which shard was streaming. At 2048 the "
                          "budget binds instead: 167,798 real tokens and "
-                         "224,144 padded of the 228,352 available, 0% capped. "
+                         "224,144 padded of the 228,352 available, 0%% capped. "
                          "Memory-safe not because attention gets cheaper -- "
                          "it does not, B*L^2 goes 29.9M to 60.9M as the batch "
                          "stops under-filling -- but because the token budget "
@@ -902,6 +914,12 @@ def main() -> None:
     #: set by the budget-growth check, consumed after the checkpoint block, so
     #: growing the budget can never skip a save. See the note at the call site.
     rebuild_stream = False
+    #: throughput at the CURRENT budget, and at the one before the last growth,
+    #: so a growth can be judged by what it bought. See the note at the call
+    #: site.
+    tps_at_budget: List[float] = []
+    prev_rate = 0.0
+    budget_frozen = False
     budget_tokens = args.token_budget
     n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
@@ -1106,6 +1124,9 @@ def main() -> None:
                   # hid a 42.9% padding tax behind a number that looked fine.
                   rate_p = (padded - padded_mark) / max(el, 1e-9)
                   rate_r = (seen - seen_mark) / max(el, 1e-9)
+                  # real tokens per second at the CURRENT budget, which is what
+                  # a budget growth has to justify itself against
+                  tps_at_budget.append(rate_r)
                   seen_mark, padded_mark = seen, padded
                   mfu = FLOPS_PER_PARAM_TOKEN(args.n_loops) * pc["active"] \
                       * rate_p / A100_BF16_PEAK
@@ -1161,16 +1182,71 @@ def main() -> None:
                   total_gib = torch.cuda.get_device_properties(0).total_memory / 2**30
                   peak = torch.cuda.max_memory_allocated() / 2**30
                   want = args.vram_target * total_gib
-                  if peak < 0.85 * want:
+                  # Has the LAST growth bought anything?
+                  #
+                  # This loop grows while `peak < 0.85 * want`, which is a
+                  # memory criterion, and never asks about the quantity it is
+                  # spending memory for. Measured on run 2 over a 59% budget
+                  # increase (131,072 -> 207,872):
+                  #
+                  #     131,072  15.90k tok/s   189,440  15.90k tok/s
+                  #     143,360  15.50k         207,872  16.35k
+                  #     157,696  15.75k
+                  #     173,056  15.70k
+                  #
+                  # flat within a +/-5% step-to-step noise band. The budget is
+                  # what drives peak memory, so the loop was buying allocator
+                  # pressure -- three CUDACachingAllocator OOM warnings, the
+                  # last with 995 MiB free -- for throughput it never checked.
+                  # A control loop whose output is unmeasured optimises its
+                  # input. So the output is measured and printed at every
+                  # growth -- but NOT acted on by default, and that default is
+                  # deliberate.
+                  #
+                  # The obvious fix is to freeze the budget once throughput
+                  # stops responding. Simulated against the numbers above it
+                  # freezes at 143,360, on the first comparison, because a
+                  # single noisy sample reads -2.5%. Worse, it optimises the
+                  # wrong quantity in the other direction: a larger budget also
+                  # buys a larger effective BATCH, and the batch size is what
+                  # correlates with held-out bits across this run
+                  # (`batch_size_effect.json`, partial r -0.52, t -2.8 over 24
+                  # readings). Freezing on throughput would trade gradient
+                  # quality for memory headroom nobody asked for.
+                  #
+                  # So: report the trade, let a human take it. `--min-budget-
+                  # gain 0` never freezes.
+                  _rate = float(np.mean(tps_at_budget)) if tps_at_budget else 0.0
+                  _gain = (_rate / prev_rate - 1.0) if prev_rate > 0 else None
+                  if _gain is not None and args.min_budget_gain > 0 \
+                          and _gain < args.min_budget_gain and not budget_frozen:
+                      print(f"[mlm] throughput has stopped responding to the "
+                            f"token budget: {prev_rate/1e3:.2f}k -> "
+                            f"{_rate/1e3:.2f}k tok/s ({100*_gain:+.1f}%). "
+                            f"Freezing at {budget_tokens:,} "
+                            f"(--min-budget-gain {args.min_budget_gain}).",
+                            flush=True)
+                      runlog.event("budget frozen", step=step,
+                                   token_budget=budget_tokens,
+                                   tok_per_s=round(_rate, 1),
+                                   gain=round(_gain, 4))
+                      budget_frozen = True
+                  if peak < 0.85 * want and not budget_frozen:
                       grown = min(int(budget_tokens * 1.10),
                                   int(budget_tokens * want / max(peak, 1e-6)))
                       grown = max(8192, grown // 1024 * 1024)
                       if grown > budget_tokens:
                           print(f"[mlm] peak {peak:.1f} of {want:.1f} GiB target; "
-                                f"token budget {budget_tokens:,} -> {grown:,}",
+                                f"token budget {budget_tokens:,} -> {grown:,}"
+                                + (f"; last growth moved throughput "
+                                   f"{prev_rate/1e3:.2f}k -> {_rate/1e3:.2f}k "
+                                   f"tok/s ({100*_gain:+.1f}%)"
+                                   if _gain is not None else ""),
                                 flush=True)
                           runlog.event(f"budget grown to {grown}", step=step,
                                        token_budget=grown, peak_gib=round(peak, 2))
+                          prev_rate = _rate
+                          tps_at_budget = []
                           budget_tokens = grown
                           torch.cuda.reset_peak_memory_stats()
                           # DEFERRED break. Breaking here skipped the

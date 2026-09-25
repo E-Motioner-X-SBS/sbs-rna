@@ -42,6 +42,37 @@ def chk(name: str, ok, detail: str = "") -> None:
         fails.append(name)
 
 
+def check_help_strings() -> int:
+    """`--help` must work on every trainer.
+
+    argparse `%`-formats help strings, so a literal `%` raises
+    `TypeError: not enough arguments for format string` -- and only when
+    `--help` is actually run, which nobody does on a training script. Six bare
+    `%` accumulated in `pretrain_mlm.py` and two in `eval_mlm_checkpoint.py`
+    across one day of adding measurements to help text, and `--help` was broken
+    the whole time without a single run noticing.
+    """
+    import subprocess
+    root = Path(__file__).resolve().parents[1]
+    py = "/store/shuvam/.venv/bin/python"
+    bad = []
+    for name in ("pretrain_mlm.py", "train_pharos.py",
+                 "train_sequence_stages.py", "eval_mlm_checkpoint.py",
+                 "train_block_scorer.py", "audit_router.py"):
+        f = root / "scripts" / name
+        if not f.exists():
+            continue
+        r = subprocess.run([py, str(f), "--help"], capture_output=True,
+                           text=True, timeout=300)
+        ok = r.returncode == 0
+        print(f"  {'OK  ' if ok else 'FAIL'} {name:34s} --help exits "
+              f"{r.returncode}")
+        if not ok:
+            bad.append(name)
+            print("       " + r.stderr.strip().splitlines()[-1][:110])
+    return len(bad)
+
+
 def main() -> int:
     torch.manual_seed(0)
 
@@ -91,6 +122,12 @@ def main() -> int:
     chk("a perfect head shows positive lift and macro 1",
         mp["lw_lift"] > 0.2 and mp["lw_macro"] > 0.999,
         f"lift {mp['lw_lift']:.4f}, macro {mp['lw_macro']:.4f}")
+
+    print("\n== every trainer's --help runs ==")
+    chk("no argparse help string has an unescaped %",
+        check_help_strings() == 0,
+        "argparse %-formats help text, so a literal % raises only when "
+        "--help is run -- which nobody does on a trainer")
 
     print()
     if fails:
