@@ -36,8 +36,22 @@ score_ckpt() {
     echo "$(date -Is) scoring step $st" >> "$LOG"
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
       timeout 900 $PY -u scripts/eval_mlm_checkpoint.py \
-        --ckpt "$f" --device cuda --n-seq 1024 --token-budget 8192 >> "$LOG" 2>&1
+        --ckpt "$f" --device cuda --n-seq 1024 --token-budget 8192 \
+        --split stratified \
+        --append-csv data/samples/analysis/runs/heldout_stratified.csv \
+        >> "$LOG" 2>&1
 }
+# `--split stratified`, and a NEW csv.
+#
+# The legacy sample is `eldors_c020_shard0004` alone: 52.7% of it falls in the
+# 20-79 nt band against the corpus's 6.5%, an eight-fold over-representation of
+# the shortest sequences, and it measured the model 0.19 bits better than a
+# corpus-weighted sample does. Its readings also swung +0.303 bits over three
+# checkpoints where the corpus-weighted figure moved +0.074.
+#
+# A new file rather than more rows in the old one: the two are different
+# samples and appending would silently splice two series. heldout_mlm.csv is
+# frozen at step 9,750 and stays as the record of what was tracked overnight.
 while [ ! -f "$STOP" ]; do
     if [ -f "$CKPT" ]; then
         # mtime first. Reading the step means loading a 4.3 GB checkpoint, and

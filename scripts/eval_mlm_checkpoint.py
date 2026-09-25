@@ -68,6 +68,34 @@ def build_fixed_batches(pm, corpus: List[Path], n_seq: int, budget: int,
     The length filter must match the trainer's for the same reason.
     """
     import pyarrow.parquet as pq
+    if split == "stratified":
+        # The corpus's own length histogram, over the reserved shards of both
+        # corpora. Measured band frequencies (`pool_composition.json`); the
+        # sample is filled per band so one shard's length bias cannot set the
+        # score. Interleaved so the bands are actually reachable -- a
+        # sequential read of the reserved set would exhaust c020 first.
+        files = list(pm.heldout_files(corpus))
+        want = {(20, 80): 0.065, (80, 160): 0.305, (160, 320): 0.241,
+                (320, 640): 0.278, (640, max_len + 1): 0.112}
+        got: dict = {b: [] for b in want}
+        need = {b: max(1, int(round(n_seq * f))) for b, f in want.items()}
+        for seq in pm.iter_sequences(files, min_len, max_len, None,
+                                     np.random.default_rng(seed),
+                                     n_interleave=8):
+            for (lo, hi) in want:
+                if lo <= len(seq) < hi and len(got[(lo, hi)]) < need[(lo, hi)]:
+                    got[(lo, hi)].append(seq)
+                    break
+            if all(len(got[b]) >= need[b] for b in want):
+                break
+        out: List[str] = []
+        for b in want:
+            out += got[b]
+        short = {f"{b[0]}-{b[1]-1}": (len(got[b]), need[b])
+                 for b in want if len(got[b]) < need[b]}
+        if short:
+            print(f"[eval] stratified sample under-filled: {short}")
+        return out
     if split == "reserved":
         # The shards the trainer's own `heldout_files` removes from the
         # training stream -- the guarantee stated rather than inferred, and
@@ -257,13 +285,21 @@ def main() -> int:
                     help="must match the trainer, or the model is scored "
                          "outside the distribution it was trained on")
     ap.add_argument("--seed", type=int, default=1234)
-    ap.add_argument("--split", choices=("legacy", "reserved"), default="legacy",
+    ap.add_argument("--split", choices=("legacy", "reserved", "stratified"),
+                    default="legacy",
                     help="which shards the fixed sample comes from. 'reserved' "
                          "is the trainer's own held-out split across BOTH "
                          "corpora; 'legacy' reproduces the sample the existing "
                          "curve was measured on, and is the default so that "
                          "curve stays one series. They are different samples "
-                         "and their numbers must not be plotted together.")
+                         "and their numbers must not be plotted together. "
+                         "'stratified' is the one to use: it draws from the "
+                         "reserved shards of both corpora with the LENGTH "
+                         "HISTOGRAM MATCHED TO THE CORPUS, because 'legacy' "
+                         "is one shard of one band (mean 185 nt) and measured "
+                         "the model 0.19 bits better than a corpus-weighted "
+                         "sample does -- 18.2% better than unigram against a "
+                         "true 8.8% at step 9,000.")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--append-csv", type=Path,
                     default=ROOT / "data/samples/analysis/runs/heldout_mlm.csv",
