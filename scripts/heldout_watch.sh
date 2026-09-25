@@ -122,6 +122,12 @@ PYEOF
             score_ckpt "$KEEP/step${pending}.pt" "$pending"
             if [ $? -eq 0 ]; then
                 echo "$(date -Is) recovered step $pending" >> "$LOG"
+                # a recovered eval IS a reading and must count toward the
+                # cadence -- without this, `scored_at` stayed where it was and
+                # the next checkpoint was scored immediately. Step 11,250
+                # recovered at 10:47 and 11,500 was then scored at 10:57,
+                # 250 steps later instead of 1,000.
+                scored_at="$pending"
                 pending=""
                 tries=0
             else
