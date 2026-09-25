@@ -265,7 +265,23 @@ def require_gpu(args) -> torch.device:
     return torch.device(args.device)
 
 
-def ss_step(model, seqs, ss, device, feats_fn) -> Tuple[torch.Tensor, float]:
+def ss_step(model, seqs, ss, device, feats_fn
+            ) -> Tuple[Optional[torch.Tensor], float, float, float]:
+    """Loss, accuracy, and the two numbers that make the accuracy mean something.
+
+    Head 4 has 8 symbols, so chance is 0.125 -- but dot-bracket is dominated by
+    unpaired positions, and an accuracy quoted without the majority rate cannot
+    distinguish a head that has learned pairing from one that has learned that
+    most bases are unpaired. Every other head in this project got a floor;
+    this one had not.
+
+    `major` is the batch's own majority-class rate and `macro` is unweighted
+    recall over the classes present, which collapses to 1/k for a head that
+    predicts one class and is where the rare bracket symbols live. At
+    initialisation the smoke test reads accuracy 0.0645 against a chance of
+    0.125 -- BELOW chance, which is what a fresh head that predicts one
+    near-constant class scores: the frequency of whatever class it picked.
+    """
     b = encode(seqs, device)
     L = b["tokens"].shape[1]
     y = ss_targets(ss, L, device)
@@ -274,10 +290,19 @@ def ss_step(model, seqs, ss, device, feats_fn) -> Tuple[torch.Tensor, float]:
     lg = out["ss_logits"].float()
     valid = (y >= 0) & b["mask"]
     if not bool(valid.any()):
-        return None, 0.0
+        return None, 0.0, 0.0, 0.0
     loss = F.cross_entropy(lg[valid], y[valid])
-    acc = float((lg[valid].argmax(-1) == y[valid]).float().mean())
-    return loss + out["aux"]["balance_loss"], acc
+    with torch.no_grad():
+        pred, tgt = lg[valid].argmax(-1), y[valid]
+        acc = float((pred == tgt).float().mean())
+        k = lg.shape[-1]
+        cnt = torch.bincount(tgt, minlength=k).float()
+        major = float(cnt.max() / cnt.sum()) if float(cnt.sum()) > 0 else 0.0
+        present = cnt > 0
+        hit = torch.bincount(tgt[pred == tgt], minlength=k).float()
+        macro = (float((hit[present] / cnt[present]).mean())
+                 if bool(present.any()) else 0.0)
+    return loss + out["aux"]["balance_loss"], acc, major, macro
 
 
 def probing_step(model, seqs, react, kinds, device, feats_fn):
@@ -432,6 +457,8 @@ def main() -> None:
         model.train()
         t0 = time.time()
         ss_loss, ss_acc, pr_loss, pr_r, step = [], [], [], [], 0
+        ss_major: List[float] = []
+        ss_macro: List[float] = []
         gen_ss = iter_ss("train", args.batch)
         gen_pr = iter_probing(args.batch, args.probing_limit)
         done_ss = done_pr = False
@@ -441,11 +468,14 @@ def main() -> None:
             try:
                 seqs, ss = next(gen_ss)
                 with torch.autocast("cuda", dtype=torch.bfloat16):
-                    l, a = ss_step(model, seqs, ss, device, feats_fn)
+                    l, a, a_maj, a_mac = ss_step(model, seqs, ss, device,
+                                                 feats_fn)
                 if l is not None:
                     total = STAGE_WEIGHTS["ss"] * l
                     ss_loss.append(float(l.detach()))
                     ss_acc.append(a)
+                    ss_major.append(a_maj)
+                    ss_macro.append(a_mac)
             except StopIteration:
                 done_ss = True
             # stage 3
@@ -493,7 +523,8 @@ def main() -> None:
                     # exercise the epoch-end VALIDATION before returning: it is
                     # new code on a path that has never run, and a smoke test
                     # that stops short of it proves nothing about it
-                    _vl, _va = [], []
+                    _vl, _va, _vmaj, _vmac = [], [], [], []
+                    _NSS = cfg.head_cfg().n_ss_symbols if hasattr(cfg, "head_cfg") else 8
                     model.eval()
                     with torch.no_grad():
                         for _vb, (_vs, _vd) in enumerate(
@@ -505,11 +536,19 @@ def main() -> None:
                                 continue
                             _vl.append(float(_r[0]))
                             _va.append(float(_r[1]))
+                            _vmaj.append(float(_r[2]))
+                            _vmac.append(float(_r[3]))
                     model.train()
-                    print(f"[seq] smoke validation: {len(_va)} batches, "
-                          f"loss {np.mean(_vl):.4f} acc {np.mean(_va):.4f}"
-                          if _va else "[seq] smoke validation: NO BATCHES "
-                          "-- the split did not load", flush=True)
+                    if _va:
+                        print(f"[seq] smoke validation: {len(_va)} batches, "
+                              f"loss {np.mean(_vl):.4f} acc {np.mean(_va):.4f} "
+                              f"majority {np.mean(_vmaj):.4f} "
+                              f"lift {np.mean(_va) - np.mean(_vmaj):+.4f} "
+                              f"macro {np.mean(_vmac):.4f} "
+                              f"(chance is 1/{_NSS} = {1/_NSS:.4f})", flush=True)
+                    else:
+                        print("[seq] smoke validation: NO BATCHES -- the split "
+                              "did not load", flush=True)
                     print("[seq] SMOKE TEST PASSED: stages 2-3 start, both "
                           "channels produced a loss, the backward pass "
                           "completes, and the bpRNA validation split loads "
@@ -544,7 +583,7 @@ def main() -> None:
         # A split that exists and is never read is not a split. Run at every
         # epoch, capped so it costs a fraction of one, and reported beside the
         # training figure so the GAP is the thing on the page.
-        vs_loss, vs_acc = [], []
+        vs_loss, vs_acc, vs_major, vs_macro = [], [], [], []
         model.eval()
         with torch.no_grad():
             for vb, (vseq, vdot) in enumerate(iter_ss("validation", args.batch)):
@@ -555,6 +594,8 @@ def main() -> None:
                     continue
                 vs_loss.append(float(r[0]))
                 vs_acc.append(float(r[1]))
+                vs_major.append(float(r[2]))
+                vs_macro.append(float(r[3]))
         model.train()
         v_acc = float(np.mean(vs_acc)) if vs_acc else None
         t_acc = float(np.mean(ss_acc)) if ss_acc else None
@@ -566,12 +607,22 @@ def main() -> None:
                      "ss_generalisation_gap": (None if (v_acc is None or t_acc is None)
                                                else round(t_acc - v_acc, 5)),
                      "ss_val_batches": len(vs_acc),
+                     "ss_majority": float(np.mean(ss_major)) if ss_major else None,
+                     "ss_macro_recall": float(np.mean(ss_macro)) if ss_macro else None,
+                     "ss_val_majority": float(np.mean(vs_major)) if vs_major else None,
+                     "ss_val_macro_recall": float(np.mean(vs_macro)) if vs_macro else None,
+                     "ss_val_lift": (None if not (vs_acc and vs_major) else
+                                     round(float(np.mean(vs_acc))
+                                           - float(np.mean(vs_major)), 5)),
                      "probing_loss": float(np.mean(pr_loss)) if pr_loss else None,
                      "probing_pearson": float(np.mean(pr_r)) if pr_r else None})
         if v_acc is not None and t_acc is not None:
+            _vm = float(np.mean(vs_major)) if vs_major else float("nan")
+            _vk = float(np.mean(vs_macro)) if vs_macro else float("nan")
             print(f"[seq] epoch {ep} head 4: train acc {t_acc:.4f}  "
-                  f"VAL acc {v_acc:.4f}  gap {t_acc - v_acc:+.4f} "
-                  f"over {len(vs_acc)} validation batches", flush=True)
+                  f"VAL acc {v_acc:.4f}  gap {t_acc - v_acc:+.4f}  "
+                  f"| val majority {_vm:.4f}  lift {v_acc - _vm:+.4f}  "
+                  f"macro {_vk:.4f}  over {len(vs_acc)} batches", flush=True)
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
         runlog.log("epoch", epoch=ep, step=step, gstep=gstep,
                    ss_loss=hist[-1]["ss_loss"], ss_accuracy=hist[-1]["ss_accuracy"],
