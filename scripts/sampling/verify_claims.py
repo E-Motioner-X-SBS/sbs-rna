@@ -716,6 +716,30 @@ def main() -> int:
             chk("R14 validation is disjoint from train",
                 len(_tr & _va), 0)
 
+        # ---- R15: what the Watson-Crick gap is measured ON -----------------
+        #
+        # The gap is the headline evidence that the model uses pairing rather
+        # than base composition, and nothing had asked where its probe
+        # sequences come from. They are RNA-Puzzles references, so they are not
+        # the training corpus -- but RNA-Puzzles targets are well-studied RNAs
+        # whose families elDORS is full of.
+        wp = ROOT / "data/samples/analysis/wc_probe_contamination.json"
+        if wp.exists():
+            wj = _rjson.loads(wp.read_text())
+            chk("R15 no probe sequence appears verbatim in training",
+                wj["exact_matches_in_training"], 0)
+            chk("R15 probe 12-mer containment", wj["containment_probes"],
+                0.600, abs_tol=0.002)
+            chk("R15 length-matched training containment",
+                wj["containment_length_matched_training"], 0.420, abs_tol=0.002)
+            # the length-matched control is the point: short sequences share
+            # more k-mers by construction, so the raw 0.600 means nothing
+            # without it
+            chk("R15 the probe families ARE over-represented",
+                int(wj["mann_whitney_p"] < 0.01), 1)
+        else:
+            chk("R15 WC probe contamination measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)

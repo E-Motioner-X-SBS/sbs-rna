@@ -1,0 +1,19 @@
+{
+ "probe": "real_base_pairs(limit_chains=60, max_len=600) -- RNA-Puzzles references",
+ "n_unique_sequences": 17,
+ "length_range": [
+  41,
+  188
+ ],
+ "kmer": 12,
+ "training_sample": {
+  "sequences": 90000,
+  "kmers_strided": 8052560
+ },
+ "exact_matches_in_training": 0,
+ "containment_probes": 0.6,
+ "containment_length_matched_training": 0.42,
+ "difference": 0.18,
+ "mann_whitney_p": 0.0001,
+ "reading": "the probe is NOT verbatim-contaminated, but its families are over-represented in the corpus relative to length-matched training sequences. The WC gap is a DIFFERENCE between two conditions on the same sequence, and memorising a sequence removes the need for a visible partner, so contamination pushes the gap DOWN -- the measured gap is a lower bound, not an inflated one. What it does limit is the scope: pairing use is demonstrated on familiar families, not novel ones."
+}
