@@ -320,6 +320,12 @@ def main() -> None:
     ap.add_argument("--size", default="small",
                     choices=("mini", "small", "base400", "shared400"))
     ap.add_argument("--epochs", type=int, default=2)
+    ap.add_argument("--val-batches", type=int, default=64,
+                    help="bpRNA validation batches scored at each epoch end. "
+                         "The split shipped with the benchmark and was never "
+                         "read; head 4's only reported accuracy was its "
+                         "training accuracy, on 10,934 examples recycled ~31x "
+                         "per Ribonanza epoch.")
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--probing-limit", type=int, default=None)
@@ -484,9 +490,30 @@ def main() -> None:
                       f"ss {_m(ss_loss, 1):.4f} acc {_m(ss_acc, 1):.4f} "
                       f"probing {_m(pr_loss, 1):.4f}", flush=True)
                 if step >= args.smoke:
+                    # exercise the epoch-end VALIDATION before returning: it is
+                    # new code on a path that has never run, and a smoke test
+                    # that stops short of it proves nothing about it
+                    _vl, _va = [], []
+                    model.eval()
+                    with torch.no_grad():
+                        for _vb, (_vs, _vd) in enumerate(
+                                iter_ss("validation", args.batch)):
+                            if _vb >= 2:
+                                break
+                            _r = ss_step(model, _vs, _vd, device, feats_fn)
+                            if _r is None or _r[0] is None:
+                                continue
+                            _vl.append(float(_r[0]))
+                            _va.append(float(_r[1]))
+                    model.train()
+                    print(f"[seq] smoke validation: {len(_va)} batches, "
+                          f"loss {np.mean(_vl):.4f} acc {np.mean(_va):.4f}"
+                          if _va else "[seq] smoke validation: NO BATCHES "
+                          "-- the split did not load", flush=True)
                     print("[seq] SMOKE TEST PASSED: stages 2-3 start, both "
-                          "channels produced a loss, and the backward pass "
-                          "completes. No checkpoint written.", flush=True)
+                          "channels produced a loss, the backward pass "
+                          "completes, and the bpRNA validation split loads "
+                          "and scores. No checkpoint written.", flush=True)
                     return 0
                 continue
             if step % args.ckpt_every == 0:
@@ -503,11 +530,48 @@ def main() -> None:
                       f"{np.mean(ss_acc[-args.log_every:]):.4f}  |  probing loss "
                       f"{np.mean(pr_loss[-args.log_every:]):.4f} r "
                       f"{np.mean(pr_r[-args.log_every:]):.4f}", flush=True)
+        # ---- the validation split, which was sitting on disk unread --------
+        #
+        # `data/benchmarks/secondary_structure/bprna_spot/` ships train,
+        # validation AND test parquets. Training read `train` and the epoch
+        # report printed accuracy on it, so head 4's only published number was
+        # its TRAINING accuracy -- and the loop is balanced per step, which
+        # means 10,934 secondary-structure examples are recycled about 31
+        # times for every pass over Ribonanza's 335,616 profiles. Overfitting
+        # is the expected outcome of that ratio and would have been invisible:
+        # the training accuracy rises either way.
+        #
+        # A split that exists and is never read is not a split. Run at every
+        # epoch, capped so it costs a fraction of one, and reported beside the
+        # training figure so the GAP is the thing on the page.
+        vs_loss, vs_acc = [], []
+        model.eval()
+        with torch.no_grad():
+            for vb, (vseq, vdot) in enumerate(iter_ss("validation", args.batch)):
+                if vb >= args.val_batches:
+                    break
+                r = ss_step(model, vseq, vdot, device, feats_fn)
+                if r is None or r[0] is None:
+                    continue
+                vs_loss.append(float(r[0]))
+                vs_acc.append(float(r[1]))
+        model.train()
+        v_acc = float(np.mean(vs_acc)) if vs_acc else None
+        t_acc = float(np.mean(ss_acc)) if ss_acc else None
         hist.append({"epoch": ep, "steps": step,
                      "ss_loss": float(np.mean(ss_loss)) if ss_loss else None,
-                     "ss_accuracy": float(np.mean(ss_acc)) if ss_acc else None,
+                     "ss_accuracy": t_acc,
+                     "ss_val_loss": float(np.mean(vs_loss)) if vs_loss else None,
+                     "ss_val_accuracy": v_acc,
+                     "ss_generalisation_gap": (None if (v_acc is None or t_acc is None)
+                                               else round(t_acc - v_acc, 5)),
+                     "ss_val_batches": len(vs_acc),
                      "probing_loss": float(np.mean(pr_loss)) if pr_loss else None,
                      "probing_pearson": float(np.mean(pr_r)) if pr_r else None})
+        if v_acc is not None and t_acc is not None:
+            print(f"[seq] epoch {ep} head 4: train acc {t_acc:.4f}  "
+                  f"VAL acc {v_acc:.4f}  gap {t_acc - v_acc:+.4f} "
+                  f"over {len(vs_acc)} validation batches", flush=True)
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
         runlog.log("epoch", epoch=ep, step=step, gstep=gstep,
                    ss_loss=hist[-1]["ss_loss"], ss_accuracy=hist[-1]["ss_accuracy"],
