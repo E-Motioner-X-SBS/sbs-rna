@@ -1,0 +1,64 @@
+{
+ "bands": [
+  "20-79",
+  "80-159",
+  "160-319",
+  "320-639",
+  "640-1024"
+ ],
+ "corpus_weights": {
+  "20-79": 0.065,
+  "80-159": 0.305,
+  "160-319": 0.241,
+  "320-639": 0.278,
+  "640-1024": 0.112
+ },
+ "corpus_bits": 2.0165,
+ "official_c020_only": {
+  "9000": 1.64953,
+  "9250": 1.78863,
+  "9500": 1.95274
+ },
+ "per_band": {
+  "9000": {
+   "20-79": 1.6271,
+   "80-159": 1.8632,
+   "160-319": 1.9021,
+   "320-639": 1.7737,
+   "640-1024": 1.9278,
+   "ALL": 1.8727
+  },
+  "9250": {
+   "20-79": 1.8394,
+   "80-159": 1.8964,
+   "160-319": 1.8963,
+   "320-639": 1.8202,
+   "640-1024": 1.9085,
+   "ALL": 1.8812
+  },
+  "9500": {
+   "20-79": 1.9775,
+   "80-159": 1.8989,
+   "160-319": 1.9008,
+   "320-639": 1.9225,
+   "640-1024": 1.9209,
+   "ALL": 1.9223
+  }
+ },
+ "corpus_weighted": {
+  "9000": 1.8396,
+  "9250": 1.8729,
+  "9500": 1.9135
+ },
+ "swing_9000_to_9500": {
+  "20-79": 0.3504,
+  "80-159": 0.0357,
+  "160-319": -0.0013,
+  "320-639": 0.1488,
+  "640-1024": -0.0069,
+  "ALL": 0.0496
+ },
+ "corpus_weighted_swing": 0.0739,
+ "official_swing": 0.3032,
+ "verdict": "the tracked curve is one shard of one length band (eldors_c020_shard0004, mean 185 nt). Its +0.303-bit collapse is +0.074 corpus-weighted, and 0.350 of the 0.303 lives in the 20-79 nt band alone. Three of five bands do not move. The absolute level is also optimistic: 1.650 official against 1.842 corpus-weighted at step 9,000, i.e. 8.7% better than the unigram baseline rather than 18.2%."
+}

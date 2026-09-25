@@ -604,6 +604,35 @@ def main() -> int:
         else:
             chk("R10 blind test run", 0, 1)
 
+        # ---- R11: the tracked held-out curve measures ONE length band ------
+        #
+        # `--split legacy` fills from the first shard with enough sequences,
+        # which is `eldors_c020_shard0004`: one shard, mean 185 nt. Scoring
+        # three consecutive checkpoints per length band on a sample that spans
+        # the corpus shows the apparent collapse is almost entirely the
+        # shortest sequences, and that the tracked level is optimistic.
+        hb = ROOT / "data/samples/analysis/heldout_by_length.json"
+        if hb.exists():
+            hj = _rjson.loads(hb.read_text())
+            chk("R11 official 9000->9500 swing", hj["official_swing"], 0.3032,
+                abs_tol=0.0002)
+            chk("R11 corpus-weighted swing over the same checkpoints",
+                hj["corpus_weighted_swing"], 0.0739, abs_tol=0.0002)
+            chk("R11 the swing is concentrated in the 20-79 nt band",
+                hj["swing_9000_to_9500"]["20-79"], 0.3504, abs_tol=0.0002)
+            chk("R11 the 160-319 band does not move at all",
+                int(abs(hj["swing_9000_to_9500"]["160-319"]) < 0.01), 1)
+            chk("R11 the 640-1024 band does not move at all",
+                int(abs(hj["swing_9000_to_9500"]["640-1024"]) < 0.01), 1)
+            # and the level, which matters more than the swing
+            chk("R11 corpus-weighted bits at step 9,000",
+                hj["corpus_weighted"]["9000"], 1.8396, abs_tol=0.0002)
+            chk("R11 the tracked curve overstates by ~0.19 bits at 9,000",
+                int(hj["corpus_weighted"]["9000"]
+                    - hj["official_c020_only"]["9000"] > 0.15), 1)
+        else:
+            chk("R11 per-length-band held-out measured", 0, 1)
+
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")
         chk("nothing in the acquisition inventory is missing", ig["n_missing"], 0)
