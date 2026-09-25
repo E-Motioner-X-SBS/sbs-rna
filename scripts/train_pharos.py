@@ -61,6 +61,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
 from pharos.model.moe import RouterFeatures                       # noqa: E402
+from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
 from pharos.train.checkpoint import atomic_save              # noqa: E402
@@ -707,7 +708,70 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
             pool.setdefault("rig_true", []).append(
                 t["b_factor_z"][rm].float().cpu().numpy())
 
+        # ---- HEAD 3, which had no validation metric at all -----------------
+        #
+        # This function returned Mg and rigidity. Two heads of ten, and not the
+        # one the project exists for: the structure head trains against a
+        # denoising loss and its only report was that loss on TRAINING batches.
+        # A stage whose deliverable is coordinates could not say whether the
+        # coordinates were improving on held-out data.
+        #
+        # The EDM loss on val costs one extra forward through the decoder and
+        # is the like-for-like number. The GEOMETRY terms matter more: `bond_cn`
+        # and `bond_pp` are flat-bottomed violations in angstroms, and they are
+        # the only quantity that asks whether the output is a CHAIN. The blind
+        # test on rp01 reported 0.0% of bonds in tolerance with a median C4'-N
+        # of 37.95 A against a true 3.38 -- a gas of points -- and TM-score and
+        # lDDT cannot see that, because superposition metrics never ask whether
+        # anything is bonded.
+        crm = t.get("coord_residue_mask")
+        if crm is not None and bool(crm.any()) and "coords" in t:
+            sh = model.heads.structure
+            # `diff_pair(hidden, coev_dense)`, not `(hidden, mask)`. The second
+            # argument is a DENSE (B, L, L) coupling map, and passing the mask
+            # got as far as a shape error only because L happened to differ
+            # between the two -- with a square mask it would have silently fed
+            # the wrong tensor into the pair features. Validation must use the
+            # same couplings the training step does, or it is measuring a
+            # different model.
+            _B, _L = t["tokens"].shape
+            cvd = torch.zeros(_B, _L, _L, device=device,
+                              dtype=out["hidden"].dtype)
+            _k = t.get("coev_key")
+            if _k is not None and _k.numel():
+                _bb = torch.div(_k, _L * _L, rounding_mode="floor")
+                _rem = _k - _bb * _L * _L
+                _ii = torch.div(_rem, _L, rounding_mode="floor")
+                _jj = _rem - _ii * _L
+                _ok = (_bb < _B) & (_ii < _L) & (_jj < _L)
+                cvd[_bb[_ok], _ii[_ok], _jj[_ok]] = \
+                    t["coev_val"].to(cvd.dtype)[_ok]
+                cvd = cvd + cvd.transpose(1, 2)
+            pair3 = model.diff_pair(out["hidden"], cvd)
+            with torch.autocast(device.type, dtype=torch.bfloat16,
+                                enabled=(device.type == "cuda")):
+                dl = sh.loss(t["coords"].to(out["hidden"].dtype),
+                             out["hidden"], pair3, crm,
+                             generator=torch.Generator().manual_seed(1234 + bi))
+            for k in ("loss", "mse", "violation", "bond_cn", "bond_pp"):
+                if k in dl:
+                    acc.setdefault(f"structure_{k}", []).append(
+                        float(dl[k].detach()))
+
+        # ---- head 10, motif class, on val ---------------------------------
+        lm = t.get("loop_mask")
+        if lm is not None and bool(lm.any()):
+            ml = out["motif_logits"]
+            for k, v in _class_metrics(ml[lm].detach(), t["loop_class"][lm],
+                                       "motif", ml.shape[-1]).items():
+                acc.setdefault(f"val_{k}", []).append(float(v))
+
     res: Dict = {k: round(float(np.mean(v)), 4) for k, v in acc.items()}
+    # the geometry numbers carry their targets, so a reader does not have to
+    # know that C4'-N is 3.38 A and P-P is 6.01 to see whether 0.4 is good
+    if "structure_bond_cn" in res:
+        res["bond_cn_target_a"] = BOND_C4_N[0]
+        res["bond_pp_target_a"] = BOND_P_P[0]
     if "mg_score" in pool:
         sc = np.concatenate(pool["mg_score"])
         yy = np.concatenate(pool["mg_label"])
@@ -1005,10 +1069,27 @@ def main() -> None:
                                  else f"{k} {v}" for k, v in sorted(parts.items())),
                       flush=True)
                 if step >= args.smoke:
-                    print("[pharos] SMOKE TEST PASSED: stage 5 starts, every "
-                          "head this batch can supervise produced a loss, and "
-                          "the backward pass completes. No checkpoint written.",
+                    # exercise the epoch-end VALIDATION before returning. It is
+                    # where the structure and motif metrics were just added,
+                    # and a smoke test that stops at step 1 never reaches it --
+                    # which is exactly how `evaluate()` came to report two
+                    # heads of ten without anyone noticing.
+                    _ev = evaluate(model, va, device, cfg, 2, args.token_budget)
+                    print(f"[pharos] smoke validation ({len(_ev)} metrics): "
+                          + "  ".join(f"{k} {v}" for k, v in sorted(_ev.items())),
                           flush=True)
+                    _need = ("structure_loss", "structure_bond_cn",
+                             "structure_bond_pp")
+                    _miss = [k for k in _need if k not in _ev]
+                    if _miss:
+                        print(f"[pharos] SMOKE TEST FAILED: validation is "
+                              f"missing {_miss} -- head 3 has no held-out "
+                              f"measurement", flush=True)
+                        return 1
+                    print("[pharos] SMOKE TEST PASSED: stage 5 starts, every "
+                          "head this batch can supervise produced a loss, the "
+                          "backward pass completes, and validation reports the "
+                          "structure head. No checkpoint written.", flush=True)
                     return 0
                 continue
             if step % args.ckpt_every == 0:
