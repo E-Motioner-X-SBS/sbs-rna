@@ -53,6 +53,39 @@ MLM_EXTRA=${MLM_EXTRA:-}
 NEED_GIB=${NEED_GIB:-60}
 SETTLE=${SETTLE:-90}           # seconds between the two free-checks
 LOGDIR=$REPO/data/samples/analysis/cron
+
+# ---- HOLD ------------------------------------------------------------------
+#
+# `touch data/samples/analysis/cron/HOLD` and the runner starts nothing. It
+# already stands off a busy card, but it had no way to be told to stand off a
+# FREE one -- so stopping training by hand lasted until the next fire, at most
+# 30 minutes, and the stop looked like it had worked until it silently undid
+# itself. A deliberate stop needs to survive the scheduler.
+#
+# Remove the file to resume; nothing else changes.
+if [ -f "$LOGDIR/HOLD" ]; then
+    printf '%s held: %s/HOLD is present\n' "$(date -Is)" "$LOGDIR"
+    # written inline, not via write_status(): that function is defined further
+    # down and calling it here would silently do nothing, which is the exact
+    # failure this whole audit keeps finding.
+    cat > "$LOGDIR/status.json" <<JSON
+{
+ "updated": "$(date -Is)",
+ "state": "held",
+ "detail": "held by $LOGDIR/HOLD -- remove the file to resume",
+ "free_gib_at_check": null,
+ "log": null,
+ "stages": {
+  "verify":  $([ -f "$LOGDIR/.done-verify" ]  && echo '"done"' || echo 'null'),
+  "stage1":  $([ -f "$LOGDIR/.done-stage1" ]  && echo '"done"' || echo 'null'),
+  "scorer":  $([ -f "$LOGDIR/.done-scorer" ]  && echo '"done"' || echo 'null'),
+  "seqstages": $([ -f "$LOGDIR/.done-seqstages" ] && echo '"done"' || echo 'null'),
+  "stage5":  $([ -f "$LOGDIR/.done-stage5" ]  && echo '"done"' || echo 'null')
+ }
+}
+JSON
+    exit 0
+fi
 LOCK=$LOGDIR/run.lock
 STATUS=$LOGDIR/status.json
 STAMP=$(date +%Y%m%d-%H%M%S)
