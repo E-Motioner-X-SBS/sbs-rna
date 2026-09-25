@@ -619,6 +619,30 @@ floor (0.01 × n_blocks × 1.0) and folding it into the reported loss puts a
 constant under every curve. The reference point is the corpus's own 2.0165
 bits/nt: a model at that number has learned base frequencies and nothing else.
 
+**And the sample that number is measured on has to match the corpus.** The
+fixed held-out sample tracked through the first run does not: it is
+`eldors_c020_shard0004` alone, and 52.7% of it falls in the 20-79 nt band
+against the corpus's 6.5%, an eight-fold over-representation of the shortest
+sequences.
+
+| | 20-79 | 80-159 | 160-319 | 320-639 | 640-1024 | mean |
+|---|---|---|---|---|---|---|
+| corpus | 6.5% | 30.5% | 24.1% | 27.8% | 11.2% | 320 nt |
+| legacy sample | **52.7%** | 21.4% | 4.1% | 16.1% | 5.7% | 185 nt |
+
+The consequences are both a level error and a spurious signal. At step 9,000
+the legacy sample reads 1.6495 bits — 18.2% better than the unigram reference —
+where a corpus-weighted sample reads **1.8396, or 8.8%**. And over steps
+9,000→9,500 the legacy number moved **+0.303 bits** while the corpus-weighted
+figure moved **+0.074**: scored per band, +0.3504 of that lives in 20-79 nt and
+the 160-319 and 640-1024 bands do not move at all. What looked like the model
+collapsing was largely the training pool drifting between length bands while
+the evaluation sat in one of them.
+
+`--split stratified` fills per band to the corpus frequencies and is what the
+watcher runs; `heldout_mlm.csv` is frozen at step 9,750 and is a short-sequence
+benchmark, not the model's held-out performance.
+
 Cost is `6N + 2N(loops-1)` per token, not `6N × loops`: intermediate loops run
 under `no_grad` and cost a forward, not a forward and a backward.
 
