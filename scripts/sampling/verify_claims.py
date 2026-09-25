@@ -500,11 +500,22 @@ def main() -> int:
                 1.6632, abs_tol=0.0002)
             chk("R7 bits at the CONFIGURED depth (8 loops)", sw["8"]["bits"],
                 2.0064, abs_tol=0.0002)
-            chk("R7 at 8 loops it is worse than the corpus unigram entropy",
-                int(sw["8"]["bits"] > lj["corpus_entropy_bits"]), 1)
-            chk("R7 advertised vs trained effective layers",
-                f'{lj["advertised_effective_layers"]}/'
-                f'{lj["actual_effective_layers_in_training"]}', "144/36")
+            # NOT "worse than the corpus entropy", which is what I first
+            # wrote and this check then caught: 2.0064 against 2.0165 is 0.5%
+            # BETTER, not worse. The true statement is that at the configured
+            # depth the model has lost essentially all of its learned
+            # advantage -- it keeps 0.0101 of the 0.3533 bits it holds at the
+            # depth it trained on.
+            chk("R7 at 8 loops it retains under 5% of its advantage",
+                int((lj["corpus_entropy_bits"] - sw["8"]["bits"])
+                    < 0.05 * (lj["corpus_entropy_bits"] - sw["2"]["bits"])), 1)
+            # numeric, because `chk` coerces with float() -- a string pair
+            # like "144/36" raises ValueError, which is how this one announced
+            # itself
+            chk("R7 advertised effective layers",
+                lj["advertised_effective_layers"], 144)
+            chk("R7 effective layers actually trained",
+                lj["actual_effective_layers_in_training"], 36)
         else:
             chk("R7 loop-depth sweep measured", 0, 1)
 
@@ -546,6 +557,52 @@ def main() -> int:
             chk("R9 corpus mean length", pj["corpus_mean"], 320.0, abs_tol=1.0)
         else:
             chk("R9 pool composition measured", 0, 1)
+
+        # ---- R10: the blind test, and what it is a baseline FOR ------------
+        #
+        # The one measurement that says whether this model competes with the
+        # published field, and it was pinned nowhere. On RNA-Puzzles rp01
+        # against 6 competitors the field's best TM is 0.3292 and its median
+        # 0.3004; PHAROS scores 0.0190. That is NOT a failure -- the structure
+        # head is a diffusion decoder and STAGE 5 HAS NEVER RUN, so this is a
+        # randomly initialised decoder and the number is the baseline stage 5
+        # starts from. Pinned so it cannot later be mistaken for a result, and
+        # so the first trained run has something to beat.
+        #
+        # The geometry columns are the ones to watch. `c4_n_ok` and `p_p_ok`
+        # are the fraction of bonds within tolerance, and they are the only
+        # check in the whole harness that asks whether the output is a CHAIN:
+        # clash score sees only atoms too close, and TM and lDDT are
+        # superposition metrics that never ask whether anything is bonded.
+        # Both are 0.0, with median C4'-N at 37.9 A against 3.38 and P-P at
+        # 30.2 A against 6.01 -- a gas of points, which is exactly what an
+        # untrained decoder should produce and exactly what nothing was
+        # checking.
+        bt = ROOT / "data/samples/analysis/blind_tests.json"
+        if bt.exists():
+            btj = _rjson.loads(bt.read_text())
+            t0 = btj["targets"][0]
+            chk("R10 the target is rp01", int(t0["target"] == "rp01"), 1)
+            chk("R10 competitors scored", t0["n_competitors"], 6)
+            chk("R10 field best TM", round(t0["tm_best"], 4), 0.3292,
+                abs_tol=0.0002)
+            chk("R10 field median TM", round(t0["tm_median"], 4), 0.3004,
+                abs_tol=0.0002)
+            chk("R10 PHAROS TM, UNTRAINED structure head",
+                round(t0["pharos"]["tm"], 4), 0.0190, abs_tol=0.0002)
+            chk("R10 no C4'-N bond is within tolerance",
+                t0["pharos"]["c4_n_ok"], 0.0, abs_tol=1e-9)
+            chk("R10 no P-P bond is within tolerance",
+                t0["pharos"]["p_p_ok"], 0.0, abs_tol=1e-9)
+            chk("R10 median C4'-N distance against a true 3.38 A",
+                round(t0["pharos"]["c4_n_median"], 2), 37.95, abs_tol=0.02)
+            chk("R10 median P-P distance against a true 6.01 A",
+                round(t0["pharos"]["p_p_median"], 2), 30.16, abs_tol=0.02)
+            # provenance: a scoreboard with no model attached is not a result
+            chk("R10 the file records which model produced it",
+                int("provenance" in btj), 1)
+        else:
+            chk("R10 blind test run", 0, 1)
 
         # ---- the data: present, and readable ------------------------------
         ig = load("inventory_gap.json")

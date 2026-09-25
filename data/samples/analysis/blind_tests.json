@@ -130,5 +130,14 @@
    "tm_rank": 7,
    "tm_of": 7
   }
- ]
+ ],
+ "provenance": {
+  "when": "2026-09-24T14:28:00+05:30",
+  "pred_dir": "(recorded retrospectively)",
+  "checkpoint": "pretrain_shared400.pt (stage 1)",
+  "step": null,
+  "tokens": null,
+  "structure_head_trained": false,
+  "note": "added after the fact; the harness now writes this block itself. Stage 5 has never run, so head 3 is a randomly initialised diffusion decoder and these scores are its baseline, not a result."
+ }
 }

@@ -182,6 +182,36 @@ def report(data: Dict, show_field: bool) -> None:
                       f"lDDT {f.get('lddt',0):.3f} RMSD {f.get('rmsd',0):6.2f}")
 
 
+
+def _provenance(args) -> Dict:
+    """Which model produced these predictions, and when.
+
+    Reads the step and token count out of the checkpoint if one is named, and
+    records whether stage 5 has run -- because the structure head is a
+    diffusion decoder that stage 1 does not train, and a TM score from an
+    untrained decoder is a baseline rather than a result.
+    """
+    import datetime
+    out: Dict = {"when": datetime.datetime.now().astimezone().isoformat(
+        timespec="seconds"),
+        "pred_dir": str(getattr(args, "pred", "")),
+        "checkpoint": None, "step": None, "tokens": None,
+        "structure_head_trained": False}
+    ck = getattr(args, "ckpt", None)
+    if ck and Path(ck).exists():
+        try:
+            import torch
+            st = torch.load(ck, map_location="cpu", weights_only=False)
+            out["checkpoint"] = str(ck)
+            out["step"] = int(st.get("step", -1))
+            out["tokens"] = int(st.get("tokens", -1))
+            # stage 1 writes `pretrain_*`; only stage 5 trains head 3
+            out["structure_head_trained"] = "pretrain" not in Path(ck).name
+        except Exception as exc:                                 # noqa: BLE001
+            out["checkpoint_error"] = repr(exc)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pred", type=Path, default=None,
@@ -195,6 +225,11 @@ def main() -> int:
     ap.add_argument("--show-field", action="store_true",
                     help="list the top submissions per target")
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--ckpt", type=Path, default=None,
+                    help="the checkpoint the predictions came from, recorded "
+                         "in the output's provenance block. Without it the "
+                         "file cannot say whether its scores are an untrained "
+                         "baseline or a result.")
     args = ap.parse_args()
 
     targets = all_targets()
@@ -211,6 +246,13 @@ def main() -> int:
     data = evaluate(targets, args.pred, args.max_competitors)
     report(data, args.show_field)
 
+    # PROVENANCE. The file used to be `{"targets": [...]}` and nothing else:
+    # no checkpoint, no step, no date. So a reader had no way to tell whether
+    # a TM of 0.019 came from an untrained diffusion decoder or from a finished
+    # model, and the two mean opposite things. For a results file whose whole
+    # purpose is comparison against published competitors, that is the
+    # difference between a baseline and a failure.
+    data["provenance"] = _provenance(args)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(data, indent=1))
     print(f"\n[eval] -> {args.out.relative_to(ROOT)}")

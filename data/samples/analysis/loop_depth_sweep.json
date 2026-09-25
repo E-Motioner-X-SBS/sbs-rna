@@ -27,5 +27,5 @@
    "acc": 0.2823
   }
  },
- "note": "stage 1 trains at a FIXED n_loops and never varies it, so the recycle projection is trained for exactly one application; stage 5 samples 1..cfg.n_loops, so it would feed depths the trunk collapses at. At 8 loops the model is worse than the 2.0165-bit corpus unigram entropy."
+ "note": "stage 1 trains at a FIXED n_loops and never varies it, so the recycle projection is trained for exactly one application; stage 5 samples 1..cfg.n_loops, so it would feed depths the trunk collapses at. At 8 loops the model reads 2.0064 bits against the 2.0165-bit corpus unigram entropy -- 0.010 bits of advantage retained out of the 0.3533 it holds at 2 loops, i.e. 2.9%. Not 'worse than the unigram baseline', which is how I first put it."
 }
