@@ -902,6 +902,13 @@ def main() -> None:
         "tokens", "padded_tokens", "ce_nats", "bits_per_token", "balance",
         "total_loss", "lr", "masked_accuracy", "tok_per_s", "padded_per_s",
         "mfu", "pad_frac", "token_budget", "n_oom", "peak_gib", "note",
+        # Declared here or dropped in silence: `RunLog` builds its
+        # DictWriter with `extrasaction="ignore"`, so a key passed to
+        # `log()` that is not in this list vanishes without an error.
+        # Adding a measurement at the call site is not adding it to the
+        # record -- verified by round-trip in test_head_metrics.py.
+        "muon_lr", "batch_tokens", "dead_expert_frac",
+        "route_width_mean", "route_width_max",
         # Perplexity, exp(CE) over masked positions. Cross-entropy and bits are
         # the same quantity on a log scale; perplexity is the same quantity
         # again, as an effective branching factor -- "the model is as uncertain
@@ -1199,7 +1206,29 @@ def main() -> None:
                              pad_frac=round(1 - seen / max(padded, 1), 6),
                              token_budget=budget_tokens, n_oom=n_oom,
                              peak_gib=round(
-                                 torch.cuda.max_memory_allocated() / 2**30, 2))
+                                 torch.cuda.max_memory_allocated() / 2**30, 2),
+                             # The telemetry added today was printed to stdout
+                             # and stopped there. stdout is a file that gets
+                             # rotated and overwritten; this csv is the durable
+                             # record every analysis reads -- and
+                             # `measure_batch_effect.py` had to parse the LOG
+                             # rather than the csv precisely because `btok` was
+                             # not here. Fixing "computed and dropped at the
+                             # call site" and leaving "printed and not
+                             # recorded" is the same defect one step along.
+                             muon_lr=(round(lr_now * args.muon_lr
+                                            / max(args.lr, 1e-12), 8)
+                                      if args.optimizer == "muon" else None),
+                             batch_tokens=(int(np.mean(btoks[-args.log_every:]))
+                                           if btoks else None),
+                             dead_expert_frac=(round(float(np.mean(
+                                 deads[-args.log_every:])), 6)
+                                 if deads else None),
+                             route_width_mean=(round(float(np.mean(
+                                 widths[-args.log_every:])), 3)
+                                 if widths else None),
+                             route_width_max=(int(np.max(
+                                 wmaxes[-args.log_every:])) if wmaxes else None))
                   hist.append({"step": step, "tokens": seen, "padded": padded,
                                "lr": lr_now,
                                "balance": float(np.mean(bals[-args.log_every:])),

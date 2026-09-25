@@ -73,6 +73,49 @@ def check_help_strings() -> int:
     return len(bad)
 
 
+
+def check_runlog_fields() -> int:
+    """A key the RunLog was not told about is dropped without a word.
+
+    `RunLog` builds its `csv.DictWriter` with `extrasaction="ignore"`, which is
+    the right call for a writer that must never crash a training run -- and it
+    means adding a measurement to a `log()` call does NOTHING unless the field
+    is also declared. Today's router telemetry -- dead experts, routing width,
+    real batch tokens, Muon's learning rate -- was printed to stdout and absent
+    from the csv for exactly that reason, and `measure_batch_effect.py` had to
+    parse the log file instead.
+
+    So: prove the drop happens, and then prove stage 1 declares what it logs.
+    """
+    import csv as _csv
+    import tempfile
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from pharos.train.telemetry import RunLog
+    bad = 0
+    with tempfile.TemporaryDirectory() as d:
+        rl = RunLog(Path(d), "probe", ["declared"])
+        rl.log("step", step=1, declared=42, undeclared=99)
+        rl.finish()
+        row = list(_csv.DictReader(next(Path(d).rglob("probe*.csv")).open()))[0]
+        if row.get("declared") != "42":
+            print("  FAIL a DECLARED field was not recorded"); bad += 1
+        if "undeclared" in row:
+            print("  FAIL an undeclared field WAS recorded"); bad += 1
+    print(f"  OK   undeclared fields are dropped silently         "
+          f"(so they must be declared)")
+
+    src = (Path(__file__).resolve().parents[1]
+           / "scripts/pretrain_mlm.py").read_text()
+    decl = src.split('RunLog(ROOT, "stage1_mlm"', 1)[1].split("])", 1)[0]
+    for f in ("muon_lr", "batch_tokens", "dead_expert_frac",
+              "route_width_mean", "route_width_max"):
+        ok = f'"{f}"' in decl
+        print(f"  {'OK  ' if ok else 'FAIL'} stage 1 declares {f:22s}")
+        if not ok:
+            bad += 1
+    return bad
+
+
 def main() -> int:
     torch.manual_seed(0)
 
@@ -122,6 +165,11 @@ def main() -> int:
     chk("a perfect head shows positive lift and macro 1",
         mp["lw_lift"] > 0.2 and mp["lw_macro"] > 0.999,
         f"lift {mp['lw_lift']:.4f}, macro {mp['lw_macro']:.4f}")
+
+    print("\n== the run log records what the step line prints ==")
+    chk("every telemetry field the trainer logs is declared",
+        check_runlog_fields() == 0,
+        "extrasaction='ignore' drops undeclared keys without an error")
 
     print("\n== every trainer's --help runs ==")
     chk("no argparse help string has an unescaped %",
