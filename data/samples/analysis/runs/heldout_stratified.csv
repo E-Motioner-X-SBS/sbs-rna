@@ -1,2 +1,3 @@
 timestamp,checkpoint,step,tokens,bits,perplexity,accuracy,n_masked,n_seq,seed,min_len,max_len,wc_gap,wc_visible,wc_masked,wc_n,device,split
 2026-09-25T06:51:40,step9750.pt,9750,1442694866,1.9221,3.78973,0.34857,39444,1026,1234,20,1024,+0.1069,0.314,0.207,449,cuda,stratified
+2026-09-25T10:21:19,step10750.pt,10750,1569067236,1.92079,3.78631,0.34843,7330,192,1234,20,1024,0.07795,0.26058,0.18263,449,cpu,stratified

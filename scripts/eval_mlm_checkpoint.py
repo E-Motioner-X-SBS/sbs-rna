@@ -407,7 +407,18 @@ def main() -> int:
                             r.get("comp_n", "") if _ok else "",
                             device.type, args.split])
     if not args.no_csv:
-        print(f"\n[eval] appended to {args.append_csv.relative_to(ROOT)}")
+        # `relative_to` RAISES on a path that is not under ROOT, and the
+        # watcher passes a relative one. So the evaluator did all its work,
+        # wrote the row correctly, and then died on a cosmetic print -- exit
+        # status 1 on a run that had succeeded. The retry logic added earlier
+        # today believed the status, re-ran a 20-minute CPU evaluation, and
+        # appended a DUPLICATE row. A status that lies is worse than none, and
+        # a retry that trusts it turns a print bug into lost hours.
+        try:
+            _shown = args.append_csv.resolve().relative_to(ROOT)
+        except ValueError:
+            _shown = args.append_csv
+        print(f"\n[eval] appended to {_shown}")
     return 0
 
 
