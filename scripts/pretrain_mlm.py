@@ -600,6 +600,13 @@ def main() -> None:
                          "(partial r -0.52). Freezing trades gradient quality "
                          "for headroom, so the gain is REPORTED at every "
                          "growth and the policy is left to a human.")
+    ap.add_argument("--ckpt-fail-limit", type=int, default=3,
+                    help="consecutive checkpoint failures tolerated before the "
+                         "run stops. A full disk raises OSError from "
+                         "atomic_save, which the OOM handler does not catch, "
+                         "so one would otherwise kill a multi-day run; but a "
+                         "run that can never save is burning compute it cannot "
+                         "keep, so it does not continue indefinitely either.")
     ap.add_argument("--oom-recover-steps", type=int, default=1000,
                     help="OOM-free steps before the token budget may climb "
                          "back toward 90%% of the level that failed. Without "
@@ -932,6 +939,7 @@ def main() -> None:
     #: the level that failed. See the note at the growth site.
     oom_ceiling = 0
     last_oom_step = -10**9
+    ckpt_fails = 0
     budget_tokens = args.token_budget
     n_oom = 0
     # The chemistry tables live on the device for the whole run; building them
@@ -1314,6 +1322,21 @@ def main() -> None:
                           rebuild_stream = True
 
               if step % args.ckpt_every == 0 or seen >= budget or rebuild_stream:
+                # A failed SAVE must not kill the run, and must not be quiet.
+                #
+                # `atomic_save` is careful about partial writes -- temp file,
+                # fsync, atomic rename, cleanup on failure -- but it raises,
+                # and the only `except` around this block catches
+                # `torch.OutOfMemoryError`. A full disk therefore takes the
+                # whole run down, and /store is at 96% with 62 GiB of this
+                # project's own checkpoints on it.
+                #
+                # Dying is not obviously wrong -- a run that cannot checkpoint
+                # is burning compute it cannot keep -- so the rule is: warn on
+                # the first failures, keep training in case the condition is
+                # transient, and give up loudly after `--ckpt-fail-limit`
+                # consecutive ones rather than running for days unsaveable.
+                try:
                   atomic_save({"cfg": cfg.__dict__, "model": _clean_state(model),
                               "opt": opt.state_dict(),
                               # every optimiser, or a Muon resume silently
@@ -1322,6 +1345,21 @@ def main() -> None:
                               "optimizer": args.optimizer, "padded": padded,
                               "tokens": seen, "step": step,
                               "history": hist, "run_id": runlog.run_id}, ck)
+                  ckpt_fails = 0
+                except OSError as _e:
+                  ckpt_fails += 1
+                  import shutil as _sh
+                  _free = _sh.disk_usage(ck.parent).free / 2**30
+                  print(f"[mlm] CHECKPOINT FAILED ({ckpt_fails}/"
+                        f"{args.ckpt_fail_limit}) at step {step}: {_e} "
+                        f"({_free:.1f} GiB free on {ck.parent})", flush=True)
+                  runlog.event(f"checkpoint failed: {_e}", step=step,
+                               n_fail=ckpt_fails, free_gib=round(_free, 1))
+                  if ckpt_fails >= args.ckpt_fail_limit:
+                      raise RuntimeError(
+                          f"{ckpt_fails} consecutive checkpoint failures; "
+                          f"{_free:.1f} GiB free. Refusing to train further "
+                          f"without being able to save.") from _e
                   # Held-out evaluation, at every checkpoint.
                   #
                   # The loss printed above is a rolling mean over whatever
