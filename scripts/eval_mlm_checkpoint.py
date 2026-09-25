@@ -372,6 +372,34 @@ def main() -> int:
             import datetime as _dt
             args.append_csv.parent.mkdir(parents=True, exist_ok=True)
             new = not args.append_csv.exists()
+            # Do not append a row this file already has.
+            #
+            # A watcher restart, a retry that fires after a run has already
+            # written its row, or a hand-run evaluation all append silently,
+            # and a duplicate is worse than a missing row: it double-weights
+            # one checkpoint in every mean and slope computed from the file,
+            # and nothing downstream looks for it. One happened today, from a
+            # retry triggered by a cosmetic crash AFTER the row was written.
+            #
+            # The key is what makes two rows the same measurement -- same
+            # checkpoint, step, device, split and sample size. A rerun that
+            # changes any of those is a different measurement and is kept.
+            if not new:
+                _key = (ck.name, str(st.get("step", "")), device.type,
+                        args.split, str(len(seqs)))
+                try:
+                    with args.append_csv.open(newline="") as _fh:
+                        for _r in _csv.reader(_fh):
+                            if len(_r) >= 18 and (_r[1], _r[2], _r[16],
+                                                  _r[17], _r[8]) == _key:
+                                print(f"[eval] {args.append_csv.name} already "
+                                      f"has {ck.name} step {_key[1]} on "
+                                      f"{device.type}/{args.split} at n_seq "
+                                      f"{_key[4]}; not appending a duplicate")
+                                return 0
+                except OSError as _e:                            # noqa: BLE001
+                    print(f"[eval] could not read {args.append_csv} to check "
+                          f"for duplicates ({_e}); appending anyway")
             with args.append_csv.open("a", newline="") as fh:
                 w = _csv.writer(fh)
                 if new:
