@@ -1,0 +1,15 @@
+{
+ "measure": "step-to-step sd of training bits/token, window-matched",
+ "run2_window_points": 9,
+ "run2_sd": 0.0609,
+ "run1_windows_same_length": 70,
+ "run1_sd_median": 0.4048,
+ "run1_sd_mean": 0.3589,
+ "run1_sd_min": 0.0089,
+ "run1_sd_max": 0.649,
+ "run1_windows_at_least_as_calm": 12,
+ "ratio_to_median": 6.6,
+ "F_vs_median": 44.1,
+ "p": 8e-06,
+ "caveat": "one 9-point window of run 2 against 70 of run 1. Run 1 HAD calm windows -- 12 of 70 were calmer than run 2 -- because sitting inside one homogeneous shard is quiet for a different reason than mixing shards is. The claim supported is that run 2 is calmer than a TYPICAL run-1 window, not yet that it is calm consistently."
+}
