@@ -111,7 +111,21 @@ class PharosConfig:
         at 18 blocks and d_model 768 counts the same as 2048 at 20 blocks but
         runs larger matmuls, which is what actually keeps the CUDA cores busy.
         """
-        c = cls(d_model=768, n_blocks=18, n_loops=8, n_heads=12, window=128,
+        # n_loops 3, not 8.
+        #
+        # 8 was aspirational: the model is trained at whatever depth the
+        # trainer passes, and measured at step 8,750 it reads 1.6632 bits at
+        # the 2 loops it saw, 1.9711 at 4 and 2.0064 at 8 -- it keeps 2.9% of
+        # its advantage over the unigram baseline at the depth this config
+        # advertised. 144 effective layers was a number no checkpoint could
+        # deliver.
+        #
+        # 3 with `--sample-loops` is free: uniform over 1..3 has mean 2.0, and
+        # cost is `6 + 2(mean - 1)` FLOPs per active parameter per token, so it
+        # is 8.0 -- exactly what a fixed 2 costs. The model becomes usable at
+        # one, two and three loops for nothing, and 54 effective layers is a
+        # number the run can actually stand behind.
+        c = cls(d_model=768, n_blocks=18, n_loops=3, n_heads=12, window=128,
                 d_pair=160, n_experts=512, d_expert=2304, top_k=6, n_shared=1)
         c.shared_experts = True
         # max_k = n_experts: a token may genuinely fire all 512. Merging

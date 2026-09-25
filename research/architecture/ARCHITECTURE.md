@@ -375,16 +375,33 @@ the router more to distinguish between.
 
 ### 5.4 Sizing
 
-| model | d | blocks | loops | effective layers | experts | total | active |
-|---|---|---|---|---|---|---|---|
-| **shared400** (trained) | **768** | **18** | 8 | **144** | **512 shared** | **394M** | **302M** |
-| base400 (independent experts) | 640 | 18 | 8 | 144 | 48 | 405M | 126M |
-| PHAROS-Small (predecessor) | 512 | 16 | 8 | 128 | 32 | 149M | 61M |
-| PHAROS-Mini | 384 | 12 | 12 | 144 | 32 | 67M | 30M |
+| model | d | blocks | loops (cfg) | effective layers | experts | total | active | of which dense head 3 |
+|---|---|---|---|---|---|---|---|---|
+| **shared400** (trained) | **768** | **18** | 8 | **144** | **512 shared** | **394.7M** | **325.7M** | 44.6M |
+| base400 (independent experts) | 640 | 18 | 8 | 144 | 48 | 405.5M | 126.8M | 31.0M |
+| base_v2 | 768 | 32 | 3 | 96 | 32 | 1105.6M | 312.8M | 44.5M |
+| PHAROS-Small (predecessor) | 512 | 16 | 8 | 128 | 32 | 258.9M | 82.8M | 19.8M |
+| PHAROS-Mini | 384 | 12 | 12 | 144 | 32 | 113.5M | 39.2M | 11.2M |
 
-Counted from the built model, not derived on paper. The two 400M rows are the
-same budget spent differently and the difference is the active column: sharing
-converts dormant expert parameters into active ones, 126M → 302M.
+Counted from the built model, not derived on paper — and re-counted after head
+3 became a diffusion decoder, which every row in the previous version of this
+table predated. Small was written as 149M/61M and measures 258.9M/82.8M; Mini
+as 67M/30M against 113.5M/39.2M; shared400's active column as 302M against
+325.7M. The difference is the last column: the decoder is a **dense**
+transformer stack outside the MoE recipe, so it lands on the active count as a
+flat addition — 28.6% of Mini's active parameters and 14.2% of base_v2's.
+
+The two 400M rows are the same budget spent differently and the difference is
+the active column: sharing converts dormant expert parameters into active ones,
+**126.8M → 325.7M**.
+
+**The `loops` column is the configuration, not what training exercises.**
+Stage 1 runs `--n-loops 2`, fixed, at every step: 36 effective layers, not 144.
+Measured at step 8,750, the trained model reads 1.6632 bits at 2 loops, 1.9718
+at 1, 1.9711 at 4 and 2.0064 at 8 — it works at the depth it saw and nowhere
+else, retaining 2.9% of its advantage over the unigram baseline at the
+configured depth. `--sample-loops` trains across depths at a cost of
+`6+2(mean-1)` FLOPs per active parameter per token against the fixed 8.
 
 **Wide beats deep at equal parameters on this hardware.** d_expert 2304 at 18
 blocks counts the same as 2048 at 20, but runs larger matmuls, and at d=512 the

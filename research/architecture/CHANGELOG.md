@@ -138,3 +138,158 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-24 06:04 IST
 
 - **A verification timeout was an uncaught exception that would block training** (`0a71379`)
+
+## 2026-09-24 08:34 IST
+
+- **Stage 1 telemetry: shared400 through step 1700 (1.488 bits, acc 0.540)** (`de51c94`)
+- claims_ok: 337 → **333**
+
+## 2026-09-24 09:04 IST
+
+- **Close the loop: sequence -> sampled backbone -> PDB -> scored against the field** (`251fd08`)
+
+## 2026-09-24 09:34 IST
+
+- **A fixed-sample evaluator, because the training loss was measuring the data** (`0e47225`)
+
+## 2026-09-24 10:04 IST
+
+- **Score every checkpoint on the held-out sample without a human in the loop** (`1b3750e`)
+
+## 2026-09-24 10:34 IST
+
+- **The curriculum could not hand off: stage 5 built a different model than stage 1** (`5a1cc3b`)
+
+## 2026-09-24 11:04 IST
+
+- **Stage 5 refuses to silently discard pretraining, and it now actually runs** (`990b878`)
+
+## 2026-09-24 11:34 IST
+
+- **Is the accuracy real? Partly: 6 of the 38 points are an artefact** (`a6ec973`)
+
+## 2026-09-24 12:04 IST
+
+- **Switch stage 1 to Muon, and let resume survive an architecture that grew** (`b31cb6e`)
+
+## 2026-09-24 12:34 IST
+
+- **The spec records the optimiser decision and the honest accuracy** (`d5342f8`)
+
+## 2026-09-24 13:04 IST
+
+- **The model is under-CONFIDENT, not just under-trained; stop decaying the tied embedding** (`b2788cb`)
+
+## 2026-09-24 13:34 IST
+
+- **Muon recovers from the restart dip and is at parity by step 3500** (`f8d815d`)
+
+## 2026-09-24 14:04 IST
+
+- **Muon verdict: no measurable difference at scale. Not reverting, not claiming a win.** (`bf3eb57`)
+
+## 2026-09-24 14:34 IST
+
+- **Catch structures that are not molecules, and two heads the spec claims but lacks** (`c59a110`)
+- claims_ok: 333 → **332**
+
+## 2026-09-24 16:04 IST
+
+- **Heads 9 and 10 now exist, with targets that were already in the archive** (`b5f4f4b`)
+
+## 2026-09-24 17:04 IST
+
+- **The corpus build died at the last step because meta() held an ndarray** (`bab2429`)
+
+## 2026-09-24 17:34 IST
+
+- **The held-out set was being trained on. It is now excluded at the source.** (`00f18cf`)
+
+## 2026-09-24 18:04 IST
+
+- **The 3D corpus carries base-pair geometry: heads 9 and 10 are live** (`2a1c27e`)
+
+## 2026-09-24 19:04 IST
+
+- **No leak: the training loss is reading easy shards, and the clean curve is good** (`8bab7ca`)
+- claims_ok: 332 → **0**
+
+## 2026-09-24 20:04 IST
+
+- claims_ok: 0 → **332**
+
+## 2026-09-24 21:34 IST
+
+- **The block scorer's headline recall is a chain-weighted mean of mostly tiny chains** (`8192cb6`)
+
+## 2026-09-24 22:04 IST
+
+- claims_ok: 332 → **0**
+
+## 2026-09-24 23:04 IST
+
+- claims_ok: 0 → **333**
+
+## 2026-09-25 00:04 IST
+
+- **Four measurements that could not fail, and so were not measurements** (`e73c299`)
+
+## 2026-09-25 01:04 IST
+
+- claims_ok: 333 → **334**
+
+## 2026-09-25 02:04 IST
+
+- **The routing-width claim now has a measurement under it** (`8fbbaed`)
+- claims_ok: 334 → **353**
+
+## 2026-09-25 02:34 IST
+
+- **The router's top length bin is 4.5 octaves wide, and takes 40% of stage 5** (`6d3e708`)
+- claims_ok: 353 → **363**
+
+## 2026-09-25 03:04 IST
+
+- **Every head reported a loss with no floor; now they report the floor too** (`42e2cf9`)
+
+## 2026-09-25 03:34 IST
+
+- **The held-out curve's "noise" is largely the batch size, and it is measurable** (`b9fd406`)
+- claims_ok: 363 → **367**
+
+## 2026-09-25 04:04 IST
+
+- **Withdrawn: the batch size does not explain step 8,500** (`3026197`)
+
+## 2026-09-25 04:34 IST
+
+- **Dim 13 of the chemistry vector is never set by anything that trains the model** (`85ee502`)
+- claims_ok: 367 → **133**
+
+## 2026-09-25 05:34 IST
+
+- **What is the rest of stage 1 worth? Not identifiable from this curve** (`307476e`)
+- claims_ok: 133 → **0**
+
+## 2026-09-25 06:34 IST
+
+- **The one number that says whether this competes was pinned nowhere** (`5936475`)
+- claims_ok: 0 → **393**
+
+## 2026-09-25 07:04 IST
+
+- **The csv declared 16 columns and wrote 12, dropping the pairing measurement** (`c646e7e`)
+- claims_ok: 393 → **404**
+
+## 2026-09-25 07:34 IST
+
+- **Coevolution is attached to the right chain: 28x enrichment, measured** (`c0130c4`)
+- claims_ok: 404 → **410**
+
+## 2026-09-25 08:04 IST
+
+- **The CPU evaluation was being charged to the run it measures** (`c8e57e4`)
+
+## 2026-09-25 08:34 IST
+
+- **An audit record, because sixteen findings in commit messages are not actionable** (`a20e212`)

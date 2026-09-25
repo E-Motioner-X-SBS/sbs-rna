@@ -140,6 +140,15 @@ def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
     `Neff/L` is not in the 3D set, so it is left absent -- which the router
     reads as zero -- rather than invented. In-complex comes from the entry's
     composition, which is measured (§11.2).
+
+    `length_bin_max` matters here and not in stage 1. The default octave bins
+    are `floor(log2(L/32))` clamped to `n_bins - 1`, which makes the top bin a
+    catch-all for everything above 1,024 -- and this corpus runs to 4,450, so
+    measured on the 3D training split that one bin takes **40.0% of chains**.
+    The long-chain regime the hierarchical pair track exists for was a single
+    indicator. Spread over [32, 4608] the occupancy is 15.7/39.9/3.0/1.2/21.7/
+    18.6% and the conditioning entropy goes 1.890 -> 2.100 bits of the 2.585
+    available.
     """
     dev = t["tokens"].device
     B = t["tokens"].shape[0]
@@ -148,7 +157,13 @@ def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
     chem_summary = t["chem"].sum(1) / t["mask"].sum(1, keepdim=True).clamp(min=1)
     return RouterFeatures(
         length=torch.as_tensor(t["lengths"], dtype=torch.float32, device=dev),
-        in_complex=in_cx, chem_summary=chem_summary[:, :5], recycle=recycle)
+        in_complex=in_cx, chem_summary=chem_summary[:, :5], recycle=recycle,
+        length_bin_max=LENGTH_BIN_MAX)
+
+
+#: Upper edge of the router's length binning for the 3D corpus, whose longest
+#: chain is 4,450 residues. See `router_features`.
+LENGTH_BIN_MAX = 4608
 
 
 def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,

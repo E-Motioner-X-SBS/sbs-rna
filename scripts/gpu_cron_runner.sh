@@ -163,12 +163,15 @@ fi
 # multi-GPU figure, not a single-card one.
 if [ ! -f "$LOGDIR/.done-stage1" ]; then
     note "=== pretrain_mlm.py (curriculum stage 1) ==="
-    if $PY -u scripts/pretrain_mlm.py \
-            --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
-            --tokens "${MLM_TOKENS:-4e9}" --token-budget 0 \
-            --corpus data/derived/parquet_starter data/derived/parquet_mars \
-            --n-loops 2 --optimizer "${MLM_OPT:-muon}" \
-            --muon-lr "${MUON_LR:-0.02}" ${MLM_EXTRA:-} >> "$LOG" 2>&1; then
+    # Flags live in configs/stage1_shared400.sh, with the measurement behind
+    # each one. Duplicating them here is how the first run ended up on
+    # --tokens 4e9 (0.37 of one epoch), --n-loops 2 (a model usable at exactly
+    # one depth), the default --max-batch 512 (92.5% of batches capped on the
+    # sequence count) and no --interleave (a pool that was 0.54 of one
+    # length-sorted shard). One file, one set of flags.
+    if MLM_TOKENS="${MLM_TOKENS:-}" MLM_SIZE="${MLM_SIZE:-}" \
+       NEED_GIB="$NEED_GIB" MLM_OPT="${MLM_OPT:-}" MUON_LR="${MUON_LR:-}" \
+       bash configs/stage1_shared400.sh ${MLM_EXTRA:-} >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage1"
         note "stage 1 finished"
     else

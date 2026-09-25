@@ -469,6 +469,13 @@ def _coevolution_for(family: str, tokens: np.ndarray):
         return None
 
 
+#: Chemistry dim 13 -- the protonation-shifted pKa flag. See `pad_batch`.
+PKA_SHIFT_DIM = 13
+#: Leontis-Westhof classes at or above this are non-canonical geometries.
+#: 1 is Watson-Crick, 0 is annotated-but-unclassified.
+NONCANONICAL_LW_MIN = 2
+
+
 def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarray]:
     """Right-pad a list of examples into rectangular arrays plus a mask."""
     B = len(items)
@@ -524,6 +531,32 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             lw_key.append(i * L * L + lp[keep, 0].astype(np.int64) * L
                           + lp[keep, 1].astype(np.int64))
             lw_val.append(lp[keep, 2].astype(np.int64))
+            # ---- chemistry dim 13: the shifted pKa, finally set -----------
+            #
+            # `residue_chemistry(..., shifted_pka=...)` has always written this
+            # dim and nothing has ever passed True: the only caller doing so is
+            # a unit test, so the dim was identically zero in every batch the
+            # model has ever seen, and its docstring's "must stay False at
+            # recycle 0" implied a recycle-time rule nobody wrote.
+            #
+            # The rule, stated: a residue in an annotated base pair whose
+            # Leontis-Westhof class is NON-CANONICAL carries a shifted pKa.
+            # Class 1 is Watson-Crick (76.57% of annotated pairs) and class 0
+            # is "annotated but unclassified" (7.74%); neither asserts a shift,
+            # the first because a canonical pair does not shift and the second
+            # because not knowing is not evidence. Classes 2-12 -- 15.69% of
+            # pairs -- are the wobble, Hoogsteen and sugar-edge geometries
+            # where protonation is documented: adenine N1 goes from pKa 3.5
+            # towards neutrality in an A+.C wobble, cytosine N3 likewise.
+            #
+            # Set here rather than in the shard, so it needs no corpus rebuild
+            # and so the rule lives in one readable place. It fires only where
+            # the structure is known: stage 1 is sequence-only and the dim
+            # stays zero there, now BY the rule rather than by omission.
+            nc = keep & (lp[:, 2] >= NONCANONICAL_LW_MIN)
+            if nc.any():
+                chem[i, lp[nc, 0].astype(np.int64), PKA_SHIFT_DIM] = 1.0
+                chem[i, lp[nc, 1].astype(np.int64), PKA_SHIFT_DIM] = 1.0
     # ---- coevolution, as a sorted sparse map ------------------------------
     #
     # A dense (B, L, L) coupling tensor is not an option: the longest chain in

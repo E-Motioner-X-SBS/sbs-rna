@@ -1,6 +1,6 @@
 {
  "documented_total_gb": 833.3,
- "here_gb": 657.29,
+ "here_gb": 851.09,
  "n_sources": 18,
  "n_present": 17,
  "n_partial": 1,
@@ -11,7 +11,7 @@
   {
    "source": "MARS",
    "documented_gb": 427.29,
-   "here_gb": 90.29,
+   "here_gb": 283.62,
    "state": "partial",
    "decision": "D18",
    "path": "sbs-rna/data/sequences/mars",
@@ -110,7 +110,7 @@
   {
    "source": "RNA3DB",
    "documented_gb": 2.15,
-   "here_gb": 23.02,
+   "here_gb": 23.49,
    "state": "present",
    "decision": null,
    "path": "sbs-rna/data/structures/databases/rna3db",

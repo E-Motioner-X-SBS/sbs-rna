@@ -1,0 +1,4 @@
+run_id,stage,kind,timestamp,elapsed_s,epoch,step,tokens,padded_tokens,ce_nats,bits_per_token,balance,total_loss,lr,masked_accuracy,tok_per_s,padded_per_s,mfu,pad_frac,token_budget,n_oom,peak_gib,note,perplexity
+20260925T032528Z,stage1_mlm,event,2026-09-25T03:25:28+00:00,0.0,,10750,1569067236,1714925632,,,,,,,,,,,,,,resumed,
+20260925T032528Z,stage1_mlm,step,2026-09-25T03:31:45+00:00,376.8,,10800,1575070776,1721490624,1.280474,1.847333,0.404497,1.684971,0.0005539024205333318,0.393283,15931.1,17421.0,0.181836,0.085054,131072,0,37.97,,3.598344
+20260925T032528Z,stage1_mlm,event,2026-09-25T03:31:45+00:00,376.9,,10800,,,,,,,,,,,,,143360,,37.97,budget grown to 143360,

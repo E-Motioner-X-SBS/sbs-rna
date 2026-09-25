@@ -823,10 +823,31 @@ def main() -> None:
                   f"and this run is {args.optimizer}; keeping the WEIGHTS and "
                   f"starting fresh optimiser state", flush=True)
         elif "opts" in sd and len(sd["opts"]) == len(opts):
-            for o, st in zip(opts, sd["opts"]):
-                o.load_state_dict(st)
+            # Tolerate a CHANGED PARAMETER SET, loudly.
+            #
+            # `load_state_dict` raises "loaded state dict contains a parameter
+            # group that doesn't match the size of optimizer's group" when the
+            # model has gained tensors since the checkpoint -- which is exactly
+            # what heads 9 and 10 did mid-run. The weights still load, and the
+            # existing guard already refuses a mostly-random model, so the only
+            # question is whether to keep the moments; with a different number
+            # of parameters in a group they cannot be keyed back to the right
+            # tensors, so the honest answer is to drop them and say so. An
+            # unhandled exception here means a resumable run stops resuming.
+            try:
+                for o, st in zip(opts, sd["opts"]):
+                    o.load_state_dict(st)
+            except ValueError as exc:
+                print(f"[mlm] optimiser state does not fit this parameter set "
+                      f"({exc}); keeping the WEIGHTS and starting fresh "
+                      f"optimiser state", flush=True)
         elif "opt" in sd:
-            opt.load_state_dict(sd["opt"])
+            try:
+                opt.load_state_dict(sd["opt"])
+            except ValueError as exc:
+                print(f"[mlm] optimiser state does not fit this parameter set "
+                      f"({exc}); keeping the WEIGHTS and starting fresh "
+                      f"optimiser state", flush=True)
         seen, step = int(sd.get("tokens", 0)), int(sd.get("step", 0))
         hist_resumed = list(sd.get("history", []))
         resumed_padded = int(sd.get("padded", 0))
@@ -1092,7 +1113,9 @@ def main() -> None:
                         f"bal {np.mean(bals[-args.log_every:]):.3f} "
                         f"{_router_str(deads, widths, wmaxes, args.log_every)}"
                         f"btok {int(np.mean(btoks[-args.log_every:])):,} "
-                        f"lr {lr_now:.2e} "
+                        f"lr {lr_now:.2e}"
+                        + (f"/{lr_now * args.muon_lr / max(args.lr, 1e-12):.2e}"
+                           if args.optimizer == "muon" else "") + " "
                         f"acc {np.mean(accs[-args.log_every:]):.4f} "
                         f"{rate_r/1e3:.1f}k tok/s "
                         f"({rate_p/1e3:.1f}k padded, pad {100*(1-seen/max(padded,1)):.1f}%) "
