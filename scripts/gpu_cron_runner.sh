@@ -181,15 +181,49 @@ if [ ! -f "$LOGDIR/.done-stage1" ]; then
     fi
 fi
 
-PRETRAIN=$REPO/data/derived/checkpoints/pretrain_small.pt
+# ---- the curriculum chain, which was broken in three places ---------------
+#
+# The point of stages 1 -> 2/3 -> 5 is that each starts from the last one's
+# representation. None of them did.
+#
+#   1. `PRETRAIN=.../pretrain_small.pt`, but stage 1 writes
+#      `pretrain_<size>.pt` and the size is shared400. The file never existed,
+#      so `INIT` was empty and stages 2-3 would have started from RANDOM
+#      weights, discarding 1.5B tokens of pretraining without a word.
+#   2. `SEQCK=.../seqstages_small.pt`, same bug one stage later.
+#   3. Stage 5 ran `--size small` while stages 1-3 ran shared400 -- a
+#      different architecture, so even a correct path would have hit a shape
+#      mismatch, and `--init-from` is tolerant enough that it might not have
+#      said so loudly.
+#
+# All three now derive from one variable, and `require_init` refuses to run a
+# stage whose predecessor is missing rather than quietly starting over. The
+# whole value of a curriculum is the chaining; a chain that silently breaks is
+# worse than no chain, because the run still produces a number.
+SIZE="${MLM_SIZE:-shared400}"
+CKPT_DIR=$REPO/data/derived/checkpoints
+
+require_init() {   # $1 = path, $2 = stage name, $3 = predecessor name
+    if [ ! -f "$1" ]; then
+        note "$2 has no input: $3 has not produced $(basename "$1")."
+        note "  Refusing to train $2 from random weights. Run $3 first, or"
+        note "  pass --from-scratch explicitly if that is really what you want."
+        write_status interrupted "$2 blocked: missing $(basename "$1")" "$F2"
+        exit 1
+    fi
+    INIT="--init-from $1"
+    note "$2 initialising from $(basename "$1")"
+}
+
+PRETRAIN=$CKPT_DIR/pretrain_${SIZE}.pt
 INIT=""
-[ -f "$PRETRAIN" ] && INIT="--init-from $PRETRAIN"
 
 # ---- 3. stages 2 and 3: secondary structure and probing, co-trained -------
 if [ ! -f "$LOGDIR/.done-seqstages" ]; then
     note "=== train_sequence_stages.py (curriculum stages 2-3) ==="
+    require_init "$PRETRAIN" "stages 2-3" "stage 1"
     if $PY -u scripts/train_sequence_stages.py \
-            --device cuda --min-free-gib "$NEED_GIB" --size "${MLM_SIZE:-shared400}" \
+            --device cuda --min-free-gib "$NEED_GIB" --size "$SIZE" \
             --epochs 2 $INIT >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-seqstages"
         note "stages 2-3 finished"
@@ -200,8 +234,7 @@ if [ ! -f "$LOGDIR/.done-seqstages" ]; then
     fi
 fi
 
-SEQCK=$REPO/data/derived/checkpoints/seqstages_small.pt
-[ -f "$SEQCK" ] && INIT="--init-from $SEQCK"
+SEQCK=$CKPT_DIR/seqstages_${SIZE}.pt
 
 # ---- 4. R1: can a model find the occupied blocks? -------------------------
 # The block scorer is a DIFFERENT architecture -- a convolutional residue
@@ -233,9 +266,10 @@ fi
 # point of running the stages in order.
 if [ ! -f "$LOGDIR/.done-stage5" ]; then
     note "=== train_pharos.py (curriculum stage 5) ==="
+    require_init "$SEQCK" "stage 5" "stages 2-3"
     if $PY -u scripts/train_pharos.py \
             --device cuda --min-free-gib "$NEED_GIB" \
-            --size small --epochs 8 --token-budget 32768 \
+            --size "$SIZE" --epochs 8 --token-budget 32768 \
             $INIT >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-stage5"
         note "stage 5 finished"

@@ -243,7 +243,18 @@ def iter_probing(batch: int, limit: Optional[int] = None
 
 def require_gpu(args) -> torch.device:
     if not args.device.startswith("cuda"):
-        raise SystemExit("GPU only; pass --device cuda once one is free.")
+        # Same escape as stage 5's, for the same reason: stages 2 and 3 have
+        # never run either, and the only card is busy for days at a time. A
+        # handful of CPU steps at a toy batch is the difference between
+        # finding a startup bug now and finding it when the curriculum
+        # finally reaches this file.
+        if getattr(args, "smoke", 0):
+            print("[seq] SMOKE TEST on CPU: startup path only, "
+                  "no checkpoint will be written", flush=True)
+            return torch.device(args.device)
+        raise SystemExit("GPU only; pass --device cuda once one is free. "
+                         "For a startup check without a GPU use "
+                         "--smoke N --device cpu.")
     mem = gpu_free_gib()
     if mem is None:
         raise SystemExit("no GPU visible to nvidia-smi")
@@ -300,7 +311,14 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--min-free-gib", type=float, default=30.0)
-    ap.add_argument("--size", default="small", choices=("mini", "small"))
+    # shared400 was missing, so the curriculum could not reach this file at
+    # all: the runner passes `--size shared400` and argparse rejected it
+    # before a single line of training ran. Stages 2-3 have never run, so
+    # nothing had ever discovered that. The choices now match stage 5's, and
+    # the config is resolved by name rather than by an `if size == "small"`
+    # that silently falls through to mini for everything else.
+    ap.add_argument("--size", default="small",
+                    choices=("mini", "small", "base400", "shared400"))
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--batch", type=int, default=32)
@@ -314,6 +332,9 @@ def main() -> None:
     ap.add_argument("--restart", action="store_true",
                     help="ignore an existing checkpoint; it is RENAMED, not "
                          "overwritten")
+    ap.add_argument("--smoke", type=int, default=0, metavar="N",
+                    help="run N steps and stop, writing no checkpoint. "
+                         "Works on CPU. For checking that stages 2-3 START.")
     ap.add_argument("--ckpt", type=Path, default=None,
                     help="checkpoint path; defaults to "
                          "data/derived/checkpoints/seqstages_<size>.pt")
@@ -321,7 +342,7 @@ def main() -> None:
 
     device = require_gpu(args)
     enable_gpu_fast_paths()
-    cfg = PharosConfig.small() if args.size == "small" else PharosConfig.mini()
+    cfg = getattr(PharosConfig, args.size)()
     model = Pharos(cfg).to(device)
     CKPT.mkdir(parents=True, exist_ok=True)
     ck = args.ckpt or (CKPT / f"seqstages_{args.size}.pt")
@@ -457,6 +478,17 @@ def main() -> None:
                 runlog.event(f"OOM #{n_oom}", epoch=ep, step=step, n_oom=n_oom)
                 continue
             step += 1
+            if args.smoke:
+                print(f"[seq] smoke step {step}/{args.smoke} "
+                      f"total {float(total.detach()):.4f} "
+                      f"ss {_m(ss_loss, 1):.4f} acc {_m(ss_acc, 1):.4f} "
+                      f"probing {_m(pr_loss, 1):.4f}", flush=True)
+                if step >= args.smoke:
+                    print("[seq] SMOKE TEST PASSED: stages 2-3 start, both "
+                          "channels produced a loss, and the backward pass "
+                          "completes. No checkpoint written.", flush=True)
+                    return 0
+                continue
             if step % args.ckpt_every == 0:
                 save(ep, False)
             if step % args.log_every == 0:
