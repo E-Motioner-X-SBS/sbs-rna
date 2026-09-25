@@ -65,9 +65,16 @@ score_ckpt() {
     # machine is charged to the run it is measuring. Capped at 8 threads and
     # 384 sequences, and gated to every 1,000 steps by the caller, the cost is
     # roughly one reading every 2.7 hours for a few percent of throughput.
+    #
+    # 192, not 384. Measured rather than estimated: 512 sequences on 11 cores
+    # did NOT finish in 50 minutes -- about 2.0e14 FLOPs at an effective
+    # 67 GFLOP/s -- so 384 on 8 cores would have been marginal against even a
+    # 90-minute ceiling. 192 sequences is ~15,000 masked positions, which pins
+    # the bits figure to about +/-0.01, well inside the 0.05 the curve already
+    # scatters by.
     OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 \
-    timeout 5400 $PY -u scripts/eval_mlm_checkpoint.py \
-        --ckpt "$f" --device cpu --n-seq 384 --token-budget 4096 \
+    timeout 3600 $PY -u scripts/eval_mlm_checkpoint.py \
+        --ckpt "$f" --device cpu --n-seq 192 --token-budget 4096 \
         --split stratified \
         --append-csv data/samples/analysis/runs/heldout_stratified.csv \
         >> "$LOG" 2>&1
