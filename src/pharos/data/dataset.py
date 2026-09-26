@@ -521,11 +521,27 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
         if x.get("coords") is not None and len(x["coords"]) == n:
             xyz[i, :n] = x["coords"]
             xyz_m[i, :n] = x["coord_mask"]
+        lp = x.get("lw_pairs")
+        # Head 10's mask must mean "this residue's loop label is known", and it
+        # meant "this chain has a loop_class array" -- which every chain has,
+        # because `loop_classes` returns zeros for a chain with no base pairs
+        # to build loops from. 3,960 of 16,604 chains in `pharos3d` carry no
+        # base-pair annotation at all, and all 3,715,593 of their residues were
+        # entering the loss labelled "not in a loop", asserted from nothing.
+        # That is 28.2% of head 10's targets, and it moves the class-0 share --
+        # which is also the head's majority baseline -- from 64.4% on chains
+        # where the label means something to 74.4% overall, in the direction
+        # that makes a head predicting only class 0 look better.
+        #
+        # Loops are defined by cis Watson-Crick pairs (LW class 1), so that is
+        # the condition: no class-1 pair, no label. Head 9 one block below has
+        # always got this right -- "not-a-base-pair is not a kind of base pair"
+        # -- and head 10 was the same statement about loops, unmade.
+        lw_known = lp is not None and len(lp) and bool((lp[:, 2] == 1).any())
         lc = x.get("loop_class")
-        if lc is not None and len(lc) == n:
+        if lc is not None and len(lc) == n and lw_known:
             loopc[i, :n] = lc
             loop_ok[i, :n] = True
-        lp = x.get("lw_pairs")
         if lp is not None and len(lp):
             keep = (lp[:, 0] < L) & (lp[:, 1] < L)
             lw_key.append(i * L * L + lp[keep, 0].astype(np.int64) * L

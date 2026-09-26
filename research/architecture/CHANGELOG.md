@@ -387,3 +387,8 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-26 19:04 IST
 
 - claims_ok: 417 → **416**
+
+## 2026-09-26 19:34 IST
+
+- **Commit the run telemetry, and keep HOLD out of the repository** (`b8e7b44`)
+- claims_ok: 416 → **417**

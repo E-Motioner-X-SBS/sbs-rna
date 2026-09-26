@@ -1217,7 +1217,13 @@ def main() -> int:
     # Splitting these was necessary once the trained model stopped being
     # PHAROS-Small: asserting "d=512" against every document would have forced
     # the spec to keep describing a configuration nothing runs.
-    for need in ["18 blocks", "d=768", "394M", "302M", "144 effective",
+    # "54 effective", not "144". This guard required the number the config
+    # ABANDONED: `shared400` went to `n_loops=3` because no checkpoint could
+    # deliver 8 -- measured, the model kept 2.9% of its advantage at the depth
+    # the doc advertised -- and the guard would have failed the document for
+    # telling the truth. A staleness check pinned to a stale value enforces the
+    # staleness.
+    for need in ["18 blocks", "d=768", "394M", "302M", "54 effective",
                  "512 experts"]:
         miss = [] if need in cfg_txt["SPEC"] else ["SPEC"]
         print(f"  {'OK ' if not miss else 'FAIL'} current config present: {need!r}"
@@ -1299,6 +1305,191 @@ def main() -> int:
               f"{'all pass (cpu)' if ok else 'FAILURES -- run it directly'}")
         if not ok:
             fails.append(f"{t.name} failing")
+
+    print("\n== scheduled measurements describe the model that is training ==")
+    # The failure this guards is not drift in a number; it is a measurement
+    # that keeps running against something that no longer exists.
+    #
+    # `probe_router_specialisation.py` is the only instrument that can tell a
+    # specialising router from a collapsed one, and it is scheduled every six
+    # hours. From 2026-09-24 to 09-26 it read `pretrain_small.pt`, a file the
+    # `shared400` restart had renamed away, so every invocation died in
+    # `torch.load`; and its hook filtered on `MoEFeedForward`, which
+    # `shared400` does not build, so even a correct path would have hooked
+    # ZERO blocks and averaged an empty list. The json it "maintains" was
+    # frozen at 2026-09-23 and described a 32-expert model. Nothing was red.
+    #
+    # Three things are pinned: the scheduled target exists, the newest reading
+    # is of the model that is actually trained, and each reading is inside the
+    # range its own definition allows.
+    import ast as _ast
+    probe = ROOT / "scripts/sampling/probe_router_specialisation.py"
+    tree = _ast.parse(probe.read_text())
+    default_ckpt = None
+    for node in _ast.walk(tree):
+        if (isinstance(node, _ast.Call) and getattr(node.func, "attr", "") == "add_argument"
+                and node.args and getattr(node.args[0], "value", "") == "--ckpt"):
+            for kw in node.keywords:
+                if kw.arg == "default":
+                    default_ckpt = kw.value.value
+    if default_ckpt is None:
+        print("  FAIL router probe declares no --ckpt default")
+        fails.append("router probe --ckpt default")
+    else:
+        ok = (ROOT / default_ckpt).exists()
+        print(f"  {'OK ' if ok else 'FAIL'} {'router probe target exists':34s} "
+              f"{default_ckpt}")
+        if not ok:
+            fails.append("router probe points at a checkpoint that does not exist")
+
+    # the size stage 1 actually trains, read from the config rather than typed
+    cfgsh = (ROOT / "configs/stage1_shared400.sh").read_text()
+    m = re.search(r'MLM_SIZE:=(\w+)', cfgsh)
+    live_size = m.group(1) if m else "shared400"
+    sys.path.insert(0, str(ROOT / "src"))
+    from pharos.model.pharos import PharosConfig            # noqa: E402
+    live_cfg = getattr(PharosConfig, live_size)()
+    live_ckpt = f"pretrain_{live_size}.pt"
+    ok = default_ckpt == f"data/derived/checkpoints/{live_ckpt}"
+    print(f"  {'OK ' if ok else 'FAIL'} {'probe target IS the stage-1 output':34s} "
+          f"{live_size} -> {live_ckpt}")
+    if not ok:
+        fails.append("router probe does not target the stage-1 checkpoint")
+
+    # the hook must match the block class this config builds, or the probe
+    # measures nothing and says so in a mean over an empty list
+    src = probe.read_text()
+    need = ("SharedMoEFeedForward" if live_cfg.shared_experts else "MoEFeedForward")
+    ok = need in src
+    print(f"  {'OK ' if ok else 'FAIL'} {'probe hooks the block class built':34s} {need}")
+    if not ok:
+        fails.append(f"router probe does not hook {need}")
+
+    # The watcher's own copy of the path went stale on the same day, and its
+    # `if ck.exists()` guard turned that into silence: `stage1_tokens` was
+    # simply absent from every tick for two days. It now resolves the path
+    # from the config, the same way this check does.
+    aw = (ROOT / "scripts/architecture_watch.py").read_text()
+    # CODE lines only. The first version of this check searched the whole
+    # file, and the comment recording the defect -- which names the dead path
+    # so a reader knows what was wrong -- made the check fail. A guard that
+    # cannot tell an explanation from the thing it explains will be silenced
+    # by whoever it inconveniences.
+    aw_code = "\n".join(l.split("#", 1)[0] for l in aw.splitlines())
+    ok = "live_stage1_checkpoint" in aw_code and "pretrain_small.pt" not in aw_code
+    print(f"  {'OK ' if ok else 'FAIL'} "
+          f"{'watcher resolves the live checkpoint':34s} "
+          f"{'from configs/stage1_shared400.sh' if ok else 'HARDCODED'}")
+    if not ok:
+        fails.append("architecture_watch hardcodes a checkpoint path")
+
+    # and no analysis script may name a checkpoint literal that is not there.
+    # A template path (`step{step}.pt`) is not a literal and is skipped.
+    lit = re.compile(r'"(data/derived/checkpoints/[A-Za-z0-9_.]+\.pt)"')
+    missing = []
+    for f in sorted((ROOT / "scripts/sampling").glob("*.py")):
+        for hit in lit.findall(f.read_text()):
+            if not (ROOT / hit).exists():
+                missing.append(f"{f.name}: {hit}")
+    print(f"  {'OK ' if not missing else 'FAIL'} "
+          f"{'analysis scripts name real checkpoints':34s} "
+          f"{'all resolve' if not missing else '; '.join(missing)}")
+    if missing:
+        fails.append("analysis script points at a missing checkpoint")
+
+    rs = A / "router_specialisation.json"
+    if not rs.exists():
+        print("  WARN router_specialisation.json absent -- the probe has never run")
+        warns.append("router specialisation never measured")
+    else:
+        hist = json.loads(rs.read_text()).get("history", [])
+        live = [h for h in hist if h.get("ckpt") == live_ckpt]
+        for h in hist:
+            E = h.get("n_experts")
+            f_ = h.get("frac_of_uniform")
+            w = h.get("mean_width")
+            bad = []
+            if not E or not (0.0 < (f_ or 0) <= 1.0 + 1e-6):
+                bad.append(f"frac_of_uniform {f_}")
+            if w is not None and not (1.0 <= w <= E + 1e-6):
+                bad.append(f"mean_width {w} outside [1, {E}]")
+            if bad:
+                print(f"  FAIL router reading step {h.get('step')} "
+                      f"({h.get('ckpt')}): " + ", ".join(bad))
+                fails.append("router reading outside its own range")
+        if not live:
+            print(f"  WARN no router reading for {live_ckpt} -- every row in "
+                  f"the history is from another model "
+                  f"({', '.join(sorted({h.get('ckpt', '?') for h in hist}))})")
+            warns.append(f"no router reading for {live_ckpt}")
+        else:
+            newest = max(live, key=lambda h: h.get("tokens", 0))
+            ok = newest.get("n_experts") == live_cfg.n_experts
+            print(f"  {'OK ' if ok else 'FAIL'} "
+                  f"{'newest reading matches live n_experts':34s} "
+                  f"{newest.get('n_experts')} vs {live_cfg.n_experts}")
+            if not ok:
+                fails.append("newest router reading is of a different model")
+            print(f"  OK  {'router at ' + format(newest['tokens'] / 1e9, '.3f') + 'B tokens':34s} "
+                  f"entropy {newest['frac_of_uniform']:.4f} of uniform, "
+                  f"width {newest.get('mean_width')}/{newest['n_experts']}, "
+                  f"dead {100 * (newest.get('dead_expert_frac') or 0):.1f}%")
+
+    print("\n== the held-out curve is one series, not two spliced ==")
+    # `heldout_files` reserves the last two shards of each corpus directory BY
+    # NAME, and the corpus grows: `mars_to_parquet.py` ingests one archive at
+    # a time and `mars_p30_*` sorts after `mars_p13_*`. When the next archive
+    # lands, two evaluation shards become training shards and two training
+    # shards become the evaluation set -- and every row of the csv before and
+    # after that moment is a reading of a DIFFERENT sample, under the same
+    # column names, with `note` still saying "held-out fixed sample". Nothing
+    # detected it because "fixed" was an assumption, not a recorded fact.
+    import csv as _csv
+    hs = ROOT / "data/samples/analysis/runs/heldout_stratified.csv"
+    if not hs.exists():
+        print("  WARN heldout_stratified.csv absent")
+        warns.append("no stratified held-out curve")
+    else:
+        rows = list(_csv.DictReader(hs.open(newline="")))
+        ids = {r.get("heldout_id") for r in rows}
+        ok = len(ids) == 1 and None not in ids and "" not in ids
+        print(f"  {'OK ' if ok else 'FAIL'} "
+              f"{'every reading is of ONE sample':34s} "
+              f"{len(rows)} rows, heldout_id {', '.join(sorted(str(i) for i in ids))}")
+        if not ok:
+            fails.append("the held-out curve splices two different samples")
+        # Device AND sample size. `heldout_watch.sh` already says a series
+        # must not mix bf16-on-cuda with fp32-on-cpu -- and the file it writes
+        # to did, because the first reading was a manual GPU eval at
+        # n_seq 1,026 taken before the watcher moved to cpu at 192. Two
+        # incomparabilities in one row: a different numeric path and a
+        # different sample. It now lives in `heldout_stratified.cuda1026.csv`
+        # so the curve means one thing; the reading is kept, not deleted.
+        cfgs = {(r.get("device"), r.get("n_seq")) for r in rows}
+        ok = len(cfgs) == 1
+        print(f"  {'OK ' if ok else 'FAIL'} "
+              f"{'one numeric path, one sample size':34s} "
+              f"{', '.join(sorted(f'{d}/n={n}' for d, n in cfgs))}")
+        if not ok:
+            fails.append("the held-out curve mixes devices or sample sizes")
+        # and whether the NEXT reading would join that series
+        sys.path.insert(0, str(ROOT / "scripts"))
+        try:
+            import pretrain_mlm as _pm
+            cur = _pm.heldout_digest([ROOT / "data/derived/parquet_starter",
+                                      ROOT / "data/derived/parquet_mars"])
+        except Exception as exc:                       # noqa: BLE001
+            cur = None
+            print(f"  WARN could not recompute the digest: {exc}")
+            warns.append("held-out digest not recomputable")
+        if cur is not None:
+            same = ids == {cur}
+            print(f"  {'OK ' if same else 'WARN'} "
+                  f"{'the next reading would extend it':34s} "
+                  f"{'corpus unchanged' if same else f'corpus grew: {cur} != recorded'}")
+            if not same:
+                warns.append(f"held-out set has moved to {cur}; the curve "
+                             f"restarts here")
 
     print("\n== diagram sources (feed figures into the report) ==")
     dg = sorted((ROOT / "research/architecture/diagrams").glob("*.mmd"))

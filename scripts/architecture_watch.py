@@ -132,6 +132,23 @@ GPU_TASKS = [
 ]
 
 
+def live_stage1_checkpoint() -> Path:
+    """Where stage 1 writes, derived from `configs/stage1_shared400.sh`.
+
+    `pretrain_mlm.py` defaults its checkpoint to `pretrain_<size>.pt`, and the
+    size is set in one place. Reading it beats repeating it: every copy of the
+    path in this repository went stale on the same day and none of them said
+    so.
+    """
+    cfg = ROOT / "configs/stage1_shared400.sh"
+    size = "shared400"
+    if cfg.exists():
+        m = re.search(r"MLM_SIZE:=(\w+)", cfg.read_text())
+        if m:
+            size = m.group(1)
+    return ROOT / f"data/derived/checkpoints/pretrain_{size}.pt"
+
+
 def gpu_free_gib() -> Optional[float]:
     """Free VRAM without creating a CUDA context."""
     code, out = run(["nvidia-smi", "--query-gpu=memory.free",
@@ -221,8 +238,17 @@ def do_gpu_work(g: Dict) -> Dict:
             # setsid so it outlives this tick and the cron session
             code, out = run(["setsid", "nohup", *[str(c) for c in task["cmd"]]],
                             timeout=20)
+            # `code` used to be assigned and never read. A launcher that
+            # refuses -- HOLD present, a lock held, a missing interpreter --
+            # exits in milliseconds, well inside the 20 s timeout, and the
+            # tick reported "started (detached)" either way. The whole point
+            # of the detach branch is that nobody watches the job afterwards,
+            # so the launch is the ONLY moment its status can be seen.
             return {"ran": task["name"], "detached": True,
-                    "note": "launched in the background"}
+                    "ok": code == 0,
+                    "note": ("launched in the background" if code == 0 else
+                             f"launcher exited {code} -- NOTHING is running"),
+                    "tail": "" if code == 0 else out[-600:]}
         code, out = run([str(c) for c in task["cmd"]], timeout=2400)
         return {"ran": task["name"], "detached": False, "ok": code == 0,
                 "tail": "" if code == 0 else out[-600:]}
@@ -289,8 +315,18 @@ def check_training() -> Dict:
                         if k in ("state", "detail", "updated")})
         except (OSError, ValueError):
             pass
-    ck = ROOT / "data/derived/checkpoints/pretrain_small.pt"
-    if ck.exists():
+    # The checkpoint stage 1 actually writes, read from the config rather than
+    # typed here. This said `pretrain_small.pt` until 2026-09-26, two days
+    # after that file was renamed away by the `shared400` restart -- and the
+    # `if ck.exists()` guard turned the mistake into silence rather than an
+    # error, so `stage1_tokens` was simply absent from every tick and the
+    # `changed` comparison in `summary()` compared None to None. The same
+    # stale path broke `probe_router_specialisation.py` the same day; a path
+    # to a moving target belongs in one place.
+    ck = live_stage1_checkpoint()
+    if not ck.exists():
+        out["stage1_checkpoint_missing"] = str(ck.relative_to(ROOT))
+    else:
         code, o = run([PY, "-c",
                        "import torch,sys;d=torch.load(sys.argv[1],map_location='cpu',"
                        "weights_only=False);print(d.get('tokens',0),d.get('step',0))",
@@ -298,6 +334,9 @@ def check_training() -> Dict:
         if code == 0 and o.split():
             tok, step = o.split()[:2]
             out["stage1_tokens"], out["stage1_step"] = int(tok), int(step)
+        else:
+            # a load that fails is not the same as a run that has not started
+            out["stage1_unreadable"] = o[-200:]
     return out
 
 
@@ -396,9 +435,20 @@ def main() -> int:
 
     gw = snap["gpu_work"]
     if gw.get("ran"):
+        ok = gw.get("ok", True)
         print(f"  GPU: started {gw['ran']}"
-              + ("  (detached)" if gw.get("detached") else
-                 "" if gw.get("ok", True) else "  FAILED"))
+              + ("  (detached)" if gw.get("detached") and ok else "")
+              + ("" if ok else "  FAILED"))
+        # The CPU branch above appends to `problems` and prints the tail; this
+        # one did neither, so a GPU task could fail on every tick for days and
+        # the run would exit 0 with `problems` empty. That is how the router
+        # probe pointed at a deleted checkpoint from 2026-09-24 to 09-26
+        # without anything downstream noticing: the word FAILED was printed
+        # into a log, the captured stderr was stored in the state json and
+        # never shown, and `stale()` re-queued it every six hours forever.
+        if not ok:
+            print(f"    {gw.get('tail', '')[:300]}")
+            problems.append("gpu_work")
     elif not g["permitted"]:
         print(f"  **I am waiting for GPU permission.** "
               f"{g['free_gib']} GiB free; queued: "

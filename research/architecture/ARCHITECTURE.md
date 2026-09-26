@@ -10,9 +10,9 @@ PHAROS predicts RNA structure from sequence. It is a hybrid-attention
 mixture-of-experts trunk with an explicit physics term, a hierarchical pair
 track for contacts, and ten output heads whose third is a denoising diffusion
 decoder. The trained configuration, **shared400**, is **18 blocks at d=768**
-— **394M** total parameters, **302M active** per token, **144 effective**
-layers through eight refinement loops, and **512 experts that share one
-network**.
+— **394M** total parameters, **325.7M active** per token (302M before head 3
+became a dense diffusion decoder), **54 effective** layers through three
+refinement loops, and **512 experts that share one network**.
 
 ---
 
@@ -352,8 +352,52 @@ picks a few experts or every token spreads across all of them. Per-token
 routing entropy separates the two, and `probe_router_specialisation.py` tracks
 it against the live checkpoint.
 
-**It specialises, and it starts late.** Measured on the 32-expert predecessor,
-where uniform entropy is log 32 = 3.466:
+**The instrument was broken for three days, and this is what it says now.**
+`probe_router_specialisation.py` is scheduled every six hours. From 2026-09-24,
+when the run moved to `shared400` and renamed `pretrain_small.pt` away, it read
+a checkpoint that no longer existed and died in `torch.load` on every tick; and
+its hook filtered on `MoEFeedForward`, which `shared400` does not build, so a
+corrected path alone would have hooked **zero** blocks and averaged an empty
+list into the json. The watcher printed the word FAILED and neither raised a
+problem nor showed the captured stderr, so the file went on being quoted while
+frozen at 2026-09-23. All three are fixed, and the probe now refuses to write a
+reading outside the range its own definition allows.
+
+Measured on `shared400` at step 13,750 (2.069B tokens, 512 experts, fp32/cpu),
+against `log 512 = 6.238` nats:
+
+| quantity | measured | uniform | reading |
+|---|---|---|---|
+| per-token routing entropy | **0.341 nats** | 6.238 | **5.5% of uniform** |
+| mean top-1 probability | **0.8983** | 0.00195 | 460× uniform |
+| nucleus width, mean | **5.29 of 512** | — | 1.0% of experts fire |
+| nucleus width, max | 363 of 512 | — | the tail is wide |
+| expert load, min / max | 0.00044 / 0.00526 | 0.00195 | 12× spread, none dead |
+| dead experts (<10% of uniform share) | **0.0%** | — | all 512 live |
+| balance term, per block | 1.22–1.32 | 1.0 | even load |
+
+Against the step-7,000 row above this is a trajectory, not a contradiction:
+routing width falls **15.28 → 5.29** and the per-block balance term falls
+**1.517 → 1.22–1.32** between 992.8M and 2.069B tokens, so the router is
+concentrating each token onto fewer experts while spreading the *load* more
+evenly across all of them. Those two moving in opposite directions is what
+specialisation looks like; collapse moves them together.
+
+This is the specialising case, not the collapsed one, and it is the first time
+the distinction has been measured on the model that is actually trained. The
+balance term sitting 22–32% above its floor while per-token entropy sits at
+5.5% of uniform is exactly the signature §5.3 predicted: different tokens pick
+different experts, so the *mean* is near-uniform while no individual token is.
+
+The caution runs the other way now. A top-1 of 0.90 is close to a hard
+assignment, and a router that becomes a hash stops receiving gradient through
+the soft mixture. Nothing in the run says that has happened — load spread is
+12×, not 500×, no expert is dead, and the balance term has not drifted across
+1,650 logged steps — but the quantity to watch on `shared400` is entropy
+falling further, not entropy staying flat.
+
+**For contrast, the 32-expert predecessor never got there.** Where uniform
+entropy is log 32 = 3.466:
 
 | tokens | per-token entropy | % of uniform | mean top-1 | sharpest block |
 |---|---|---|---|---|
@@ -363,21 +407,22 @@ where uniform entropy is log 32 = 3.466:
 | 188.6M | 3.4064 | 98.3% | 0.0587 | 3.260 |
 | **573.3M** | **3.3546** | **96.8%** | **0.0742** | **2.986** |
 
-Through the first 82M tokens the router is indistinguishable from uniform and
+Through the first 82M tokens that router is indistinguishable from uniform and
 the MoE is a dense feed-forward with 32× the parameters. From roughly 100M it
 begins to sharpen, monotonically across the last three points: top-1 rises from
 0.049 to **0.074** against 0.031 for a coin flip, and the sharpest block falls
-from 3.29 to 2.99 nats. It is still only 3.2% below uniform, so this is early
-rather than strong specialisation. What can be said is that the flat reading at
-82M was a measurement taken too early, not a property of the design — and it is
-the direct motivation for the finer 512-expert granularity above, which gives
-the router more to distinguish between.
+from 3.29 to 2.99 nats — but at 573M tokens it is still only 3.2% below
+uniform. `shared400` is at 94.5% below uniform at 2.069B. The two series are
+not one curve and the json keeps them apart by checkpoint; what the comparison
+supports is that 512 fine-grained shared experts under nucleus routing
+specialise where 32 independent ones under top-k did not, which is the change
+the finer granularity was made for.
 
 ### 5.4 Sizing
 
 | model | d | blocks | loops (cfg) | effective layers | experts | total | active | of which dense head 3 |
 |---|---|---|---|---|---|---|---|---|
-| **shared400** (trained) | **768** | **18** | 8 | **144** | **512 shared** | **394.7M** | **325.7M** | 44.6M |
+| **shared400** (trained) | **768** | **18** | **3** | **54** | **512 shared** | **394.7M** | **325.7M** | 44.6M |
 | base400 (independent experts) | 640 | 18 | 8 | 144 | 48 | 405.5M | 126.8M | 31.0M |
 | base_v2 | 768 | 32 | 3 | 96 | 32 | 1105.6M | 312.8M | 44.5M |
 | PHAROS-Small (predecessor) | 512 | 16 | 8 | 128 | 32 | 258.9M | 82.8M | 19.8M |
@@ -395,13 +440,18 @@ The two 400M rows are the same budget spent differently and the difference is
 the active column: sharing converts dormant expert parameters into active ones,
 **126.8M → 325.7M**.
 
-**The `loops` column is the configuration, not what training exercises.**
-Stage 1 runs `--n-loops 2`, fixed, at every step: 36 effective layers, not 144.
-Measured at step 8,750, the trained model reads 1.6632 bits at 2 loops, 1.9718
-at 1, 1.9711 at 4 and 2.0064 at 8 — it works at the depth it saw and nowhere
-else, retaining 2.9% of its advantage over the unigram baseline at the
-configured depth. `--sample-loops` trains across depths at a cost of
-`6+2(mean-1)` FLOPs per active parameter per token against the fixed 8.
+**The `loops` column is now what training exercises, because the
+configuration was brought down to meet it.** It advertised 8 and 144 effective
+layers; stage 1 ran `--n-loops 2`, fixed, at every step, so the model that
+existed was 36 layers deep. Measured at step 8,750 it reads 1.6632 bits at 2
+loops, 1.9718 at 1, 1.9711 at 4 and 2.0064 at 8 — it works at the depth it saw
+and nowhere else, retaining 2.9% of its advantage over the unigram baseline at
+the depth the table claimed. `shared400` is therefore `n_loops=3` with
+`--sample-loops`, which draws the depth uniformly from 1..3: mean 2.0, so
+`6+2(mean-1)` = 8 FLOPs per active parameter per token, **the same cost as the
+fixed 2** — and the model comes out usable at one, two and three loops instead
+of at exactly one. 54 effective layers is a number a checkpoint can stand
+behind; 144 was not.
 
 **Wide beats deep at equal parameters on this hardware.** d_expert 2304 at 18
 blocks counts the same as 2048 at 20, but runs larger matmuls, and at d=512 the

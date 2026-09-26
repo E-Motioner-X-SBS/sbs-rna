@@ -400,6 +400,38 @@ def main() -> int:
                 except OSError as _e:                            # noqa: BLE001
                     print(f"[eval] could not read {args.append_csv} to check "
                           f"for duplicates ({_e}); appending anyway")
+            # The row this call is about to write, so its width can be
+            # checked against the header BEFORE it is appended.
+            #
+            # This file has already been ragged once: four declared columns
+            # were never written and `csv.DictReader` returned None for them.
+            # Adding `heldout_id` would have done it again from the other
+            # direction -- a 19-field row appended under an 18-field header,
+            # because the header is only written for a NEW file. A writer
+            # that cannot tell is a writer that will.
+            _g = r.get("comp_gap", float("nan"))
+            _ok = _g == _g                      # NaN when unavailable
+            _row = [_dt.datetime.now().isoformat(timespec="seconds"),
+                    ck.name, st.get("step", ""), st.get("tokens", ""),
+                    round(r["bits"], 5), round(r["perplexity"], 5),
+                    round(r["accuracy"], 5), r["n_masked"],
+                    len(seqs), args.seed, args.min_len, args.max_len,
+                    round(_g, 5) if _ok else "",
+                    round(r.get("comp_visible", 0.0), 5) if _ok else "",
+                    round(r.get("comp_masked", 0.0), 5) if _ok else "",
+                    r.get("comp_n", "") if _ok else "",
+                    device.type, args.split,
+                    pm.heldout_digest(args.corpus)]
+            if not new:
+                with args.append_csv.open(newline="") as _fh:
+                    _hdr = next(_csv.reader(_fh), [])
+                if len(_hdr) != len(_row):
+                    raise SystemExit(
+                        f"[eval] {args.append_csv} has {len(_hdr)} columns "
+                        f"and this row has {len(_row)}. Appending would make "
+                        f"the file ragged and every reader would silently "
+                        f"mis-align. Migrate the file or write a new one; "
+                        f"header: {','.join(_hdr)}")
             with args.append_csv.open("a", newline="") as fh:
                 w = _csv.writer(fh)
                 if new:
@@ -410,30 +442,30 @@ def main() -> int:
                                 # bf16 autocast on cuda, fp32 on cpu: the two
                                 # are not the same numeric path and a series
                                 # that mixes them silently is not one series
-                                "device", "split"])
-                # All SIXTEEN columns the header declares.
-                #
-                # The row wrote twelve. The four Watson-Crick complementarity
-                # columns were declared in the header, computed in full, and
-                # printed to stdout -- and then dropped on the way to the file,
-                # so every row was ragged against its own header and
+                                "device", "split",
+                                # WHICH shards the sample came from.
+                                #
+                                # `heldout_files` takes the last two of each
+                                # corpus directory by name, and this corpus
+                                # grows -- `mars_to_parquet.py` ingests one
+                                # archive at a time and `mars_p30_*` sorts
+                                # after `mars_p13_*`. When the next archive
+                                # lands, the reserved set changes and every
+                                # reading after it is of a DIFFERENT sample,
+                                # in this same file, still labelled "the
+                                # fixed held-out sample". Eight hex
+                                # characters make that visible instead of
+                                # silent.
+                                "heldout_id"])
+                # All NINETEEN columns the header declares, built above so
+                # the width guard could see them. The row used to write twelve
+                # against a sixteen-column header: the four Watson-Crick
+                # complementarity columns were declared, computed in full,
+                # printed to stdout, and dropped on the way to the file, so
                 # `csv.DictReader` returned None for exactly the measurement
-                # that distinguishes "the model learned base composition" from
-                # "the model learned pairing". The legacy file predates those
-                # columns and is self-consistent at twelve; the mismatch
-                # appeared the moment a fresh csv was created.
-                _g = r.get("comp_gap", float("nan"))
-                _ok = _g == _g                      # NaN when unavailable
-                w.writerow([_dt.datetime.now().isoformat(timespec="seconds"),
-                            ck.name, st.get("step", ""), st.get("tokens", ""),
-                            round(r["bits"], 5), round(r["perplexity"], 5),
-                            round(r["accuracy"], 5), r["n_masked"],
-                            len(seqs), args.seed, args.min_len, args.max_len,
-                            round(_g, 5) if _ok else "",
-                            round(r.get("comp_visible", 0.0), 5) if _ok else "",
-                            round(r.get("comp_masked", 0.0), 5) if _ok else "",
-                            r.get("comp_n", "") if _ok else "",
-                            device.type, args.split])
+                # that separates "the model learned base composition" from
+                # "the model learned pairing".
+                w.writerow(_row)
     if not args.no_csv:
         # `relative_to` RAISES on a path that is not under ROOT, and the
         # watcher passes a relative one. So the evaluator did all its work,

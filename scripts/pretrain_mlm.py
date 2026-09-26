@@ -176,6 +176,31 @@ def heldout_files(corpus) -> List[Path]:
     return sorted(out)
 
 
+def heldout_digest(corpus) -> str:
+    """A short stable name for WHICH shards the held-out sample came from.
+
+    `heldout_files` takes the last `N_HELDOUT_SHARDS` of each corpus directory
+    by sorted name, and its docstring says the split "is still a pure function
+    of the file names, so a resumed run computes the same one". That is true
+    only while the file NAMES do not change, and this corpus grows: MARS is
+    ingested one archive at a time by `mars_to_parquet.py`, and
+    `mars_p30_shard0000` sorts after `mars_p13_shard0048`. The moment a new
+    archive lands, the two reserved MARS shards become training shards, two
+    shards the model has never been evaluated on become the held-out set, and
+    every row of `heldout_stratified.csv` before and after that point is a
+    reading of a different sample -- under the same column names, in the same
+    file, with `note` still reading "held-out fixed sample".
+
+    Nothing detects that, because "fixed" was an assumption and not a
+    recorded fact. This makes it a recorded fact: eight hex characters that
+    change when the reserved set does, written into the checkpoint and into
+    the evaluation csv so two numbers can be known to be comparable.
+    """
+    import hashlib
+    names = "\n".join(f"{f.parent.name}/{f.name}" for f in heldout_files(corpus))
+    return hashlib.sha1(names.encode()).hexdigest()[:8]
+
+
 def iter_sequences(corpus, min_len: int, max_len: int,
                    shards: Optional[int] = None,
                    rng: Optional[np.random.Generator] = None,
@@ -713,6 +738,9 @@ def main() -> None:
     corpora = [c for c in corpora if c.is_dir()]
     if not corpora:
         raise SystemExit(f"no corpus directory found in {args.corpus or [CORPUS]}")
+    # Named once, here, so the checkpoint, the resume check and the evaluation
+    # csv all refer to the same thing. See `heldout_digest`.
+    heldout_id = heldout_digest(corpora)
 
     def _rel(d: Path) -> str:
         try:
@@ -849,6 +877,27 @@ def main() -> None:
         # Restore EVERY optimiser, and refuse to restore across a change of
         # optimiser: AdamW's moments mean nothing to Muon, and loading them
         # would resume a run whose optimiser state is silently garbage.
+        # WHICH shards were held out when this checkpoint was written.
+        #
+        # `heldout_files` is the last two of each corpus directory by name,
+        # and MARS is ingested one archive at a time, so `mars_p30_*` landing
+        # on disk silently promotes two evaluation shards into the training
+        # stream and demotes two training shards into the evaluation set. A
+        # resume after that point trains on data it will then be scored on
+        # and appends the result to the same curve. Nothing about the numbers
+        # would look wrong.
+        _saved_ho = sd.get("heldout_id")
+        if _saved_ho and _saved_ho != heldout_id:
+            print(f"[mlm] *** the held-out shard set has CHANGED since this "
+                  f"checkpoint was written: {_saved_ho} -> {heldout_id}. The "
+                  f"corpus grew, so `heldout_files` now reserves different "
+                  f"shards -- this run may train on sequences the earlier "
+                  f"part of the curve was scored on, and readings either "
+                  f"side of here are NOT one series.", flush=True)
+        elif _saved_ho:
+            print(f"[mlm] held-out shard set unchanged ({heldout_id})",
+                  flush=True)
+
         saved_kind = sd.get("optimizer", "adamw")
         if saved_kind != args.optimizer:
             print(f"[mlm] checkpoint was written with --optimizer {saved_kind} "
@@ -1017,7 +1066,7 @@ def main() -> None:
                              np.random.default_rng(args.heldout_seed))
         print(f"[mlm] held-out sample: {len(_hs):,} sequences in "
               f"{len(_groups)} fixed batches, drawn from "
-              f"{len(heldout_files(corpora))} RESERVED shards that training "
+              f"{len(heldout_files(corpora))} RESERVED shards [{heldout_id}] that training "
               f"never reads", flush=True)
 
         def heldout(mdl, _g=_groups, _bc=batch_chem):
@@ -1392,6 +1441,7 @@ def main() -> None:
                               "opts": [o.state_dict() for o in opts],
                               "optimizer": args.optimizer, "padded": padded,
                               "tokens": seen, "step": step,
+                              "heldout_id": heldout_id,
                               "history": hist, "run_id": runlog.run_id}, ck)
                   ckpt_fails = 0
                 except OSError as _e:

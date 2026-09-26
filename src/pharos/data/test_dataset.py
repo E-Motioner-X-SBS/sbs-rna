@@ -254,6 +254,46 @@ def main() -> int:
             chk(f"{label}: reactivity aligns to the sequence",
                 all(len(e["reactivity"]) == len(e["sequence"]) for e in ex), "")
 
+    print("\n== property 8: head 9 and head 10 get targets that mean something ==")
+    # The mask for a supervised head has one job: be true exactly where the
+    # label is known. Head 10's was true wherever a `loop_class` ARRAY existed,
+    # and `loop_classes` returns zeros for a chain with no base pairs to build
+    # loops from -- so 3,960 of `pharos3d`'s 16,604 chains, 28.2% of the target
+    # pool, were teaching the head "not in a loop" on no evidence, and pushing
+    # its majority baseline from 64.4% to 74.4% while they did it.
+    import numpy as _np
+    shards = sorted((ROOT / "data/derived/pharos3d").glob("shard-*.npz"))
+    if not shards:
+        chk("pharos3d corpus present", 0, "run the dataset build")
+    else:
+        r = ShardReader(shards[0])
+        items = [r[i] for i in range(min(len(r), 96))]
+        b = pad_batch(items)
+        lm, lc, m = b["loop_mask"], b["loop_class"], b["mask"]
+        # every masked-in residue must come from a chain carrying at least one
+        # cis Watson-Crick pair, because that is what defines a loop
+        wc = _np.array([bool(len(x.get("lw_pairs", [])) )
+                        and bool((x["lw_pairs"][:, 2] == 1).any())
+                        for x in items])
+        chk("head 10: no label without a Watson-Crick annotation",
+            not bool(lm[~wc].any()),
+            f"{int(lm[~wc].sum())} labelled residues on {int((~wc).sum())} "
+            f"unannotated chains")
+        chk("head 10: annotated chains ARE labelled",
+            bool(lm[wc].any()) and bool((lm[wc].sum(1) > 0).all()),
+            f"{int(lm.sum()):,} of {int(m.sum()):,} residues")
+        chk("head 10: the label is not one class",
+            len(_np.unique(lc[lm])) >= 2,
+            ", ".join(f"{int(v)}:{100*int(c)/int(lm.sum()):.1f}%"
+                      for v, c in zip(*_np.unique(lc[lm], return_counts=True))))
+        lv = b["lw_val"]
+        chk("head 9: pair targets are present and multi-class",
+            lv.size > 0 and len(_np.unique(lv)) >= 6,
+            f"{lv.size:,} pairs, {len(_np.unique(lv))} classes")
+        chk("head 9: every class is inside the head's range",
+            lv.size > 0 and int(lv.min()) >= 0 and int(lv.max()) < 13,
+            f"{int(lv.min())}..{int(lv.max())} against n_lw_classes 13")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

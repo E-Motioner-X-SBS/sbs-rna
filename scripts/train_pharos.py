@@ -274,6 +274,69 @@ def assert_coevolution_reaches_the_model(tr, n_batches: int = 4,
           f"coupling ({100 * frac:.2f}%; 3.54% on the built corpus)", flush=True)
 
 
+def assert_supervised_heads_have_targets(tr, n_batches: int = 4,
+                                         n_chains: int = 12) -> None:
+    """Refuse to train heads 9 and 10 on nothing, or on one class.
+
+    Both degrade silently. Head 9's loss is skipped entirely when no sampled
+    pair carries an annotation; head 10's is skipped when `loop_mask` is empty.
+    A skipped loss costs nothing, raises nothing, and leaves a head in the
+    model that reports metrics on the batches where it does fire -- so a
+    corpus rebuild that drops `lw_pairs`, or a mask that tightens too far,
+    produces a run that looks complete and trains eight heads.
+
+    The single-class check matters as much as the presence one. Head 10's
+    mask used to be true for every residue of every chain, including the
+    3,960 `pharos3d` chains with no base-pair annotation at all, whose
+    3,715,593 residues all read "not in a loop": present, plentiful, and
+    28.2% of them meaningless. Targets that are all one class are the same
+    failure with a full tensor.
+    """
+    rng = np.random.default_rng(0)
+    n_lw = n_loop = 0
+    lw_classes: set = set()
+    loop_classes: set = set()
+    masked = total = 0
+    for _ in range(n_batches):
+        idxs = rng.choice(len(tr), min(n_chains, len(tr)), replace=False).tolist()
+        t = to_device(tr.collate(idxs), torch.device("cpu"))
+        lv = t.get("lw_val")
+        if lv is not None and lv.numel():
+            n_lw += int(lv.numel())
+            lw_classes |= set(lv.unique().tolist())
+        lm = t.get("loop_mask")
+        if lm is not None:
+            masked += int(lm.sum())
+            total += int(t["mask"].sum())
+            if bool(lm.any()):
+                lc = t["loop_class"][lm]
+                n_loop += int(lc.numel())
+                loop_classes |= set(lc.unique().tolist())
+    if n_lw == 0:
+        raise SystemExit(
+            "[pharos] head 9 (Leontis-Westhof) receives NO target in "
+            f"{n_batches} batches. The corpus carries no `lw_pairs`, or "
+            "`pad_batch` is not emitting `lw_key`/`lw_val`. The loss is "
+            "skipped when this happens, so the run would complete with the "
+            "head untrained and nothing said.")
+    if n_loop == 0:
+        raise SystemExit(
+            "[pharos] head 10 (motif class) receives NO target in "
+            f"{n_batches} batches: `loop_mask` is empty everywhere. It is "
+            "gated on the chain carrying a cis Watson-Crick pair, so either "
+            "the corpus lost its annotation or the gate is wrong.")
+    if len(loop_classes) < 2:
+        raise SystemExit(
+            f"[pharos] head 10 sees ONE class ({loop_classes}) across "
+            f"{n_loop:,} labelled residues. Cross-entropy against a constant "
+            "target trains a bias and reads as high accuracy.")
+    print(f"[pharos] head 9: {n_lw:,} pair targets, {len(lw_classes)} of 13 "
+          f"classes present", flush=True)
+    print(f"[pharos] head 10: {masked:,} of {total:,} residues labelled "
+          f"({100 * masked / max(total, 1):.1f}%; unannotated chains are "
+          f"masked out), {len(loop_classes)} of 3 classes present", flush=True)
+
+
 def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
                        jj: torch.Tensor, L: int) -> Optional[torch.Tensor]:
     """The coupling score at each sampled pair, 0 where there is none.
@@ -307,9 +370,17 @@ def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
 
     Heads 9 and 10 reported bare accuracy, and bare accuracy on these targets
     is not a measurement. Over the corpus, 76.57% of annotated base pairs are
-    one Leontis-Westhof class (cis Watson-Crick) and 74.42% of residues carry
-    one loop class; a head that has learned nothing except the prior scores
-    those numbers and reads as a working head. This is the same failure the
+    one Leontis-Westhof class (cis Watson-Crick) and **64.4%** of residues
+    whose loop class is actually known carry one; a head that has learned
+    nothing except the prior scores those numbers and reads as a working head.
+
+    64.4%, not 74.42%. The higher figure came from counting the 3,715,593
+    residues of the 3,960 `pharos3d` chains that carry no base-pair annotation
+    at all, every one of them labelled "not in a loop" by a mask that meant
+    "this chain has a loop_class array" rather than "this label is known".
+    `pad_batch` no longer labels them, so the floor this head is measured
+    against dropped ten points -- in the direction that makes the head's job
+    harder and the number honest. This is the same failure the
     rest of the audit has been chasing -- a component that exists, is measured,
     and whose output is never checked for basic validity -- so the metric is
     reported against its own floor.
@@ -337,6 +408,54 @@ def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
                 f"{tag}_macro": float(macro),
                 f"{tag}_n_class": int(present.sum())}
 
+
+
+#: Every column the two `runlog.log` calls below actually pass.
+#:
+#: Declared nine and passed forty. `extrasaction="ignore"` meant the step rows
+#: carried `lr`, `loss`, `n_oom` and `peak_gib` and dropped all nineteen
+#: `part_*` losses and every metric the 09-25 audit added; the four `val_*`
+#: names that WERE declared -- `val_contact_ap`, `val_mg_ap`,
+#: `val_rigidity_r`, `val_bfactor_r` -- match nothing `evaluate()` returns, so
+#: they were four columns that could never have been filled. Both halves of
+#: the mismatch in one list.
+#:
+#: Derived from the tags rather than typed, so adding a head to
+#: `_TAGGED_CLASS` grows the csv instead of quietly not growing it.
+_TAGGED_CLASS = ("lw", "motif", "base")      # _class_metrics
+_TAGGED_BIN = ("mg",)                        # _binary_metrics
+_TAGGED_REG = ("rigidity", "fluct")          # _regression_metrics
+_PART_SCALARS = ("contact", "distance", "dist_acc", "structure",
+                 "structure_mse", "mg", "rigidity", "fluctuation", "base",
+                 "lw", "motif", "balance", "coev_frac", "coev_norm",
+                 "motif_gate", "motif_eff", "motif_top_share", "n_lw")
+_EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
+              "contact_n", "coev_frac", "motif_eff",
+              "lw_acc", "lw_major", "lw_lift", "lw_macro", "lw_n_class",
+              "structure_loss", "structure_mse", "structure_violation",
+              "structure_bond_cn", "structure_bond_pp",
+              "bond_cn_target_a", "bond_pp_target_a",
+              "mg_base_rate", "mg_average_precision", "mg_ap_lift",
+              "mg_precision_at_calibrated_thr", "mg_recall_at_calibrated_thr",
+              "rigidity_r_pooled", "rigidity_n",
+              "motif_acc", "motif_major", "motif_lift", "motif_macro",
+              "motif_n_class")
+
+def _stage5_fields() -> list:
+    f = ["lr", "loss", "n_oom", "peak_gib", "note"]
+    parts = list(_PART_SCALARS)
+    for t in _TAGGED_CLASS:
+        parts += [f"{t}_{x}" for x in ("acc", "major", "lift", "macro", "n_class")]
+    for t in _TAGGED_BIN:
+        parts += [f"{t}_{x}" for x in ("pos_rate", "auroc")]
+    for t in _TAGGED_REG:
+        parts += [f"{t}_{x}" for x in ("r", "base")]
+    f += [f"part_{k}" for k in dict.fromkeys(parts)]
+    f += [f"val_{k}" for k in _EVAL_KEYS]
+    return list(dict.fromkeys(f))
+
+
+STAGE5_FIELDS = _stage5_fields()
 
 
 def _binary_metrics(logit: torch.Tensor, target: torch.Tensor,
@@ -691,7 +810,11 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
         if max_batches is not None and bi >= max_batches:
             break
         t = to_device(batch, device)
-        with torch.autocast("cuda", dtype=torch.bfloat16):
+        # `enabled=`, not an unconditional cuda autocast. Every other autocast
+        # in this file is guarded; this one was not, so a cpu run entered a
+        # cuda autocast region on a machine that may have no cuda at all.
+        with torch.autocast(device.type, dtype=torch.bfloat16,
+                            enabled=(device.type == "cuda")):
             out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
                         feats=router_features(t),
                         dynamics=bool(t["rigidity_mask"].any()))
@@ -707,6 +830,66 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                 out["rigidity"][rm].float().cpu().numpy())
             pool.setdefault("rig_true", []).append(
                 t["b_factor_z"][rm].float().cpu().numpy())
+
+        # ---- HEAD 1, which had no validation metric either ----------------
+        #
+        # `val_contact_ap` was a DECLARED telemetry column for a number this
+        # function never computed. Contacts are the head the pair track exists
+        # for and the one every other head's features route through, and the
+        # only thing said about it on held-out data was nothing at all.
+        #
+        # Scored exactly as training scores it -- the same sampled pairs, the
+        # same coevolution lookup, the same motif mixture -- because a
+        # validation path that builds the features differently measures a
+        # different model. Average precision with the base rate beside it,
+        # for the same reason the Mg head is: the positives are a few percent
+        # of sampled pairs and accuracy at any threshold is uninformative.
+        Bv, Lv = t["tokens"].shape
+        ii_l, jj_l, y_l, bi_l = [], [], [], []
+        for b in range(Bv):
+            Lb = int(t["lengths"][b])
+            ii, jj, y = sample_pairs(t["contacts"][b], Lb, 512, device)
+            if ii is None or len(ii) == 0:
+                continue
+            ii_l.append(ii); jj_l.append(jj); y_l.append(y)
+            bi_l.append(torch.full((len(ii),), b, dtype=torch.long,
+                                   device=device))
+        if ii_l:
+            ii = torch.cat(ii_l); jj = torch.cat(jj_l)
+            yv = torch.cat(y_l); bidx = torch.cat(bi_l)
+            h = out["hidden"]
+            pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], -1))
+            lwk = t.get("lw_key")
+            if lwk is not None and lwk.numel():
+                lo = torch.minimum(ii, jj).to(torch.int64)
+                hi = torch.maximum(ii, jj).to(torch.int64)
+                want = bidx.to(torch.int64) * Lv * Lv + lo * Lv + hi
+                pos = torch.searchsorted(lwk, want).clamp(max=lwk.numel() - 1)
+                hitlw = lwk[pos] == want
+                if bool(hitlw.any()):
+                    # `lwl.shape[-1]`, not a config attribute. `cfg.heads`
+                    # does not exist -- it is `cfg.head_cfg()` -- and this is
+                    # the second time in this file that reaching for the class
+                    # count through the config has been wrong where the
+                    # logits' own width is right by construction.
+                    lwl = model.heads.pair.geometry(pair[hitlw])
+                    for k, v in _class_metrics(lwl, t["lw_val"][pos[hitlw]],
+                                               "lw", lwl.shape[-1]).items():
+                        acc.setdefault(k, []).append(float(v))
+            cv = lookup_coevolution(t, bidx, ii, jj, Lv)
+            if cv is not None:
+                acc.setdefault("coev_frac", []).append(
+                    float((cv != 0).float().mean()))
+                pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))
+            if model.motifs is not None:
+                r, minfo = model.motifs(pair)
+                acc.setdefault("motif_eff", []).append(
+                    float(minfo["effective_motifs"]))
+                pair = pair + model.motif_mix(r)
+            pool.setdefault("contact_score", []).append(
+                model.heads.pair.contact(pair).squeeze(-1).float().cpu().numpy())
+            pool.setdefault("contact_label", []).append(
+                (yv > 0.5).cpu().numpy())
 
         # ---- HEAD 3, which had no validation metric at all -----------------
         #
@@ -764,7 +947,11 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
             ml = out["motif_logits"]
             for k, v in _class_metrics(ml[lm].detach(), t["loop_class"][lm],
                                        "motif", ml.shape[-1]).items():
-                acc.setdefault(f"val_{k}", []).append(float(v))
+                # no `val_` here. The epoch log prefixes every key this
+                # function returns, so prefixing again produced
+                # `val_val_motif_acc` -- a column no field list declares, in
+                # the one metric block `evaluate` added for head 10.
+                acc.setdefault(k, []).append(float(v))
 
     res: Dict = {k: round(float(np.mean(v)), 4) for k, v in acc.items()}
     # the geometry numbers carry their targets, so a reader does not have to
@@ -772,6 +959,15 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
     if "structure_bond_cn" in res:
         res["bond_cn_target_a"] = BOND_C4_N[0]
         res["bond_pp_target_a"] = BOND_P_P[0]
+    if "contact_score" in pool:
+        sc = np.concatenate(pool["contact_score"])
+        yy = np.concatenate(pool["contact_label"])
+        base = float(yy.mean())
+        res["contact_base_rate"] = round(base, 4)
+        res["contact_ap"] = round(average_precision(sc, yy), 4)
+        res["contact_ap_lift"] = (round(res["contact_ap"] / base, 2)
+                                  if base > 0 else None)
+        res["contact_n"] = int(len(sc))
     if "mg_score" in pool:
         sc = np.concatenate(pool["mg_score"])
         yy = np.concatenate(pool["mg_label"])
@@ -888,6 +1084,7 @@ def main() -> None:
     print(f"[pharos] shards resident: {tr.prewarm(verbose=True):.2f} GiB RSS")
     assert_structure_supervision(tr, args.structure_weight)
     assert_coevolution_reaches_the_model(tr)
+    assert_supervised_heads_have_targets(tr)
 
     model = Pharos(cfg).to(device)
     # §12.1 is a CURRICULUM: stage 5 is meant to fine-tune the representation
@@ -999,10 +1196,7 @@ def main() -> None:
             print(f"[pharos] all {args.epochs} epochs already done", flush=True)
             return
 
-    runlog = RunLog(ROOT, "stage5_3d", [
-        "lr", "loss", "n_oom", "peak_gib", "note",
-        "val_contact_ap", "val_mg_ap", "val_rigidity_r", "val_bfactor_r",
-    ], manifest={
+    runlog = RunLog(ROOT, "stage5_3d", STAGE5_FIELDS, manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
         "epochs": args.epochs, "token_budget": args.token_budget,
         "lr_peak": args.lr, "n_neg": args.n_neg,

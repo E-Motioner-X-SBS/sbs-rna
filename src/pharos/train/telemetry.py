@@ -85,6 +85,8 @@ class RunLog:
         (base / stage).mkdir(parents=True, exist_ok=True)
         self.shared = base / f"{stage}.csv"
         self.per_run = base / stage / f"{self.run_id}.csv"
+        self._known = set(self.fields)
+        self._warned: set = set()
         self._fh: List = []
         self._wr: List = []
         for path in (self.shared, self.per_run):
@@ -130,7 +132,30 @@ class RunLog:
         self._wr.append(wr)
 
     def log(self, kind: str, *, epoch=None, step=None, **row) -> None:
-        """Write one row to both files and flush, so a kill loses nothing."""
+        """Write one row to both files and flush, so a kill loses nothing.
+
+        An undeclared key is SAID OUT LOUD, once, the first time it appears.
+
+        `csv.DictWriter(extrasaction="ignore")` is the right behaviour for a
+        writer -- a stray key must not kill a training run at hour nine -- and
+        the wrong behaviour for a codebase, because the author of the caller
+        gets no signal at all. Measured cost of that silence: stage 1's four
+        router scalars were passed to `log()` and dropped for a full run, and
+        stage 5 declared nine fields against the **forty-odd** its two callers
+        actually pass, so every per-head metric added by the 09-25 audit would
+        have gone to a csv with four permanently empty columns in a stage that
+        had not run yet. Both were found by reading the header, which is not a
+        method that scales.
+
+        One line per key per run, on stdout, so it lands in the run log next
+        to the step it happened on.
+        """
+        unknown = [k for k in row if k not in self._known and k not in self._warned]
+        if unknown:
+            self._warned.update(unknown)
+            print(f"[telemetry] {self.stage}: {len(unknown)} column(s) passed "
+                  f"to log() but not declared, so they are NOT being written: "
+                  f"{', '.join(sorted(unknown))}", flush=True)
         base = {
             "run_id": self.run_id, "stage": self.stage, "kind": kind,
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),

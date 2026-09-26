@@ -88,6 +88,7 @@ def check_runlog_fields() -> int:
     So: prove the drop happens, and then prove stage 1 declares what it logs.
     """
     import csv as _csv
+    import importlib.util as _iu
     import tempfile
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from pharos.train.telemetry import RunLog
@@ -103,6 +104,50 @@ def check_runlog_fields() -> int:
             print("  FAIL an undeclared field WAS recorded"); bad += 1
     print(f"  OK   undeclared fields are dropped silently         "
           f"(so they must be declared)")
+    # ...and now they are dropped LOUDLY. Silence is what let stage 1 lose four
+    # columns for a run and stage 5 declare nine against forty.
+    import io as _io
+    import contextlib as _ctx
+    with tempfile.TemporaryDirectory() as d:
+        rl = RunLog(Path(d), "probe", ["declared"])
+        buf = _io.StringIO()
+        with _ctx.redirect_stdout(buf):
+            rl.log("step", step=1, declared=1, undeclared=2)
+            rl.log("step", step=2, declared=1, undeclared=2)
+        rl.finish()
+        out = buf.getvalue()
+        if "undeclared" not in out or "[telemetry]" not in out:
+            print("  FAIL an undeclared field was dropped WITHOUT a warning")
+            bad += 1
+        elif out.count("[telemetry]") != 1:
+            print(f"  FAIL the warning repeated ({out.count('[telemetry]')}x); "
+                  f"it must be once per key per run")
+            bad += 1
+        else:
+            print("  OK   and it says so, once                          "
+                  f"{out.strip().splitlines()[0][:52]}")
+
+    # Stage 5's field list is BUILT from the metric tags, so the test checks
+    # that the build covers what the two `runlog.log` calls actually pass
+    # rather than checking a literal. The list was nine names long against
+    # roughly forty passed, and four of the nine matched nothing `evaluate()`
+    # returns -- both halves of a mismatch nobody could see from the call site.
+    spec5 = _iu.spec_from_file_location(
+        "tp5", Path(__file__).resolve().parents[1] / "scripts/train_pharos.py")
+    tp5 = _iu.module_from_spec(spec5)
+    spec5.loader.exec_module(tp5)
+    f5 = set(tp5.STAGE5_FIELDS)
+    for need in ("part_contact", "part_lw_lift", "part_motif_macro",
+                 "part_mg_auroc", "part_rigidity_r", "part_coev_frac",
+                 "val_contact_ap", "val_structure_loss", "val_motif_lift",
+                 "val_lw_macro", "val_mg_average_precision"):
+        ok = need in f5
+        print(f"  {'OK  ' if ok else 'FAIL'} stage 5 declares {need:22s}")
+        if not ok:
+            bad += 1
+    if "val_val_motif_acc" in f5:
+        print("  FAIL stage 5 declares a double-prefixed val_val_ column")
+        bad += 1
 
     src = (Path(__file__).resolve().parents[1]
            / "scripts/pretrain_mlm.py").read_text()
