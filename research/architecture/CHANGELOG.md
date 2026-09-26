@@ -293,3 +293,97 @@ Written by `scripts/architecture_watch.py`, which checks every 30 minutes and re
 ## 2026-09-25 08:34 IST
 
 - **An audit record, because sixteen findings in commit messages are not actionable** (`a20e212`)
+
+## 2026-09-25 09:04 IST
+
+- **Restart: 8B tokens, loops 1-3 sampled, corrected data pipeline, dim 13 wired** (`ea60c91`)
+
+## 2026-09-25 10:04 IST
+
+- **Two correct-looking rules that, composed, starved the held-out curve** (`697fc70`)
+- claims_ok: 410 → **413**
+
+## 2026-09-25 10:34 IST
+
+- **The results file had no idea whether it already held a row** (`6f3284f`)
+
+## 2026-09-25 12:04 IST
+
+- **--help has been broken all day, and the fix I nearly shipped was wrong** (`c624415`)
+
+## 2026-09-25 13:04 IST
+
+- **The token budget was a one-way ratchet, and it just cost half the batch** (`962e559`)
+- claims_ok: 413 → **417**
+
+## 2026-09-25 13:34 IST
+
+- **A full disk would have killed the run, and /store is at 96%** (`d764a1f`)
+
+## 2026-09-25 14:04 IST
+
+- **The "fixed" held-out sample was not fixed, and the log said so all along** (`63ede58`)
+
+## 2026-09-25 14:34 IST
+
+- **The telemetry I un-dropped this morning was printed and then dropped again** (`6c52cbb`)
+
+## 2026-09-25 15:04 IST
+
+- **The 2.8x speedup was one point; with a fourth it is a wash** (`70d9012`)
+
+## 2026-09-25 15:34 IST
+
+- **Interleaving calmed the training loss 6.6x, and run 1 had calm windows too** (`95fc8c1`)
+
+## 2026-09-25 17:34 IST
+
+- **Stage 5's validation reported two heads of ten, and not the one that matters** (`a4b251c`)
+
+## 2026-09-25 18:04 IST
+
+- **Stage 1 stopped at step 13,750 / 2.0686B tokens, on a checkpoint** (`66b8d55`)
+
+## 2026-09-25 18:34 IST
+
+- **The stop would have lasted 30 minutes: the scheduler had no way to be told** (`25183fe`)
+
+## 2026-09-25 19:04 IST
+
+- **Run 2 closed: 1.80266 bits at 2.069B tokens, 10.6% better than base frequencies** (`74669fe`)
+
+## 2026-09-25 22:04 IST
+
+- claims_ok: 417 → **0**
+
+## 2026-09-26 00:04 IST
+
+- claims_ok: 0 → **417**
+
+## 2026-09-26 03:04 IST
+
+- claims_ok: 417 → **0**
+
+## 2026-09-26 05:04 IST
+
+- claims_ok: 0 → **417**
+
+## 2026-09-26 06:04 IST
+
+- claims_ok: 417 → **0**
+
+## 2026-09-26 07:04 IST
+
+- claims_ok: 0 → **417**
+
+## 2026-09-26 08:04 IST
+
+- claims_ok: 417 → **0**
+
+## 2026-09-26 12:04 IST
+
+- claims_ok: 0 → **417**
+
+## 2026-09-26 19:04 IST
+
+- claims_ok: 417 → **416**

@@ -48,3 +48,11 @@ data/samples/analysis/cron/GPU_PERMITTED
 
 # MARS archives and their shards: bulk data, regenerable from acquire_all.py
 data/derived/parquet_mars/
+
+# Machine-local runtime state, never committed.
+#
+# HOLD stops the cron runner starting anything. It is a deliberate, local
+# decision about THIS machine's GPU -- committing it would silently hold the
+# scheduler on every clone, and the holder would have no idea why nothing
+# ever trains.
+data/samples/analysis/cron/HOLD
