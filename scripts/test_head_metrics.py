@@ -149,6 +149,32 @@ def check_runlog_fields() -> int:
         print("  FAIL stage 5 declares a double-prefixed val_val_ column")
         bad += 1
 
+    # Stages 2/3: the declared list must cover every key `hist.append({...})`
+    # builds, because the epoch call logs that dict. It used to hand-pick four
+    # of thirteen, so the validation accuracy, the generalisation gap, the
+    # majority rate, the macro recall and the val lift -- the two of which say
+    # whether stage 2 is learning or memorising -- were computed, printed,
+    # written to json and dropped on the way to the csv.
+    import re as _re
+    src23 = (Path(__file__).resolve().parents[1]
+             / "scripts/train_sequence_stages.py").read_text()
+    decl23 = set(_re.findall(
+        r'"([a-z_0-9]+)"',
+        src23.split('RunLog(ROOT, "stage23_seq"', 1)[1].split("], manifest", 1)[0]))
+    h23 = src23.split("hist.append({", 1)[1]
+    _d, _i = 1, 0
+    while _d:
+        _d += (h23[_i] == "{") - (h23[_i] == "}")
+        _i += 1
+    hist_keys = set(_re.findall(r'"([a-z_0-9]+)":', h23[:_i - 1])) - {"epoch", "steps"}
+    dropped = sorted(hist_keys - decl23)
+    print(f"  {'OK  ' if not dropped else 'FAIL'} "
+          f"stage 2/3 declares its whole history  "
+          f"{len(hist_keys)} keys"
+          f"{'' if not dropped else ', DROPPED: ' + ', '.join(dropped)}")
+    if dropped:
+        bad += 1
+
     src = (Path(__file__).resolve().parents[1]
            / "scripts/pretrain_mlm.py").read_text()
     decl = src.split('RunLog(ROOT, "stage1_mlm"', 1)[1].split("])", 1)[0]

@@ -432,9 +432,25 @@ def main() -> None:
                   flush=True)
             return
 
+    # Everything `hist` records, because `hist` is what the epoch line prints
+    # and what the results json keeps.
+    #
+    # The declared list was four names against a thirteen-field history: the
+    # validation accuracy, the generalisation gap, the majority rate, the
+    # macro recall and the val lift -- every metric the 09-25 audit added,
+    # and the two numbers that say whether stage 2 is learning or memorising
+    # -- were computed, stored, printed, written to json, and dropped on the
+    # way to the csv. So the time series of them existed nowhere. Same defect
+    # as stage 1's router scalars and stage 5's forty columns, one stage over.
+    #
+    # The epoch call below now logs `hist[-1]` itself rather than hand-picking
+    # from it, so the record and the row cannot drift apart again.
     runlog = RunLog(ROOT, "stage23_seq", [
-        "gstep", "lr", "ss_loss", "ss_accuracy", "probing_loss",
-        "probing_pearson", "n_oom", "note",
+        "gstep", "lr", "ss_loss", "ss_accuracy",
+        "ss_majority", "ss_macro_recall",
+        "ss_val_loss", "ss_val_accuracy", "ss_val_majority",
+        "ss_val_macro_recall", "ss_val_lift", "ss_generalisation_gap",
+        "ss_val_batches", "probing_loss", "probing_pearson", "n_oom", "note",
     ], manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
         "epochs": args.epochs, "batch": args.batch, "lr_peak": args.lr,
@@ -561,6 +577,12 @@ def main() -> None:
                 runlog.log("step", epoch=ep, step=step, gstep=gstep, lr=lr_now,
                            ss_loss=_m(ss_loss, args.log_every),
                            ss_accuracy=_m(ss_acc, args.log_every),
+                           # the floor the accuracy above has to clear. 2D
+                           # structure is mostly unpaired, so an accuracy
+                           # without it is not a measurement -- which is why
+                           # `ss_step` returns it, and it was going nowhere.
+                           ss_majority=_m(ss_major, args.log_every),
+                           ss_macro_recall=_m(ss_macro, args.log_every),
                            probing_loss=_m(pr_loss, args.log_every),
                            probing_pearson=_m(pr_r, args.log_every),
                            n_oom=n_oom)
@@ -624,10 +646,11 @@ def main() -> None:
                   f"| val majority {_vm:.4f}  lift {v_acc - _vm:+.4f}  "
                   f"macro {_vk:.4f}  over {len(vs_acc)} batches", flush=True)
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
-        runlog.log("epoch", epoch=ep, step=step, gstep=gstep,
-                   ss_loss=hist[-1]["ss_loss"], ss_accuracy=hist[-1]["ss_accuracy"],
-                   probing_loss=hist[-1]["probing_loss"],
-                   probing_pearson=hist[-1]["probing_pearson"], n_oom=n_oom)
+        # `**hist[-1]`, not four of its thirteen fields picked out by hand.
+        # `epoch` and `steps` are passed positionally above and would collide.
+        runlog.log("epoch", epoch=ep, step=step, gstep=gstep, n_oom=n_oom,
+                   **{k: v for k, v in hist[-1].items()
+                      if k not in ("epoch", "steps")})
         save(ep, True)
 
     if not hist:
