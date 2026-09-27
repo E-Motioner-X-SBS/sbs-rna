@@ -56,3 +56,4 @@ data/derived/parquet_mars/
 # scheduler on every clone, and the holder would have no idea why nothing
 # ever trains.
 data/samples/analysis/cron/HOLD
+data/samples/analysis/cron/WATCH_HOLD

@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -194,12 +195,59 @@ def do_cpu_work() -> Dict:
             "due": len(due), "tail": "" if code == 0 else out[-600:]}
 
 
-def training_alive() -> bool:
-    code, out = run(["pgrep", "-f",
-                     "gpu_cron_runner.sh|pretrain_mlm.py|train_pharos.py|"
-                     "train_sequence_stages.py|train_block_scorer.py"],
-                    timeout=60)
-    return code == 0 and bool(out.strip())
+#: The entry points that constitute "a training run", by file name.
+TRAINERS = ("pretrain_mlm.py", "train_pharos.py", "train_sequence_stages.py",
+            "train_block_scorer.py")
+
+
+def training_alive() -> Optional[str]:
+    """Is one of THIS repo's trainers actually on the card? Returns what.
+
+    `pgrep -f "gpu_cron_runner.sh|pretrain_mlm.py|train_pharos.py|..."` was
+    three kinds of wrong at once, and it gates the single most important
+    decision this scheduler makes: `do_gpu_work` starts nothing at all,
+    including the stage-1 resume, when this says yes.
+
+      * **It matches any command line containing the string.** `check_claims`
+        -- which this same tick runs, a few lines earlier -- executes `--help`
+        on all six trainers, and `test_head_metrics.py` does it again. A
+        `--smoke` run, an editor open on the file, and `grep train_pharos.py`
+        all match. Observed on the 23:04 tick of 2026-09-26: the watcher
+        printed "GPU: training is already running; leaving it alone" while
+        the only matching process was a CPU smoke test and the only thing on
+        the card belonged to another user.
+      * **It says nothing about the GPU.** A smoke test on cpu is not
+        training, and suppressing the scheduler for it is backwards.
+      * **It says nothing about which checkout.** A second clone of this
+        repository on the same machine would silently stop this one.
+
+    So ask the card instead: which PIDs hold GPU memory, and is any of them
+    one of our trainers, running from this tree, not in a `--help` or
+    `--smoke` invocation. If `nvidia-smi` cannot be read the answer is None,
+    which is safe: `gpu_free_gib` returns None on the same failure and
+    `do_gpu_work` already refuses every task when free memory is unknown.
+    """
+    code, out = run(["nvidia-smi", "--query-compute-apps=pid",
+                     "--format=csv,noheader"], timeout=60)
+    if code != 0:
+        return None
+    for line in out.strip().splitlines():
+        pid = line.strip()
+        if not pid.isdigit():
+            continue
+        try:
+            argv = Path(f"/proc/{pid}/cmdline").read_bytes().decode(
+                "utf-8", "replace").split("\0")
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            continue                     # exited between the query and here
+        if "--help" in argv or "--smoke" in argv:
+            continue
+        name = next((t for t in TRAINERS
+                     if any(a.endswith(t) for a in argv)), None)
+        if name and Path(cwd) == ROOT:
+            return f"{name} (pid {pid})"
+    return None
 
 
 def gpu_status() -> Dict:
@@ -213,7 +261,8 @@ def gpu_status() -> Dict:
     return {"permitted": permitted,
             "free_gib": None if free is None else round(free, 1),
             "ready_if_permitted": ready, "short_of_memory": short,
-            "training_alive": training_alive(),
+            "training_alive": bool(_tr := training_alive()),
+            "training_process": _tr,
             "waiting": (not permitted) or not ready}
 
 
@@ -455,7 +504,8 @@ def main() -> int:
               f"{', '.join(x['name'] for x in GPU_TASKS)}")
         print(f"  (grant it with: touch {GPU_PERMIT.relative_to(ROOT)})")
     elif g["training_alive"]:
-        print(f"  GPU: training is already running; leaving it alone")
+        print(f"  GPU: {g.get('training_process')} is on the card; "
+              f"leaving it alone")
     else:
         print(f"  GPU permitted, {g['free_gib']} GiB free — {gw.get('why')}")
 

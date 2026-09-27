@@ -52,6 +52,17 @@ from train_block_scorer import gpu_free_gib, to_device               # noqa: E40
 
 CKPT = ROOT / "data/derived/checkpoints/block_scorer.pt"
 DATA = ROOT / "data/derived/pharos3d"
+
+
+def _refuse(why: str) -> int:
+    """Exit without writing. A contaminated number is worse than no number."""
+    print(f"[cascade] REFUSING TO MEASURE: {why}\n"
+          f"  Retrain the scorer on the current corpus, or point --ckpt at a "
+          f"scorer trained under this split. Writing the file anyway would "
+          f"overwrite a valid measurement with one taken on chains the model "
+          f"has seen, and nothing downstream could tell the difference.",
+          flush=True)
+    return 1
 OUT = ROOT / "data/samples/analysis"
 MODES = ("random", "separation", "learned_noprior", "learned")
 
@@ -218,7 +229,46 @@ def main() -> int:
     model = BlockScorer(cfg).to(device)
     model.load_state_dict(sd["model"])
     te = Pharos3DDataset(DATA, split="test")
-    print(f"scorer from epoch {sd.get('epoch')}, test split, "
+
+    # Is this model allowed to be scored on this test set?
+    #
+    # The corpus has been rebuilt three times with the SAME 16,604 chains and
+    # a re-drawn family-disjoint split: v1 was train 11,723 / val 1,189 /
+    # test 1,450, and the current one is 10,641 / 853 / 4,081. **2,603 of the
+    # current 4,081 test chains -- 63.8% -- were in v1's train set.**
+    # `block_scorer.pt` was trained under v1, so evaluating it on today's
+    # test split measures recall on chains it memorised.
+    #
+    # That is what the scheduled run on 2026-09-26 23:34 did. It wrote the
+    # result over the valid one, in the same file, under the same keys, and
+    # the only thing that noticed was a pinned `n_chains == 1450` -- a check
+    # whose natural reading is "the number moved, update the pin".
+    #
+    # A checkpoint written after this change carries `split_digest`. An older
+    # one does not, so fall back to the chain counts the results file
+    # recorded, which are enough to separate 1,450 from 4,081.
+    want = sd.get("split_digest")
+    if want is None:
+        _res = ROOT / "data/samples/analysis/block_scorer_results.json"
+        if _res.exists():
+            _n = json.loads(_res.read_text()).get("splits", {}).get("test")
+            if _n is not None and _n != len(te):
+                return _refuse(
+                    f"the scorer was trained when the test split held {_n:,} "
+                    f"chains and it now holds {len(te):,}. The split has been "
+                    f"re-drawn, so this evaluation would score the model on "
+                    f"chains it trained on.")
+        else:
+            print("[cascade] WARNING: this checkpoint records no split digest "
+                  "and there is no results file to cross-check; the numbers "
+                  "below assume the split has not moved since it trained.",
+                  flush=True)
+    elif want != te.split_digest:
+        return _refuse(f"the scorer trained under split {want} and this "
+                       f"corpus carries {te.split_digest}.")
+
+    print(f"scorer from epoch {sd.get('epoch')}, test split "
+          f"[{te.split_digest}], {len(te):,} chains, "
           f"b1={cfg.b1} b2={cfg.b2} target_c={cfg.target_c}\n")
 
     results = {}

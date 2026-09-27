@@ -27,6 +27,36 @@ import numpy as np
 from .dataset import ShardReader, pad_batch
 
 
+def split_digest(manifest: Dict) -> str:
+    """Eight hex characters naming WHICH split assignment this corpus carries.
+
+    The corpus has been rebuilt three times with the same 16,604 chains and a
+    re-drawn split: v1 was train 11,723 / val 1,189 / test 1,450, and v2 and
+    v3 are 10,641 / 853 / 4,081. **63.8% of the current test set -- 2,603 of
+    4,081 chains -- was in v1's TRAIN set.**
+
+    That is not a detail. `block_scorer.pt` was trained under v1, and
+    `measure_cascade_recall.py` loads it and evaluates it on
+    `Pharos3DDataset(DATA, split="test")`, which now resolves to v3's test
+    set. The scheduled re-measurement on 2026-09-26 23:34 did exactly that
+    and wrote the result over the valid one: a number computed on chains the
+    model had been trained on, in the same file, under the same keys, with
+    nothing to say it was different in kind rather than in value. The only
+    guard that caught anything was a pin on `n_chains == 1450`, which reads
+    as staleness and invites updating the pin.
+
+    Nothing about the split is wrong -- family-disjoint (D17) is the right
+    policy and redrawing it was a deliberate improvement. What was missing is
+    that a model and an evaluation have to agree on which draw they mean, and
+    neither recorded it. This is that record: a hash over the sorted
+    (pdb, chain, split) triples, so any change in assignment changes it.
+    """
+    import hashlib
+    rows = sorted(f"{c['pdb']}_{c['chain']}:{c.get('split')}"
+                  for sh in manifest["shards"] for c in sh["chains"])
+    return hashlib.sha1("\n".join(rows).encode()).hexdigest()[:8]
+
+
 class Pharos3DDataset:
     """The whole sharded set, addressed as one flat sequence of chains."""
 
@@ -47,6 +77,8 @@ class Pharos3DDataset:
                 self._index.append((si, li))
                 self.meta.append(cm)
         self._files = [self.root / sh["file"] for sh in man["shards"]]
+        #: which draw of the split this is; see `split_digest`
+        self.split_digest = split_digest(man)
 
     def __len__(self) -> int:
         return len(self._index)

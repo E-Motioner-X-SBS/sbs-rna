@@ -27,6 +27,21 @@ LOG=$LOGDIR/architecture_watch.log
 mkdir -p "$LOGDIR"
 cd "$REPO" || exit 1
 
+# `touch data/samples/analysis/cron/WATCH_HOLD` and this stops checking.
+#
+# A full tick runs verify_claims.py, which runs 13 test suites as subprocesses;
+# test_diffusion.py alone took 38 minutes at 542% CPU on a loaded machine, and
+# a tick that outlasts the 30-minute interval is followed by another. There was
+# no way to tell this loop to stand down short of editing the crontab, so
+# "stop the non-essential CPU work" had no answer inside the repository --
+# the same gap `HOLD` closed for gpu_cron_runner.sh, which this mirrors.
+#
+# Remove the file to resume; nothing else changes.
+if [ -f "$LOGDIR/WATCH_HOLD" ]; then
+    printf '%s held: %s/WATCH_HOLD is present\n' "$(date -Is)" "$LOGDIR" >> "$LOG"
+    exit 0
+fi
+
 # One at a time. A full check runs 13 test suites and can outlast the interval.
 exec 9>"$LOCK"
 flock -n 9 || exit 0

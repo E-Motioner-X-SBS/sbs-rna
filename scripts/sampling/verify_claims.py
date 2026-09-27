@@ -1397,6 +1397,36 @@ def main() -> int:
     if missing:
         fails.append("analysis script points at a missing checkpoint")
 
+    # `training_alive` gates every GPU task including the stage-1 resume, and
+    # it used to be `pgrep -f "...|train_pharos.py|..."`, which matches any
+    # command line containing the string -- including the `--help` runs that
+    # `check_claims` itself makes on every tick. Behavioural, not textual: a
+    # string check on the source is exactly the guard that gets edited away.
+    import subprocess as _sp
+    import importlib.util as _iu2
+    _sp2 = _iu2.spec_from_file_location("aw_probe",
+                                        ROOT / "scripts/architecture_watch.py")
+    _aw = _iu2.module_from_spec(_sp2)
+    _sp2.loader.exec_module(_aw)
+    _decoy = _sp.Popen([sys.executable, "-c", "import time;time.sleep(6)",
+                        "scripts/train_pharos.py"], cwd=ROOT,
+                       stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+    try:
+        _old = _sp.run(["pgrep", "-f", "train_pharos.py"],
+                       capture_output=True, text=True)
+        _old_says = _old.returncode == 0 and bool(_old.stdout.strip())
+        _new_says = _aw.training_alive()
+        ok = _old_says and not _new_says
+        print(f"  {'OK ' if ok else 'FAIL'} "
+              f"{'a non-GPU process is not training':34s} "
+              f"pgrep {_old_says}, on-card {_new_says!r}")
+        if not ok:
+            fails.append("training_alive matches processes that are not "
+                         "training on this card")
+    finally:
+        _decoy.kill()
+        _decoy.wait(timeout=10)
+
     rs = A / "router_specialisation.json"
     if not rs.exists():
         print("  WARN router_specialisation.json absent -- the probe has never run")
@@ -1434,6 +1464,70 @@ def main() -> int:
                   f"entropy {newest['frac_of_uniform']:.4f} of uniform, "
                   f"width {newest.get('mean_width')}/{newest['n_experts']}, "
                   f"dead {100 * (newest.get('dead_expert_frac') or 0):.1f}%")
+
+    print("\n== a model is only scored on a split it did not train on ==")
+    # The corpus has been rebuilt three times with the SAME 16,604 chains and
+    # a re-drawn family-disjoint split. v1: train 11,723 / val 1,189 /
+    # test 1,450. v2 and v3: 10,641 / 853 / 4,081. **2,603 of the current
+    # 4,081 test chains -- 63.8% -- were in v1's train set.**
+    #
+    # `block_scorer.pt` trained under v1. The scheduled cascade re-measurement
+    # loads it and evaluates on `split="test"`, which resolves to whatever the
+    # corpus says today; on 2026-09-26 23:34 it did so and overwrote the valid
+    # numbers with contaminated ones -- same file, same keys, plausible
+    # values. The only guard that fired was a pinned `n_chains == 1450`, whose
+    # natural reading is "stale, update the pin".
+    sys.path.insert(0, str(ROOT / "src"))
+    from pharos.data.loader import split_digest                   # noqa: E402
+    man = json.loads((ROOT / "data/derived/pharos3d/manifest.json").read_text())
+    cur_digest = split_digest(man)
+    by_chain = man["split"]["by_chain"]
+    print(f"  OK  {'current corpus split':34s} {cur_digest}, "
+          + ", ".join(f"{k} {v:,}" for k, v in sorted(by_chain.items())))
+
+    bsr_splits = load("block_scorer_results.json")["splits"]
+    cr_n = load("cascade_recall.json")["learned"]["n_chains"]
+    ok = cr_n == bsr_splits["test"]
+    print(f"  {'OK ' if ok else 'FAIL'} "
+          f"{'cascade scored the scorer\'s own split':34s} "
+          f"{cr_n:,} chains vs the scorer's test {bsr_splits['test']:,}")
+    if not ok:
+        fails.append("cascade_recall was measured on a different split from "
+                     "the one block_scorer.pt trained under")
+
+    # and the measurement must REFUSE rather than produce the number
+    src_cr = (ROOT / "scripts/sampling/measure_cascade_recall.py").read_text()
+    ok = "_refuse(" in src_cr and "split_digest" in src_cr
+    print(f"  {'OK ' if ok else 'FAIL'} "
+          f"{'and refuses when they disagree':34s} "
+          f"{'guarded' if ok else 'UNGUARDED'}")
+    if not ok:
+        fails.append("measure_cascade_recall does not check the split")
+
+    # Every result file that records a split, not just the block scorer's.
+    # The re-draw on 2026-09-24 predates no model in this repository, so this
+    # is one fact -- every checkpoint was measured under the old draw -- and
+    # it is better said once, with the inventory, than discovered per file.
+    stale_results = []
+    for f in sorted(A.glob("*results*.json")):
+        try:
+            sp = json.loads(f.read_text()).get("splits")
+        except (OSError, ValueError):
+            continue
+        if isinstance(sp, dict) and sp.get("test") not in (None, by_chain.get("test")):
+            stale_results.append(f"{f.name} (test {sp['test']:,})")
+    if stale_results:
+        print(f"  WARN {len(stale_results)} result file(s) were measured under "
+              f"an earlier split draw; the corpus now assigns "
+              f"test {by_chain.get('test'):,}:")
+        for r in stale_results:
+            print(f"         {r}")
+        print(f"       Their numbers remain valid FOR THE SPLIT THEY WERE "
+              f"MEASURED ON. They are not measurements of the current corpus, "
+              f"and re-measuring needs the model retrained under this draw -- "
+              f"63.8% of today's test chains were in the old train set.")
+        warns.append(f"{len(stale_results)} result files predate the "
+                     f"2026-09-24 split re-draw")
 
     print("\n== the held-out curve is one series, not two spliced ==")
     # `heldout_files` reserves the last two shards of each corpus directory BY

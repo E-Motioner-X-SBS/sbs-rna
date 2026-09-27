@@ -382,8 +382,17 @@ def train(args) -> None:
             best = score
             # the RESULT: best epoch only, and deliberately without optimiser
             # state, because this is what evaluation and the cascade read
+            # `split_digest`, so a later evaluation can tell whether it is
+            # scoring this model on the split it was trained under. The
+            # corpus has been rebuilt with a RE-DRAWN split and 63.8% of the
+            # current test set was in the old train set; without this the
+            # only way to notice is a pinned chain count, which reads as
+            # staleness rather than as contamination.
             atomic_save({"cfg": cfg.__dict__, "model": model.state_dict(),
-                        "epoch": ep, "val": ev}, args.ckpt)
+                        "epoch": ep, "val": ev,
+                        "split_digest": tr.split_digest,
+                        "splits": {"train": len(tr), "val": len(va),
+                                   "test": len(te)}}, args.ckpt)
         save_state(ep, True)          # the RESUME STATE: last epoch, always
 
     # ---- the comparison R1 is actually about --------------------------
