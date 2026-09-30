@@ -1294,7 +1294,24 @@ def main() -> None:
               # 10% a step so it approaches the ceiling rather than jumping
               # over it, and it stops entirely once an OOM has been seen, since
               # past that point the ceiling is known.
-              if (step % args.adapt_every == 0 and n_oom == 0
+              # NOT `and n_oom == 0`.
+              #
+              # That gate made `--oom-recover-steps` dead code. The recovery
+              # branch inside this block tests `n_oom > 0`, which can never be
+              # true inside a block entered only when `n_oom == 0`, so a run
+              # that OOMed once kept its reduced budget for good -- the flag
+              # existed, was documented, was configurable, and its code path
+              # was unreachable. Measured on 2026-10-01: four OOMs at step
+              # 14,358 cut the budget 180,224 -> 92,160, and 3,700 steps later
+              # it was still 92,160 with `--oom-recover-steps 1000` set. Half
+              # the intended batch for the rest of the run, and batch size is
+              # what correlates with held-out bits here (partial r -0.52).
+              #
+              # The GROWTH branch below keeps its own `n_oom == 0` test, so
+              # the intended behaviour is unchanged: after an OOM the budget
+              # never climbs toward the target again, it only walks back
+              # toward 90% of the level that failed.
+              if (step % args.adapt_every == 0
                       and torch.cuda.is_available()):
                   total_gib = torch.cuda.get_device_properties(0).total_memory / 2**30
                   peak = torch.cuda.max_memory_allocated() / 2**30
