@@ -1,9 +1,9 @@
 {
- "updated": "2026-09-27T05:39:02+05:30",
- "state": "held",
- "detail": "held by /store/shuvam/E-motioner-X-SBS/sbs-rna/data/samples/analysis/cron/HOLD -- remove the file to resume",
- "free_gib_at_check": null,
- "log": null,
+ "updated": "2026-09-30T19:23:45+05:30",
+ "state": "running",
+ "detail": "pipeline started",
+ "free_gib_at_check": 65,
+ "log": "run-20260930-192215.log",
  "stages": {
   "verify":  "done",
   "stage1":  null,

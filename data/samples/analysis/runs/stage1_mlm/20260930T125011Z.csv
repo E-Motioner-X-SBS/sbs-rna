@@ -1,0 +1,8 @@
+run_id,stage,kind,timestamp,elapsed_s,epoch,step,tokens,padded_tokens,ce_nats,bits_per_token,balance,total_loss,lr,masked_accuracy,tok_per_s,padded_per_s,mfu,pad_frac,token_budget,n_oom,peak_gib,note,muon_lr,batch_tokens,dead_expert_frac,route_width_mean,route_width_max,perplexity
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:50:11+00:00,0.1,,13750,2068600977,2255978560,,,,,,,,,,,,,,resumed,,,,,,
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:56:09+00:00,358.2,,13773,2073543987,,,,,,,,,,,,193536,1,,OOM #1: token budget -> 193536,,,,,,
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:56:13+00:00,361.7,,13773,2073543987,,,,,,,,,,,,163840,2,,OOM #2: token budget -> 163840,,,,,,
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:56:15+00:00,364.1,,13773,2073543987,,,,,,,,,,,,139264,3,,OOM #3: token budget -> 139264,,,,,,
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:56:21+00:00,369.9,,13773,2073543987,,,,,,,,,,,,117760,4,,OOM #4: token budget -> 117760,,,,,,
+20260930T125011Z,stage1_mlm,event,2026-09-30T12:56:26+00:00,374.3,,13773,2073543987,,,,,,,,,,,,99328,5,,OOM #5: token budget -> 99328,,,,,,
+20260930T125011Z,stage1_mlm,step,2026-09-30T12:59:06+00:00,534.8,,13800,2075989555,2263921728,0.974403,1.405767,0.260614,1.235017,0.0005197114334142836,0.563005,13815.6,14852.6,0.155028,0.083012,99328,5,76.64,,0.01732371,147771,0.0,6.546,404,2.649585

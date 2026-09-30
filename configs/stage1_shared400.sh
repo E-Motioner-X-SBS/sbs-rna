@@ -32,6 +32,26 @@
 set -eu
 REPO=/store/shuvam/E-motioner-X-SBS/sbs-rna
 cd "$REPO"
+
+# Pin the allocator. Do NOT inherit it.
+#
+# The throughput of this run depended on WHO STARTED IT. cron does not source
+# the user profile; an interactive shell does, and the profile exports
+# `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. Measured on 2026-09-30,
+# same checkpoint, same step, same code:
+#
+#     launched by cron (run 2)           ~2.0 s/step     15.9k tok/s
+#     launched from a shell, inherited   37.8 s/step      4.4k tok/s
+#
+# 3.5x, from an environment variable nobody passed on purpose. Expandable
+# segments are a good default when there is room; at a 60 GiB peak on an
+# 80 GiB card they leave the allocator mapping and unmapping at the ceiling,
+# which is what the `expandable_segments: memory mapping failed with OOM
+# while trying to map 20971520 bytes` warnings were -- and memory sat at
+# 67.8 GiB against run 2's 60.0 GiB peak for the same budget.
+#
+# Set explicitly so the two launch paths cannot diverge again.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False
 # Overridable by the cron runner, defaulted here so the file is the source of
 # truth when it is run directly.
 : "${MLM_TOKENS:=8e9}"
@@ -39,15 +59,39 @@ cd "$REPO"
 : "${NEED_GIB:=60}"
 : "${MLM_OPT:=muon}"
 : "${MUON_LR:=0.02}"
-# Fixed budget and a vram target that keeps the auto-tune from growing into
-# the OOM that cost run 2 half its batch. 0 restores auto-tuning.
+# Fixed budget, pinned at the level the MEASUREMENTS support -- not the one
+# the previous comment claimed they did.
 #
-# The auto-tune grew to 228,352 (peak 58.8 GiB), then took one more 10% step
-# and peak went past 79 -- memory is not linear in the budget, because
-# attention is B*L^2 and the pool composition moves. Four OOMs at one step
-# followed, each cutting 15%, ending at 117,760. 180,224 is 79% of the level
-# that survived; at an estimated 46.4 GiB peak it sits above
-# 0.85 * 0.65 * 79.3 = 43.8, so the growth check never fires.
+# That comment said the auto-tune "grew to 228,352 (peak 58.8 GiB)". It did
+# not. 58.8 is the peak at **207,872**, from six samples. Run 2's own
+# telemetry, grouped by the budget each step actually ran at:
+#
+#     budget    n   peak mean   peak MAX
+#     143,360    6      41.3       42.9
+#     157,696    6      45.3       48.8
+#     173,056    6      49.4       52.0
+#     180,224   17      59.6       60.0
+#     189,440    6      53.9       57.8
+#     207,872    6      57.7       58.8
+#     228,352   87      65.4       69.6
+#
+# 69.6 GiB at 228,352, from the best-sampled row in the table. Against an
+# 80 GiB card with a 1.7 GiB neighbour and allocator fragmentation, that does
+# not fit -- and on 2026-09-30 it did not: five OOMs at step 13,773 took the
+# budget 228,352 -> 99,328, worse than run 2's floor, and throughput fell to
+# 13.8k tok/s against run 2's 15.9k. The card being free does not buy a
+# bigger batch, because the neighbour was never the binding constraint; the
+# trainer's own peak on long-sequence pools was.
+#
+# Note how weakly peak tracks budget -- 189,440 peaks LOWER than 180,224 --
+# because memory is driven by B*L^2 and which length band the pool drew, not
+# by the budget alone. That is why the MAX column over many samples is the
+# only column worth sizing against, and why the six-sample rows are not
+# evidence of headroom.
+#
+# 180,224 ran 1,650 steps with zero OOMs at 15.9k tok/s, and its 60.0 GiB
+# max now sits under 80 rather than under ~71, so it has MORE margin than it
+# had in run 2. Max speed here is the exclusive card, not a bigger batch.
 : "${MLM_TOKEN_BUDGET:=180224}"
 : "${MLM_VRAM_TARGET:=0.65}"
 exec /store/shuvam/.venv/bin/python -u scripts/pretrain_mlm.py \
