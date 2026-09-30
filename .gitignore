@@ -57,3 +57,4 @@ data/derived/parquet_mars/
 # ever trains.
 data/samples/analysis/cron/HOLD
 data/samples/analysis/cron/WATCH_HOLD
+data/samples/analysis/cron/HELDOUT_STOP

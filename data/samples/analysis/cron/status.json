@@ -1,7 +1,7 @@
 {
- "updated": "2026-09-30T19:23:45+05:30",
- "state": "running",
- "detail": "pipeline started",
+ "updated": "2026-10-01T04:26:57+05:30",
+ "state": "interrupted",
+ "detail": "stage 1 stopped; resumes next fire",
  "free_gib_at_check": 65,
  "log": "run-20260930-192215.log",
  "stages": {
