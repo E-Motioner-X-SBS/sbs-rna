@@ -58,3 +58,7 @@ data/derived/parquet_mars/
 data/samples/analysis/cron/HOLD
 data/samples/analysis/cron/WATCH_HOLD
 data/samples/analysis/cron/HELDOUT_STOP
+data/samples/analysis/cron/MONITOR_HOLD
+data/samples/analysis/cron/.monitor_last
+data/samples/analysis/cron/monitor.lock
+data/samples/analysis/cron/monitor_state.json
