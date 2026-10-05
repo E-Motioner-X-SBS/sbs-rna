@@ -208,6 +208,74 @@ def main() -> int:
     chk("the unnumbered heads are still produced", not extra_missing,
         f"missing: {extra_missing or 'none'}")
 
+    print("\n== property 7c: every head produced is either trained or declared ==")
+    # every optional branch on at once, so the set below is the whole surface
+    # the model can present and not whichever corner this test happened to run
+    with torch.no_grad():
+        o_full = model(tok, mod, chem, mask, pair_index=(ii, jj),
+                       dynamics=True, mlm=True)
+    # A head that nothing supervises still emits a number, every forward pass,
+    # for the rest of the project. `fitness` had a loss weight printed at
+    # startup and written into two report files with no loss behind it;
+    # `disorder_logit` was named in stage 5's own docstring as a head that
+    # stage trains, with its label sitting in every shard, and no term ever
+    # read it. Both looked exactly like the trained heads from outside.
+    #
+    # Pinned as three explicit sets rather than discovered by searching the
+    # trainers for `out["key"]`. The first version of this test did search,
+    # and reported `fitness` as trained -- because the comment that says
+    # there is no `out["fitness"]` anywhere contains the string `out["fitness"]`.
+    # A check that greps its own prose is the exact defect this file exists
+    # to catch, committed inside the catcher.
+    #
+    # The lists are maintenance, deliberately: a new head fails this test
+    # until someone classifies it, which is the one moment anybody will.
+    TRAINED = {                      # a loss term reads this, somewhere
+        "mlm_logits": "stage 1", "ss_logits": "stage 2",
+        "reactivity": "stage 3", "contact_logit": "stage 5",
+        "distance_logits": "stage 5", "lw_logits": "stage 5",
+        "mg_logit": "stage 5", "motif_logits": "stage 5",
+        "rigidity": "stage 5", "fluctuation": "stage 5",
+        "base_logits": "stage 5",
+    }
+    INDIRECT = {                     # no loss of its own; gradient arrives anyway
+        "hidden": "the trunk output every head reads",
+        "stiffness_diag": "fluctuation is computed from it, so the rigidity "
+                          "loss reaches it",
+        "stiffness_off": "same path as stiffness_diag",
+    }
+    UNTRAINED = {                    # emitted, no gradient, and why
+        "disorder_logit":
+            "the label names polymer positions that were never modelled, and "
+            "the corpus tokens are the modelled residues only, so a target "
+            "aligned to them is vacuously zero. Needs entity_poly_seq in the "
+            "corpus: a build change, not a loss term.",
+        "splice_logits":
+            "no RNA splice-site corpus has been acquired.",
+        "fitness":
+            "NABench and RNAGym are on disk under data/benchmarks/fitness/ "
+            "(126 MB of per-assay CSVs) and no loader has been written.",
+        "ensemble_state_logits":
+            "the K-state mixture weights. \u00a710 defines the ensemble but no "
+            "observable in the corpus distinguishes the states, so there is "
+            "nothing to fit them to.",
+    }
+    _emitted = {k for k, v in o_full.items() if torch.is_tensor(v)}
+    _declared = set(TRAINED) | set(INDIRECT) | set(UNTRAINED)
+    chk("no output is emitted without being classified",
+        not (_emitted - _declared),
+        f"unclassified: {sorted(_emitted - _declared) or 'none'}")
+    chk("nothing is classified that is no longer emitted",
+        not (_declared - _emitted),
+        f"stale: {sorted(_declared - _emitted) or 'none'}")
+    chk("the three sets are disjoint",
+        len(_declared) == len(TRAINED) + len(INDIRECT) + len(UNTRAINED),
+        f"{len(TRAINED)} trained, {len(INDIRECT)} indirect, "
+        f"{len(UNTRAINED)} untrained")
+    chk("every untrained head says why, at length",
+        all(len(v) > 40 for v in UNTRAINED.values()),
+        ", ".join(sorted(UNTRAINED)))
+
     print("\n== property 7b: the MLM head starts at chance, not off a cliff ==")
     import math as _m
     import torch.nn.functional as _F

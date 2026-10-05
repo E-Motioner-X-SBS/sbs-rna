@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -97,10 +98,20 @@ def load_csv(p: Path) -> list:
 
 
 def f(x, default=None):
+    """float(x), or `default` -- and NaN counts as unreadable, not as a number.
+
+    `float("nan")` parses without complaint, and every comparison against it
+    is False. So a diverged run writing `nan` into the held-out CSV read as
+    "not worse than unigram", skipped the no-progress check (whose deltas are
+    also NaN, also False), and was reported OK -- forever. The monitor whose
+    whole job is to notice a run going wrong was structurally unable to
+    notice the single most obvious way a run goes wrong.
+    """
     try:
-        return float(x)
+        v = float(x)
     except (TypeError, ValueError):
         return default
+    return v if math.isfinite(v) else default
 
 
 def main() -> int:
@@ -129,7 +140,14 @@ def main() -> int:
                          capture_output=True, text=True).stdout.split()
     running = bool(pid)
 
-    if held and not running:
+    # Every "how long since X" check below measures time since TRAINING last
+    # did something. While the run is deliberately held they all keep ticking
+    # and all eventually fire, so a clean pause reported one ALERT and a WARN
+    # about a checkpoint and a token budget that are exactly where they were
+    # left. An alarm that goes off because you turned the machine off is an
+    # alarm people learn to ignore, which is the only way this monitor fails.
+    paused = held and not running
+    if paused:
         say("OK", "scheduler", "HOLD is set and nothing is training (deliberate)")
     elif not running:
         say("ALERT", "trainer is NOT running",
@@ -157,10 +175,16 @@ def main() -> int:
     # ---- resumable -------------------------------------------------------
     if CKPT.exists():
         age = (now - CKPT.stat().st_mtime) / 60
-        v = "OK" if age < 60 else ("WARN" if age < 180 else "ALERT")
-        say(v, "checkpoint freshness",
-            f"written {age:.0f} min ago"
-            + ("" if v == "OK" else " -- everything since is lost if the card goes"))
+        if paused:
+            say("OK", "checkpoint freshness",
+                f"written {age:.0f} min ago, at the pause -- nothing has run "
+                f"since, so nothing is at risk")
+        else:
+            v = "OK" if age < 60 else ("WARN" if age < 180 else "ALERT")
+            say(v, "checkpoint freshness",
+                f"written {age:.0f} min ago"
+                + ("" if v == "OK" else
+                   " -- everything since is lost if the card goes"))
     elif not held:
         say("ALERT", "no checkpoint", str(CKPT))
 
@@ -272,6 +296,10 @@ def main() -> int:
             if at_ceiling:
                 say("OK", f"budget after {n_oom} OOM(s)",
                     f"{budget:,} -- recovered to the ceiling")
+            elif paused:
+                say("OK", f"budget after {n_oom} OOM(s)",
+                    f"{budget:,} at the pause -- it only moves while training "
+                    f"runs, so standing still here means nothing")
             elif (pb is not None and pn == n_oom and budget == pb
                     and mins >= MIN_ELAPSED_MIN):
                 say("WARN", "budget has not moved since the last report",

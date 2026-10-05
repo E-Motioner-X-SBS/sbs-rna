@@ -61,6 +61,7 @@ from pharos.train.muon import Muon, muon_param_groups
 from pharos.data.vocab import PAD_ID, SYM2ID, SYMBOLS, encode_chain  # noqa: E402
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
+from pharos.train.guard import check_loss
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
 #: the pretraining alphabet: elDORS is normalised to these
@@ -1156,6 +1157,8 @@ def main() -> None:
                   ce = F.cross_entropy(logits[sel], tgt[sel])
                   bal = out["aux"]["balance_loss"]
                   loss = ce + bal
+              check_loss(loss, step, {"ce": float(ce.detach()),
+                                      "balance": float(bal.detach())})
               for _o in opts:
                 _o.zero_grad(set_to_none=True)
               loss.backward()

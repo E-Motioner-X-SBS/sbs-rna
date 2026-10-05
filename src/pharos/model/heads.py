@@ -221,66 +221,26 @@ class PharosHeads(nn.Module):
             out.update(self.pair(pair))
         return out
 
-    @staticmethod
-    def loss(out: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor],
-             weights: Optional[Dict[str, float]] = None
-             ) -> tuple[torch.Tensor, Dict[str, float]]:
-        """Sum of the heads for which this batch actually carries labels.
-
-        Every term is gated on its target being present **and** on its own
-        validity mask. A head with no labels in this batch contributes nothing
-        rather than contributing a zero that quietly shrinks the average -- the
-        corpus is heterogeneous by design (probing for some chains, B-factors
-        for X-ray only, fitness for a different set entirely), so most batches
-        supervise a subset.
-        """
-        w = {"contact": 1.0, "distance": 1.0, "ss": 0.5, "mg": 0.3, "rigidity": 0.3,
-             "reactivity": 0.5, "base": 0.2, "fitness": 0.5, "splice": 0.5,
-             "coords": 1.0, **(weights or {})}
-        parts: Dict[str, float] = {}
-        total = None
-
-        def add(name: str, value: torch.Tensor) -> None:
-            nonlocal total
-            if value is None or not torch.isfinite(value):
-                return
-            total = value * w[name] if total is None else total + value * w[name]
-            parts[name] = float(value.detach())
-
-        m = target.get("mask")
-        if "contact" in target and "contact_logit" in out:
-            add("contact", F.binary_cross_entropy_with_logits(
-                out["contact_logit"], target["contact"].float(),
-                pos_weight=target.get("contact_pos_weight")))
-        if "distance_bin" in target and "distance_logits" in out:
-            add("distance", F.cross_entropy(out["distance_logits"].transpose(-1, -2)
-                                            if out["distance_logits"].dim() == 3
-                                            else out["distance_logits"],
-                                            target["distance_bin"]))
-        if "ss" in target and m is not None:
-            add("ss", F.cross_entropy(out["ss_logits"][m], target["ss"][m]))
-        if "mg" in target and m is not None:
-            add("mg", F.binary_cross_entropy_with_logits(
-                out["mg_logit"][m], target["mg"][m].float()))
-        # D12: rigidity is X-ray only, and the mask is not optional
-        rm = target.get("rigidity_mask")
-        if "rigidity" in target and rm is not None and bool(rm.any()):
-            add("rigidity", F.smooth_l1_loss(out["rigidity"][rm], target["rigidity"][rm]))
-        rx = target.get("reactivity_mask")
-        if "reactivity" in target and rx is not None and bool(rx.any()):
-            add("reactivity", F.smooth_l1_loss(
-                out["reactivity"][rx], target["reactivity"][rx]))
-        bm = target.get("base_mask")
-        if "base" in target and bm is not None and bool(bm.any()):
-            add("base", F.cross_entropy(out["base_logits"][bm], target["base"][bm]))
-        if "fitness" in target:
-            add("fitness", F.smooth_l1_loss(out["fitness"], target["fitness"]))
-        if "splice" in target and m is not None:
-            add("splice", F.cross_entropy(out["splice_logits"][m], target["splice"][m]))
-        if total is None:
-            total = torch.zeros((), device=next(iter(out.values())).device)
-        return total, parts
-
+    #: `PharosHeads.loss` used to live here: a static method that summed every
+    #: head under a documented weight table -- contact 1.0, distance 1.0,
+    #: ss 0.5, mg 0.3, rigidity 0.3, reactivity 0.5, base 0.2, fitness 0.5,
+    #: splice 0.5, coords 1.0 -- and silently skipped any term that came out
+    #: non-finite.
+    #:
+    #: Nothing ever called it. Not `train_pharos.py`, not
+    #: `train_sequence_stages.py`, not a test. The real weights are assembled
+    #: inline in each trainer and they are NOT those: stage 5 uses mg 0.3,
+    #: rigidity 0.3, fluctuation 0.1, base 0.2, motif 0.3, lw 0.5, contact 1.0,
+    #: distance 0.5, structure `--structure-weight`, balance 1.0. The one that
+    #: disagreed outright was distance, 1.0 here against 0.5 in the trainer,
+    #: and this table was the one a reader would find first.
+    #:
+    #: It also carried the project's only non-finite guard, on a path no
+    #: gradient ever took, while the four trainers that do take gradients had
+    #: none. That is now `pharos.train.guard.check_loss`, called by all four.
+    #:
+    #: Deleted rather than wired up, because two loss definitions is how they
+    #: drift: this one had already drifted, and nothing could tell.
 
 #: §9's table, as data, so a test can assert the implementation matches it.
 #:

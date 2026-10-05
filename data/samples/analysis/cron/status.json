@@ -1,9 +1,9 @@
 {
- "updated": "2026-10-04T11:30:55+05:30",
- "state": "interrupted",
- "detail": "stopped by a signal; resumes next fire",
- "free_gib_at_check": 73,
- "log": "run-20261003-195132.log",
+ "updated": "2026-10-05T20:09:01+05:30",
+ "state": "held",
+ "detail": "held by /store/shuvam/E-motioner-X-SBS/sbs-rna/data/samples/analysis/cron/HOLD -- remove the file to resume",
+ "free_gib_at_check": null,
+ "log": null,
  "stages": {
   "verify":  "done",
   "stage1":  null,

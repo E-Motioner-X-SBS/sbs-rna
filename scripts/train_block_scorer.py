@@ -60,6 +60,7 @@ from pharos.model.block_scorer import (BlockScorer, ScorerConfig,   # noqa: E402
                                        l1_budget, l2_budget, occupancy_labels,
                                        occupancy_loss, recall_at_budget,
                                        valid_mask)
+from pharos.train.guard import check_loss
 
 
 def enable_gpu_fast_paths() -> None:
@@ -337,6 +338,7 @@ def train(args) -> None:
                            for k, v in out.items()}
                     loss, parts = occupancy_loss(out, t["contacts"],
                                                  t["lengths"], cfg)
+                check_loss(loss, step, parts)
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

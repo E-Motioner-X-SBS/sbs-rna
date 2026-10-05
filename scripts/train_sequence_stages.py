@@ -2,8 +2,12 @@
 """Stages 2, 3 and 6 of the §12.1 curriculum — the sequence-supervised heads.
 
     stage 2  secondary structure   head 4   bpRNA-SPOT, 10,934 train
-    stage 3  chemical probing      head 7   Ribonanza, 335,616 profiles
-    stage 6  fitness (auxiliary)   head 8   NABench + RNAGym
+    stage 3  chemical probing      head 5   Ribonanza, 335,616 profiles
+    stage 6  fitness (auxiliary)   `fitness`  NOT IMPLEMENTED -- see STAGE_WEIGHTS
+
+§9 numbers ten heads and `fitness` is not one of them: it is in
+`EXTRA_HEAD_KEYS`, the outputs the renumbering left unnamed. This block
+called it head 8, which is disorder.
 
 All three read sequence and predict something per residue or per sequence, so
 they share a trainer and are **co-trained** rather than run one after another.
@@ -66,13 +70,22 @@ from pharos.model.moe import RouterFeatures                          # noqa: E40
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
 from pharos.train.checkpoint import atomic_save
+from pharos.train.guard import check_loss
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
 #: dot-bracket alphabet, matching HeadConfig.n_ss_symbols = 8
 SS_SYMBOLS = ".()[]{}<"
 SS_INDEX = {c: i for i, c in enumerate(SS_SYMBOLS)}
 #: loss weights, stated rather than implied -- see the module docstring
-STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0, "fitness": 0.3}
+#: Only the weights that are actually read. `"fitness": 0.3` used to sit here
+#: for stage 6, and nothing read it: there is no fitness loader, no fitness
+#: loss and no `out["fitness"]` anywhere in this file. It was printed at
+#: startup and written into two report files, so every record of every run
+#: claimed a third task that never ran. The NABench and RNAGym data IS on
+#: disk (data/benchmarks/fitness/, 126 MB of per-assay CSVs) and the model
+#: DOES emit a `fitness` head -- the wiring between them is what is missing,
+#: and leaving the weight here made the gap invisible.
+STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0}
 
 
 def enable_gpu_fast_paths() -> None:
@@ -319,7 +332,7 @@ def probing_step(model, seqs, react, kinds, device, feats_fn):
         return None, 0.0
     out = model(b["tokens"], b["mod_ids"], b["chem"], b["mask"],
                 feats=feats_fn(b), n_loops=2)
-    # head 7 emits two channels: DMS and SHAPE-like are different chemistries
+    # head 5 emits two channels: DMS and SHAPE-like are different chemistries
     chan = torch.tensor([0 if "DMS" in k.upper() else 1 for k in kinds],
                         device=device)
     pred = out["reactivity"].float().gather(
@@ -480,6 +493,7 @@ def main() -> None:
         done_ss = done_pr = False
         while not (done_ss and done_pr):
             total = None
+            step_parts: dict = {}
             # stage 2
             try:
                 seqs, ss = next(gen_ss)
@@ -488,6 +502,7 @@ def main() -> None:
                                                  feats_fn)
                 if l is not None:
                     total = STAGE_WEIGHTS["ss"] * l
+                    step_parts["ss"] = float(l.detach())
                     ss_loss.append(float(l.detach()))
                     ss_acc.append(a)
                     ss_major.append(a_maj)
@@ -502,6 +517,7 @@ def main() -> None:
                 if l is not None:
                     total = (STAGE_WEIGHTS["reactivity"] * l if total is None
                              else total + STAGE_WEIGHTS["reactivity"] * l)
+                    step_parts["reactivity"] = float(l.detach())
                     pr_loss.append(float(l.detach()))
                     pr_r.append(r)
             except StopIteration:
@@ -513,6 +529,7 @@ def main() -> None:
                 g["lr"] = lr_now
             gstep += 1
             try:
+                check_loss(total, gstep, step_parts)
                 opt.zero_grad(set_to_none=True)
                 total.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

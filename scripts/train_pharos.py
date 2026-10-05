@@ -7,11 +7,30 @@ come out of the deposited files themselves. It is the stage that uses everything
 `build_dataset.py` extracts:
 
     head 1   contact          contact set, 8 A, |i-j| >= 4
-    head 5   Mg2+ sites       residues within 3 A of a magnesium
-    head 6   rigidity         normalised B-factor -- X-RAY ONLY (D12)
-    head 10  base identity    the N_struct residues
-    disorder disorder        _pdbx_unobs_or_zero_occ_residues
+    head 2   distance         binned C4'-C4', 2-40 A
+    head 3   structure        backbone by EDM diffusion
+    head 6   Mg2+ sites       residues within 3 A of a magnesium
+    head 7   rigidity         normalised B-factor -- X-RAY ONLY (D12)
+    head 9   geometry         Leontis-Westhof class, per pair
+    head 10  motif            hairpin / internal / neither, per residue
+    extra    base identity    the N_struct residues
     ensemble fluctuation      supervised through the rigidity target
+
+Numbered per `pharos.model.heads.HEAD_SPEC`, which is §9's table as data.
+This block used the numbering §9 ABANDONED -- 5 Mg, 6 rigidity, 10 base
+identity -- so for every head it named, the number was wrong, and the two
+schemes have been read against each other in this project more than once.
+
+**`disorder_logit` is NOT trained here**, although this block used to say it
+was and `unobserved_seq_id` is in every shard. It cannot be, as the corpus
+stands: the label names polymer positions that were never modelled, and the
+tokens are the modelled residues only, so a disorder target aligned to them
+is vacuously zero -- which `mmcif_entities.residue_labels` says in as many
+words. Supervising it needs the corpus to carry the full `entity_poly_seq`
+and an observed/unobserved flag per position, which is a build change, not a
+loss term. `splice_logits` and `fitness` are likewise emitted and untrained;
+`src/pharos/model/test_pharos.py` property 8 pins all three so the set cannot
+grow quietly.
 
 Three things the data forces, each of which is a way to get this wrong.
 
@@ -65,6 +84,7 @@ from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
 from pharos.train.checkpoint import atomic_save              # noqa: E402
+from pharos.train.guard import check_loss
 
 sys.path.insert(0, str(ROOT / "scripts"))
 from train_block_scorer import gpu_free_gib                       # noqa: E402
@@ -536,7 +556,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
     total = torch.zeros((), device=dev)
     w = t["weights"]
 
-    # head 5 -- Mg2+ sites. Heavily imbalanced (4.7% positive), and a missed
+    # head 6 -- Mg2+ sites. Heavily imbalanced (4.7% positive), and a missed
     # site is a missed ion, so positives are up-weighted by the batch ratio.
     m = t["mask"]
     if m.any():
@@ -549,7 +569,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         parts["mg"] = float(l.detach())
         parts.update(_binary_metrics(out["mg_logit"][m].detach(), tgt[m], "mg"))
 
-    # head 6 -- rigidity. D12: X-ray only, and the mask is what enforces it.
+    # head 7 -- rigidity. D12: X-ray only, and the mask is what enforces it.
     rm = t["rigidity_mask"]
     if want_dyn and rm.any():
         l = F.smooth_l1_loss(out["rigidity"][rm], t["b_factor_z"][rm].float())
@@ -570,7 +590,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
             (t["b_factor_z"][rm].float()
              - t["b_factor_z"][rm].float().min()).clamp(min=0), "fluct"))
 
-    # head 10 -- base identity, exactly where it was never assigned
+    # base identity (unnumbered in §9), exactly where it was never assigned
     bm = t["base_mask"]
     if bm.any():
         l = F.cross_entropy(out["base_logits"][bm], t["tokens"][bm].clamp(max=3))
@@ -1230,6 +1250,7 @@ def main() -> None:
                     loss, parts, _ = step_losses(
                         model, t, cfg, args.n_neg, n_loops=nl,
                         structure_weight=args.structure_weight)
+                check_loss(loss, gstep, parts)
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
