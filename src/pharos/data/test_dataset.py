@@ -18,6 +18,9 @@ result rather than an error:
      assumed: no Rfam family may appear in both train and a held-out split.
   6. RDAT PARSES BOTH VERSIONS -- 0.34 is tab-separated and 0.24 space-
      separated, and the space-separated form parsed to nothing.
+  7. COORDINATES ARE CENTRED -- float16's precision scales with distance from
+     the origin, so a deposition frame 300 A out is quantised at 0.25 A. Every
+     other check is translation invariant and cannot see this.
 
 Run: python3 src/pharos/data/test_dataset.py
 """
@@ -293,6 +296,52 @@ def main() -> int:
         chk("head 9: every class is inside the head's range",
             lv.size > 0 and int(lv.min()) >= 0 and int(lv.max()) < 13,
             f"{int(lv.min())}..{int(lv.max())} against n_lw_classes 13")
+
+    print("\n== property 9: coordinates are centred, and the frame is kept ==")
+    # float16's spacing is RELATIVE: 0.031 A at 32 A from the origin, 0.125 at
+    # 128, 0.25 at 256, 1.0 at 1024. Coordinates were stored in the
+    # deposition's own frame, median |coord| 170 A and max 1310, so 22% of the
+    # corpus carried 0.25 A or worse of quantisation on head 3's only
+    # supervision -- and nothing noticed, because every check that existed was
+    # translation invariant. The bond medians were right. Coverage was 99.9%.
+    # Training ran. The one question nobody asked was where the origin was.
+    #
+    # So this asks it, and asks the two things that follow from it: that the
+    # glycosidic bond's SPREAD (not its median -- quantisation is unbiased and
+    # leaves the median alone) is small enough to be crystallography rather
+    # than storage, and that the translation removed is still on disk, because
+    # a centring that discards the centroid is a lossy one-way transform.
+    if not shards:
+        pass
+    else:
+        import numpy as _np
+        with _np.load(shards[0]) as _z:
+            has_c = "coord_center" in _z.files
+            _x = _z["coords"].astype(_np.float32)
+            _m = _z["coord_mask"]
+            _c = _z["coord_center"] if has_c else None
+            _off = _z["res_off"]
+        mx = float(_np.abs(_x[_m]).max()) if _m.any() else 0.0
+        chk("coordinates are centred (max |coord| < 256 A)", mx < 256.0,
+            f"max {mx:.1f} A -> float16 spacing "
+            f"{float(_np.spacing(_np.float16(max(mx, 1)))):.4f} A")
+        k = _m[:, 1] & _m[:, 2]
+        d = _np.linalg.norm(_x[k, 1] - _x[k, 2], axis=-1)
+        q = _np.percentile(d, [25, 75])
+        sd = float((q[1] - q[0]) / 1.349)
+        chk("the glycosidic bond is at its reference length",
+            abs(float(_np.median(d)) - 3.38) < 0.05,
+            f"C4'-N median {float(_np.median(d)):.4f} A against 3.38")
+        chk("its spread is crystallography, not storage noise", sd < 0.075,
+            f"robust sd {sd:.4f} A (float32 gives 0.051, uncentred fp16 0.104)")
+        chk("the removed translation is recorded", has_c,
+            f"coord_center for {0 if _c is None else len(_c)} chains "
+            f"against {len(_off) - 1} in the shard")
+        if has_c:
+            chk("one centroid per chain, and off the origin",
+                len(_c) == len(_off) - 1 and float(_np.abs(_c).max()) > 1.0,
+                f"median |centre| {float(_np.median(_np.abs(_c).max(-1))):.1f} A"
+                f" -- deposition frames really are far out")
 
     print()
     if fails:
