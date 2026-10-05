@@ -77,12 +77,35 @@ class ChainExample:
     contacts: np.ndarray          # int32  (n, 2), i < j, j - i >= MIN_SEPARATION
     #: The diffusion head's supervision: P / C4' / glycosidic-N per residue, in
     #: `rna_chain_coords` order so index i is the same residue as `tokens[i]`.
-    #: Stored as float16 -- 0.002 A of quantisation against coordinates whose
-    #: own uncertainty is tenths of an Angstrom, for half the corpus size.
+    #: Stored as float16, **centred on the chain's own resolved atoms** -- and
+    #: the centring is what makes float16 honest. float16 spacing is relative,
+    #: not absolute: 0.031 A at 32 A from the origin but 0.25 A at 256 and 1.0
+    #: at 1024. Deposition frames are nowhere near the origin -- the median
+    #: |coord| in the raw archive is 170 A and the maximum 1310 -- so storing
+    #: them as deposited quantised 22% of this corpus at 0.25 A or worse. The
+    #: claim that used to sit here, "0.002 A of quantisation", was true only
+    #: for a chain sitting on the origin, and no chain does.
+    #:
+    #: Measured on the 37 sampled chains beyond 256 A, as the spread of the
+    #: near-rigid 3.38 A C4'-N bond: float32 0.0511 A, uncentred float16
+    #: 0.1044 (and a +0.011 A bias in the bond itself), centred float16
+    #: 0.0540. Centring recovers the precision at no cost in size.
+    #:
+    #: The centroid is over RESOLVED atoms only. Unresolved slots are (0, 0, 0)
+    #: and averaging them in drags the centroid toward the origin by a few tens
+    #: of Angstroms, which silently undoes most of the benefit.
+    #:
     #: `coord_mask` is false where an atom was not resolved (every 5' terminus
     #: has no phosphate); the loss skips those rather than fitting a guess.
-    coords: Optional[np.ndarray] = None        # float16 (L, 3, 3)
+    coords: Optional[np.ndarray] = None        # float16 (L, 3, 3), centred
     coord_mask: Optional[np.ndarray] = None    # bool    (L, 3)
+    #: The translation removed from `coords`, float32, so the deposition frame
+    #: is recoverable: `coords + coord_center` is what the mmCIF held. Nothing
+    #: in training wants it -- the structure head is translation invariant and
+    #: centres again through `random_rigid` -- but discarding a number that
+    #: cannot be recomputed from what is kept is how a corpus becomes a
+    #: one-way function.
+    coord_center: Optional[np.ndarray] = None  # float32 (3,)
     #: Head 9's target. `(n, 3)` of (i, j, Leontis-Westhof class), the
     #: depositor's own `_ndb_struct_na_base_pair` annotation rather than
     #: anything reconstructed from coordinates. Class 0 is "annotated but
@@ -154,7 +177,8 @@ class ChainExample:
         # `loop_class` did exactly that.
         for k in ("tokens", "mod_ids", "chem", "contacts", "mg_site",
                   "b_factor_z", "unknown_base", "unobserved_seq_id",
-                  "coords", "coord_mask", "lw_pairs", "loop_class"):
+                  "coords", "coord_mask", "coord_center",
+                  "lw_pairs", "loop_class"):
             d.pop(k, None)
         assert not any(isinstance(v, np.ndarray) for v in d.values()), (
             "meta() still holds an ndarray: "
@@ -166,6 +190,10 @@ class ChainExample:
                                if self.unknown_base is not None else 0)
         d["n_contacts"] = int(len(self.contacts))
         d["n_lw_pairs"] = int(len(self.lw_pairs)) if self.lw_pairs is not None else 0
+        # three floats, JSON-safe, so the deposition frame of any chain is
+        # recoverable from the manifest alone without opening a shard
+        d["coord_center"] = ([round(float(v), 3) for v in self.coord_center]
+                             if self.coord_center is not None else None)
         d["frac_backbone_resolved"] = (
             round(float(self.coord_mask.all(1).mean()), 4)
             if self.coord_mask is not None else None)
@@ -286,7 +314,21 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             # the two parses disagree about this chain; drop it rather than
             # pair a frame with the wrong residue
             continue
-        bb_xyz, bb_msk = bb[0].astype(np.float16), bb[1]
+        # Centre before the float16 cast, never after: float16's spacing grows
+        # with magnitude, so a deposition frame 300 A from the origin is
+        # quantised at 0.25 A and the precision is gone by the time anything
+        # downstream centres it. Over resolved atoms only -- unresolved slots
+        # are still (0, 0, 0) here and would pull the centroid off the chain.
+        bb_xyz32, bb_msk = bb[0].astype(np.float32), bb[1]
+        if bb_msk.any():
+            bb_cen = bb_xyz32[bb_msk].mean(0).astype(np.float32)
+        else:
+            bb_cen = np.zeros(3, dtype=np.float32)
+        # The masked-out slots stay exactly zero rather than becoming -centre:
+        # they are not positions, and a reader that forgets the mask should
+        # see an obviously wrong origin rather than a plausible one.
+        bb_xyz = np.where(bb_msk[..., None], bb_xyz32 - bb_cen, 0.0
+                          ).astype(np.float16)
         # heads 9 and 10, keyed through label_seq_id into this residue order
         seq2idx = {int(key[1]): n for n, (key, _c, _a) in enumerate(residues)}
         lw_rows, lw_map = [], {}
@@ -313,7 +355,7 @@ def build_entry(path: Path, entry_meta: Optional[Dict] = None,
             pdb=path.stem.replace(".cif", ""), chain=ch, length=L,
             tokens=tokens, mod_ids=mods, chem=chem.astype(np.float16),
             contacts=contacts,
-            coords=bb_xyz, coord_mask=bb_msk,
+            coords=bb_xyz, coord_mask=bb_msk, coord_center=bb_cen,
             lw_pairs=lw_arr, loop_class=loops,
             resolution=em.get("resolution"), method=em.get("method", "?"),
             clashscore=em.get("clashscore"),
@@ -374,6 +416,12 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
                              else np.zeros((e.length, 3), bool)
                              for e in examples])
              if examples else np.empty((0, 3), bool))
+    # per CHAIN, not per residue, so this one is indexed by chain and not
+    # sliced by res_off -- the translation that `coords` had removed
+    xyz_c = (np.stack([e.coord_center if e.coord_center is not None
+                       else np.zeros(3, np.float32) for e in examples]
+                      ).astype(np.float32)
+             if examples else np.empty((0, 3), np.float32))
     # LW pairs are ragged like contacts, so they get their own offsets;
     # loop_class is per-residue and rides on res_off like every other one
     lwp = (np.concatenate([e.lw_pairs if e.lw_pairs is not None
@@ -392,7 +440,7 @@ def write_shard(path: Path, examples: Sequence[ChainExample]) -> Dict:
                         res_off=res_off, con_off=con_off,
                         mg_site=mg, b_factor_z=bz, unknown_base=ub,
                         unobserved_seq_id=unob, unob_off=unob_off,
-                        coords=xyz, coord_mask=xyz_m,
+                        coords=xyz, coord_mask=xyz_m, coord_center=xyz_c,
                         lw_pairs=lwp, lw_off=lw_off, loop_class=loopc)
     return {"file": path.name, "n_chains": len(examples),
             "n_residues": int(res_off[-1]), "n_contacts": int(con_off[-1]),
@@ -418,7 +466,8 @@ class ShardReader:
 
     _FIELDS = ("tokens", "mod_ids", "chem", "contacts", "mg_site", "b_factor_z",
                "unknown_base", "unobserved_seq_id", "unob_off",
-               "coords", "coord_mask", "lw_pairs", "lw_off", "loop_class")
+               "coords", "coord_mask", "coord_center",
+               "lw_pairs", "lw_off", "loop_class")
 
     def __init__(self, path: Path, meta: Optional[Sequence[Dict]] = None):
         self.path = Path(path)
@@ -449,6 +498,10 @@ class ShardReader:
             uo = A["unob_off"]
             out["unobserved_seq_id"] = A["unobserved_seq_id"][
                 int(uo[i]):int(uo[i + 1])]
+        # per-chain, so indexed by i rather than sliced by res_off like the
+        # per-residue fields above
+        if "coord_center" in A and i < len(A["coord_center"]):
+            out["coord_center"] = A["coord_center"][i]
         if i < len(self.meta):
             out["meta"] = self.meta[i]
         return out

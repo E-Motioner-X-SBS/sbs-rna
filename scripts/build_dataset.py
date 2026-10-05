@@ -205,6 +205,103 @@ def resplit(out: Path) -> None:
     print(f"  by residue: {man['split']['by_residue']}")
 
 
+#: What a correctly built corpus must satisfy. These are not style checks:
+#: every one of them was passing silently in a corpus that had a real defect,
+#: because nothing read the coordinates back after writing them.
+#:
+#: `MAX_ABS_COORD` is the centring check. float16 spacing is relative, so a
+#: coordinate's precision depends entirely on how far from the origin it sits:
+#: 0.031 A at 32, 0.125 at 128, 0.25 at 256, 1.0 at 1024. A correctly centred
+#: chain has |coord| bounded by its own radius; the largest RNA chain in the
+#: PDB is under 200 A across, so anything past 256 means a deposition frame
+#: leaked through the cast.
+MAX_ABS_COORD = 256.0
+#: C4'-N is the glycosidic bond: 3.38 A, essentially rigid. Its median is the
+#: cheapest honest readout that coordinates survived the pipeline, and its
+#: SPREAD is the readout of storage noise -- float32 gives 0.051 A, uncentred
+#: float16 gave 0.104.
+BOND_C4_N_A = 3.38
+BOND_C4_N_TOL = 0.05
+BOND_C4_N_MAX_SD = 0.075
+
+
+def _validate_geometry(out_dir: Path) -> Dict:
+    """Read the shards back and check the coordinates are physically real.
+
+    This exists because the corpus it was written for passed every other
+    check. Coverage was 99.9%, bond medians matched reference values to two
+    decimal places, and training ran -- while 22% of coordinates were quantised
+    at 0.25 A or worse, because they were stored in the deposition's frame
+    hundreds of Angstroms from the origin and float16's resolution scales with
+    magnitude. Every existing check was translation invariant, so none of them
+    could see it.
+
+    Returns the measured numbers for the manifest. Raises if they are wrong:
+    a corpus that fails here must not be shipped, because the next thing that
+    reads it will be a training run that cannot tell.
+    """
+    import numpy as np
+
+    shards = sorted(out_dir.glob("shard-*.npz"))
+    if not shards:
+        raise RuntimeError(f"no shards written to {out_dir}")
+    max_abs = 0.0
+    n_res = 0
+    cn: List = []
+    n_center = 0
+    center_mag: List = []
+    for f in shards:
+        with np.load(f) as z:
+            if "coord_center" not in z.files:
+                raise RuntimeError(
+                    f"{f.name} has no coord_center: the translation removed "
+                    f"from coords was not recorded, so the deposition frame "
+                    f"is unrecoverable")
+            x = z["coords"].astype(np.float32)
+            m = z["coord_mask"]
+            c = z["coord_center"]
+            n_center += len(c)
+            center_mag.append(np.abs(c).max(-1))
+            if m.any():
+                max_abs = max(max_abs, float(np.abs(x[m]).max()))
+            n_res += len(x)
+            k = m[:, 1] & m[:, 2]
+            if k.any():
+                cn.append(np.linalg.norm(x[k, 1] - x[k, 2], axis=-1))
+    d = np.concatenate(cn)
+    q = np.percentile(d, [25, 75])
+    med, sd = float(np.median(d)), float((q[1] - q[0]) / 1.349)
+    cm = np.concatenate(center_mag)
+    out = {
+        "max_abs_coord_A": round(max_abs, 2),
+        "c4p_n_median_A": round(med, 4),
+        "c4p_n_robust_sd_A": round(sd, 4),
+        "n_coord_residues": n_res,
+        "n_coord_center": n_center,
+        "center_median_abs_A": round(float(np.median(cm)), 1),
+        "center_max_abs_A": round(float(cm.max()), 1),
+    }
+    fail = []
+    if max_abs > MAX_ABS_COORD:
+        fail.append(f"max |coord| {max_abs:.1f} A > {MAX_ABS_COORD} -- "
+                    f"coordinates are NOT centred, so float16 is quantising "
+                    f"them at {np.spacing(np.float16(max_abs)):.3f} A")
+    if abs(med - BOND_C4_N_A) > BOND_C4_N_TOL:
+        fail.append(f"C4'-N median {med:.4f} A, expected "
+                    f"{BOND_C4_N_A} +/- {BOND_C4_N_TOL}")
+    if sd > BOND_C4_N_MAX_SD:
+        fail.append(f"C4'-N robust sd {sd:.4f} A > {BOND_C4_N_MAX_SD} -- "
+                    f"the glycosidic bond is rigid, so this is storage noise")
+    print(f"[ds] geometry: max |coord| {max_abs:.1f} A  "
+          f"C4'-N {med:.4f} +/- {sd:.4f} A  "
+          f"centroids {n_center:,} (median |c| {out['center_median_abs_A']} A)",
+          flush=True)
+    if fail:
+        raise RuntimeError("corpus geometry check FAILED:\n  - "
+                           + "\n  - ".join(fail))
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -299,6 +396,9 @@ def main() -> None:
         "rfam_families_present": len(fam),
         "chains_with_rfam": sum(fam.values()),
         "top_families": fam.most_common(10),
+        #: read back from the written shards, not from what we believed we
+        #: wrote -- see `_validate_geometry`
+        "geometry": _validate_geometry(args.out),
         "shards": shards,
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=1))
