@@ -686,8 +686,20 @@ def pad_batch(items: Sequence[Dict], pad_id: int = PAD_ID) -> Dict[str, np.ndarr
             #: its backbone atoms were resolved -- two points do not fix a frame
             "coord_residue_mask": mask & xyz_m.all(-1),
             # D12: the rigidity target is valid only where the structure is
-            # X-ray, so the mask is per-chain AND per-residue
-            "rigidity_mask": mask & rigid_ok[:, None],
+            # X-ray, so the mask is per-chain AND per-residue.
+            #
+            # It is ALSO per-measurement. A residue whose B-factor was never
+            # set is written NaN by the parser, and on a corpus built before
+            # that fix it carries `-mean/std` instead -- a fabricated extreme.
+            # Both are rejected here: B > 0 implies z > -mean/std, so a z
+            # below -6 needs a coefficient of variation under 1/6 and is not
+            # a measurement. The positive tail is KEPT in full: it decays
+            # smoothly (0.019% past 6, nothing past 20), which is what a
+            # right-skewed B-factor distribution looks like, whereas the
+            # negative tail sat flat at 0.09% out past -50. Excluding it the
+            # channel reads mean -0.013, sd 0.944 -- a z-score, as intended.
+            "rigidity_mask": (mask & rigid_ok[:, None]
+                              & np.isfinite(bz) & (bz > -6.0)),
             # head 10 recovers identity exactly where it was not assigned
             "base_mask": mask & (ub > 0),
             "unobserved_seq_id": [x.get("unobserved_seq_id") for x in items],

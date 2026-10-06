@@ -84,7 +84,7 @@ import math
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 from functools import lru_cache
 
@@ -228,9 +228,18 @@ def stream_batches(args) -> Dict[str, int]:
     # short streams restart inside the epoch, so an epoch is as long as the
     # longest stream. This matched the loop's INTENT before and not its
     # behaviour; now it matches both.
-    return {"ss": -(-n_ss // args.batch),
-            "reactivity": -(-n_pr // args.batch),
-            "fitness": -(-n_fit // args.batch)}
+    b = getattr(args, "token_budget", 0)
+    if not b:
+        return {"ss": -(-n_ss // args.batch),
+                "reactivity": -(-n_pr // args.batch),
+                "fitness": -(-n_fit // args.batch)}
+    # Under a token budget the batch count is total tokens / budget, to within
+    # the padding each pack leaves. Mean lengths, measured: bpRNA 131 nt,
+    # Ribonanza 177 (the constructs are fixed-length), the fitness corpus 45.
+    per = max(1, b)
+    return {"ss": -(-(n_ss * 131) // per),
+            "reactivity": -(-(n_pr * 177) // per),
+            "fitness": -(-(n_fit * 45) // per)}
 
 
 def estimate_steps(args) -> int:
@@ -273,8 +282,53 @@ def encode(seqs: List[str], device) -> Dict[str, torch.Tensor]:
             "mask": msk}
 
 
+def pack_by_tokens(lengths: Sequence[int], budget: int, max_batch: int,
+                   rng: Optional[np.random.Generator] = None) -> List[List[int]]:
+    """Indices grouped so each batch costs about `budget` padded tokens.
+
+    Stages 2/3/6 batched by SEQUENCE COUNT while stages 1 and 5 both batch by
+    token budget -- and both of those document at length why, stage 1's note
+    reading "a fixed count is a latent OOM: 64 sequences is 1.3k tokens if
+    they are 20 nt and 65k if they are 1,024". Measured on a free A100 at the
+    cron runner's own `--batch 32`, with Ribonanza at ~177 nt, this stage ran
+    **5,700 tokens a step in 11.5 of 80 GiB at ~1,750 tok/s** against stage
+    1's ~17,000 on the same card. The budget was not the binding constraint;
+    nothing was.
+
+    Length-sorted before cutting, because a batch pads to its longest member
+    and bpRNA runs from tens of nucleotides to over a thousand. The running
+    maximum is tracked rather than the first element -- the same off-by-one
+    that let 71% of stage-5 batches exceed their budget (finding 55).
+    """
+    order = sorted(range(len(lengths)), key=lambda i: lengths[i])
+    out: List[List[int]] = []
+    cur: List[int] = []
+    cur_max = 0
+    for i in order:
+        L = max(int(lengths[i]), 1)
+        nxt = L if L > cur_max else cur_max
+        if cur and ((len(cur) + 1) * nxt > budget or len(cur) >= max_batch):
+            out.append(cur)
+            cur, cur_max, nxt = [], 0, L
+        cur.append(i)
+        cur_max = nxt
+    if cur:
+        out.append(cur)
+    if rng is not None:
+        rng.shuffle(out)
+    return out
+
+
 # ---------------------------------------------------------------- stage 2
-def iter_ss(split: str, batch: int) -> Iterator[Tuple[List[str], List[str]]]:
+def iter_ss(split: str, batch: int, budget: int = 0,
+            rng: Optional[np.random.Generator] = None
+            ) -> Iterator[Tuple[List[str], List[str]]]:
+    """bpRNA rows. Token-budgeted when `budget` is set, else `batch` rows.
+
+    The whole split is 10,934 rows and fits in memory, so it is read once and
+    packed, rather than streamed into fixed-size groups: packing needs the
+    lengths, and the lengths are the point.
+    """
     import pyarrow.parquet as pq
     f = BENCH / f"secondary_structure/bprna_spot/{split}.parquet"
     if not f.exists():
@@ -283,18 +337,20 @@ def iter_ss(split: str, batch: int) -> Iterator[Tuple[List[str], List[str]]]:
     ss: List[str] = []
     for b in pq.ParquetFile(f).iter_batches(
             batch_size=512, columns=["sequence", "secondary_structure"]):
-        d = b.to_pylist()
-        for r in d:
+        for r in b.to_pylist():
             s, t = r["sequence"], r["secondary_structure"]
             if not s or not t or len(s) != len(t):
                 continue
             seqs.append(s)
             ss.append(t)
-            if len(seqs) >= batch:
-                yield seqs, ss
-                seqs, ss = [], []
-    if seqs:
-        yield seqs, ss
+    if not seqs:
+        return
+    if budget:
+        for idx in pack_by_tokens([len(x) for x in seqs], budget, batch, rng):
+            yield [seqs[i] for i in idx], [ss[i] for i in idx]
+    else:
+        for s0 in range(0, len(seqs), batch):
+            yield seqs[s0:s0 + batch], ss[s0:s0 + batch]
 
 
 def ss_targets(ss: List[str], L: int, device) -> torch.Tensor:
@@ -306,13 +362,34 @@ def ss_targets(ss: List[str], L: int, device) -> torch.Tensor:
 
 
 # ---------------------------------------------------------------- stage 3
-def iter_probing(batch: int, limit: Optional[int] = None
+def iter_probing(batch: int, limit: Optional[int] = None, budget: int = 0,
+                 rng: Optional[np.random.Generator] = None
                  ) -> Iterator[Tuple[List[str], np.ndarray, List[str]]]:
-    """Ribonanza rows: sequence, 206 reactivity columns, experiment type."""
+    """Ribonanza rows: sequence, 206 reactivity columns, experiment type.
+
+    Token-budgeted when `budget` is set. Streamed in POOLS rather than read
+    whole: the file is 526 MB and 335,616 rows, so holding it costs more than
+    the model does. A pool of `batch * 64` rows is enough for the packer to
+    see a representative length spread -- these are ~177 nt constructs, so
+    the spread is small and the pool only has to beat the batch size.
+    """
     import csv
     f = BENCH / "chemical_probing/ribonanza_train_quickstart.csv"
     if not f.exists():
         return
+    pool_rows = max(batch * 64, 1024) if budget else batch
+
+    def _flush(seqs, rows, kinds):
+        if not seqs:
+            return
+        if not budget:
+            yield seqs, np.asarray(rows, dtype=np.float32), kinds
+            return
+        for idx in pack_by_tokens([len(x) for x in seqs], budget, batch, rng):
+            yield ([seqs[i] for i in idx],
+                   np.asarray([rows[i] for i in idx], dtype=np.float32),
+                   [kinds[i] for i in idx])
+
     seqs: List[str] = []
     rows: List[List[float]] = []
     kinds: List[str] = []
@@ -330,13 +407,12 @@ def iter_probing(batch: int, limit: Optional[int] = None
                          for c in rcols])
             kinds.append(r[i_exp])
             n += 1
-            if len(seqs) >= batch:
-                yield seqs, np.asarray(rows, dtype=np.float32), kinds
+            if len(seqs) >= pool_rows:
+                yield from _flush(seqs, rows, kinds)
                 seqs, rows, kinds = [], [], []
             if limit and n >= limit:
-                return
-    if seqs:
-        yield seqs, np.asarray(rows, dtype=np.float32), kinds
+                break
+    yield from _flush(seqs, rows, kinds)
 
 
 # ---------------------------------------------------------------- stage 6
@@ -384,7 +460,7 @@ def load_fitness(split: str) -> List[Tuple[str, np.ndarray, np.ndarray]]:
 
 
 def iter_fitness(split: str, batch: int, rng: np.random.Generator,
-                 limit: Optional[int] = None
+                 limit: Optional[int] = None, budget: int = 0
                  ) -> Iterator[Tuple[str, List[str], np.ndarray]]:
     """Batches of one assay each, in a shuffled order.
 
@@ -399,8 +475,15 @@ def iter_fitness(split: str, batch: int, rng: np.random.Generator,
     chunks: List[Tuple[str, np.ndarray]] = []
     for assay, seqs, _ in groups:
         order = rng.permutation(len(seqs))
-        for s0 in range(0, len(order), batch):
-            chunks.append((assay, order[s0:s0 + batch]))
+        # one assay per batch still, but sized by TOKENS. Every variant of an
+        # assay is the same length -- they are mutants of one construct -- so
+        # the budget divides exactly and no packing is needed: Rachapun is
+        # 35 nt and Townshend 79, a factor of two the fixed count ignored.
+        n_b = batch
+        if budget:
+            n_b = max(1, min(batch, budget // max(len(str(seqs[0])), 1)))
+        for s0 in range(0, len(order), n_b):
+            chunks.append((assay, order[s0:s0 + n_b]))
     index = {a: (q, y) for a, q, y in groups}
     n = 0
     for k in rng.permutation(len(chunks)):
@@ -602,7 +685,15 @@ def main() -> None:
                          "training accuracy, on 10,934 examples recycled ~31x "
                          "per Ribonanza epoch.")
     ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--batch", type=int, default=512,
+                    help="MAXIMUM sequences in a batch. With --token-budget "
+                         "this is a cap against a pathological batch of "
+                         "thousands of 20-nt sequences, not the batch size.")
+    ap.add_argument("--token-budget", type=int, default=32768,
+                    help="padded tokens per batch, the way stages 1 and 5 "
+                         "size theirs. 0 restores the old fixed-count "
+                         "behaviour. At the previous --batch 32 this stage "
+                         "ran 5,700 tokens a step in 11.5 of 80 GiB.")
     ap.add_argument("--probing-limit", type=int, default=None)
     ap.add_argument("--fitness-limit", type=int, default=None,
                     help="cap stage 6 rows per epoch")
@@ -764,7 +855,8 @@ def main() -> None:
         "n_oom", "note",
     ], manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
-        "epochs": args.epochs, "batch": args.batch, "lr_peak": args.lr,
+        "epochs": args.epochs, "batch": args.batch,
+        "token_budget": args.token_budget, "lr_peak": args.lr,
         "total_steps_estimated": total_steps,
         "stage_weights": weights,
         "stage6_enabled": use_fitness,
@@ -821,11 +913,14 @@ def main() -> None:
         fit_rng = np.random.default_rng(1234 + ep)
         for k in passes:
             passes[k] = pulled[k] = 0
-        gen_ss = cycled(lambda: iter_ss("train", args.batch), "ss")
-        gen_pr = cycled(lambda: iter_probing(args.batch, args.probing_limit),
+        gen_ss = cycled(lambda: iter_ss("train", args.batch,
+                                        args.token_budget, fit_rng), "ss")
+        gen_pr = cycled(lambda: iter_probing(args.batch, args.probing_limit,
+                                             args.token_budget, fit_rng),
                         "reactivity")
         gen_fit = (cycled(lambda: iter_fitness("train", args.batch, fit_rng,
-                                               args.fitness_limit), "fitness")
+                                               args.fitness_limit,
+                                               args.token_budget), "fitness")
                    if use_fitness else iter(()))
         done_ss = done_pr = done_fit = False
         while step < steps_per_epoch and not (done_ss and done_pr and done_fit):
@@ -916,7 +1011,8 @@ def main() -> None:
                     model.eval()
                     with torch.no_grad():
                         for _vb, (_vs, _vd) in enumerate(
-                                iter_ss("validation", args.batch)):
+                                iter_ss("validation", args.batch,
+                                        args.token_budget)):
                             if _vb >= 2:
                                 break
                             _r = ss_step(model, _vs, _vd, device, feats_fn)
@@ -1023,7 +1119,8 @@ def main() -> None:
         vs_loss, vs_acc, vs_major, vs_macro = [], [], [], []
         model.eval()
         with torch.no_grad():
-            for vb, (vseq, vdot) in enumerate(iter_ss("validation", args.batch)):
+            for vb, (vseq, vdot) in enumerate(
+                    iter_ss("validation", args.batch, args.token_budget)):
                 if vb >= args.val_batches:
                     break
                 r = ss_step(model, vseq, vdot, device, feats_fn)

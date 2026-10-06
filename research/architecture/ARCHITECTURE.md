@@ -474,28 +474,42 @@ parameter is ξ = l_B/b; with b = 1.40 Å for A-form RNA, **ξ = 5.11** and the
 condensed fraction is **θ = 0.804**. Not the 0.76 quoted for B-DNA — A-RNA is
 more densely charged, and using the DNA value understates screening.
 
-### 6.2 Debye screening — specified, NOT WIRED
+### 6.2 Debye screening — WIRED
 
 Effective charge and screening length follow from the ionic condition, giving a
-screened-Coulomb term that was to enter full attention as an additive bias, so
-that the ionic condition is an input that changes *what attends to what* rather
-than a label appended to the output.
+screened-Coulomb term that enters full attention as an additive bias, so that
+the ionic condition is an input that changes *what attends to what* rather than
+a label appended to the output.
 
-**The model does not do this.** `TokenTrunk.forward` accepts a `pair_bias_fn`
-and nothing passes one, so `FullAttention` always receives `pair_bias=None`
-and `ElectrostaticBias` is never called from anywhere in the repository. The
-closed-form physics of §6.1 is correct and tested (`test_manning.py`); it
-simply does not reach the token track.
+`Pharos.forward(..., ionic=..., electrostatics=True)` passes a `pair_bias_fn`
+to the trunk. Loop 0 has no distance estimate and runs with `pair_bias=None`;
+every later loop builds one as
 
-It is orphaned by the §9 change that made head 3 a diffusion decoder: the bias
-needs the previous loop's *distance estimate*, and a denoiser emits no
-coordinates in a forward pass. `Pharos.forward` also takes no ionic condition.
-Wiring it means running the pair track inside the trunk loop — 21M pairs at
-L = 4,608, every loop — so it is a costed decision, not a patch.
+```
+VirtualDistance(h) -> d_ij (Å) -> manning.b_elec(d, ionic, lam=exp(log_scale))
+                               -> * bias_scale[head] -> attention logits
+```
 
-Declared in `pharos.UNWIRED` and asserted by `test_pharos.py` property 7e,
-which fails if anyone wires it so the declaration cannot go stale. See finding
-51 in `AUDIT_2026-09-26.md`.
+`VirtualDistance` is the cheap distance estimate the bias needs: a projection
+of each residue to three numbers and the pairwise Euclidean distance, `L²·3`
+rather than `L²·d_pair` (4 MB at L=1,024, not 537 MB). It is *learned* and
+labelled as such; the physics applied on top is the closed form of §6.1, called
+rather than restated. It adds `d_model·3` parameters — 1,536 in Small, 2,304 in
+Base-v2.
+
+`bias_scale` is per-head and **starts at zero**, so a loaded checkpoint is
+numerically unchanged and the bias earns its way in. Its own gradient is
+non-zero at that init, so the gate opens itself.
+
+For gradients, the bias of the differentiated pass is recomputed from the
+**detached** iterate rather than carried out of the `no_grad` recurrence: §6.2's
+parameters learn through the final pass while the recurrence stays one-step.
+
+Measured by `test_pharos.py` property 7e/7f: inert at init (max delta 0.00e+00);
+0 mM vs 15 mM Mg²⁺ moves the representation by 4.68e-04 as the screening length
+goes 9.61 Å → 6.88 Å; the bias equals `manning.b_elec` to fp32; the estimate has
+a 17.0 Å median, i.e. ångström not arbitrary units; and every one of the three
+parameters receives a non-zero gradient. See findings 51 and 63–65.
 
 ### 6.3 Mg²⁺ and rigidity
 

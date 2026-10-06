@@ -272,6 +272,7 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True,
     cols: list[str] = []
     in_loop = header = False
     atoms: dict[tuple, list] = defaultdict(list)
+    seen_atom: set = set()                     # (residue key, atom name)
     names: dict[tuple, str] = {}
     ribo: set = set()
     model: str | None = None
@@ -325,6 +326,36 @@ def rna_chain_coords(path: Path, drop_hydrogens: bool = True,
                     continue
                 key = (ch, seq, r.get("pdbx_PDB_ins_code", "?"))
                 aid = r.get("label_atom_id", "").strip('"')
+                # C16b: ONE CONFORMER. The model filter above is C16; this is
+                # the same defect one column over. A residue refined with
+                # alternate conformations deposits EVERY atom twice, in
+                # altloc A and altloc B, inside a single model -- 4ZDP chain
+                # E is 1,580 atoms in each -- and keyed only by
+                # (chain, seq, ins) both copies land in one residue's atom
+                # list. A contact is "any heavy atom within the cutoff", so
+                # the contact set becomes the UNION over the conformers:
+                # measured on that chain, **507 contacts against 201** once
+                # the duplicate is collapsed. 744 of the corpus's 5,085
+                # resolvable entries carry a non-primary altloc.
+                #
+                # Deduplicated on (residue, ATOM NAME), keeping the first
+                # occurrence -- NOT by filtering `label_alt_id` to 'A'. A
+                # first version did that and deleted 4x4t chain B outright
+                # plus one residue from each of ten other chains, because a
+                # residue modelled in only ONE conformation can carry the
+                # label 'B' with no 'A' to fall back to: 4x4t residues 29-31
+                # are 'B' only. The label is not a priority, it is a name.
+                # First-occurrence is also what `rna_chain_backbone` has
+                # always done for its three atoms.
+                #
+                # `entry_composition` was never exposed because it
+                # deduplicates on the residue key and says so;
+                # `eval/structure.py`, which scores predictions, calls
+                # gemmi's `remove_alternative_conformations()`. The reader
+                # that builds what the model TRAINS on was the one without it.
+                if (key, aid) in seen_atom:
+                    continue
+                seen_atom.add((key, aid))
                 atoms[key].append((aid, xyz) if with_atom_names else xyz)
                 names[key] = r["label_comp_id"].strip('"')
                 if aid == "O2'":
@@ -494,6 +525,7 @@ def residue_labels(path: Path, ion_cutoff: float = 3.0,
     order: dict = defaultdict(list)
     ion_xyz: list = []
     res_xyz: dict = defaultdict(list)
+    seen_atom: set = set()      # (residue key, atom name)
 
     # `_pdbx_unobs_or_zero_occ_residues` is its own loop and has to be read
     # before the coordinates, since unobserved residues have none
@@ -570,6 +602,16 @@ def residue_labels(path: Path, ion_cutoff: float = 3.0,
             if r.get("type_symbol") == "H":
                 continue
             key = (ch, int(sq), r.get("pdbx_PDB_ins_code", "?"))
+            # one conformer, deduplicated by atom name exactly as
+            # `rna_chain_coords` does -- see C16b there. The B-factor mean
+            # was taken across two refinements of the same atom, and the
+            # coordinate list this builds must agree with the one the
+            # geometry comes from or the two readers disagree about which
+            # atoms a residue has.
+            aid = r.get("label_atom_id", "").strip('"')
+            if (key, aid) in seen_atom:
+                continue
+            seen_atom.add((key, aid))
             if key not in names:
                 names[key] = comp
                 order[ch].append(key)
@@ -605,9 +647,33 @@ def residue_labels(path: Path, ion_cutoff: float = 3.0,
         # B-factors are only comparable within a structure, so normalise per
         # chain; the raw mean travels too, because the scale itself differs
         # between X-ray and cryo-EM and D12 needs that distinction visible
+        # The statistics come from the OBSERVED B-factors only -- `bf == 0`
+        # means "not set", not "perfectly ordered". Applying the resulting
+        # z to those entries too, which is what this did, hands them
+        # `-mean/std`: a fabricated extreme that says the residue is the most
+        # rigid in the structure. Measured on the v4 corpus it produced 3,408
+        # residues below z = -5 across 35 chains -- one 271-residue chain had
+        # 213 of them at exactly -7.17 -- and those 0.1% inflated the channel
+        # standard deviation from 0.94 to 3.33. The giveaway is that every
+        # extreme value within a chain is ONE repeated number, which a
+        # continuous measurement does not produce.
+        #
+        # They are written NaN: a target that is absent rather than extreme,
+        # which the collate masks out of `rigidity_mask`. Silently mapping
+        # them to 0 would be the same defect one step quieter -- the residue
+        # would then train as exactly average.
         obs = bf[bf > 0]
-        norm = ((bf - obs.mean()) / obs.std()) if obs.size > 1 and obs.std() > 0 \
-            else _np.zeros_like(bf)
+        if obs.size > 1 and obs.std() > 0:
+            norm = (bf - obs.mean()) / obs.std()
+            norm = _np.where(bf > 0, norm, _np.nan)
+        else:
+            # No usable statistic -- every B equal, or none set at all, which
+            # is common in cryo-EM depositions. Returning zeros here said
+            # every residue is exactly average rigidity: the same fabrication
+            # as the line above, at chain scale rather than residue scale.
+            # 3J8G chain B is 2,874 residues of it. NaN says what is true,
+            # which is that the chain carries no rigidity target.
+            norm = _np.full_like(bf, _np.nan)
         # Positions named by `_pdbx_unobs_or_zero_occ_residues` for this chain.
         # These are NOT in the arrays above and cannot be: an unobserved
         # residue has no atoms, so it never appears in `_atom_site`. Keeping

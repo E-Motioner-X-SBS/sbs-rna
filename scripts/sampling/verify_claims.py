@@ -832,7 +832,14 @@ def main() -> int:
             ds = _json.loads(mf.read_text())
             chk("dataset chains", ds["n_chains"], 16604)
             chk("dataset residues", ds["n_residues"], 13172991)
-            chk("dataset contacts", ds["n_contacts"], 63298800)
+            # 63,296,107, not 63,298,800. The 2,693 difference is finding
+            # 59: `rna_chain_coords` took the union over alternate
+            # conformations, so a residue refined in two conformers
+            # contributed both atom sets and a contact that exists in either
+            # counted. 4ZDP chain E alone went 507 -> 201. Chains, residues,
+            # shards and `split_digest` are all unchanged, so nothing
+            # measured against the split has to be re-measured.
+            chk("dataset contacts", ds["n_contacts"], 63296107)
             chk("dataset longest chain", ds["length"]["max"], 4450)
             sp = ds["split"]["by_residue"]
             chk("split: train residues", sp["train"], 10010363)
@@ -862,8 +869,14 @@ def main() -> int:
             _s.path.insert(0, str(ROOT / "src"))
             from pharos.data.dataset import disorder_is_meaningful as _dm
             rows = [c for sh in ds["shards"] for c in sh["chains"]]
+            # 712,027, not 712,033. Six residues lost their Mg flag under
+            # finding 59: a residue is flagged when ANY of its heavy atoms is
+            # within 3 A of an ion, and for these six the only atom that
+            # qualified belonged to the alternate conformer. Deduplicating on
+            # (residue, atom name) keeps one conformer, so the flag now comes
+            # from the same atoms the coordinates do. 6 of 712,033 is 0.0008%.
             chk("head 5: Mg-coordinated residues",
-                sum(c.get("n_mg_sites", 0) for c in rows), 712033)
+                sum(c.get("n_mg_sites", 0) for c in rows), 712027)
             chk("head 6: X-ray residues (rigidity-valid)",
                 sum(c["length"] for c in rows if c.get("rigidity_valid")), 4274596)
             chk("head 10: N_struct residues",
@@ -1283,7 +1296,15 @@ def main() -> int:
               # passes, and nothing asks it.
               ROOT / "scripts/test_head_metrics.py",
               ROOT / "src/pharos/eval/test_metrics.py",
-              ROOT / "src/pharos/model/test_shared_moe.py"]
+              ROOT / "src/pharos/model/test_shared_moe.py",
+              # Not named `test_*`, so the drift check below cannot see it and
+              # it has to be listed deliberately. It is the standing check for
+              # the defect class this whole register is about: a channel that
+              # exists, is measured, and is never checked for validity. It
+              # asks of every channel whether the CORPUS carries information
+              # in it and whether that information REACHES the model -- which
+              # is how findings 64 and 66 were found.
+              ROOT / "scripts/probe_channels.py"]
     # Every test module in the tree must be in that list. Four were not, for
     # weeks, and one of them was the test of the floors every head is judged
     # against. A list maintained by hand drifts from the directory it is
@@ -1292,7 +1313,8 @@ def main() -> int:
     _have = {str(q.relative_to(ROOT)) for q in ROOT.rglob("test_*.py")
              if "archive" not in q.parts and ".git" not in q.parts
              and "__pycache__" not in q.parts}
-    _listed = {str(q.relative_to(ROOT)) for q in suites}
+    _listed = {str(q.relative_to(ROOT)) for q in suites
+               if q.name.startswith("test_")}
     _ungated = sorted(_have - _listed)
     _ghost = sorted(_listed - _have)
     print(f"  {'OK ' if not _ungated else 'FAIL'} "
@@ -1445,6 +1467,16 @@ def main() -> int:
                                         ROOT / "scripts/architecture_watch.py")
     _aw = _iu2.module_from_spec(_sp2)
     _sp2.loader.exec_module(_aw)
+    #
+    # The invariant is that the DECOY does not change the answer -- not that
+    # the answer is False. Asserting `not training_alive()` is only valid when
+    # nothing is training, and this verifier is explicitly designed to run
+    # WHILE training does: `architecture_watch.sh` fires it every thirty
+    # minutes and its own docstring says "it is safe while training is
+    # running". So the check failed the moment a real trainer was on the card
+    # -- observed against a genuine stage-2/3/6 run -- reporting DRIFT for the
+    # one condition it was written to tolerate.
+    _before = _aw.training_alive()
     _decoy = _sp.Popen([sys.executable, "-c", "import time;time.sleep(6)",
                         "scripts/train_pharos.py"], cwd=ROOT,
                        stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
@@ -1452,14 +1484,17 @@ def main() -> int:
         _old = _sp.run(["pgrep", "-f", "train_pharos.py"],
                        capture_output=True, text=True)
         _old_says = _old.returncode == 0 and bool(_old.stdout.strip())
-        _new_says = _aw.training_alive()
-        ok = _old_says and not _new_says
+        _after = _aw.training_alive()
+        ok = _old_says and _after == _before
         print(f"  {'OK ' if ok else 'FAIL'} "
               f"{'a non-GPU process is not training':34s} "
-              f"pgrep {_old_says}, on-card {_new_says!r}")
+              f"pgrep {_old_says}, on-card {_before!r} -> {_after!r}"
+              + ("" if _before is None or _before is False
+                 else "  (a real trainer IS on the card; the decoy must not "
+                      "change the answer, and did not)"))
         if not ok:
-            fails.append("training_alive matches processes that are not "
-                         "training on this card")
+            fails.append("training_alive changed its answer for a process "
+                         "that is not training on this card")
     finally:
         _decoy.kill()
         _decoy.wait(timeout=10)

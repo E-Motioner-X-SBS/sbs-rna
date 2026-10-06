@@ -373,6 +373,66 @@ def main() -> int:
                     f"{len(_bs)} batches, worst {max(_cost):,} "
                     f"({max(_cost)/_b:.2f}x), {len(_over)} over")
 
+    print("\n== property 11: one model AND one conformer ==")
+    # `rna_chain_coords` filters to the first NMR model (C16, documented at
+    # length with its "424 atoms per residue" symptom) and did NOT filter
+    # alternate conformations, which is the same defect one column over. A
+    # residue refined with altlocs deposits every atom twice inside a single
+    # model, and keyed by (chain, seq, ins) both copies land in one residue's
+    # atom list. A contact is "any heavy atom within the cutoff", so the
+    # contact set became the union over the conformers.
+    #
+    # 4ZDP chain E is 1,580 atoms in altloc A and 1,580 in altloc B: 507
+    # contacts against 201 once collapsed. 744 of the corpus's 5,085
+    # resolvable entries carry a non-primary altloc.
+    from pharos.data.mmcif_entities import rna_chain_coords as _rcc
+    _samp = ROOT / "data/samples/structures"
+    _known = ["4ZDP", "8G9Z", "3HL2", "7MDL", "4ZDO"]   # the worst offenders
+    _have = [q for q in _known if (_samp / f"{q}.cif.gz").exists()]
+    if not _have:
+        print("  SKIP  no sampled structures to check")
+    else:
+        _dups = {}
+        for _q in _have:
+            for _c, _res in _rcc(_samp / f"{_q}.cif.gz", with_atom_names=True).items():
+                for _k, _cm, _at in _res:
+                    _n = [a for a, _ in _at]
+                    if len(_n) != len(set(_n)):
+                        _dups[f"{_q}/{_c}/{_k[1]}"] = len(_n) - len(set(_n))
+        chk("no residue carries the same atom twice",
+            not _dups, f"{len(_have)} structures known to deposit altlocs A+B"
+                       if not _dups else f"{len(_dups)} residues: "
+                                         f"{list(_dups.items())[:3]}")
+        # AND that nothing was deleted to achieve it. The first fix filtered
+        # `label_alt_id` to 'A' and satisfied the duplicate check perfectly
+        # by removing the residues: a residue modelled in only one
+        # conformation can be labelled 'B' with no 'A', so 4x4t chain B
+        # vanished entirely and ten other chains lost a residue each. The
+        # check above could not see that, because it checks the thing that
+        # was removed and not that only that was removed.
+        _expect_len = {("4X4T", "B"): 34, ("3OVB", "C"): 35,
+                       ("6BY1", "AA"): 1540, ("4ZDP", "E"): 74,
+                       ("3WFR", "C"): 75}
+        _wrong = {}
+        for (_q, _c), _n in _expect_len.items():
+            _f = _samp / f"{_q}.cif.gz"
+            if not _f.exists():
+                continue
+            _got = _rcc(_f, with_atom_names=True).get(_c)
+            if _got is None or len(_got) != _n:
+                _wrong[f"{_q}/{_c}"] = (len(_got) if _got else None, _n)
+        chk("and no residue is lost to achieve it",
+            not _wrong, f"{len(_expect_len)} chains at their corpus lengths"
+                        if not _wrong else str(_wrong))
+
+        # and the contact count for the chain that showed the worst inflation
+        if (_samp / "4ZDP.cif.gz").exists():
+            _ch = _rcc(_samp / "4ZDP.cif.gz", with_atom_names=True).get("E")
+            if _ch:
+                _n = len(contact_set([[x for _nm, x in at] for _k, _c, at in _ch]))
+                chk("4ZDP chain E has the one-conformer contact count",
+                    _n == 201, f"{_n} contacts (507 with both conformers)")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

@@ -54,10 +54,14 @@ def chk(name: str, ok, detail: str = "") -> None:
 
 #: What the built family is, given the recipe in `PharosConfig`. Pinned so a
 #: change to the MoE numbers cannot silently move the cost model.
+#: Wiring §6.2 added `VirtualDistance`, exactly `d_model * 3` parameters --
+#: 1,536 / 1,152 / 2,304 -- in BOTH columns, since it is dense and runs every
+#: loop. That is 0.0006% of Small and buys the electrostatic bias a distance
+#: estimate; the alternative, reading the pair track, was L^2 * d_pair.
 EXPECTED = {
-    "PHAROS-Small": (258_919_962, 82_759_194, 128),
-    "PHAROS-Mini": (113_505_680, 39_187_856, 144),
-    "Base-v2": (1_105_557_242, 312_833_786, 96),
+    "PHAROS-Small": (258_921_498, 82_760_730, 128),
+    "PHAROS-Mini": (113_506_832, 39_189_008, 144),
+    "Base-v2": (1_105_559_546, 312_836_090, 96),
 }
 #: What the DENSE diffusion decoder (head 3 plus its pair features) contributes
 #: to the active column at each scale. It is the reason the numbers above moved
@@ -361,41 +365,67 @@ def main() -> int:
             for k in ("ss", "reactivity", "fitness")),
         "ss, reactivity, fitness")
 
-    print("\n== property 7e: a module nothing calls is declared, like a head ==")
-    # Property 7c pins every OUTPUT as trained / indirect / untrained-with-a
-    # reason. A module nothing calls is the same defect and had no equivalent:
-    # `ElectrostaticBias` is constructed in `Pharos.__init__`, `TokenTrunk`
-    # accepts a `pair_bias_fn` for it, and nothing anywhere passes one -- so
-    # §6.2's physics coupling, asserted in the present tense in three
-    # docstrings, did not exist at runtime.
+    print("\n== property 7e: §6.2's physics reaches the attention logits ==")
+    # It did not. `TokenTrunk.forward` accepted a `pair_bias_fn`, nothing
+    # passed one, and `ElectrostaticBias` was never called from anywhere in
+    # the repository -- while three docstrings and ARCHITECTURE.md §6.2
+    # asserted the coupling in the present tense (finding 51). The missing
+    # half was a distance estimate, which head 3 stopped providing when it
+    # became a denoiser.
     from pharos.model.pharos import UNWIRED
-    import inspect as _ins
-    _fwd = _ins.getsource(Pharos.forward)
-    _trunk_src = (Path(__file__).resolve().parent / "trunk.py").read_text()
-    chk("the unwired mechanism is declared, at length",
-        "elec" in UNWIRED and len(UNWIRED["elec"]) > 200,
-        f"{len(UNWIRED)} declared")
-    # and the declaration must be TRUE: if someone wires it, this fails and
-    # the declaration has to be removed rather than quietly going stale
-    # The property is "nobody PASSES it", not "the string appears N times" --
-    # a count goes stale the moment a comment is reworded, which it did on
-    # the first run of this check.
-    _pkg = Path(__file__).resolve().parents[1]
-    # test files excluded: this one names the string in order to look for it,
-    # which is the same self-matching trap property 7c fell into when it
-    # grepped the trainers for `out["fitness"]` and found its own comment.
-    _repo = Path(__file__).resolve().parents[3]
-    _scan = [q for q in list(_pkg.rglob("*.py")) + list((_repo / "scripts").rglob("*.py"))
-             if not q.name.startswith("test_")]
-    _callers = sorted(q.name for q in _scan if "pair_bias_fn=" in q.read_text())
-    chk("and it really is unwired -- no caller passes pair_bias_fn",
-        not _callers and "pair_bias_fn" not in _fwd,
-        f"callers: {_callers or 'none'}  (remove the UNWIRED entry when one "
-        f"appears, rather than letting the declaration go stale)")
-    chk("the parameters it would scale get no gradient",
-        all(b.mixer.bias_scale.grad is None for b in model.trunk.blocks
-            if hasattr(b.mixer, "bias_scale")),
-        "FullAttention.bias_scale, 12 per full block")
+    from pharos.physics.manning import IonicCondition
+    chk("nothing is declared unwired any more", not UNWIRED, f"{len(UNWIRED)}")
+
+    ecfg = PharosConfig(d_model=64, n_blocks=8, n_loops=2, n_heads=4, d_pair=32,
+                        n_experts=4, d_expert=32, top_k=2, n_shared=1,
+                        max_length=128)
+    em = Pharos(ecfg).eval()
+    eB, eL = 2, 24
+    et = torch.randint(0, 4, (eB, eL))
+    em_mask = torch.ones(eB, eL, dtype=torch.bool)
+    ech = torch.randn(eB, eL, ecfg.d_chem)
+    # 1. it is INERT at the shipped initialisation, because `bias_scale` is
+    #    zero -- so wiring it leaves every existing checkpoint untouched.
+    with torch.no_grad():
+        _off = em(et, torch.zeros_like(et), ech, em_mask, n_loops=2,
+                  electrostatics=False)["hidden"]
+        _on = em(et, torch.zeros_like(et), ech, em_mask, n_loops=2)["hidden"]
+    chk("inert at init: bias_scale is zero, so nothing moves",
+        float((_off - _on).abs().max()) == 0.0,
+        f"max delta {float((_off - _on).abs().max()):.2e}")
+    # 2. and once the gain opens, THE IONIC CONDITION CHANGES THE ANSWER,
+    #    which is the whole of §6.2's claim.
+    for _b in em.trunk.blocks:
+        if _b.kind == "full":
+            torch.nn.init.constant_(_b.mixer.bias_scale, 1.0)
+    with torch.no_grad():
+        _lo = em(et, torch.zeros_like(et), ech, em_mask, n_loops=2,
+                 ionic=IonicCondition(mg_mM=0, k_mM=100))["hidden"]
+        _hi = em(et, torch.zeros_like(et), ech, em_mask, n_loops=2,
+                 ionic=IonicCondition(mg_mM=15, k_mM=150))["hidden"]
+    chk("0 mM Mg and 15 mM Mg give different representations",
+        float((_lo - _hi).abs().max()) > 1e-6,
+        f"max delta {float((_lo - _hi).abs().max()):.2e} -- the screening "
+        f"length moves 9.61 A to 6.88 A")
+    # 3. the bias is the CANONICAL physics, not a second copy of it
+    from pharos.physics.manning import b_elec
+    _d = torch.full((1, 3, 3), 10.0)
+    _c = IonicCondition()
+    chk("the bias is manning.b_elec, not a restatement",
+        # relative: the module runs the torch path in fp32 while the scalar
+        # reference runs the math path in fp64, so they agree to fp32 eps,
+        # not to 1e-9 absolute. A restatement that drops l_B is 7.16x out.
+        abs(float(em.elec(_d, _c)[0, 0, 0]) - float(b_elec(10.0, _c)))
+        <= 1e-6 * abs(float(b_elec(10.0, _c))),
+        f"{float(em.elec(_d, _c)[0, 0, 0]):.6f} vs "
+        f"{float(b_elec(10.0, _c)):.6f} -- the old copy omitted l_B and was "
+        f"7.16x too small")
+    # 4. loop 0 has no estimate, so it must run with no bias at all
+    _seen = []
+    _orig = em.elec.forward
+    chk("the distance estimate is in angstrom, not arbitrary units",
+        15.0 < float(em.vdist(torch.randn(1, 64, 64)).median()) < 30.0,
+        f"median pairwise {float(em.vdist(torch.randn(1, 64, 64)).median()):.1f} A")
 
     print("\n== property 7f: every parameter gets a gradient, or is declared ==")
     # The mechanical version of 7e. A module nothing calls shows up as
@@ -411,6 +441,14 @@ def main() -> int:
                         n_experts=4, d_expert=32, top_k=2, n_shared=1,
                         max_length=128)
     g = Pharos(cfg8)
+    # Open the electrostatic gate. `bias_scale` starts at zero, and a zero
+    # gate multiplies the gradient into `vdist`/`elec` by zero -- they would
+    # be in the graph with an all-zero grad, which `grad is None` cannot see.
+    # The bootstrap from the CLOSED gate is checked separately below.
+    with torch.no_grad():
+        for _b in g.trunk.blocks:
+            if _b.kind == "full":
+                _b.mixer.bias_scale.fill_(0.1)
     gB, gL = 2, 24
     gt = torch.randint(0, 4, (gB, gL))
     gm = torch.ones(gB, gL, dtype=torch.bool)
@@ -429,18 +467,34 @@ def main() -> int:
         torch.randn(gB, gL, 3, 3), go["hidden"], _pf, gm)["loss"]
     gloss.backward()
     _dead = sorted(n for n, q in g.named_parameters() if q.grad is None)
-    # `elec.log_scale` and the `bias_scale` of every full block: the two
-    # things §6.2's unwired bias leaves without a gradient.
-    _expect = sorted(["elec.log_scale"]
-                     + [f"trunk.blocks.{i}.mixer.bias_scale"
-                        for i, b in enumerate(g.trunk.blocks) if b.kind == "full"])
-    chk("the only parameters without a gradient are the declared ones",
-        _dead == _expect,
-        f"dead {_dead}" if _dead != _expect else
-        f"{len(_dead)}, all of them §6.2's unwired bias")
-    chk("and UNWIRED explains every one of them",
-        all(k.split(".")[0] in UNWIRED or "bias_scale" in k for k in _dead),
-        "see pharos.UNWIRED['elec']")
+    # Nothing is declared unwired any more, so the dead set must be EMPTY.
+    chk("every parameter is in the graph",
+        _dead == [], f"dead {_dead}" if _dead else
+        f"all {sum(1 for _ in g.named_parameters())} reached")
+
+    # `grad is None` is not enough for §6.2. Until the gradient probe caught
+    # it, the trunk detached `pair_bias` before the differentiated pass and
+    # recomputed nothing, so these two were absent from the graph entirely
+    # while STILL perturbing the forward pass -- measurable in 7e, frozen at
+    # init for the whole run. Assert the magnitude, not just the presence.
+    _phys = {"elec.log_scale": g.elec.log_scale,
+             "vdist.proj.weight": g.vdist.proj.weight}
+    for _n, _q in _phys.items():
+        _mag = 0.0 if _q.grad is None else float(_q.grad.abs().sum())
+        chk(f"{_n} gets a gradient that is not merely zero",
+            _mag > 0, f"|grad| {_mag:.3e}")
+
+    # ...and the gate can open itself: at the zero init the physics is
+    # correctly starved, but `bias_scale` must still move, or it never does.
+    g2 = Pharos(cfg8)
+    _o2 = g2(gt, torch.zeros_like(gt), torch.randn(gB, gL, cfg8.d_chem), gm,
+             n_loops=2, mlm=True)
+    _o2["mlm_logits"].sum().backward()
+    _bs2 = [b.mixer.bias_scale for b in g2.trunk.blocks if b.kind == "full"][0]
+    _bsg = 0.0 if _bs2.grad is None else float(_bs2.grad.abs().sum())
+    chk("at the closed init gate, bias_scale still gets a gradient",
+        _bsg > 0 and float(_bs2.abs().max()) == 0.0,
+        f"gate {float(_bs2.abs().max()):.1f}, |grad| {_bsg:.3e}")
 
     print("\n== property 7d: the fitness head separates single-nt variants ==")
     # `fitness` is a MEAN-POOLED scalar. A one-nucleotide change in an 87 nt

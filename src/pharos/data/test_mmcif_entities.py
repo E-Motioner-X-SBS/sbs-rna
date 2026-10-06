@@ -42,7 +42,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mmcif_entities import (RNA_STD, entity_poly_types, entry_composition,
-                            longest_rna_chain, rna_chain_coords, rna_residues)
+                            longest_rna_chain, residue_labels, rna_chain_coords,
+                            rna_residues)
 
 S = Path(__file__).resolve().parents[3] / "data" / "samples" / "structures"
 
@@ -296,6 +297,57 @@ def main() -> int:
         f"{big.name}: {len(t)} chains, {len(set(t.values()))} distinct types")
     chk("its chain ids are plausible (no stray sequence text)",
         all(len(c) <= 4 for c in t), f"max id len {max((len(c) for c in t), default=0)}")
+
+    print("\n== property 10: b_factor_z is a z-score of the OBSERVED B-factors ==")
+    # Finding 66. The statistics came from `bf > 0` -- an unset B-factor is
+    # not a measurement -- and the normalisation was then applied to every
+    # residue, so an unset one received `-mean/std`: a fabricated extreme
+    # saying it is the most rigid in the structure. On the v4 corpus that was
+    # 3,408 residues below z = -5 across 35 chains, one of them 213 residues
+    # at exactly -7.17, and those 0.107% inflated the channel's standard
+    # deviation from 0.94 to 3.33 -- invisible in every metric beside it.
+    #
+    # The test is on the INVARIANT, not on a specimen file: whatever the
+    # entry, a finite z must come from a positive B, and the finite values
+    # must be standardised. Unset entries are NaN, so the collate can drop
+    # them; mapping them to 0 would be the same defect one step quieter.
+    import numpy as _np
+    seen = 0
+    for f in files[:14]:
+        for ch, d in residue_labels(f).items():
+            z, bf = d.get("b_factor_z"), d.get("b_factor")
+            if z is None or bf is None or len(z) < 3:
+                continue
+            seen += 1
+            fin = _np.isfinite(z)
+            if not fin.any():
+                continue
+            if (~fin).any() and (bf[~fin] > 0).any():
+                chk(f"{f.name}:{ch} NaN only where B is unset", 0,
+                    f"{int((bf[~fin] > 0).sum())} observed residues written NaN")
+            if (bf <= 0).any() and fin[bf <= 0].any():
+                chk(f"{f.name}:{ch} unset B gets no z", 0,
+                    f"{int(fin[bf <= 0].sum())} unset residues carry a finite z")
+    chk("every chain's finite z comes from a positive B", True,
+        f"{seen} chains across {len(files[:14])} entries")
+    # and the standardisation itself holds on the observed subset
+    worst = None
+    for f in files[:14]:
+        for ch, d in residue_labels(f).items():
+            z, bf = d.get("b_factor_z"), d.get("b_factor")
+            if z is None or bf is None:
+                continue
+            o = _np.isfinite(z) & (bf > 0)
+            if o.sum() < 30 or z[o].std() == 0:
+                continue
+            err = max(abs(float(z[o].mean())), abs(float(z[o].std()) - 1.0))
+            if worst is None or err > worst[0]:
+                worst = (err, f"{f.name}:{ch}", float(z[o].mean()), float(z[o].std()))
+    if worst is not None:
+        chk("the observed subset is standardised", worst[0] < 0.05,
+            f"worst {worst[1]}: mean {worst[2]:+.4f} sd {worst[3]:.4f}")
+    else:
+        chk("a chain with enough observed B-factors is available", 0, 1)
 
     print()
     if fails:

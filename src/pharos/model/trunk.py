@@ -25,12 +25,16 @@ Physics and refinement are coupled, not sequential -- IN THE DESIGN ONLY
 §6.2 says the recycled signal is the previous iteration's distance estimate,
 entering the next pass through the electrostatic pair bias on the FULL
 blocks, so that a change in ionic condition changes what attends to what.
-`forward` takes a `pair_bias_fn` for exactly that, and **no caller passes
-one** -- see `pharos.UNWIRED`. `FullAttention` therefore always receives
-`pair_bias=None` and the coupling does not exist at runtime. The hook is
-kept because the mechanism is still the intended design; the paragraph above
-used to be written in the present tense and was describing a code path with
-no caller.
+`forward` takes a `pair_bias_fn` for exactly that, and `Pharos.forward`
+passes one whenever `electrostatics=True` (the default). Loop 0 has no
+distance estimate yet and so runs with `pair_bias=None`; every later loop
+gets the bias built from the preceding iterate.
+
+The bias for the differentiated pass is recomputed from the DETACHED iterate
+rather than carried out of the `no_grad` region, so §6.2's own parameters
+get a gradient through the final pass while the recurrence stays one-step.
+Carrying it out and detaching -- which is what this did first -- left the
+physics perturbing the forward pass with its parameters frozen at init.
 
 What IS live is the representational recycle: loop `i>0` adds
 `recycle_proj(recycle_norm(h))` to the input, and the router sees
@@ -185,13 +189,23 @@ class TokenTrunk(nn.Module):
                         f = RouterFeatures(**{**f.__dict__, "recycle": it})
                     inp = x0 + self.recycle_proj(self.recycle_norm(h)) if it else x0
                     h, _ = self._one_pass(inp, mask, pair_bias, f)
-                    if pair_bias_fn is not None:
+                    # the bias from the LAST in-loop iterate is recomputed
+                    # below with a gradient, so don't pay for it twice
+                    if pair_bias_fn is not None and it < n - 2:
                         pair_bias = pair_bias_fn(h, it)
                     if supervise is not None:
                         supervise(h.detach(), it)
             h = h.detach()
-            if pair_bias is not None:
-                pair_bias = pair_bias.detach()
+            # The recurrence is detached, but §6.2's own parameters still have
+            # to learn. Recompute the bias from the detached iterate OUTSIDE
+            # `no_grad`: the gradient then reaches `pair_bias_fn`'s parameters
+            # through the final pass only, which is the same one-step rule the
+            # rest of the trunk obeys. Detaching here instead -- as this did
+            # until the gradient probe caught it -- leaves the electrostatic
+            # scale and the distance projection frozen at their init for the
+            # whole run, while still perturbing the forward pass.
+            if pair_bias_fn is not None:
+                pair_bias = pair_bias_fn(h, n - 2)
 
         # ---- final loop: the only one that carries a gradient --------------
         it = n - 1

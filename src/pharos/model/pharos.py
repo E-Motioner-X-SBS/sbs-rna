@@ -239,46 +239,87 @@ class InputEmbedding(nn.Module):
 #: `test_pharos.py` property 7c uses for the heads. An output nothing reads
 #: and a module nothing calls are the same defect; the heads got a pinned
 #: declaration during the 09-26 audit and the modules did not.
-UNWIRED: Dict[str, str] = {
-    "elec": (
-        "§6.2's screened-Coulomb pair bias. `TokenTrunk.forward` accepts a "
-        "`pair_bias_fn` and NO CALLER PASSES ONE, so `FullAttention` always "
-        "receives `pair_bias=None` and this module is never called. It is "
-        "orphaned by the §9 change that made head 3 a diffusion decoder: the "
-        "bias needs the previous loop's DISTANCE ESTIMATE, and a denoiser "
-        "emits no coordinates in a forward pass, so there is nothing to feed "
-        "it. `forward` also takes no ionic condition, which is the second "
-        "sign it was never plumbed. Wiring it means running the pair track "
-        "inside the trunk loop -- 21M pairs at L=4,608, every loop -- so it "
-        "is a costed architecture change, not an oversight to patch. Until "
-        "then §6.2 describes a mechanism this model does not have."),
-}
+#:
+#: `elec` was the only entry and is now wired -- see `VirtualDistance` and
+#: the `pair_bias_fn` in `forward`. Property 7e asserts this dict is TRUE
+#: rather than merely present: an entry here must really have no caller, and
+#: a module with a caller must not be listed.
+UNWIRED: Dict[str, str] = {}
 
 
 class ElectrostaticBias(nn.Module):
-    """§6.2 — screened Coulomb pair bias from the previous loop's distances.
+    """§6.2 — the screened-Coulomb pair bias, from `physics.manning`.
 
-    **NOT WIRED.** See `UNWIRED` above: nothing calls this, because nothing
-    passes `pair_bias_fn` to the trunk. The class is correct and tested; it
-    has no caller.
+    `B_elec(r) = -lam * q_eff^2 * l_B * exp(-r/lambda_D) / r`, with `q_eff`
+    and the Debye length from Manning condensation (§6.1) at the given ionic
+    condition. The behaviour it reproduces, which `test_manning.py` pins: as
+    salt rises the screening length shortens 9.61 -> 6.88 A and the bias
+    weakens -0.0097 -> -0.0064.
 
-    `B_elec(r) = -A * q_eff^2 * exp(-kappa r) / r`, with `q_eff = -0.196` for
-    A-RNA from Manning condensation (§6.1) and `kappa` from the ionic condition.
-    The measured behaviour this must reproduce: as salt rises, the screening
-    length shortens 9.61 -> 6.88 A and the bias weakens -0.0097 -> -0.0064. That
-    is the mechanism by which an ionic condition changes a prediction, so it is
-    computed from `physics.manning`, not learned.
+    **This calls `manning.b_elec` rather than restating it.** It used to
+    carry its own copy of the formula, and the copy was a different
+    function: it hardcoded `q_eff = -0.196` instead of deriving it, took a
+    `kappa` where the canonical form takes a Debye length, and **omitted the
+    Bjerrum length l_B = 7.158 A entirely**, making it 7.16x too small. Its
+    own docstring said the bias "is computed from `physics.manning`, not
+    learned" -- the intent, not the code. Two definitions of one equation is
+    how they drift; the same defect as `PharosHeads.loss` in finding 36, in
+    the physics instead of the losses.
+
+    `log_scale` is the one learned quantity and starts at 0, so the bias
+    enters at exactly its physical magnitude.
     """
 
     def __init__(self, learn_scale: bool = True):
         super().__init__()
         self.log_scale = nn.Parameter(torch.zeros(1), requires_grad=learn_scale)
 
-    def forward(self, dist: torch.Tensor, kappa: float, q_eff: float = -0.196
-                ) -> torch.Tensor:
-        r = dist.clamp(min=2.0)
-        b = -(q_eff ** 2) * torch.exp(-kappa * r) / r
-        return b * torch.exp(self.log_scale)
+    def forward(self, dist: torch.Tensor, cond=None) -> torch.Tensor:
+        from ..physics.manning import IonicCondition as _IC, b_elec
+        # `lam` stays a TENSOR. Casting it with float() -- as this did until
+        # the gradient probe caught it -- severs the graph, and `log_scale`
+        # then never receives a gradient however the bias is used.
+        return b_elec(dist.clamp(min=1.0), cond or _IC(),
+                      lam=torch.exp(self.log_scale))
+
+
+class VirtualDistance(nn.Module):
+    """A pairwise distance estimate in angstrom, from a hidden state.
+
+    §6.2 needs "the previous loop's distance estimate", and the architecture
+    stopped providing one when head 3 became a denoiser: a diffusion decoder
+    emits no coordinates in a forward pass, which is why the bias sat
+    unwired (finding 51). The pair track could supply distances, but densely
+    that is `L^2 * d_pair` -- 21M pairs at L=4,608, every loop -- which is
+    why wiring it was recorded as a costed change.
+
+    This is the cheap form: project each residue to three numbers and take
+    the pairwise Euclidean distance. `L^2 * 3` rather than `L^2 * 128`, so
+    at L=1,024 it is a 4 MB matrix instead of 537 MB -- and one scalar per
+    pair is all an attention bias can use.
+
+    It is a LEARNED estimate, labelled as such. The initial weight scale
+    puts the median pairwise separation near 20 A so the screened Coulomb
+    starts in the regime it was derived for. The physics on top is NOT
+    learned: `b_elec` is closed form from the ionic condition. The only
+    gains are `ElectrostaticBias.log_scale` and `FullAttention.bias_scale`,
+    and the latter is **zero-initialised**, so switching this on leaves
+    every existing checkpoint numerically unchanged until the bias earns its
+    way in.
+    """
+
+    def __init__(self, d_model: int, d_coord: int = 3, scale_a: float = 20.0):
+        super().__init__()
+        self.proj = nn.Linear(d_model, d_coord, bias=False)
+        # |c_i - c_j| ~ sqrt(2 * d_coord) * std(c) and std(c) = w_std *
+        # sqrt(d_model) for a unit-variance h, which the trunk's final
+        # LayerNorm guarantees. Solve for the target median separation.
+        nn.init.normal_(self.proj.weight,
+                        std=scale_a / ((2 * d_coord) ** 0.5 * d_model ** 0.5))
+
+    def forward(self, h: torch.Tensor) -> torch.Tensor:
+        c = self.proj(h).float()
+        return torch.cdist(c, c)
 
 
 class Pharos(nn.Module):
@@ -309,6 +350,10 @@ class Pharos(nn.Module):
         # output, which is what the rest of the pair track is built from too.
         self.diff_pair = DiffusionPairFeatures(cfg.d_model, cfg.d_pair)
         self.elec = ElectrostaticBias()
+        # §6.2's missing half: the distance estimate the bias is a function
+        # of. See `VirtualDistance` -- three numbers per residue, so the
+        # pair matrix is a scalar field and not a `d_pair` tensor.
+        self.vdist = VirtualDistance(cfg.d_model)
         # §8: retrieval, not memorisation. Queried from the PAIR features --
         # i.e. after pairing is estimated -- never from sequence, because the
         # sequence-only version of this idea was measured at 0.073 sigma. The
@@ -337,7 +382,9 @@ class Pharos(nn.Module):
                 n_loops: Optional[int] = None,
                 deep_supervision: bool = False,
                 mlm: bool = False,
-                dynamics: bool = False) -> Dict:
+                dynamics: bool = False,
+                ionic=None,
+                electrostatics: bool = True) -> Dict:
         x = self.embed(tokens, mod_ids, chem)
         iterates = []
 
@@ -345,7 +392,22 @@ class Pharos(nn.Module):
             if deep_supervision:
                 iterates.append((it, h))
 
-        h, aux = self.trunk(x, mask, feats, n_loops=n_loops, supervise=supervise)
+        # §6.2, wired. `pair_bias_fn(h, loop)` is called AFTER each loop and
+        # its result feeds the NEXT one, so loop 0 runs with `pair_bias=None`
+        # exactly as the trunk's contract says -- the circularity §5.3
+        # records, represented rather than fabricated.
+        #
+        # `electrostatics=False` turns it off for the ablation that gives the
+        # claim its meaning: the ionic condition is supposed to change what
+        # attends to what, and that is only demonstrable against a run where
+        # it does not.
+        pair_bias_fn = None
+        if electrostatics:
+            def pair_bias_fn(hh: torch.Tensor, loop: int) -> torch.Tensor:
+                return self.elec(self.vdist(hh), ionic)
+
+        h, aux = self.trunk(x, mask, feats, n_loops=n_loops,
+                            pair_bias_fn=pair_bias_fn, supervise=supervise)
 
         pair = None
         if pair_index is not None:

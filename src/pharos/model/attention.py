@@ -211,19 +211,20 @@ class SlidingWindowAttention(nn.Module):
 
 
 class FullAttention(nn.Module):
-    """Global softmax attention, with an additive physics bias it never gets.
+    """Global softmax attention with an additive screened-electrostatic bias.
 
-    `pair_bias` is where §6.2's Hamiltonian was to reach the token track: a
-    screened electrostatic term from the previous loop's distance estimate,
-    added to the logits so the ionic condition changes what attends to what.
+    `pair_bias` is how §6.2's Hamiltonian reaches the token track: a screened
+    Coulomb term from the previous loop's distance estimate, added to the
+    logits so the ionic condition changes what attends to what. `Pharos`
+    supplies it via `pair_bias_fn` (`VirtualDistance` -> `ElectrostaticBias`
+    -> `manning.b_elec`); only the FULL blocks receive it.
 
-    **In this model it is always `None`.** Nothing passes `pair_bias_fn` to
-    the trunk, so `bias_scale` -- 12 parameters per full block, 24 in
-    shared400 -- receives no gradient and the branch below never runs. See
-    `pharos.UNWIRED` for why, and for what wiring it would cost. The
-    parameter and the branch are kept because the mechanism is the intended
-    design and the code is correct; what was wrong was this docstring
-    asserting it in the present tense.
+    `bias_scale` is per-head and starts at ZERO, so a loaded checkpoint is
+    numerically unchanged and the bias earns its way in. The gradient to
+    `bias_scale` is non-zero at that init (the bias tensor is), so the gate
+    opens itself; `test_pharos.py` property 7f pins both halves of that --
+    the gate moving at a closed init, and real gradient reaching
+    `vdist`/`elec` once it is open.
     """
 
     def __init__(self, d_model: int, n_heads: int = 8, dropout: float = 0.0):

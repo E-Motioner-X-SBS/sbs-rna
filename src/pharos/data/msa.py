@@ -185,13 +185,29 @@ def apc_mutual_information(msa: np.ndarray,
         # (N, K) for column i, weighted against every other column
         oi = oh[:, i, :] * w[:, None]
         joint = np.einsum("nk,ncl->ckl", oi, oh)       # (C, K, K)
-        pij = (joint + pseudocount / K) / (W + pseudocount)
+        # `W + pseudocount * K`, not `W + pseudocount`. Laplace smoothing has
+        # to be consistent between the joint and the marginals or the joint is
+        # not a distribution: adding `pc/K` to each of K^2 cells adds `pc*K` of
+        # mass, so the denominator must absorb `pc*K`. With `W + pc` the joint
+        # summed to `(W + pc*K) / (W + pc)` -- measured 1.1905 at N=10, 1.0396
+        # at N=50, 1.0199 at N=100, 1.0020 at N=1000 -- while `fi` above summed
+        # to exactly 1.
+        #
+        # The bias is therefore DEPTH-DEPENDENT, which is the harmful part: a
+        # shallow Rfam family got a systematically larger mutual information
+        # than a deep one for the same actual coupling, and alignment depth is
+        # a property of the family rather than of the structure.
+        pij = (joint + pseudocount / K) / (W + pseudocount * K)
         outer = fi[i][None, :, None] * fi[:, None, :]
         with np.errstate(divide="ignore", invalid="ignore"):
             term = pij * np.log(np.maximum(pij, 1e-12) / np.maximum(outer, 1e-12))
         mi[i] = np.nansum(term, axis=(1, 2))
     np.fill_diagonal(mi, 0.0)
 
+    # The means include the zeroed diagonal, where Dunn et al. take them over
+    # j != i. That scales the whole correction by (C-1)/C -- 1% at C=100 --
+    # which is a uniform under-correction and not depth-dependent, so it is
+    # left alone and recorded rather than changed under a model in flight.
     m_row = mi.mean(1, keepdims=True)
     m_all = float(mi.mean()) or 1e-9
     apc = mi - (m_row @ m_row.T) / m_all

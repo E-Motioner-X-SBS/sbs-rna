@@ -309,8 +309,13 @@ INIT=""
 
 # ---- 3. stages 2 and 3: secondary structure and probing, co-trained -------
 if [ ! -f "$LOGDIR/.done-seqstages" ]; then
-    note "=== train_sequence_stages.py (curriculum stages 2-3) ==="
+    note "=== train_sequence_stages.py (curriculum stages 2, 3 and 6) ==="
     require_init "$PRETRAIN" "stages 2-3" "stage 1"
+    # No --batch: the trainer batches by TOKEN BUDGET now, the way stages 1
+    # and 5 do, and its defaults are a 32,768-token budget with --batch as a
+    # 512-sequence cap. At the old fixed --batch 32 this stage ran 11,300
+    # tokens a step at 3,478 tok/s in 11.5 of 80 GiB; budgeted it runs 88,500
+    # at 16,100, which takes the two declared epochs from 18.9 hours to 5.5.
     if $PY -u scripts/train_sequence_stages.py \
             --device cuda --min-free-gib "$NEED_GIB" --size "$SIZE" \
             --epochs 2 $INIT >> "$LOG" 2>&1; then
