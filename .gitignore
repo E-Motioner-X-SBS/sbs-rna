@@ -65,3 +65,8 @@ data/samples/analysis/cron/monitor_state.json
 
 # Reference implementations kept for cross-checking, not for building.
 research/prior-art/md_rnaions/*.zip
+
+# The training watch writes a report every half hour. The README is the
+# documentation; the reports, alerts and heartbeat are live state.
+data/samples/analysis/watch/*
+!data/samples/analysis/watch/README.md

@@ -46,4 +46,8 @@ if ! timeout 900 nice -n 15 "$PY" scripts/training_watch.py >> "$W/watch.log" 2>
         echo '```'
     } > "$W/ALERT"
 fi
+# Half-hourly for seven days is 336 reports. Keep a fortnight's worth and
+# drop the rest; `history.jsonl` is the durable record and stays.
+find "$W" -maxdepth 1 -name 'report-*.md' -mtime +14 -delete 2>/dev/null
+
 exit 0
