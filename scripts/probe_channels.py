@@ -117,18 +117,26 @@ def probe_corpus(n_shards: int) -> None:
 
     section("A3. the rigidity target")
     b = cat["b_factor_z"].astype(np.float32)
-    keep = np.isfinite(b) & (b > -6.0)
-    rej = float((~keep).mean())
-    chk("the surviving target is a z-score", abs(b[keep].mean()) < 0.1
-        and 0.8 < b[keep].std() < 1.2,
-        f"mean {b[keep].mean():+.4f} sd {b[keep].std():.4f} "
-        f"(rejected {100*rej:.4f}%)")
-    # finding 66's signature: a continuous measurement does not repeat exactly
-    ext = b[np.isfinite(b) & (b <= -6.0)]
-    chk("no fabricated block below z = -6", ext.size == 0,
-        f"{ext.size:,} residues, {len(np.unique(ext))} distinct values"
-        + (" -- repeats mean -mean/std, see finding 66" if ext.size else "")
-        + ("  [pre-rebuild corpus: the collate guard masks these]" if ext.size else ""))
+    fin = np.isfinite(b)
+    # The exact invariant -- a finite z comes only from a POSITIVE B -- needs
+    # the raw B-factor and so is tested at the parser, in
+    # `test_mmcif_entities.py` property 10. What the corpus alone can show is
+    # whether the surviving channel is actually standardised, which is what
+    # finding 66 broke: the fabricated entries dragged sd from 0.94 to 3.33.
+    chk("the finite target is a standardised z-score",
+        abs(b[fin].mean()) < 0.05 and 0.95 < b[fin].std() < 1.05,
+        f"mean {b[fin].mean():+.4f} sd {b[fin].std():.4f}")
+    # unset B-factors must be ABSENT, not extreme and not zero: both of those
+    # are a fabricated rigidity target, one of them merely quieter
+    nan_f = float((~fin).mean())
+    chk("unset B-factors are NaN rather than invented",
+        0.0 < nan_f < 0.6, f"{100*nan_f:.2f}% of residues carry no target")
+    ext = b[fin & (b <= -6.0)]
+    chk("the negative tail is negligible and not a block",
+        ext.size < 0.001 * b.size,
+        f"{ext.size:,} residues below z = -6 ({100*ext.size/b.size:.4f}%), "
+        f"{len(np.unique(ext))} distinct"
+        if ext.size else "none")
 
     section("A4. structural channels")
     g = cat["mg_site"]
@@ -306,6 +314,69 @@ def probe_model() -> None:
         chk(f"{name} has a non-zero gradient", g > 0, f"|grad| {g:.3e}")
 
 
+def probe_losses() -> None:
+    """Does each head's loss actually respond to ITS target?
+
+    A head can produce a correctly-shaped output, be logged every step, and
+    have its loss wired to the wrong tensor. Perturbing one target at a time
+    and watching which loss moves is the only check that catches that.
+    """
+    import torch
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from pharos.data.loader import Pharos3DDataset
+    from pharos.model.pharos import Pharos, PharosConfig
+    import train_pharos as T
+
+    root = ROOT / "data/derived/pharos3d"
+    if not (root / "manifest.json").exists():
+        chk("the 3D corpus is present for the loss probe", False, str(root))
+        return
+    tr = Pharos3DDataset(root, split="train")
+    t = T.to_device(tr.collate([0, 1, 2, 3, 4, 5]), torch.device("cpu"))
+    if not bool(t["rigidity_mask"].any()):
+        notes.append("no X-ray chain in the probe batch; heads 6/7 not exercised")
+    cfg = PharosConfig(d_model=48, n_blocks=8, n_loops=2, n_heads=4, d_pair=24,
+                       n_experts=4, d_expert=24, top_k=2, n_shared=1,
+                       max_length=int(t["tokens"].shape[1]) + 8)
+    torch.manual_seed(0)
+    mdl = Pharos(cfg).eval()
+
+    def run(tt):
+        torch.manual_seed(1234)     # same sampled pairs and recycling count
+        with torch.no_grad():
+            return T.step_losses(mdl, tt, cfg, n_neg=8, n_loops=2)[1]
+
+    base = run(t)
+    cases = [
+        ("mg_site",    ["mg"],                      lambda d: 1 - d),
+        ("b_factor_z", ["rigidity", "fluctuation"], lambda d: d + 3.0),
+        ("lw_val",     ["lw"],                      lambda d: (d + 1) % 13),
+        ("loop_class", ["motif"],                   lambda d: (d + 1) % 3),
+        # NOT a rigid motion: the structure loss is translation-invariant by
+        # design, which is asserted separately below
+        ("coords",     ["structure"],               lambda d: d * 1.5),
+    ]
+    for key, watch, fn in cases:
+        tt = dict(t)
+        tt[key] = fn(t[key].clone())
+        got = run(tt)
+        for w in watch:
+            a, b = base.get(w), got.get(w)
+            if a is None or b is None:
+                chk(f"{w} is produced for this batch", False, f"{w} absent")
+                continue
+            chk(f"perturbing {key} moves {w}", abs(float(a) - float(b)) > 1e-9,
+                f"{float(a):.5f} -> {float(b):.5f}")
+    # and the one invariance that must HOLD: a rigid translation changes
+    # nothing, or the structure head is learning the crystal frame
+    tt = dict(t)
+    tt["coords"] = t["coords"] + 7.0
+    got = run(tt)
+    chk("a rigid translation leaves the structure loss alone",
+        abs(float(base["structure"]) - float(got["structure"])) < 1e-9,
+        f"{float(base['structure']):.5f} -> {float(got['structure']):.5f}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--shards", type=int, default=8)
@@ -316,6 +387,8 @@ def main() -> int:
     probe_corpus(a.shards)
     if not a.skip_model:
         probe_model()
+        section("B4. every head's loss responds to its own target")
+        probe_losses()
     if notes:
         print("\nRecorded, not failures:")
         for s in notes:

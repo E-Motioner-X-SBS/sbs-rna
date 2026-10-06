@@ -158,4 +158,5 @@ the corpus is rebuilt.
 | `disorder_logit` is emitted and untrained | needs `entity_poly_seq` in the corpus: a build change, not a loss term |
 | `splice_logits` is emitted and untrained | no RNA splice-site corpus has been acquired |
 | `ensemble_state_logits` is emitted and untrained | no observable in the corpus distinguishes the K states |
+| the supervised fitness head barely transfers across construct families | one bounded epoch from the 34%-budget stage-1 checkpoint reads val rho **+0.604** over 12/12 assays (unseen VARIANTS of seen constructs) against transfer rho **+0.085** over 5/5 (the Townshend aptamer family held out entirely). The split exists to expose exactly this, and the leaderboard's macro-mean includes an aptamer category, so the gap is the number to watch as training continues rather than a defect to fix now |
 | the block scorer's published numbers predate the split re-draw | re-measurable for the first time since finding 43; costs a GPU and ~30 epochs |
