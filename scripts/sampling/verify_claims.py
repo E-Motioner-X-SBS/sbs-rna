@@ -1268,6 +1268,13 @@ def main() -> int:
     import subprocess
     suites = [ROOT / "research/architecture/reference/test_hierarchical_pair_track.py",
               ROOT / "src/pharos/physics/test_manning.py",
+              # §6.1/§6.2's closed form against an INDEPENDENT implementation
+              # (Hayes' md_rnaions). test_manning.py checks our constants
+              # against numbers we derived ourselves, which catches arithmetic
+              # and not a wrong formula: a wrong formula reproduces its own
+              # wrong value perfectly.
+              ROOT / "src/pharos/physics/test_manning_reference.py",
+              ROOT / "src/pharos/data/test_torsions.py",
               ROOT / "src/pharos/data/test_mmcif_entities.py",
               ROOT / "src/pharos/data/test_chemistry.py",
               ROOT / "src/pharos/data/test_chemistry_torch.py",

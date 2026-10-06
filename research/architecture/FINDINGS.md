@@ -330,6 +330,75 @@ reachable at all. That is the whole §6.2 design stated as a measurement, and
 it is also the discrimination that makes the proof worth trusting: a check
 that returned "inert" for everything would have passed this checkpoint too.
 
+## 80–81 — what an independent implementation of the same physics said
+
+`md_rnaions` (Ryan Hayes, the reference code behind generalized Manning
+condensation) arrived as a reference for §6.2. Checking our closed form
+against it is the only check of that form that has ever been worth
+anything: `test_manning.py` compares our constants against numbers we
+derived ourselves, which catches arithmetic and nothing else, because a
+wrong formula reproduces its own wrong value perfectly.
+
+| # | what | status |
+|---|---|---|
+| 80 | **NOT a defect, and worth as much as one.** Two implementations sharing nothing but the physics — ours from SI constants and the Malmberg–Maryott cubic, Hayes' in C from `eps = exp(5.71455988 - 0.004540698*T)` — agree on ε_r to 1.6e−4, on l_B to 1.2e−4, and on λ_D to **6.2e−5 at every concentration from 25 to 300 mM**. §6.2's closed form is independently confirmed | `CONFIRMED` |
+| 81 | `IonicCondition.screening()` evaluates `condensed_fraction` and `effective_charge` at **z = 1 whatever is in solution**. Raising Mg²⁺ from 0 to 15 mM shortens λ_D 9.6078 → 7.9788 Å and leaves θ and `q_eff` **bit-identical**. Manning gives θ = 1 − 1/(zξ), so a divalent condenses 0.9022 against 0.8044 and `q_eff` halves — and `B_elec` goes as `q_eff²`, so the omitted channel is **4× against the 1.2× the screening term supplies**. The model's whole response to Mg²⁺ ran through the smaller of the two | `FIXED` |
+
+The two models also disagree on λ_D with Mg²⁺ present, by 20.9% (11.918 Å
+against 9.857 Å), and that one is **not** an error in either. Hayes runs Mg
+as explicit particles, so they must not also appear in the implicit
+screening — his `c_Cl` rises by `2·c_Mg` for electroneutrality and the Mg
+itself is left out of κ. PHAROS has no explicit ions, so Mg belongs in the
+ionic strength with z² = 4. It is asserted in the test module rather than
+left to be rediscovered, because anyone comparing a PHAROS ionic response
+against a number from that paper is comparing two different definitions of
+the screening length.
+
+**81's fix is not z = 2.** The solution is a mixture and there is no closed
+form for one — which is precisely why that paper exists: it gives every
+phosphate its own dynamical θᵢ and finds it by minimising a free energy
+with Debye–Hückel shell terms, a mixing entropy and a soft constraint.
+`ElectrostaticBias.theta_head` predicts θᵢ from the representation instead,
+and `b_elec_sitewise` uses `qᵢ·qⱼ` where the global form used `q_eff²`.
+
+Two properties make it a generalisation rather than a replacement:
+
+* θᵢ is squashed into **[0.80440, 0.90220]** — Manning's own bounds for z=1
+  and z=2 — so the head cannot leave the interval on which "condensed
+  fraction" means anything. Asserted at sigmoid saturation with inputs
+  scaled by 100, not on a typical input.
+* `site_scale` is zero-initialised, so at init every residue carries the rod
+  charge and the bias is **bitwise identical** to the global form, max |Δ|
+  0.000e+00. No loaded checkpoint's forward pass moves.
+
+The head is inert until the gate opens — at `site_scale = 0` the derivative
+with respect to `theta_head` is exactly zero, which is finding 64's shape.
+Here it is deliberate, and it is **declared and asserted in both
+directions** (gate takes gradient at init 1.8e+00; head takes none; head
+takes 2.4e−01 once the gate is nudged) rather than discovered later by a
+gradient probe. The dead window is short: the sibling gate `bias_scale` is
+measured reaching 1.04e−02 within 200 steps of stage 2/3.
+
+### A correction, recorded because it changed a conclusion I had already given
+
+I reported that §6.2 was "inert everywhere except after stage 5" and
+contributing 0.0006%, from the gate values in three checkpoints. Two of
+those three **predate the wiring in-process**: stage 1 finished 2026-10-04,
+the wiring landed 2026-10-06 16:32, and the seqstages checkpoint written at
+16:48 carries 536 tensors — no `vdist.proj.weight` — so that process had the
+pre-wiring code loaded. §6.2 had never once been trained in a sequence
+stage. The first run that has gives, after **200 steps**:
+
+| | before | whole stage-5 run | seqstages, 200 steps |
+|---|---|---|---|
+| `bias_scale` blk 7 | 0 | 2.80e−03 | **1.04e−02** |
+| `bias_scale` blk 15 | 0 | 1.73e−03 | **6.39e−03** |
+| `elec.log_scale` | 0 | 4.67e−05 | **9.53e−04** |
+
+The physics was not quiet by design. It had never been reached. Reading a
+parameter's value out of a checkpoint says what that RUN did, and a run is
+identified by the code it had loaded, not by the commit that exists now.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

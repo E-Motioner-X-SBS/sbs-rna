@@ -62,9 +62,9 @@ EXPECTED = {
     # +266,758 / +150,918 / +596,742 over the pre-head-11 numbers: the torsion
     # head is a `_mlp(d, d, 6)` on the residue track, so it lands on BOTH
     # columns (it is dense, not routed) and scales with d_model alone.
-    "PHAROS-Small": (259_188_256, 83_027_488, 128),
-    "PHAROS-Mini": (113_657_750, 39_339_926, 144),
-    "Base-v2": (1_106_156_288, 313_432_832, 96),
+    "PHAROS-Small": (259_188_770, 83_028_002, 128),
+    "PHAROS-Mini": (113_658_136, 39_340_312, 144),
+    "Base-v2": (1_106_157_058, 313_433_602, 96),
 }
 #: What the DENSE diffusion decoder (head 3 plus its pair features) contributes
 #: to the active column at each scale. It is the reason the numbers above moved
@@ -431,6 +431,65 @@ def main() -> int:
     chk("the distance estimate is in angstrom, not arbitrary units",
         15.0 < float(em.vdist(torch.randn(1, 64, 64)).median()) < 30.0,
         f"median pairwise {float(em.vdist(torch.randn(1, 64, 64)).median()):.1f} A")
+
+    print("\n== property 7e2: condensation is per-site, and stays physical ==")
+    # Checking §6.2 against `md_rnaions` (the reference code for generalized
+    # Manning condensation) showed that Mg2+ moves our screening length and
+    # leaves `theta` and `q_eff` bit-identical, because they are evaluated at
+    # z = 1 whatever is in solution -- and B_elec goes as q_eff^2, so the
+    # channel left out is the larger one. `theta_head` supplies a per-residue
+    # departure from the rod value. These assert that it is a GENERALISATION:
+    # it must contain the thing it generalises, exactly, at init.
+    from pharos.physics.manning import (IonicCondition as _IC2,  # noqa: E402
+                                        b_elec as _be,
+                                        condensation_bounds as _cb,
+                                        effective_charge as _qe)
+    _m = Pharos(PharosConfig.mini())
+    _h = torch.randn(2, 12, _m.cfg.d_model)
+    _d = torch.rand(2, 12, 12) * 20 + 3
+    _q = _m.elec.site_charges(_h)
+    chk("at init every residue carries Manning's rod charge",
+        _q.unique().numel() == 1 and abs(float(_q.flatten()[0]) - _qe()) < 1e-8,
+        f"{_q.unique().numel()} distinct, {float(_q.flatten()[0]):.10f} "
+        f"vs {_qe():.10f}")
+    _a = _m.elec(_d, _IC2(), h=_h)
+    with torch.no_grad():
+        _b = _be(_d.clamp(min=1.0), _IC2(), lam=torch.exp(_m.elec.log_scale))
+    chk("so the bias is UNCHANGED from the rod form at init",
+        float((_a - _b).abs().max()) == 0.0,
+        f"max |delta| {float((_a - _b).abs().max()):.3e} -- a loaded "
+        f"checkpoint's forward pass does not move")
+    _a.sum().backward()
+    chk("the gate takes a gradient at init",
+        _m.elec.site_scale.grad is not None
+        and float(_m.elec.site_scale.grad.abs().max()) > 0,
+        f"|g| {float(_m.elec.site_scale.grad.abs().max()):.3e}")
+    chk("and the head is inert until it opens -- DECLARED, not accidental",
+        float(_m.elec.theta_head.weight.grad.abs().max()) == 0.0,
+        "zero-gated, the same shape as finding 64 and for the same reason")
+    _m.zero_grad()
+    with torch.no_grad():
+        _m.elec.site_scale.fill_(0.5)
+    _a = _m.elec(_d, _IC2(), h=_h)
+    _a.sum().backward()
+    chk("once the gate is open the head learns",
+        float(_m.elec.theta_head.weight.grad.abs().max()) > 0,
+        f"|g| {float(_m.elec.theta_head.weight.grad.abs().max()):.3e}")
+    # and it can never leave the interval on which "condensed fraction" means
+    # something -- checked at saturation, not on a typical input
+    _lo, _hi = _cb()
+    with torch.no_grad():
+        _m.elec.site_scale.fill_(1.0)
+        _m.elec.theta_head.bias.fill_(50.0)      # drive the sigmoid to 1
+        _qhi = _m.elec.site_charges(torch.randn(4, 32, _m.cfg.d_model) * 100)
+        _m.elec.theta_head.bias.fill_(-50.0)     # and to 0
+        _qlo = _m.elec.site_charges(torch.randn(4, 32, _m.cfg.d_model) * 100)
+    _th = torch.cat([1.0 + _qhi.flatten(), 1.0 + _qlo.flatten()])
+    chk("theta stays inside Manning's bounds even at saturation",
+        float(_th.min()) >= _lo - 1e-6 and float(_th.max()) <= _hi + 1e-6,
+        f"theta in [{float(_th.min()):.5f}, {float(_th.max()):.5f}], "
+        f"bounds [{_lo:.5f}, {_hi:.5f}]")
+    del _m, _h, _d, _a, _b, _q
 
     print("\n== property 7f: every parameter gets a gradient, or is declared ==")
     # The mechanical version of 7e. A module nothing calls shows up as

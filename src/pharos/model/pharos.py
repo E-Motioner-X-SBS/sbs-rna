@@ -268,19 +268,77 @@ class ElectrostaticBias(nn.Module):
 
     `log_scale` is the one learned quantity and starts at 0, so the bias
     enters at exactly its physical magnitude.
+
+    SITE-SPECIFIC CONDENSATION
+    --------------------------
+    `q_eff` above is Manning's result for an infinite uniformly charged rod,
+    so it is one number for every phosphate in the molecule. Real RNA is
+    neither infinite nor uniform, and checking §6.2 against `md_rnaions`
+    (Hayes et al., the reference code for generalized Manning condensation)
+    made the consequence precise: raising Mg2+ from 0 to 15 mM shortens the
+    screening length 9.61 -> 7.98 A, and leaves `theta` and `q_eff`
+    BIT-IDENTICAL, because `IonicCondition.screening()` evaluates them at
+    `z = 1` whatever is in the solution. The whole response to divalent ion
+    therefore runs through the Debye length -- and `B_elec` goes as
+    `q_eff^2`, so the channel left out is the larger one: 4x against 1.2x.
+
+    That model gives every phosphate its own dynamical `theta_i` and finds
+    it by minimising a free energy; there is no closed form for a K+/Mg2+
+    mixture. `theta_head` predicts it from the representation instead, and
+    is squashed into `[theta(z=1), theta(z=2)] = [0.8044, 0.9022]` so the
+    head cannot leave the interval on which "condensed fraction" means
+    anything.
+
+    `site_scale` is zero-initialised, in the same discipline as
+    `bias_scale`: at init `theta_i` is exactly the rod value for every
+    residue and the bias is bit-identical to what it was, so no checkpoint
+    changes numerically when this is added.
     """
 
-    def __init__(self, learn_scale: bool = True):
+    def __init__(self, learn_scale: bool = True, d_model: int | None = None):
         super().__init__()
         self.log_scale = nn.Parameter(torch.zeros(1), requires_grad=learn_scale)
+        self.theta_head = nn.Linear(d_model, 1) if d_model else None
+        self.site_scale = nn.Parameter(torch.zeros(1)) if d_model else None
 
-    def forward(self, dist: torch.Tensor, cond=None) -> torch.Tensor:
-        from ..physics.manning import IonicCondition as _IC, b_elec
+    def site_charges(self, h: torch.Tensor, cond=None) -> torch.Tensor:
+        """Per-residue effective charge, `(B, L)`, inside Manning's bounds.
+
+        Written as `q_rod + deviation` rather than as `-(1 - theta)` so the
+        thing the head actually supplies -- a departure from the rod value --
+        is the thing in the expression. At `site_scale = 0` the deviation is
+        identically zero and every residue carries Manning's `q_eff`.
+
+        The gate opens before the head can learn: at `site_scale = 0` the
+        derivative with respect to `theta_head`'s parameters is zero, so the
+        head is inert until the gate moves. That is finding 64's shape and it
+        is deliberate here rather than accidental -- the alternative is a
+        non-zero initial deviation, which would change every loaded
+        checkpoint's forward pass. `site_scale` itself DOES take gradient at
+        init (its derivative is the deviation the head happens to propose),
+        and the measured behaviour of the sibling gate `bias_scale` is that
+        it reaches 1e-2 within 200 steps of stage 2/3. The probe asserts both
+        halves rather than trusting them.
+        """
+        from ..physics.manning import condensation_bounds, effective_charge
+        lo, hi = condensation_bounds()
+        u = torch.sigmoid(self.theta_head(h).squeeze(-1))
+        return effective_charge() + (hi - lo) * self.site_scale * u
+
+    def forward(self, dist: torch.Tensor, cond=None,
+                h: torch.Tensor | None = None) -> torch.Tensor:
+        from ..physics.manning import (IonicCondition as _IC, b_elec,
+                                       b_elec_sitewise)
         # `lam` stays a TENSOR. Casting it with float() -- as this did until
         # the gradient probe caught it -- severs the graph, and `log_scale`
         # then never receives a gradient however the bias is used.
-        return b_elec(dist.clamp(min=1.0), cond or _IC(),
-                      lam=torch.exp(self.log_scale))
+        lam = torch.exp(self.log_scale)
+        d = dist.clamp(min=1.0)
+        if self.theta_head is None or h is None:
+            return b_elec(d, cond or _IC(), lam=lam)
+        q = self.site_charges(h, cond)                       # (B, L)
+        return b_elec_sitewise(d, q.unsqueeze(-1), q.unsqueeze(-2),
+                               cond or _IC(), lam=lam)
 
 
 class VirtualDistance(nn.Module):
@@ -349,7 +407,7 @@ class Pharos(nn.Module):
         # rather than inside the head because it is a function of the TRUNK's
         # output, which is what the rest of the pair track is built from too.
         self.diff_pair = DiffusionPairFeatures(cfg.d_model, cfg.d_pair)
-        self.elec = ElectrostaticBias()
+        self.elec = ElectrostaticBias(d_model=cfg.d_model)
         # §6.2's missing half: the distance estimate the bias is a function
         # of. See `VirtualDistance` -- three numbers per residue, so the
         # pair matrix is a scalar field and not a `d_pair` tensor.
@@ -404,7 +462,9 @@ class Pharos(nn.Module):
         pair_bias_fn = None
         if electrostatics:
             def pair_bias_fn(hh: torch.Tensor, loop: int) -> torch.Tensor:
-                return self.elec(self.vdist(hh), ionic)
+                # `hh` goes in as well as the distance: the effective charge
+                # is per-residue now, not one rod value for the molecule.
+                return self.elec(self.vdist(hh), ionic, h=hh)
 
         h, aux = self.trunk(x, mask, feats, n_loops=n_loops,
                             pair_bias_fn=pair_bias_fn, supervise=supervise)

@@ -512,6 +512,59 @@ goes 9.61 Å → 6.88 Å; the bias equals `manning.b_elec` to fp32; the estimate
 a 17.0 Å median, i.e. ångström not arbitrary units; and every one of the three
 parameters receives a non-zero gradient. See findings 51 and 63–65.
 
+### 6.2a Condensation is per-site, and Mg²⁺ reaches only half of it
+
+§6.1's `q_eff = −0.1956` is Manning's result for an **infinite, uniformly
+charged rod**, so it is one number for every phosphate in the molecule.
+Checking the closed form against `md_rnaions` — Ryan Hayes' reference code
+for generalized Manning condensation, an independent C implementation using
+a different empirical fit for the permittivity of water — produced two
+results, one reassuring and one not.
+
+**The monovalent physics is independently confirmed.** Two implementations
+sharing nothing but the physics agree to 1 part in 10⁴:
+
+| quantity | md_rnaions | PHAROS | rel |
+|---|---|---|---|
+| ε_r(298.15 K) | 78.31591 | 78.30334 | 1.6e−4 |
+| l_B | 7.15665 Å | 7.15754 Å | 1.2e−4 |
+| λ_D at 25–300 mM KCl | — | — | 6.2e−5 at every point |
+
+**Mg²⁺ moves the screening length and not the condensation.**
+`IonicCondition.screening()` evaluates `condensed_fraction` and
+`effective_charge` at **z = 1 whatever is in solution**, so going from 0 to
+15 mM Mg²⁺ shortens λ_D 9.61 Å → 7.98 Å and leaves θ and `q_eff`
+*bit-identical*. Manning gives θ = 1 − 1/(zξ), so a divalent counterion
+condenses 0.9022 against 0.8044 and `q_eff` halves — and `B_elec` goes as
+`q_eff²`, so **the omitted channel is a factor of 4 against the 1.2 the
+screening term supplies.** The model's entire response to Mg²⁺ ran through
+the smaller of the two.
+
+There is no closed form for a K⁺/Mg²⁺ mixture, which is the point of the
+generalized model: it gives every phosphate its own dynamical θᵢ and finds
+it by minimising a free energy with Debye–Hückel shell terms, mixing
+entropy and a soft constraint. `ElectrostaticBias.theta_head` predicts θᵢ
+from the representation instead, and `b_elec_sitewise` uses `qᵢ·qⱼ` where
+the global form used `q_eff²`.
+
+Two properties make it a generalisation rather than a replacement, both
+asserted in `test_pharos.py` property 7e2:
+
+* θᵢ is squashed into **[θ(z=1), θ(z=2)] = [0.80440, 0.90220]**, so the head
+  cannot leave the interval on which "condensed fraction" means anything —
+  checked at sigmoid saturation, not on a typical input.
+* `site_scale` is zero-initialised, so at init every residue carries the rod
+  charge and the bias is **bitwise identical** to the global form (max |Δ|
+  0.000e+00). No loaded checkpoint's forward pass moves.
+
+The gate opens before the head can learn: at `site_scale = 0` the derivative
+with respect to `theta_head` is zero. That is finding 64's shape, and here it
+is deliberate — the alternative is a non-zero initial deviation, which would
+change every checkpoint. `site_scale` itself takes gradient at init, and the
+sibling gate `bias_scale` is measured reaching 1e−2 within 200 steps of
+stage 2/3, so the dead window is short. Both halves are asserted rather than
+assumed.
+
 ### 6.3 Mg²⁺ and rigidity
 
 Mg²⁺ proximity and local rigidity are coupled at **1.523 σ**, measured on 1,535

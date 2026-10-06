@@ -142,3 +142,50 @@ if __name__ == "__main__":
         s = c.screening()
         print(f"  {name:20s} Debye length {s['kappa_inv_A']:6.2f} A   "
               f"B_elec at 10 A = {b_elec(10.0, c):8.4f}")
+
+
+def condensation_bounds(T: float = 298.15,
+                        b: float = B_AXIAL_A_RNA) -> tuple[float, float]:
+    """`(theta_min, theta_max)` — the interval any condensed fraction lives in.
+
+    Manning's criterion is `theta = 1 - 1/(z*xi)`: counterions condense until
+    the residual reduced charge density falls to `1/z`. A monovalent
+    counterion therefore neutralises 80.44% of the phosphate charge and a
+    divalent 90.22%, and a real K+/Mg2+ mixture lies between the two.
+
+    There is no closed form for the mixture, and that is the point of the
+    generalized condensation model (Hayes et al.): the condensed fraction is
+    a per-phosphate quantity set by local geometry, obtained in that work by
+    giving every phosphate its own dynamical `theta_i` and minimising a free
+    energy. A network predicting `theta_i` from a representation is doing the
+    same job without the dynamics -- but it must not be free to leave the
+    interval, because outside it the quantity is not a condensed fraction.
+
+    Returned as the bounds a learned `theta` is squashed into, so the physics
+    constrains the head rather than the head being trusted to respect it.
+    """
+    xi = manning_xi(T, b)
+    return 1.0 - 1.0 / xi, 1.0 - 1.0 / (2.0 * xi)
+
+
+def b_elec_sitewise(d_ij_A, q_i, q_j, cond: IonicCondition, lam=1.0):
+    """`B_elec` with a SEPARATE effective charge at each end of the pair.
+
+    `b_elec` above uses one `q_eff` for every phosphate in the molecule, which
+    is Manning's result for an infinite uniformly charged rod. Real RNA is
+    neither infinite nor uniform: a phosphate buried in a compact fold sits
+    in a deeper potential and condenses more counterion than one on an
+    exposed loop, which is the measurement the generalized model exists to
+    reproduce.
+
+    `B = -lam * q_i * q_j * l_B * exp(-d/lambda_D) / d`. Passing
+    `q_i = q_j = effective_charge()` reproduces `b_elec` exactly, which is
+    the property the test module pins -- a generalisation that does not
+    contain the thing it generalises is a replacement, not a generalisation.
+    """
+    import torch
+    s = cond.screening()
+    d = d_ij_A.clamp(min=1e-3) if torch.is_tensor(d_ij_A) else max(float(d_ij_A), 1e-3)
+    ex = torch.exp(-d / s["kappa_inv_A"]) if torch.is_tensor(d) \
+        else math.exp(-d / s["kappa_inv_A"])
+    return -lam * q_i * q_j * s["l_B_A"] * ex / d

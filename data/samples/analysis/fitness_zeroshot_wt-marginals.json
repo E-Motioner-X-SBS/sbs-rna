@@ -4,8 +4,8 @@
  "size": "shared400",
  "n_loops": 3,
  "strategy": "wt-marginals",
- "device": "cpu",
- "amp": "fp32",
+ "device": "cuda",
+ "amp": "torch.bfloat16",
  "benchmark_digest": "b0109fc7",
  "limit_per_assay": null,
  "partial": false,
@@ -100,35 +100,35 @@
   "Ribozyme": {
    "n_assays_expected": 26,
    "n_assays_scored": 26,
-   "signed": 0.15597943488525517,
-   "abs": 0.1874627475945352,
-   "auc": 0.5901646473057788,
+   "signed": 0.15537818649900403,
+   "abs": 0.18712416513914795,
+   "auc": 0.5895278146303076,
    "depth_baseline": 0.19467156074806977,
    "depth_baseline_undefined": 1
   },
   "tRNA": {
    "n_assays_expected": 3,
    "n_assays_scored": 3,
-   "signed": 0.4406914602632221,
-   "abs": 0.4406914602632221,
-   "auc": 0.7179699725954762,
+   "signed": 0.4431523498929401,
+   "abs": 0.4431523498929401,
+   "auc": 0.7192960240885707,
    "depth_baseline": 0.48315201686679493,
    "depth_baseline_undefined": 0
   },
   "Aptamer": {
    "n_assays_expected": 2,
    "n_assays_scored": 2,
-   "signed": -0.08668049099077652,
-   "abs": 0.1044827070260777,
-   "auc": 0.5345365626389293,
+   "signed": -0.08156631147107408,
+   "abs": 0.09510119003673352,
+   "auc": 0.5302114085713647,
    "depth_baseline": -0.11731970551260044,
    "depth_baseline_undefined": 0
   }
  },
- "macro_signed": 0.16999680138590026,
- "macro_abs": 0.24421230496127833,
+ "macro_signed": 0.17232140830695672,
+ "macro_abs": 0.24179256835627386,
  "macro_depth_baseline": 0.1868346240340881,
  "beats_depth_baseline": false,
  "problems": [],
- "seconds": 122.3
+ "seconds": 15.3
 }

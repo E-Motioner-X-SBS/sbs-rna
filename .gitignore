@@ -62,3 +62,6 @@ data/samples/analysis/cron/MONITOR_HOLD
 data/samples/analysis/cron/.monitor_last
 data/samples/analysis/cron/monitor.lock
 data/samples/analysis/cron/monitor_state.json
+
+# Reference implementations kept for cross-checking, not for building.
+research/prior-art/md_rnaions/*.zip
