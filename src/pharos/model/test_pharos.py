@@ -237,6 +237,7 @@ def main() -> int:
         "mg_logit": "stage 5", "motif_logits": "stage 5",
         "rigidity": "stage 5", "fluctuation": "stage 5",
         "base_logits": "stage 5",
+        "fitness": "stage 6",
     }
     INDIRECT = {                     # no loss of its own; gradient arrives anyway
         "hidden": "the trunk output every head reads",
@@ -252,9 +253,6 @@ def main() -> int:
             "corpus: a build change, not a loss term.",
         "splice_logits":
             "no RNA splice-site corpus has been acquired.",
-        "fitness":
-            "NABench and RNAGym are on disk under data/benchmarks/fitness/ "
-            "(126 MB of per-assay CSVs) and no loader has been written.",
         "ensemble_state_logits":
             "the K-state mixture weights. \u00a710 defines the ensemble but no "
             "observable in the corpus distinguishes the states, so there is "
@@ -275,6 +273,55 @@ def main() -> int:
     chk("every untrained head says why, at length",
         all(len(v) > 40 for v in UNTRAINED.values()),
         ", ".join(sorted(UNTRAINED)))
+    # `fitness` moved from UNTRAINED to TRAINED when stage 6 was wired. The
+    # claim is checkable from here, so it is checked from here rather than
+    # taken on the word of the table above.
+    _st = (Path(__file__).resolve().parents[3]
+           / "scripts/train_sequence_stages.py").read_text()
+    chk("stage 6 reads out[\"fitness\"] and weights it",
+        'out["fitness"]' in _st and '"fitness": 0.3' in _st,
+        "train_sequence_stages.py")
+    chk("every STAGE_WEIGHTS key has a loop that applies it",
+        all(f'STAGE_WEIGHTS["{k}"]' in _st
+            for k in ("ss", "reactivity", "fitness")),
+        "ss, reactivity, fitness")
+
+    print("\n== property 7d: the fitness head separates single-nt variants ==")
+    # `fitness` is a MEAN-POOLED scalar. A one-nucleotide change in an 87 nt
+    # construct moves the pooled representation by about 1/87 of one token's
+    # delta, and if that lands under the head's own numerical noise then no
+    # amount of training can give it a fitness landscape: the MSE would fall
+    # (it would be predicting the mean of a zero-mean target) while every
+    # Spearman came back NaN. The architecture has to be able to represent
+    # the task before the trainer is asked to learn it.
+    import numpy as _np
+    _wt = "GGCCGGCAUGGUCCCAGCCUCCUCGCUGGCGCCGGCUGGGCAACAUUCCGAGGGGACCGUCCCC"
+    _rng = _np.random.default_rng(0)
+    _seqs = [_wt]
+    for _ in range(11):
+        _i = int(_rng.integers(0, len(_wt)))
+        _alt = [c for c in "ACGU" if c != _wt[_i]][int(_rng.integers(0, 3))]
+        _seqs.append(_wt[:_i] + _alt + _wt[_i + 1:])
+    _ids = {"A": 0, "C": 1, "G": 2, "U": 3}
+    _tk = torch.tensor([[_ids[c] for c in q] for q in _seqs])
+    _mk = torch.ones_like(_tk, dtype=torch.bool)
+    _ch = torch.zeros(_tk.shape[0], _tk.shape[1], cfg.d_chem)
+    # dims 0-4 of the chemistry are the one-hot base identity, which is the
+    # only part of it that differs between these variants; the rest is zero
+    # so the probe measures the trunk's response to the substitution and not
+    # to a random feature vector.
+    _ch.scatter_(2, _tk.unsqueeze(-1), 1.0)
+    with torch.no_grad():
+        _f = model(_tk, torch.zeros_like(_tk), _ch, _mk,
+                   n_loops=2)["fitness"].float().numpy()
+    _d = _np.abs(_f[1:] - _f[0])
+    _eps = float(_np.spacing(_np.abs(_f).max()))
+    chk("one-nucleotide variants give distinct fitness values",
+        len(_np.unique(_f)) == len(_f), f"{len(_np.unique(_f))}/{len(_f)} distinct")
+    chk("the separation is far above fp32 spacing",
+        float(_d.min()) > 1000 * _eps,
+        f"smallest gap {_d.min():.3e}, fp32 eps {_eps:.3e}, "
+        f"ratio {_d.min()/_eps:.3g}")
 
     print("\n== property 7b: the MLM head starts at chance, not off a cliff ==")
     import math as _m

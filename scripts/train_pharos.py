@@ -28,9 +28,11 @@ tokens are the modelled residues only, so a disorder target aligned to them
 is vacuously zero -- which `mmcif_entities.residue_labels` says in as many
 words. Supervising it needs the corpus to carry the full `entity_poly_seq`
 and an observed/unobserved flag per position, which is a build change, not a
-loss term. `splice_logits` and `fitness` are likewise emitted and untrained;
-`src/pharos/model/test_pharos.py` property 8 pins all three so the set cannot
-grow quietly.
+loss term. `splice_logits` is likewise emitted and untrained here, and so is
+`ensemble_state_logits`; `src/pharos/model/test_pharos.py` property 7c pins
+the whole emitted surface as trained / indirect / untrained-with-a-reason, so
+the set cannot grow quietly. `fitness` was on that list and no longer is:
+stage 6 trains it in `train_sequence_stages.py`, not here.
 
 Three things the data forces, each of which is a way to get this wrong.
 

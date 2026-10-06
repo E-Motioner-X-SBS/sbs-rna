@@ -658,12 +658,23 @@ averaged with the family-disjoint test set.
 | 3 | chemical probing | Ribonanza | same, co-trained |
 | 4 | physics | closed form, no stage | — |
 | 5 | 3D multi-task | 16,604 chains | `train_pharos.py` |
+| 6 | fitness (auxiliary) | 139,837 variants, 12 assays | `train_sequence_stages.py`, co-trained |
 | R1 | block selector | same | `train_block_scorer.py` |
 
 **The stages chain.** Each passes its checkpoint forward with `--init-from`;
 stages that do not pass weights are unrelated runs, not a curriculum. The block
 selector is deliberately standalone — it is a convolutional residue encoder, not
 the trunk, so there is nothing to chain from.
+
+**Stage 6 trains on what is left after the benchmark is removed.** The 31
+assays of the RNAGym ncRNA fitness leaderboard are held back entirely, because
+24 of them are also shipped by NABench and a head trained on "NABench" and
+scored on "RNAGym" would be scored on its own training data.
+`build_fitness_dataset.py` enforces the separation by assay identity *and* by
+exact sequence and refuses to write a corpus that violates it. What stays
+comparable to the published table is `eval_fitness_zeroshot.py`, which scores
+the leaderboard with the MLM head's masked marginals and needs no fitness head
+at all — see §12.4.
 
 Span masking is geometric with mean 3, not single tokens: a helix is locally
 periodic, so a single masked base is fillable from its neighbours without
@@ -722,6 +733,30 @@ map to training weights 1.00 / 0.80 / 0.55 / 0.30; unscored entries take 0.80.
 
 Family-disjoint on families small enough to hold out, with the four dominant
 rRNA families forced to train and measured separately as described in §11.
+
+**The fitness corpus has three splits and a held-back benchmark**, because a
+fitness label is per-assay and per-assay data leaks in two different ways.
+
+| split | what it is | what it measures |
+|---|---|---|
+| `benchmark` | the 31 RNAGym ncRNA leaderboard assays, 856,629 variants | nothing trains on it; `eval_fitness_zeroshot.py` scores it |
+| `train` | 112,063 variants, 12 assays, 2 construct families | — |
+| `val` | 27,774 variants of the **same** 12 assays | unseen variants of a seen construct |
+| `transfer` | 37,028 variants, the 5 Townshend aptamers | an **unseen construct family** |
+
+Disjointness is enforced on both axes, because either alone passes while the
+other fails. `Guy_2014_tRNA` is 132 nt in NABench and 105 nt in RNAGym and the
+two files share no exact sequence, so a sequence check calls one experiment
+two. `Beck_2022_ribozyme` and `Roberts_2023_cepeb3_ribozyme` are 21,321
+identical sequences under unrelated names, so a name check calls two files
+one. The train/val split is by sequence hash rather than by row, because the
+ten Rachapun files share a few hundred sequences with each other.
+
+Targets are rank-transformed to a standard normal **within each assay**: the
+raw scores span four orders of magnitude across assays, so an unnormalised
+regression loss would be dominated by whichever assay was measured on the
+larger instrument. The raw score is kept beside the target, because Spearman
+must not be computed on the thing that was fitted.
 
 ### 12.5 Optimiser and schedule
 

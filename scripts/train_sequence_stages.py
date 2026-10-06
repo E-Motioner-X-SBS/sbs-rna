@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stages 2, 3 and 6 of the §12.1 curriculum — the sequence-supervised heads.
 
-    stage 2  secondary structure   head 4   bpRNA-SPOT, 10,934 train
-    stage 3  chemical probing      head 5   Ribonanza, 335,616 profiles
-    stage 6  fitness (auxiliary)   `fitness`  NOT IMPLEMENTED -- see STAGE_WEIGHTS
+    stage 2  secondary structure   head 4      bpRNA-SPOT, 10,934 train
+    stage 3  chemical probing      head 5      Ribonanza, 335,616 profiles
+    stage 6  fitness (auxiliary)   `fitness`   139,837 variants, 12 assays
 
 §9 numbers ten heads and `fitness` is not one of them: it is in
 `EXTRA_HEAD_KEYS`, the outputs the renumbering left unnamed. This block
@@ -14,14 +14,54 @@ they share a trainer and are **co-trained** rather than run one after another.
 The curriculum orders them because the *representation* matures in that order,
 not because the losses conflict, and stage 6 is explicitly auxiliary.
 
+Stage 6 and the benchmark it must not touch
+-------------------------------------------
+`build_fitness_dataset.py` splits the fitness data into a benchmark and a
+training set, and the split is the point. 24 of the 31 assays on the RNAGym
+ncRNA leaderboard are ALSO shipped by NABench, so "train on NABench, evaluate
+on RNAGym" is one dataset wearing two names. This trainer reads only
+`data/derived/fitness_v1/{train,val,transfer}.parquet`, which the builder
+guarantees share no assay and no exact sequence with `benchmark.parquet`.
+What stays comparable to a published table is `eval_fitness_zeroshot.py`,
+which needs no fitness head at all.
+
+Three fitness numbers come out, and they answer different questions:
+
+    train      within-assay Spearman on variants the head has fitted
+    val        within-assay Spearman on UNSEEN VARIANTS of the same 12 assays
+    transfer   per-assay Spearman on the five Townshend aptamers, a construct
+               family held out of training entirely
+
+The gap between `val` and `transfer` is the honest statement of what a
+supervised fitness head trained on two construct families can do. Reporting
+only the first would be reporting the training accuracy, which is the defect
+the bpRNA validation split below exists to stop.
+
 Why probing is weighted above secondary structure
 -------------------------------------------------
 §12.1 calls Ribonanza "the largest labelled channel the model will see":
 335,616 profiles against 673 clean 3D sequences, **499x**. Secondary structure
-is 10,934 examples. If the two are summed unweighted, 2D dominates the gradient
-by virtue of being read more often per epoch rather than by carrying more
-information, so each stage's loss is scaled by an explicit weight that is
-recorded rather than implied.
+is 10,934 examples. If the three were summed unweighted the smaller channels
+would be read as often as the largest -- see the cycling note below -- so each
+stage's loss is scaled by an explicit weight that is recorded rather than
+implied.
+
+Every stream is read at every step
+----------------------------------
+This loop used to create one generator per stage per epoch and stop pulling
+from a stage once its generator raised `StopIteration`. With 342 secondary
+structure batches against 10,488 probing batches, head 4 therefore received a
+gradient on 3.3% of the steps in an epoch and then sat idle for the other
+96.7% -- while the file claimed the opposite, that "10,934 secondary-structure
+examples are recycled about 31 times for every pass over Ribonanza", and
+`STAGE_WEIGHTS["ss"] = 0.5` was set to hold back a channel that was in fact
+starving. The weight and the comment described a loop that did not exist.
+
+An epoch is now `max` over the streams' batch counts -- which is what
+`estimate_steps` has always computed -- and the shorter streams restart within
+it, so every step carries every task and the weights mean what they say. The
+epoch report prints each stream's pass count so the ratio is on the page
+rather than in a comment.
 
 Reactivity is a masked target
 -----------------------------
@@ -56,6 +96,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BENCH = ROOT / "data/benchmarks"
 OUT = ROOT / "data/samples/analysis"
 CKPT = ROOT / "data/derived/checkpoints"
+#: stage 6's corpus. Built by `build_fitness_dataset.py`, which also writes the
+#: benchmark this trainer is forbidden to read.
+FITNESS = ROOT / "data/derived/fitness_v1"
 
 #: See train_pharos.CKPT_FORMAT. A checkpoint without it predates resumable
 #: checkpoints and carries no optimiser state, so it is weights, not training
@@ -76,16 +119,20 @@ from train_block_scorer import gpu_free_gib                          # noqa: E40
 #: dot-bracket alphabet, matching HeadConfig.n_ss_symbols = 8
 SS_SYMBOLS = ".()[]{}<"
 SS_INDEX = {c: i for i, c in enumerate(SS_SYMBOLS)}
-#: loss weights, stated rather than implied -- see the module docstring
-#: Only the weights that are actually read. `"fitness": 0.3` used to sit here
-#: for stage 6, and nothing read it: there is no fitness loader, no fitness
-#: loss and no `out["fitness"]` anywhere in this file. It was printed at
-#: startup and written into two report files, so every record of every run
-#: claimed a third task that never ran. The NABench and RNAGym data IS on
-#: disk (data/benchmarks/fitness/, 126 MB of per-assay CSVs) and the model
-#: DOES emit a `fitness` head -- the wiring between them is what is missing,
-#: and leaving the weight here made the gap invisible.
-STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0}
+#: loss weights, stated rather than implied -- see the module docstring.
+#:
+#: `"fitness": 0.3` sat here once before with nothing reading it: no loader, no
+#: loss, no `out["fitness"]` anywhere in the file. It was printed at startup
+#: and written into two report files, so every record of every run claimed a
+#: third task that never ran. It was removed, and it is back now because the
+#: loader, the loss and the three reported correlations exist below.
+#:
+#: 0.3 because stage 6 is auxiliary: it is the only one of the three whose
+#: supervision is a single scalar per sequence, and its corpus is two
+#: construct families rather than a sample of RNA. `test_stage6.py` asserts
+#: that every weight here is read by the loop, which is the check that was
+#: missing when the phantom weight survived.
+STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0, "fitness": 0.3}
 
 
 def enable_gpu_fast_paths() -> None:
@@ -155,7 +202,18 @@ def estimate_steps(args) -> int:
             n_pr = max(sum(1 for _ in fh) - 1, 0)
     if args.probing_limit:
         n_pr = min(n_pr, args.probing_limit)
-    per_epoch = max(-(-n_ss // args.batch), -(-n_pr // args.batch), 1)
+    n_fit = 0
+    h = FITNESS / "train.parquet"
+    if h.exists() and not getattr(args, "no_fitness", False):
+        n_fit = pq.ParquetFile(h).metadata.num_rows
+        if getattr(args, "fitness_limit", None):
+            n_fit = min(n_fit, args.fitness_limit)
+    # `max`, not `sum`: one batch is pulled from each stream per step and the
+    # short streams restart inside the epoch, so an epoch is as long as the
+    # longest stream. This matched the loop's INTENT before and not its
+    # behaviour; now it matches both.
+    per_epoch = max(-(-n_ss // args.batch), -(-n_pr // args.batch),
+                    -(-n_fit // args.batch), 1)
     return per_epoch * max(args.epochs, 1)
 
 
@@ -252,6 +310,142 @@ def iter_probing(batch: int, limit: Optional[int] = None
                 return
     if seqs:
         yield seqs, np.asarray(rows, dtype=np.float32), kinds
+
+
+# ---------------------------------------------------------------- stage 6
+def _spearman(a: np.ndarray, b: np.ndarray) -> float:
+    """Signed Spearman, or NaN when it is not defined.
+
+    NaN when either side is constant, which is the case that matters: a head
+    whose output has not moved off its initialisation predicts the same number
+    for every variant, `spearmanr` returns NaN, and `np.nanmean` over the
+    assays then reports the average of whatever was left. A dead head and a
+    head that worked on two assays produce the same summary. Callers here
+    count the NaNs and print the count.
+    """
+    from scipy.stats import spearmanr
+    if len(a) < 3:
+        return float("nan")
+    r = spearmanr(a, b).correlation
+    return float(r) if np.isfinite(r) else float("nan")
+
+
+@lru_cache(maxsize=4)
+def load_fitness(split: str) -> List[Tuple[str, np.ndarray, np.ndarray]]:
+    """`[(assay, sequences, targets)]` for one split, grouped by assay.
+
+    Grouped, and kept grouped, because the metric is a WITHIN-ASSAY Spearman:
+    the DMS score of a tRNA assay and of a ribozyme assay are different
+    quantities measured on different instruments, and a correlation computed
+    across a mixed batch would mostly measure which assay a sequence came
+    from. `target` is already rank-normalised within its assay by the builder,
+    so the regression loss is comparable across a mixed batch even though the
+    correlation is not.
+    """
+    import pyarrow.parquet as pq
+    f = FITNESS / f"{split}.parquet"
+    if not f.exists():
+        return []
+    t = pq.read_table(f, columns=["assay", "seq", "target"]).to_pydict()
+    by: Dict[str, Tuple[List[str], List[float]]] = {}
+    for a, q, y in zip(t["assay"], t["seq"], t["target"]):
+        g = by.setdefault(a, ([], []))
+        g[0].append(q)
+        g[1].append(float(y))
+    return [(a, np.array(q, dtype=object), np.asarray(y, dtype=np.float32))
+            for a, (q, y) in sorted(by.items())]
+
+
+def iter_fitness(split: str, batch: int, rng: np.random.Generator,
+                 limit: Optional[int] = None
+                 ) -> Iterator[Tuple[str, List[str], np.ndarray]]:
+    """Batches of one assay each, in a shuffled order.
+
+    One assay per batch so the within-batch Spearman the loop logs is the
+    quantity the benchmark uses. Shuffled across assays so consecutive steps
+    do not all come from `Rachapun_2022_f1u_ribozyme`, which is 65,536 of the
+    139,837 rows and would otherwise own the first half of every epoch.
+    """
+    groups = load_fitness(split)
+    if not groups:
+        return
+    chunks: List[Tuple[str, np.ndarray]] = []
+    for assay, seqs, _ in groups:
+        order = rng.permutation(len(seqs))
+        for s0 in range(0, len(order), batch):
+            chunks.append((assay, order[s0:s0 + batch]))
+    index = {a: (q, y) for a, q, y in groups}
+    n = 0
+    for k in rng.permutation(len(chunks)):
+        assay, idx = chunks[int(k)]
+        q, y = index[assay]
+        yield assay, [str(x) for x in q[idx]], y[idx]
+        n += len(idx)
+        if limit and n >= limit:
+            return
+
+
+def fitness_step(model, seqs: List[str], target: np.ndarray, device, feats_fn
+                 ) -> Tuple[Optional[torch.Tensor], float, float]:
+    """Loss, within-assay Spearman, and the spread of the predictions.
+
+    The spread is returned because it is the one number that says the head is
+    alive. `fitness` is a mean-pooled scalar: a one-nucleotide change in an
+    87 nt construct moves the pooled representation by about 1/87 of one
+    token's delta, and a head that collapsed to a constant would still produce
+    a falling MSE -- it would be predicting the mean of a zero-mean target --
+    while every correlation it was scored on came back NaN. Measured at
+    initialisation and at 3.34B tokens the separation is 10^4 to 10^5 times
+    fp32 spacing (`test_pharos.py`, property 7d), so a collapse here is a
+    training failure rather than an architectural limit, and this is how it is
+    seen.
+    """
+    b = encode(seqs, device)
+    t = torch.as_tensor(np.asarray(target, dtype=np.float32), device=device)
+    out = model(b["tokens"], b["mod_ids"], b["chem"], b["mask"],
+                feats=feats_fn(b), n_loops=2)
+    pred = out["fitness"].float()
+    if pred.shape != t.shape:
+        raise RuntimeError(f"fitness head gave {tuple(pred.shape)} for a "
+                           f"target of {tuple(t.shape)}")
+    loss = F.mse_loss(pred, t)
+    with torch.no_grad():
+        pn = pred.detach().cpu().numpy()
+        rho = _spearman(pn, np.asarray(target))
+        spread = float(pn.std())
+    return loss + out["aux"]["balance_loss"], rho, spread
+
+
+@torch.no_grad()
+def score_fitness(model, split: str, device, feats_fn, batch: int,
+                  max_rows: Optional[int] = None) -> Dict:
+    """Per-assay Spearman over a whole split, with the NaNs counted.
+
+    `max_rows` caps each assay, not the split: capping the split would score
+    the first assays and silently drop the last, and the per-category means a
+    reader compares would then be over different assay sets each epoch.
+    """
+    groups = load_fitness(split)
+    rows: List[Dict] = []
+    for assay, seqs, y in groups:
+        n = len(seqs) if max_rows is None else min(len(seqs), max_rows)
+        preds = np.empty(n, dtype=np.float32)
+        for s0 in range(0, n, batch):
+            chunk = [str(x) for x in seqs[s0:min(s0 + batch, n)]]
+            b = encode(chunk, device)
+            out = model(b["tokens"], b["mod_ids"], b["chem"], b["mask"],
+                        feats=feats_fn(b), n_loops=2)
+            preds[s0:s0 + len(chunk)] = out["fitness"].float().cpu().numpy()
+        rows.append({"assay": assay, "n": int(n),
+                     "spearman": _spearman(preds, y[:n]),
+                     "pred_sd": float(preds.std()),
+                     "distinct": int(len(np.unique(preds)))})
+    rho = [r["spearman"] for r in rows if np.isfinite(r["spearman"])]
+    return {"split": split, "n_assays": len(rows), "n_scored": len(rho),
+            "mean_spearman": float(np.mean(rho)) if rho else None,
+            "min_pred_sd": (round(min(r["pred_sd"] for r in rows), 8)
+                            if rows else None),
+            "per_assay": rows}
 
 
 def require_gpu(args) -> torch.device:
@@ -367,6 +561,17 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--probing-limit", type=int, default=None)
+    ap.add_argument("--fitness-limit", type=int, default=None,
+                    help="cap stage 6 rows per epoch")
+    ap.add_argument("--no-fitness", action="store_true",
+                    help="run stages 2-3 only. The run then says so in its "
+                         "manifest rather than silently reporting two tasks "
+                         "under a three-task weight table.")
+    ap.add_argument("--fitness-val-rows", type=int, default=4096,
+                    help="rows per assay scored at each epoch end for the "
+                         "stage-6 val and transfer correlations. Per ASSAY, "
+                         "not per split: a cap on the split would score the "
+                         "first assays and drop the last.")
     ap.add_argument("--init-from", type=Path, default=None,
                     help="a stage-1 pretraining checkpoint")
     ap.add_argument("--log-every", type=int, default=100)
@@ -415,7 +620,26 @@ def main() -> None:
               f"{len(missing.missing_keys)} keys fresh")
     pc = model.param_counts()
     print(f"[seq] {args.size}: {pc['total']:,} total / {pc['active']:,} active")
-    print(f"[seq] stage weights {STAGE_WEIGHTS}")
+
+    # Stage 6 runs only if its corpus is on disk, and the run SAYS which of the
+    # two it is. A weight table that lists a task the run is not performing is
+    # the exact defect that let `"fitness": 0.3` sit here unread for the life
+    # of the file; the weights printed below are the ones about to be applied.
+    use_fitness = (not args.no_fitness) and (FITNESS / "train.parquet").exists()
+    weights = dict(STAGE_WEIGHTS)
+    if not use_fitness:
+        weights.pop("fitness")
+        why = ("--no-fitness" if args.no_fitness
+               else f"{FITNESS / 'train.parquet'} is missing -- run "
+                    f"scripts/build_fitness_dataset.py")
+        print(f"[seq] stage 6 DISABLED: {why}")
+    else:
+        groups = load_fitness("train")
+        print(f"[seq] stage 6: {sum(len(y) for _, _, y in groups):,} variants "
+              f"over {len(groups)} assays, "
+              f"val {sum(len(y) for _, _, y in load_fitness('val')):,}, "
+              f"transfer {sum(len(y) for _, _, y in load_fitness('transfer')):,}")
+    print(f"[seq] stage weights {weights}")
 
     def feats_fn(b):
         return RouterFeatures(
@@ -463,12 +687,24 @@ def main() -> None:
         "ss_majority", "ss_macro_recall",
         "ss_val_loss", "ss_val_accuracy", "ss_val_majority",
         "ss_val_macro_recall", "ss_val_lift", "ss_generalisation_gap",
-        "ss_val_batches", "probing_loss", "probing_pearson", "n_oom", "note",
+        "ss_val_batches", "probing_loss", "probing_pearson",
+        # stage 6. `fitness_pred_sd` is in the time series on purpose: it is
+        # the column that distinguishes a head that is learning slowly from a
+        # head that has collapsed to a constant, and the two look identical in
+        # the loss.
+        "fitness_loss", "fitness_spearman", "fitness_pred_sd",
+        "ss_batches", "probing_batches", "fitness_batches",
+        "ss_passes", "probing_passes", "fitness_passes",
+        "fitness_val_spearman", "fitness_val_assays",
+        "fitness_transfer_spearman", "fitness_transfer_assays",
+        "fitness_generalisation_gap",
+        "n_oom", "note",
     ], manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
         "epochs": args.epochs, "batch": args.batch, "lr_peak": args.lr,
         "total_steps_estimated": total_steps,
-        "stage_weights": STAGE_WEIGHTS,
+        "stage_weights": weights,
+        "stage6_enabled": use_fitness,
         "init_from": str(args.init_from) if args.init_from else None,
         "resumed_from_epoch": start_ep, "resumed_from_gstep": gstep,
         "checkpoint": str(ck),
@@ -482,16 +718,54 @@ def main() -> None:
                     "epoch": ep, "epoch_done": done,
                     "gstep": gstep, "history": hist}, ck)
 
+    # Each stream restarts inside the epoch instead of going quiet when it
+    # runs out, so every step carries every task. Both counters are reported,
+    # because the ratio between the streams is the thing that used to live in
+    # a comment and disagree with the code.
+    #
+    # `pulled` counts BATCHES and `passes` counts completed sweeps. Pulled is
+    # the one to read: a pass is only credited when a generator runs out, so
+    # the longest stream -- the one whose length defines the epoch -- finishes
+    # its sweep exactly as the loop stops and would report 0 passes having
+    # supplied every step. Counting the thing that happened rather than the
+    # thing that completed is the difference.
+    pulled = {"ss": 0, "reactivity": 0, "fitness": 0}
+    passes = {"ss": 0, "reactivity": 0, "fitness": 0}
+
+    def cycled(make, name):
+        while True:
+            got = False
+            for item in make():
+                got = True
+                pulled[name] += 1
+                yield item
+            passes[name] += 1
+            if not got:
+                # an empty corpus must not spin: yield nothing, forever,
+                # rather than loop on a generator that returns immediately
+                return
+
+    steps_per_epoch = max(1, total_steps // max(args.epochs, 1))
     for ep in range(start_ep, args.epochs):
         model.train()
         t0 = time.time()
         ss_loss, ss_acc, pr_loss, pr_r, step = [], [], [], [], 0
         ss_major: List[float] = []
         ss_macro: List[float] = []
-        gen_ss = iter_ss("train", args.batch)
-        gen_pr = iter_probing(args.batch, args.probing_limit)
-        done_ss = done_pr = False
-        while not (done_ss and done_pr):
+        fit_loss: List[float] = []
+        fit_r: List[float] = []
+        fit_sd: List[float] = []
+        fit_rng = np.random.default_rng(1234 + ep)
+        for k in passes:
+            passes[k] = pulled[k] = 0
+        gen_ss = cycled(lambda: iter_ss("train", args.batch), "ss")
+        gen_pr = cycled(lambda: iter_probing(args.batch, args.probing_limit),
+                        "reactivity")
+        gen_fit = (cycled(lambda: iter_fitness("train", args.batch, fit_rng,
+                                               args.fitness_limit), "fitness")
+                   if use_fitness else iter(()))
+        done_ss = done_pr = done_fit = False
+        while step < steps_per_epoch and not (done_ss and done_pr and done_fit):
             total = None
             step_parts: dict = {}
             # stage 2
@@ -522,6 +796,21 @@ def main() -> None:
                     pr_r.append(r)
             except StopIteration:
                 done_pr = True
+            # stage 6
+            try:
+                _assay, fseqs, ftgt = next(gen_fit)
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    l, r, sd = fitness_step(model, fseqs, ftgt, device, feats_fn)
+                if l is not None:
+                    total = (STAGE_WEIGHTS["fitness"] * l if total is None
+                             else total + STAGE_WEIGHTS["fitness"] * l)
+                    step_parts["fitness"] = float(l.detach())
+                    fit_loss.append(float(l.detach()))
+                    if np.isfinite(r):
+                        fit_r.append(r)
+                    fit_sd.append(sd)
+            except StopIteration:
+                done_fit = True
             if total is None:
                 continue
             lr_now = lr_at(gstep, total_steps, args.lr)
@@ -548,10 +837,13 @@ def main() -> None:
                 continue
             step += 1
             if args.smoke:
+                _fz = (f" fitness {_m(fit_loss, 1):.4f} "
+                       f"rho {(_m(fit_r, 1) if fit_r else float('nan')):+.4f} "
+                       f"sd {_m(fit_sd, 1):.4f}" if fit_loss else " fitness -")
                 print(f"[seq] smoke step {step}/{args.smoke} "
                       f"total {float(total.detach()):.4f} "
                       f"ss {_m(ss_loss, 1):.4f} acc {_m(ss_acc, 1):.4f} "
-                      f"probing {_m(pr_loss, 1):.4f}", flush=True)
+                      f"probing {_m(pr_loss, 1):.4f}{_fz}", flush=True)
                 if step >= args.smoke:
                     # exercise the epoch-end VALIDATION before returning: it is
                     # new code on a path that has never run, and a smoke test
@@ -582,10 +874,33 @@ def main() -> None:
                     else:
                         print("[seq] smoke validation: NO BATCHES -- the split "
                               "did not load", flush=True)
-                    print("[seq] SMOKE TEST PASSED: stages 2-3 start, both "
-                          "channels produced a loss, the backward pass "
-                          "completes, and the bpRNA validation split loads "
-                          "and scores. No checkpoint written.", flush=True)
+                    # and stage 6's two evaluation splits, on the same
+                    # principle: a smoke test that stops before the new code
+                    # proves nothing about the new code.
+                    if use_fitness:
+                        model.eval()
+                        _fv = score_fitness(model, "val", device, feats_fn,
+                                            args.batch, max_rows=64)
+                        _ft = score_fitness(model, "transfer", device, feats_fn,
+                                            args.batch, max_rows=64)
+                        model.train()
+                        for _nm, _r in (("val", _fv), ("transfer", _ft)):
+                            print(f"[seq] smoke stage 6 {_nm:8s} "
+                                  f"{_r['n_scored']}/{_r['n_assays']} assays "
+                                  f"scored, rho {_r['mean_spearman']}, "
+                                  f"smallest prediction sd {_r['min_pred_sd']}",
+                                  flush=True)
+                        if _fv["n_scored"] == 0:
+                            print("[seq] SMOKE TEST FAILED: the fitness head "
+                                  "returned a constant for every assay",
+                                  flush=True)
+                            return 1
+                    print(f"[seq] SMOKE TEST PASSED: stages 2-3"
+                          f"{' and 6' if use_fitness else ''} start, every "
+                          f"channel produced a loss, the backward pass "
+                          f"completes, and the bpRNA validation split"
+                          f"{' and both fitness splits' if use_fitness else ''}"
+                          f" load and score. No checkpoint written.", flush=True)
                     return 0
                 continue
             if step % args.ckpt_every == 0:
@@ -602,12 +917,25 @@ def main() -> None:
                            ss_macro_recall=_m(ss_macro, args.log_every),
                            probing_loss=_m(pr_loss, args.log_every),
                            probing_pearson=_m(pr_r, args.log_every),
+                           fitness_loss=_m(fit_loss, args.log_every),
+                           fitness_spearman=_m(fit_r, args.log_every),
+                           fitness_pred_sd=_m(fit_sd, args.log_every),
+                           ss_batches=pulled["ss"],
+                           probing_batches=pulled["reactivity"],
+                           fitness_batches=pulled["fitness"],
+                           ss_passes=passes["ss"],
+                           probing_passes=passes["reactivity"],
+                           fitness_passes=passes["fitness"],
                            n_oom=n_oom)
+                fz = (f"  |  fitness loss {_m(fit_loss, args.log_every):.4f} "
+                      f"rho {_m(fit_r, args.log_every):+.4f} "
+                      f"sd {_m(fit_sd, args.log_every):.4f}"
+                      if fit_loss else "")
                 print(f"[seq] ep{ep} step{step} lr {lr_now:.2e}  2D loss "
                       f"{np.mean(ss_loss[-args.log_every:]):.4f} acc "
                       f"{np.mean(ss_acc[-args.log_every:]):.4f}  |  probing loss "
                       f"{np.mean(pr_loss[-args.log_every:]):.4f} r "
-                      f"{np.mean(pr_r[-args.log_every:]):.4f}", flush=True)
+                      f"{np.mean(pr_r[-args.log_every:]):.4f}{fz}", flush=True)
         # ---- the validation split, which was sitting on disk unread --------
         #
         # `data/benchmarks/secondary_structure/bprna_spot/` ships train,
@@ -636,6 +964,36 @@ def main() -> None:
                 vs_major.append(float(r[2]))
                 vs_macro.append(float(r[3]))
         model.train()
+
+        # ---- stage 6: unseen variants, then an unseen construct family ----
+        #
+        # Two numbers, because they answer different questions and only the
+        # second one is about generalisation. `val` holds back 20% of the
+        # variants of the SAME twelve assays, so a head that has memorised
+        # each assay's landscape still scores well on it. `transfer` is the
+        # five Townshend aptamers, a construct family no training step has
+        # seen. Reporting the first alone would be reporting the training
+        # accuracy under another name.
+        fit_val = fit_tr = None
+        if use_fitness:
+            model.eval()
+            fit_val = score_fitness(model, "val", device, feats_fn,
+                                    args.batch, args.fitness_val_rows)
+            fit_tr = score_fitness(model, "transfer", device, feats_fn,
+                                   args.batch, args.fitness_val_rows)
+            model.train()
+            for nm, r in (("val", fit_val), ("transfer", fit_tr)):
+                miss = r["n_assays"] - r["n_scored"]
+                flag = (f"  <<< {miss} assay(s) gave a CONSTANT prediction"
+                        if miss else "")
+                mean = r["mean_spearman"]
+                print(f"[seq] epoch {ep} stage 6 {nm:8s} "
+                      f"rho {mean:+.4f} over {r['n_scored']}/{r['n_assays']} "
+                      f"assays, smallest prediction sd {r['min_pred_sd']:.3g}"
+                      f"{flag}" if mean is not None else
+                      f"[seq] epoch {ep} stage 6 {nm:8s} NO ASSAY SCORED"
+                      f" ({r['n_assays']} tried){flag}", flush=True)
+
         v_acc = float(np.mean(vs_acc)) if vs_acc else None
         t_acc = float(np.mean(ss_acc)) if ss_acc else None
         hist.append({"epoch": ep, "steps": step,
@@ -654,7 +1012,31 @@ def main() -> None:
                                      round(float(np.mean(vs_acc))
                                            - float(np.mean(vs_major)), 5)),
                      "probing_loss": float(np.mean(pr_loss)) if pr_loss else None,
-                     "probing_pearson": float(np.mean(pr_r)) if pr_r else None})
+                     "probing_pearson": float(np.mean(pr_r)) if pr_r else None,
+                     "ss_batches": pulled["ss"],
+                     "probing_batches": pulled["reactivity"],
+                     "fitness_batches": pulled["fitness"],
+                     "ss_passes": passes["ss"],
+                     "probing_passes": passes["reactivity"],
+                     "fitness_passes": passes["fitness"],
+                     "fitness_loss": float(np.mean(fit_loss)) if fit_loss else None,
+                     "fitness_spearman": float(np.mean(fit_r)) if fit_r else None,
+                     "fitness_pred_sd": float(np.mean(fit_sd)) if fit_sd else None,
+                     "fitness_val_spearman": (fit_val or {}).get("mean_spearman"),
+                     "fitness_val_assays": (fit_val or {}).get("n_scored"),
+                     "fitness_transfer_spearman": (fit_tr or {}).get("mean_spearman"),
+                     "fitness_transfer_assays": (fit_tr or {}).get("n_scored"),
+                     # val minus transfer: how much of the head is the assay
+                     # rather than the RNA. Positive means it learned the
+                     # twelve assays it saw more than it learned fitness.
+                     "fitness_generalisation_gap": (
+                         None if not (fit_val and fit_tr)
+                         or fit_val["mean_spearman"] is None
+                         or fit_tr["mean_spearman"] is None
+                         else round(fit_val["mean_spearman"]
+                                    - fit_tr["mean_spearman"], 5)),
+                     "fitness_val_per_assay": (fit_val or {}).get("per_assay"),
+                     "fitness_transfer_per_assay": (fit_tr or {}).get("per_assay")})
         if v_acc is not None and t_acc is not None:
             _vm = float(np.mean(vs_major)) if vs_major else float("nan")
             _vk = float(np.mean(vs_macro)) if vs_macro else float("nan")
@@ -662,12 +1044,19 @@ def main() -> None:
                   f"VAL acc {v_acc:.4f}  gap {t_acc - v_acc:+.4f}  "
                   f"| val majority {_vm:.4f}  lift {v_acc - _vm:+.4f}  "
                   f"macro {_vk:.4f}  over {len(vs_acc)} batches", flush=True)
+        print(f"[seq] epoch {ep} streams: "
+              + "  ".join(f"{k} {pulled[k]:,} batches / {passes[k]} passes"
+                          for k in ("ss", "reactivity", "fitness")), flush=True)
         print(f"[seq] epoch {ep}: {hist[-1]}  ({time.time()-t0:.0f}s)", flush=True)
         # `**hist[-1]`, not four of its thirteen fields picked out by hand.
         # `epoch` and `steps` are passed positionally above and would collide.
         runlog.log("epoch", epoch=ep, step=step, gstep=gstep, n_oom=n_oom,
                    **{k: v for k, v in hist[-1].items()
-                      if k not in ("epoch", "steps")})
+                      # the two per-assay breakdowns are lists; they belong in
+                      # the json history, not in a csv cell
+                      if k not in ("epoch", "steps",
+                                   "fitness_val_per_assay",
+                                   "fitness_transfer_per_assay")})
         save(ep, True)
 
     if not hist:
@@ -676,8 +1065,8 @@ def main() -> None:
         print("[seq] no epochs ran; leaving the existing results file alone",
               flush=True)
         return
-    report = {"size": args.size, "params": pc, "stage_weights": STAGE_WEIGHTS,
-              "history": hist}
+    report = {"size": args.size, "params": pc, "stage_weights": weights,
+              "stage6_enabled": use_fitness, "history": hist}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"seqstages_{args.size}_results.json").write_text(json.dumps(report, indent=1))
     print(f"\n[seq] -> {OUT / f'seqstages_{args.size}_results.json'}")

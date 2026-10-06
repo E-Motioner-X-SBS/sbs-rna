@@ -1267,7 +1267,9 @@ def main() -> int:
               ROOT / "src/pharos/model/test_motif_bank.py",
               ROOT / "src/pharos/model/test_dynamics.py",
               ROOT / "src/pharos/data/test_dataset.py",
-              ROOT / "src/pharos/data/test_mlm_leak.py"]
+              ROOT / "src/pharos/data/test_mlm_leak.py",
+              ROOT / "src/pharos/data/test_fitness.py",
+              ROOT / "src/pharos/train/test_guard.py"]
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's
@@ -1528,6 +1530,86 @@ def main() -> int:
               f"63.8% of today's test chains were in the old train set.")
         warns.append(f"{len(stale_results)} result files predate the "
                      f"2026-09-24 split re-draw")
+
+    print("\n== stage 6 does not train on the benchmark it is scored against ==")
+    # The same class as the split above, one corpus over. 24 of the 31 assays
+    # on the RNAGym ncRNA leaderboard are ALSO shipped by NABench, usually
+    # under the same name -- so "train on NABench, evaluate on RNAGym" is one
+    # dataset wearing two names, and a fitness head trained that way would
+    # post a leaderboard-beating number by having been shown the answers.
+    #
+    # Neither benchmark's own tooling says so. The builder refuses instead of
+    # reporting, and this re-derives the refusal from the files it wrote.
+    fitdir = ROOT / "data/derived/fitness_v1"
+    if not (fitdir / "manifest.json").exists():
+        print("  WARN fitness corpus not built; "
+              "run scripts/build_fitness_dataset.py")
+        warns.append("stage 6 corpus not built")
+    else:
+        import pandas as _pd
+        fm = json.loads((fitdir / "manifest.json").read_text())
+        _b = _pd.read_parquet(fitdir / "benchmark.parquet")
+        _t = _pd.concat([_pd.read_parquet(fitdir / f"{n}.parquet")
+                         for n in ("train", "val", "transfer")])
+        chk("benchmark assays", int(_b.assay.nunique()), 31)
+        chk("benchmark ribozyme assays",
+            int(_b[_b.category == "Ribozyme"].assay.nunique()), 26)
+        chk("benchmark tRNA assays",
+            int(_b[_b.category == "tRNA"].assay.nunique()), 3)
+        chk("benchmark aptamer assays",
+            int(_b[_b.category == "Aptamer"].assay.nunique()), 2)
+        chk("assays shared with the training set",
+            len(set(_b.assay) & set(_t.assay)), 0)
+        # by sequence as well as by name: Guy_2014_tRNA is 132 nt in one
+        # source and 105 in the other and shares no exact sequence, while
+        # Beck_2022 and Roberts_2023_cepeb3 are 21,321 identical sequences
+        # under two names. Either check alone passes while the other fails.
+        chk("exact sequences shared with the training set",
+            len(set(_b.seq) & set(_t.seq)), 0)
+        _ps = _t.groupby("seq").split.nunique()
+        chk("sequences landing in two training splits",
+            int(_ps.max()) - 1, 0)
+        chk("every benchmark assay reconstructs from its wild type",
+            sum(1 for r in fm["benchmark"]["reconstruction"].values()
+                if r["variant_ok"] == r["parsed"] == r["n_mutant_rows"]), 31)
+        print(f"  OK  {'corpus':38s} digest={fm['digest']}  "
+              f"benchmark {len(_b):,} rows / {_b.assay.nunique()} assays, "
+              f"train+val {len(_t) - len(_t[_t.split == 'transfer']):,}, "
+              f"transfer {int((_t.split == 'transfer').sum()):,}")
+
+        # and the zero-shot reading, if one has been taken
+        zs = sorted(A.glob("fitness_zeroshot_*.json"))
+        zs = [f for f in zs if "smoke" not in f.name]
+        if not zs:
+            print("  WARN no zero-shot fitness reading yet "
+                  "(scripts/eval_fitness_zeroshot.py)")
+            warns.append("no zero-shot fitness reading")
+        for f in zs:
+            d = json.loads(f.read_text())
+            if d.get("partial"):
+                continue
+            # The value moves as stage 1 trains, so what is PINNED is that
+            # every assay contributed -- a nan Spearman does not lower a mean,
+            # so a dead reading and a good one summarise alike.
+            got = sum(v["n_assays_scored"] for v in d["per_category"].values())
+            chk(f"{f.stem}: assays contributing to the macro", got, 31)
+            ok = not d["problems"]
+            print(f"  {'OK ' if ok else 'FAIL'} "
+                  f"{f.stem + ': clean':38s} "
+                  + ("; ".join(d["problems"]) if d["problems"] else "no problems"))
+            if not ok:
+                fails.append(f"{f.stem} reported problems")
+            cats = d["per_category"]
+            label = "  macro {:+.4f}".format(d["macro_signed"])
+            print(f"  OK  {label:38s} "
+                  f"ribozyme {cats['Ribozyme']['signed']:+.4f}  "
+                  f"tRNA {cats['tRNA']['signed']:+.4f}  "
+                  f"aptamer {cats['Aptamer']['signed']:+.4f}  "
+                  f"({d['tokens']/1e9:.2f}B tokens, {d['strategy']})")
+            if d.get("published_leaderboard"):
+                print(f"  OK  {'  rank among the published 12':38s} "
+                      f"{d['rank_of_this_run']} of "
+                      f"{len(d['published_leaderboard']) + 1}")
 
     print("\n== the held-out curve is one series, not two spliced ==")
     # `heldout_files` reserves the last two shards of each corpus directory BY

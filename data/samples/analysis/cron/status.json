@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-05T20:09:01+05:30",
+ "updated": "2026-10-06T07:39:01+05:30",
  "state": "held",
  "detail": "held by /store/shuvam/E-motioner-X-SBS/sbs-rna/data/samples/analysis/cron/HOLD -- remove the file to resume",
  "free_gib_at_check": null,
@@ -8,6 +8,8 @@
   "verify":  "done",
   "stage1":  null,
   "scorer":  "done",
+  "fitnessdata": null,
+  "fitness_zeroshot": null,
   "seqstages": null,
   "stage5":  null
  }

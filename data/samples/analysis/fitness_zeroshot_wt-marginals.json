@@ -1,0 +1,37 @@
+{
+ "checkpoint": "/store/shuvam/E-motioner-X-SBS/sbs-rna/data/derived/checkpoints/pretrain_shared400.pt",
+ "tokens": 3340096189.0,
+ "size": "shared400",
+ "n_loops": 3,
+ "strategy": "wt-marginals",
+ "benchmark_digest": "b0109fc7",
+ "limit_per_assay": null,
+ "partial": false,
+ "per_category": {
+  "Ribozyme": {
+   "n_assays_expected": 26,
+   "n_assays_scored": 26,
+   "signed": 0.15597016990057966,
+   "abs": 0.18745369272743642,
+   "auc": 0.5901525875941616
+  },
+  "tRNA": {
+   "n_assays_expected": 3,
+   "n_assays_scored": 3,
+   "signed": 0.44070169735748244,
+   "abs": 0.44070169735748244,
+   "auc": 0.7179758450566478
+  },
+  "Aptamer": {
+   "n_assays_expected": 2,
+   "n_assays_scored": 2,
+   "signed": -0.08670025107363713,
+   "abs": 0.10450284669718804,
+   "auc": 0.5345368470083913
+  }
+ },
+ "macro_signed": 0.16999053872814165,
+ "macro_abs": 0.2442194122607023,
+ "problems": [],
+ "seconds": 75.1
+}

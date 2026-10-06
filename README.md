@@ -68,6 +68,12 @@ python3 scripts/corpus_tools.py stats
 # regenerate exploration figures + reports
 python3 scripts/explore_rna_data.py --sample-per-chunk 50000
 python3 scripts/explore_eldors_chunks.py
+
+# stage 6: build the fitness corpus, then score the benchmark it holds back.
+# The builder REFUSES if the training set touches the 31 RNAGym ncRNA
+# leaderboard assays -- 24 of them are also shipped by NABench.
+python3 scripts/build_fitness_dataset.py
+python3 scripts/eval_fitness_zeroshot.py --device cuda   # leaderboard convention
 ```
 
 ## Version-control policy

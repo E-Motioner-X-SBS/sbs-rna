@@ -309,6 +309,55 @@ def main() -> int:
                 say("OK", f"budget after {n_oom} OOM(s)",
                     f"{budget:,}" + (f" (was {pb:,})" if pb else ""))
 
+    # ---- stage 6's corpus, and the benchmark it holds back ---------------
+    #
+    # Checked here and not only in verify_claims because this is the file
+    # somebody actually looks at. The failure it guards is not a crash: a
+    # fitness head trained on the assays it is scored against produces a
+    # better number, not a worse one, so nothing downstream complains.
+    fit = ROOT / "data/derived/fitness_v1/manifest.json"
+    if not fit.exists():
+        say("WARN", "stage 6 corpus",
+            "not built -- scripts/build_fitness_dataset.py")
+    else:
+        try:
+            fm = json.loads(fit.read_text())
+        except (OSError, ValueError) as exc:
+            say("ALERT", "stage 6 corpus", f"unreadable: {exc}")
+            fm = None
+        if fm:
+            leak = fm.get("leak_check", {})
+            clean = leak == {"shared_assays": 0, "shared_sequences": 0}
+            say("OK" if clean else "ALERT", "stage 6 holds back its benchmark",
+                f"{fm['benchmark']['n_assays']} benchmark assays, "
+                f"{fm['training']['n_assays']} trained on, digest "
+                f"{fm['digest']}" if clean else f"LEAK: {leak}")
+            zs = [z for z in sorted(RUNS.parent.glob("fitness_zeroshot_*.json"))
+                  if "smoke" not in z.name]
+            if not zs:
+                say("OK", "zero-shot fitness",
+                    "no reading yet -- runs when the card frees")
+            else:
+                for z in zs:
+                    try:
+                        d = json.loads(z.read_text())
+                    except (OSError, ValueError):
+                        continue
+                    if d.get("partial"):
+                        continue
+                    scored = sum(v["n_assays_scored"]
+                                 for v in d["per_category"].values())
+                    # A nan Spearman does not lower a mean, so the count of
+                    # assays that contributed is the number that says whether
+                    # the macro means anything.
+                    say("OK" if scored == 31 else "ALERT",
+                        f"zero-shot fitness ({d['strategy']})",
+                        f"macro {d['macro_signed']:+.4f} over {scored}/31 "
+                        f"assays at {d['tokens']/1e9:.2f}B tokens"
+                        + (f", rank {d['rank_of_this_run']} of "
+                           f"{len(d['published_leaderboard']) + 1}"
+                           if d.get("published_leaderboard") else ""))
+
     # ---- headroom --------------------------------------------------------
     du = shutil.disk_usage(ROOT)
     free_gb = du.free / 1e9

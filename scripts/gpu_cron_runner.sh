@@ -79,6 +79,8 @@ if [ -f "$LOGDIR/HOLD" ]; then
   "verify":  $([ -f "$LOGDIR/.done-verify" ]  && echo '"done"' || echo 'null'),
   "stage1":  $([ -f "$LOGDIR/.done-stage1" ]  && echo '"done"' || echo 'null'),
   "scorer":  $([ -f "$LOGDIR/.done-scorer" ]  && echo '"done"' || echo 'null'),
+  "fitnessdata": $([ -f "$LOGDIR/.done-fitnessdata" ] && echo '"done"' || echo 'null'),
+  "fitness_zeroshot": $([ -f "$LOGDIR/.done-fitness-zeroshot" ] && echo '"done"' || echo 'null'),
   "seqstages": $([ -f "$LOGDIR/.done-seqstages" ] && echo '"done"' || echo 'null'),
   "stage5":  $([ -f "$LOGDIR/.done-stage5" ]  && echo '"done"' || echo 'null')
  }
@@ -132,6 +134,8 @@ write_status() {
   "verify":  $([ -f "$LOGDIR/.done-verify" ]  && echo '"done"' || echo 'null'),
   "stage1":  $([ -f "$LOGDIR/.done-stage1" ]  && echo '"done"' || echo 'null'),
   "scorer":  $([ -f "$LOGDIR/.done-scorer" ]  && echo '"done"' || echo 'null'),
+  "fitnessdata": $([ -f "$LOGDIR/.done-fitnessdata" ] && echo '"done"' || echo 'null'),
+  "fitness_zeroshot": $([ -f "$LOGDIR/.done-fitness-zeroshot" ] && echo '"done"' || echo 'null'),
   "seqstages": $([ -f "$LOGDIR/.done-seqstages" ] && echo '"done"' || echo 'null'),
   "stage5":  $([ -f "$LOGDIR/.done-stage5" ]  && echo '"done"' || echo 'null')
  }
@@ -235,6 +239,50 @@ fi
 # worse than no chain, because the run still produces a number.
 SIZE="${MLM_SIZE:-shared400}"
 CKPT_DIR=$REPO/data/derived/checkpoints
+
+# ---- 2b. the fitness corpus, and the benchmark it holds back -------------
+#
+# Built before stages 2-3 because stage 6 is co-trained inside them, and built
+# by a script that REFUSES on a leak rather than reporting one: 24 of the 31
+# RNAGym ncRNA leaderboard assays are also shipped by NABench, so a fitness
+# head trained on "NABench" and scored on "RNAGym" would be scored on its own
+# training data. Cheap (about 40 s, CPU only) and deterministic, so it runs
+# whenever its manifest is missing rather than being a thing someone remembers.
+if [ ! -f "$LOGDIR/.done-fitnessdata" ]; then
+    note "=== build_fitness_dataset.py (stage 6 corpus + held-back benchmark) ==="
+    if $PY -u scripts/build_fitness_dataset.py >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-fitnessdata"
+        note "fitness corpus built"
+    else
+        note "FITNESS CORPUS FAILED -- stage 6 would train on the benchmark"
+        write_status failed "build_fitness_dataset.py failed; see the log" "$F2"
+        exit 1
+    fi
+fi
+
+# ---- 2c. zero-shot fitness: the number that is comparable to a table ------
+#
+# PHAROS is a masked language model, so RNAGym's leaderboard convention --
+# the masked-marginal log-likelihood ratio at the mutated positions -- needs
+# no fitness head and no fine-tuning. This measures stage 1's checkpoint
+# against twelve published models and is therefore run right after stage 1
+# finishes, before anything fine-tunes the trunk away from it.
+#
+# 472,358 forward passes over the 31 assays. Minutes on a free A100; it is
+# not attempted on a card that is not.
+if [ ! -f "$LOGDIR/.done-fitness-zeroshot" ] && [ -f "$CKPT_DIR/pretrain_${SIZE}.pt" ]; then
+    note "=== eval_fitness_zeroshot.py (RNAGym ncRNA, masked-marginals) ==="
+    if $PY -u scripts/eval_fitness_zeroshot.py \
+            --device cuda --size "$SIZE" \
+            --checkpoint "$CKPT_DIR/pretrain_${SIZE}.pt" >> "$LOG" 2>&1; then
+        touch "$LOGDIR/.done-fitness-zeroshot"
+        note "zero-shot fitness scored"
+    else
+        # A failure here is a measurement that did not happen, not a broken
+        # model: the curriculum is not blocked on it.
+        note "zero-shot fitness did not complete; will retry next fire"
+    fi
+fi
 
 require_init() {   # $1 = path, $2 = stage name, $3 = predecessor name
     if [ ! -f "$1" ]; then
