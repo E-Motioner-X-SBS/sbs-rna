@@ -114,6 +114,7 @@ from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E40
 from pharos.train.telemetry import RunLog                            # noqa: E402
 from pharos.train.checkpoint import (atomic_save, load_optimizer,
                                      load_resume)
+from pharos.train.schedule import lr_for                          # noqa: E402
 from pharos.train.guard import check_loss
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
@@ -686,6 +687,17 @@ def main() -> None:
                          "training accuracy, on 10,934 examples recycled ~31x "
                          "per Ribonanza epoch.")
     ap.add_argument("--lr", type=float, default=3e-4)
+    # Defaults to the incumbent, so passing nothing changes nothing and a run
+    # in flight is unaffected. See `pharos.train.schedule` for why `wsd`
+    # should be the default of the NEXT run: a cosine's value at step t is a
+    # function of a total this setup cannot pin down, and that has already
+    # cost one silent 82x warm restart.
+    ap.add_argument("--lr-schedule", default="cosine", choices=("cosine", "wsd"))
+    ap.add_argument("--decay-frac", type=float, default=0.2,
+                    help="wsd only: fraction of the total spent annealing")
+    ap.add_argument("--warmup-steps", type=int, default=200,
+                    help="wsd only: an absolute count, deliberately not a "
+                         "fraction of the total")
     ap.add_argument("--batch", type=int, default=512,
                     help="MAXIMUM sequences in a batch. With --token-budget "
                          "this is a cap against a pathological batch of "
@@ -800,8 +812,16 @@ def main() -> None:
     if not use_fitness:
         sb["fitness"] = 0
     per_epoch = max(1, total_steps // max(args.epochs, 1))
-    print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} steps "
-          f"({args.epochs} epochs of {per_epoch:,})", flush=True)
+    if args.lr_schedule == "wsd":
+        print(f"[seq] schedule: WSD -- {args.warmup_steps} warm-up steps, "
+              f"stable at {args.lr:.2e}, then a 1-sqrt anneal to 0 over the "
+              f"last {args.decay_frac:.0%} of ~{total_steps:,} steps "
+              f"({args.epochs} epochs of {per_epoch:,}). The stable phase does "
+              f"not depend on the total, so a resume cannot warm-restart it.",
+              flush=True)
+    else:
+        print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} "
+              f"steps ({args.epochs} epochs of {per_epoch:,})", flush=True)
     # A RESUME INTO A DIFFERENT SCHEDULE IS A WARM RESTART, AND IT MUST SAY SO.
     #
     # `lr_at(gstep, total_steps, peak)` has no memory. A run that annealed a
@@ -902,6 +922,7 @@ def main() -> None:
         "epochs": args.epochs, "batch": args.batch,
         "token_budget": args.token_budget, "lr_peak": args.lr,
         "total_steps_estimated": total_steps,
+        "lr_schedule": args.lr_schedule,
         "stage_weights": weights,
         "stage6_enabled": use_fitness,
         "init_from": str(args.init_from) if args.init_from else None,
@@ -1022,7 +1043,11 @@ def main() -> None:
                 done_fit = True
             if total is None:
                 continue
-            lr_now = lr_at(gstep, total_steps, args.lr)
+            lr_now = (lr_at(gstep, total_steps, args.lr)
+                      if args.lr_schedule == "cosine" else
+                      lr_for("wsd", gstep, total_steps, args.lr,
+                             warmup_steps=args.warmup_steps,
+                             decay_frac=args.decay_frac))
             for g in opt.param_groups:
                 g["lr"] = lr_now
             gstep += 1
