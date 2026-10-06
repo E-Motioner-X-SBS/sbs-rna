@@ -86,7 +86,8 @@ from pharos.model.moe import (LENGTH_BIN_MAX as _LENGTH_BIN_MAX,  # noqa: E402
 from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
-from pharos.train.checkpoint import atomic_save              # noqa: E402
+from pharos.train.checkpoint import (atomic_save,          # noqa: E402
+                                     load_resume)
 from pharos.train.guard import check_loss
 
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -1197,9 +1198,15 @@ def main() -> None:
         resume = None
     if resume is not None:
         # RESUME BEATS --init-from: the runner passes --init-from every fire.
-        model.load_state_dict(resume["model"])
+        # strict=False, with a bounded tolerance -- see `load_resume`.
+        rep = load_resume(model, resume, what=f"[pharos] resume from {ck.name}")
         print(f"[pharos] resumed from {ck.name}: epoch {resume.get('epoch')}, "
               f"step {resume.get('step', 0):,}", flush=True)
+        if rep["fresh"]:
+            print(f"[pharos]   {len(rep['fresh'])} tensor(s) absent from it and "
+                  f"freshly initialised ({rep['n_fresh']:,} parameters, "
+                  f"{rep['frac']:.4%} of the model): "
+                  f"{', '.join(sorted(rep['fresh']))}", flush=True)
     elif args.init_from and Path(args.init_from).exists():
         sd = torch.load(args.init_from, map_location=device)
         res = model.load_state_dict(sd["model"], strict=False)

@@ -281,6 +281,55 @@ single-batch, and batch composition swings hard -- `dist_major` alone ranges
 0.29 to 0.48 across steps. The pooled epoch validation is the signal, and it
 improved on every head.
 
+## 78–79 — adding a parameter broke every resume and every evaluation
+
+Running the curriculum end to end from the 3.340B-token stage-1 checkpoint
+found both of these in the first ninety seconds, and neither is visible
+without actually running it. Wiring §6.2 (finding 63) added one parameter,
+`vdist.proj.weight`, 2,304 of 394,780,316. Every checkpoint in the tree was
+written before it existed.
+
+| # | what | status |
+|---|---|---|
+| 78 | `train_sequence_stages.py` and `train_pharos.py` both load the RESUME path with `model.load_state_dict(resume["model"])` -- **strict** -- three lines above an `--init-from` path that uses `strict=False` and reports what it loaded. One new parameter therefore turned every resumable checkpoint in the tree into a bare `RuntimeError: Missing key(s) in state_dict: "vdist.proj.weight"`, which says nothing about how much of the model is affected or whether continuing is sound. A project that adds parameters as it goes cannot have its resume path be the one that breaks | `FIXED` |
+| 79 | `_check_load` refuses to score a checkpoint missing any non-allowlisted tensor. Correct in form, wrong here: in all these checkpoints `bias_scale` is stored as **exactly 0.0** -- the zero-initialised gate the §6.2 wiring was built around -- so `vdist.proj.weight` is multiplied by zero and cannot move a logit. The guard counted tensors where the question was reachability, and stopped the only published-comparable number this model has | `FIXED` |
+
+**78's fix is not `strict=False`.** That is worse than the crash: a resume
+that silently re-randomises half the trunk reports as a resume and is not
+one, which is the exact failure `--init-from`'s own guard exists to stop, on
+the path that never had it. `pharos.train.checkpoint.load_resume` loads
+non-strictly, **names** every fresh tensor in the log, and refuses past 1% of
+the model -- measured in PARAMETERS, not tensors, because one missing tensor
+can be a 2,304-element projection or a 285M-element embedding table and the
+tensor count cannot tell them apart. The test asserts both directions: a
+0.0972% addition resumes and is named, a 99.5% one is refused with the tensor
+named and the fraction stated.
+
+**79's fix is not an allowlist entry either.** Adding `vdist.proj.weight` to
+`_MAY_BE_MISSING` would wave it through on a checkpoint where the gate HAD
+opened -- a real defect hidden, to silence one that does not exist. The
+question is empirical, so `_provably_inert` measures it: one forward pass at
+the loaded weights, then three more with the named tensors filled from
+`randn * 10`, in fp32 rather than the evaluator's bf16 so the comparison is
+as sensitive as the hardware allows. Bitwise-identical logits is a proof for
+THAT checkpoint and claims nothing about any other, which is the property an
+allowlist cannot have.
+
+The control matters more than the result. Run against four tensors of the
+same checkpoint:
+
+| tensor | verdict | evidence |
+|---|---|---|
+| `vdist.proj.weight` | inert | 3 draws at 10x, logits bitwise identical |
+| `elec.log_scale` | inert | same -- it is behind the same zero gate |
+| `trunk.blocks.7.mixer.bias_scale` | **reachable** | draw 1 moved the logits by 6.790e-03 |
+| `mlm_norm.weight` | **reachable** | draw 1 moved the logits by 3.886e+01 |
+
+The gate itself is reachable at 6.8e-3 while the tensor it gates is not
+reachable at all. That is the whole §6.2 design stated as a measurement, and
+it is also the discrimination that makes the proof worth trusting: a check
+that returned "inert" for everything would have passed this checkpoint too.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

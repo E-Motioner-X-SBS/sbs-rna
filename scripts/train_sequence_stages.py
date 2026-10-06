@@ -112,7 +112,7 @@ from pharos.data.vocab import PAD_ID, SYMBOLS, encode_chain          # noqa: E40
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
-from pharos.train.checkpoint import atomic_save
+from pharos.train.checkpoint import atomic_save, load_resume
 from pharos.train.guard import check_loss
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
@@ -743,9 +743,17 @@ def main() -> None:
         # fire, so without this an interrupted stage restarts from stage 1's
         # weights and throws away everything it had done -- and an epoch here is
         # about 10,500 steps.
-        model.load_state_dict(resume["model"])
+        # strict=False, with a bounded tolerance -- see `load_resume`. This
+        # was a bare strict load, and wiring §6.2 added one 2,304-parameter
+        # tensor that made every checkpoint in the tree raise on resume.
+        rep = load_resume(model, resume, what=f"[seq] resume from {ck.name}")
         print(f"[seq] resumed from {ck.name}: epoch {resume.get('epoch', 0)}, "
               f"step {resume.get('gstep', 0):,}", flush=True)
+        if rep["fresh"]:
+            print(f"[seq]   {len(rep['fresh'])} tensor(s) absent from it and "
+                  f"freshly initialised ({rep['n_fresh']:,} parameters, "
+                  f"{rep['frac']:.4%} of the model): "
+                  f"{', '.join(sorted(rep['fresh']))}", flush=True)
     elif args.init_from and args.init_from.exists():
         sd = torch.load(args.init_from, map_location=device)
         missing = model.load_state_dict(sd["model"], strict=False)

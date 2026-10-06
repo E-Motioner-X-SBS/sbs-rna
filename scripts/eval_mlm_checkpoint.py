@@ -264,10 +264,90 @@ def _check_load(model, sd, ck) -> None:
         print(f"[eval] WARNING {len(unexpected)} unexpected keys, e.g. "
               f"{unexpected[:3]}")
     if bad:
+        # Before refusing, ASK whether the tensor can change an output at all.
+        #
+        # §6.2's `vdist.proj.weight` post-dates every checkpoint in the tree,
+        # and in all of them `bias_scale` is stored as exactly 0.0 -- the
+        # zero-initialised gate the wiring was built around -- so the bias it
+        # feeds is multiplied by zero and the fresh tensor cannot move a
+        # logit. Refusing there reports a problem that does not exist and
+        # stops the held-out curve; adding the name to `_MAY_BE_MISSING`
+        # would wave it through on a checkpoint where the gate HAD opened,
+        # which is a real problem hidden. Neither is right, and neither is
+        # necessary: the question is empirical, so measure it.
+        dead, detail = _provably_inert(model, bad)
+        if dead:
+            print(f"[eval] {len(bad)} tensor(s) absent and PROVABLY INERT in "
+                  f"this checkpoint: {bad[:5]} -- {detail}")
+            return
         raise SystemExit(
             f"[eval] REFUSING to score {ck}: {len(bad)} tensors "
             f"({n_bad:,} parameters) are missing from the checkpoint and would "
-            f"be scored at random initialisation -- {bad[:5]}")
+            f"be scored at random initialisation -- {bad[:5]}\n"
+            f"  and they are reachable: {detail}")
+
+
+def _provably_inert(model, names, n_draws: int = 3) -> tuple:
+    """Do `names` change this model's output? Perturb them and look.
+
+    A tensor absent from a checkpoint is scored at whatever the constructor
+    gave it, and the question the guard actually cares about is not "is it
+    missing" but "does the number I am about to report depend on it". Those
+    differ whenever a parameter sits behind a gate the checkpoint stores as
+    zero, which is how every zero-initialised gate in this model starts.
+
+    So: one forward pass at the loaded weights, then `n_draws` more with the
+    named tensors filled with large random values, in fp32 rather than the
+    evaluator's bf16 so the comparison is as sensitive as the hardware allows.
+    Bitwise-identical logits across every draw is a proof for THIS checkpoint
+    and claims nothing about any other -- which is the property an allowlist
+    cannot have.
+    """
+    from pharos.model.moe import RouterFeatures
+
+    full = dict(model.state_dict())
+    present = [n for n in names if n in full]
+    if not present:
+        return False, "none of them are parameters of this model"
+    dev = next(model.parameters()).device
+    g = torch.Generator(device="cpu").manual_seed(0)
+    B, L = 2, 24
+    tok = torch.randint(1, 5, (B, L), generator=g).to(dev)
+    chem = torch.zeros(B, L, model.cfg.d_chem, device=dev)
+    mask = torch.ones(B, L, dtype=torch.bool, device=dev)
+    feats = RouterFeatures(length=mask.sum(1).float(),
+                           chem_summary=chem.sum(1)[:, :5])
+
+    def logits():
+        with torch.no_grad():
+            o = model(tok, torch.zeros_like(tok), chem, mask,
+                      feats=feats, n_loops=2, mlm=True)
+        return o["mlm_logits"].float().clone()
+
+    was_training = model.training
+    model.eval()
+    try:
+        ref = logits()
+        saved = {n: full[n].detach().clone() for n in present}
+        for d in range(n_draws):
+            with torch.no_grad():
+                for n in present:
+                    full[n].copy_(torch.randn_like(full[n]) * 10.0)
+            got = logits()
+            if not torch.equal(ref, got):
+                delta = (got - ref).abs().max().item()
+                with torch.no_grad():
+                    for n in present:
+                        full[n].copy_(saved[n])
+                return False, (f"draw {d + 1} moved the logits by "
+                               f"{delta:.3e}")
+        with torch.no_grad():
+            for n in present:
+                full[n].copy_(saved[n])
+    finally:
+        model.train(was_training)
+    return True, (f"{n_draws} draws at 10x scale left the MLM logits bitwise "
+                  f"identical")
 
 
 def main() -> int:
