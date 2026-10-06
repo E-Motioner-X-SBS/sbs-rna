@@ -134,6 +134,19 @@ SS_INDEX = {c: i for i, c in enumerate(SS_SYMBOLS)}
 #: missing when the phantom weight survived.
 STAGE_WEIGHTS = {"ss": 0.5, "reactivity": 1.0, "fitness": 0.3}
 
+#: Below this spread the `fitness` head is not predicting at all, whatever its
+#: Spearman says -- it is being correlated against float noise. See
+#: `score_fitness`.
+#:
+#: 1e-5, not the 1e-3 this was first set to. The threshold has to separate
+#: "collapsed" from "early in training", and those are two measured numbers,
+#: not a guess: a head at fp32 noise has a spread around 1e-8, and the head
+#: measured after 250 steps from a random init showed 0.0024 against a
+#: unit-variance target. 1e-3 sits a factor of two under a live-but-untrained
+#: head and would have fired on an ordinary first epoch, which is how a guard
+#: gets switched off. 1e-5 has two orders of margin on each side.
+DEAD_PRED_SD = 1e-5
+
 
 def enable_gpu_fast_paths() -> None:
     """A100 fast paths that are free and off by default.
@@ -182,13 +195,16 @@ def lr_at(step: float, total: float, peak: float,
     return peak * (floor_frac + (1.0 - floor_frac) * 0.5 * (1.0 + math.cos(math.pi * y)))
 
 
-def estimate_steps(args) -> int:
-    """Total optimiser steps, from row counts rather than by running an epoch.
+def stream_batches(args) -> Dict[str, int]:
+    """Batches per epoch in each stream, from row counts rather than a dry run.
 
-    The loop pulls one batch from each stage per step and continues until both
-    generators are exhausted, so an epoch is `max` of the two batch counts, not
-    the sum. Parquet carries its row count in the footer, so stage 2 is free;
-    stage 3 is a CSV and is counted by lines, once.
+    Split out of `estimate_steps` and printed at startup because the epoch is
+    now BOUNDED by this arithmetic rather than merely paced by it. The loop
+    used to run until every generator was exhausted and use the estimate only
+    for the cosine schedule, so a wrong estimate skewed the learning rate; now
+    the short streams restart and `steps_per_epoch` is the only thing that
+    ends an epoch, so a wrong estimate silently truncates training. An
+    estimate that decides how much training happens has to be on the page.
     """
     import pyarrow.parquet as pq
     n_ss = 0
@@ -212,9 +228,20 @@ def estimate_steps(args) -> int:
     # short streams restart inside the epoch, so an epoch is as long as the
     # longest stream. This matched the loop's INTENT before and not its
     # behaviour; now it matches both.
-    per_epoch = max(-(-n_ss // args.batch), -(-n_pr // args.batch),
-                    -(-n_fit // args.batch), 1)
-    return per_epoch * max(args.epochs, 1)
+    return {"ss": -(-n_ss // args.batch),
+            "reactivity": -(-n_pr // args.batch),
+            "fitness": -(-n_fit // args.batch)}
+
+
+def estimate_steps(args) -> int:
+    """Total optimiser steps over the whole run.
+
+    `max`, not `sum`: one batch is pulled from each stream per step and the
+    short streams restart inside the epoch, so an epoch is as long as the
+    longest stream. This matched the loop's INTENT before and not its
+    behaviour; now it matches both.
+    """
+    return max(max(stream_batches(args).values()), 1) * max(args.epochs, 1)
 
 
 def encode(seqs: List[str], device) -> Dict[str, torch.Tensor]:
@@ -441,10 +468,26 @@ def score_fitness(model, split: str, device, feats_fn, batch: int,
                      "pred_sd": float(preds.std()),
                      "distinct": int(len(np.unique(preds)))})
     rho = [r["spearman"] for r in rows if np.isfinite(r["spearman"])]
+    # A head that has collapsed to EXACTLY one value scores NaN and is
+    # caught. A head whose output varies by 1e-9 does not: `spearmanr` ranks
+    # float noise and returns a perfectly finite, perfectly meaningless
+    # number, and `n_scored` counts it as a scored assay. The first version
+    # of this function had only the exact test, which is the weaker half of
+    # the check it was written to be.
+    #
+    # The threshold is absolute because the TARGET is absolute: the builder
+    # rank-normalises every assay to unit variance, so a prediction spread
+    # below 1e-3 is a head explaining a thousandth of the signal it is being
+    # correlated against, whatever its correlation says.
+    dead = [r["assay"] for r in rows if r["pred_sd"] < DEAD_PRED_SD]
+    # Reported as well as flagged: `min_pred_sd` is the number that says how
+    # far above the floor the head is, and a flag that only fires at the
+    # bottom says nothing on the way down.
     return {"split": split, "n_assays": len(rows), "n_scored": len(rho),
             "mean_spearman": float(np.mean(rho)) if rho else None,
             "min_pred_sd": (round(min(r["pred_sd"] for r in rows), 8)
                             if rows else None),
+            "n_degenerate": len(dead), "degenerate": dead,
             "per_assay": rows}
 
 
@@ -649,9 +692,27 @@ def main() -> None:
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     hist: List[Dict] = []
+    #: per-assay stage-6 breakdowns, kept out of `hist` so that `hist` stays
+    #: exactly the set of csv columns. See the note where it is appended.
+    fit_detail: List[Dict] = []
     total_steps = max(1, estimate_steps(args))
+    sb = stream_batches(args)
+    if not use_fitness:
+        sb["fitness"] = 0
+    per_epoch = max(1, total_steps // max(args.epochs, 1))
     print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} steps "
-          f"({args.epochs} epochs)", flush=True)
+          f"({args.epochs} epochs of {per_epoch:,})", flush=True)
+    # The ratio the weights are set against, stated before a step is taken.
+    # It lived in a comment that disagreed with the loop for the life of the
+    # file: the comment said bpRNA was recycled ~31 times per Ribonanza pass
+    # and the loop gave head 4 a gradient on 3.3% of the steps.
+    print("[seq] per epoch: " + "  ".join(
+        f"{k} {v:,} batches x{per_epoch / max(v, 1):.1f}" for k, v in sb.items()
+        if v) + f"  (epoch = the longest, {per_epoch:,})", flush=True)
+    if per_epoch < max(sb.values() or [0]):
+        print(f"[seq] WARNING: an epoch is {per_epoch:,} steps but the longest "
+              f"stream has {max(sb.values()):,} batches -- it will be "
+              f"truncated", flush=True)
     gstep, start_ep, n_oom = 0, 0, 0
     if resume is not None:
         if "opt" in resume:
@@ -696,7 +757,9 @@ def main() -> None:
         "ss_batches", "probing_batches", "fitness_batches",
         "ss_passes", "probing_passes", "fitness_passes",
         "fitness_val_spearman", "fitness_val_assays",
+        "fitness_val_degenerate", "fitness_val_min_pred_sd",
         "fitness_transfer_spearman", "fitness_transfer_assays",
+        "fitness_transfer_degenerate",
         "fitness_generalisation_gap",
         "n_oom", "note",
     ], manifest={
@@ -895,6 +958,13 @@ def main() -> None:
                                   "returned a constant for every assay",
                                   flush=True)
                             return 1
+                        if _fv["n_degenerate"] == _fv["n_assays"]:
+                            print(f"[seq] SMOKE TEST FAILED: every assay's "
+                                  f"prediction spread is under {DEAD_PRED_SD:g} "
+                                  f"against a unit-variance target -- the head "
+                                  f"is not predicting, whatever its Spearman "
+                                  f"says", flush=True)
+                            return 1
                     print(f"[seq] SMOKE TEST PASSED: stages 2-3"
                           f"{' and 6' if use_fitness else ''} start, every "
                           f"channel produced a loss, the backward pass "
@@ -984,8 +1054,14 @@ def main() -> None:
             model.train()
             for nm, r in (("val", fit_val), ("transfer", fit_tr)):
                 miss = r["n_assays"] - r["n_scored"]
-                flag = (f"  <<< {miss} assay(s) gave a CONSTANT prediction"
-                        if miss else "")
+                bits = []
+                if miss:
+                    bits.append(f"{miss} gave a CONSTANT prediction")
+                if r["n_degenerate"]:
+                    bits.append(f"{r['n_degenerate']} have a spread under "
+                                f"{DEAD_PRED_SD:g} against a unit-variance "
+                                f"target: {', '.join(r['degenerate'][:3])}")
+                flag = ("  <<< " + "; ".join(bits)) if bits else ""
                 mean = r["mean_spearman"]
                 print(f"[seq] epoch {ep} stage 6 {nm:8s} "
                       f"rho {mean:+.4f} over {r['n_scored']}/{r['n_assays']} "
@@ -1024,8 +1100,11 @@ def main() -> None:
                      "fitness_pred_sd": float(np.mean(fit_sd)) if fit_sd else None,
                      "fitness_val_spearman": (fit_val or {}).get("mean_spearman"),
                      "fitness_val_assays": (fit_val or {}).get("n_scored"),
+                     "fitness_val_degenerate": (fit_val or {}).get("n_degenerate"),
+                     "fitness_val_min_pred_sd": (fit_val or {}).get("min_pred_sd"),
                      "fitness_transfer_spearman": (fit_tr or {}).get("mean_spearman"),
                      "fitness_transfer_assays": (fit_tr or {}).get("n_scored"),
+                     "fitness_transfer_degenerate": (fit_tr or {}).get("n_degenerate"),
                      # val minus transfer: how much of the head is the assay
                      # rather than the RNA. Positive means it learned the
                      # twelve assays it saw more than it learned fitness.
@@ -1035,8 +1114,18 @@ def main() -> None:
                          or fit_tr["mean_spearman"] is None
                          else round(fit_val["mean_spearman"]
                                     - fit_tr["mean_spearman"], 5)),
-                     "fitness_val_per_assay": (fit_val or {}).get("per_assay"),
-                     "fitness_transfer_per_assay": (fit_tr or {}).get("per_assay")})
+                     })
+        # The per-assay breakdowns are LISTS and do not belong in a csv cell,
+        # so they do not go in `hist`. `hist` is logged with `**hist[-1]` and
+        # `test_head_metrics.py` asserts that every one of its keys is a
+        # declared column -- an invariant that exists because stage 5 once
+        # declared nine columns and passed forty. Putting them in `hist` and
+        # then filtering them out at the `runlog.log` call satisfied neither
+        # the csv nor the invariant; they live beside it instead, and reach
+        # the results json by their own route.
+        fit_detail.append({"epoch": ep,
+                           "val": (fit_val or {}).get("per_assay"),
+                           "transfer": (fit_tr or {}).get("per_assay")})
         if v_acc is not None and t_acc is not None:
             _vm = float(np.mean(vs_major)) if vs_major else float("nan")
             _vk = float(np.mean(vs_macro)) if vs_macro else float("nan")
@@ -1052,11 +1141,7 @@ def main() -> None:
         # `epoch` and `steps` are passed positionally above and would collide.
         runlog.log("epoch", epoch=ep, step=step, gstep=gstep, n_oom=n_oom,
                    **{k: v for k, v in hist[-1].items()
-                      # the two per-assay breakdowns are lists; they belong in
-                      # the json history, not in a csv cell
-                      if k not in ("epoch", "steps",
-                                   "fitness_val_per_assay",
-                                   "fitness_transfer_per_assay")})
+                      if k not in ("epoch", "steps")})
         save(ep, True)
 
     if not hist:
@@ -1066,7 +1151,8 @@ def main() -> None:
               flush=True)
         return
     report = {"size": args.size, "params": pc, "stage_weights": weights,
-              "stage6_enabled": use_fitness, "history": hist}
+              "stage6_enabled": use_fitness, "history": hist,
+              "fitness_per_assay": fit_detail}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"seqstages_{args.size}_results.json").write_text(json.dumps(report, indent=1))
     print(f"\n[seq] -> {OUT / f'seqstages_{args.size}_results.json'}")

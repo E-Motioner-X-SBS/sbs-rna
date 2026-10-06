@@ -156,7 +156,7 @@
 ## Open Questions
 - OQ-1 [**ANSWERED — NO BIAS**]: confound controlled (partial corr survives), and
   the <30-residue exclusion is now tested directly
-  (`scripts/sampling/test_residue_guard_bias.py`). Recomputing the gradient at
+  (`scripts/sampling/measure_residue_guard_bias.py`). Recomputing the gradient at
   guards 30/20/15/10/5/1: the span moves from **1.760 to 1.757 sigma**, a change of
   **0.003 sigma**, and stays monotonic at every threshold. Dropping the guard
   entirely adds only 4 structures and 43 nucleotides (24,623 -> 24,666, +0.17%),

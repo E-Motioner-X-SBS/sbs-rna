@@ -318,10 +318,21 @@ def main() -> int:
     model = Pharos(cfg).to(device).eval()
     ck = torch.load(args.checkpoint, map_location=device)
     sd = ck["model"] if "model" in ck else ck
-    r = model.load_state_dict(sd, strict=False)
+    sd = {k.replace("_orig_mod.", ""): v for k, v in sd.items()}
+    # REFUSE a partial load rather than print one. This used to call
+    # `load_state_dict(strict=False)`, print the count of missing keys, and
+    # score the model anyway -- so a `--size` that did not match the
+    # checkpoint, a renamed trunk parameter or a half-written file would have
+    # scored a partly random model and printed it a leaderboard position.
+    # That is the defect this whole scorer is built to avoid, committed in
+    # its own loader. `_check_load` is `eval_mlm_checkpoint.py`'s, reused
+    # rather than reimplemented so the two cannot disagree about what counts
+    # as a tolerable absence.
+    from eval_mlm_checkpoint import _check_load
+    _check_load(model, sd, args.checkpoint)
     tokens_seen = float(ck.get("tokens", 0))
     print(f"[fz] {args.checkpoint.name}: {tokens_seen/1e9:.2f}B tokens, "
-          f"{len(r.missing_keys)} fresh keys, {len(r.unexpected_keys)} unexpected")
+          f"loaded and checked")
     print(f"[fz] strategy {args.strategy}, n_loops {args.n_loops}, "
           f"device {device}")
     chem_fn = BatchChemistry(SYMBOLS, device)
@@ -431,9 +442,21 @@ def main() -> int:
           f"measurement of how well a score tracks mutation count, and this "
           f"row is the floor to read every other row against.")
 
+    # The banner fires for EITHER kind of subset. It used to fire only for
+    # `--limit-per-assay`, so a run with `--assays` printed a rank against the
+    # full published table with nothing saying it had scored three of the 31.
+    # The json knew -- `"partial": bool(limit) or bool(assays)` -- and the
+    # thing a person reads did not.
+    _why = []
     if args.limit_per_assay:
-        print(f"\n[fz] PARTIAL: only the first {args.limit_per_assay:,} variants "
-              f"of each assay were scored. Not comparable to the table above.")
+        _why.append(f"only the first {args.limit_per_assay:,} variants of "
+                    f"each assay")
+    if args.assays:
+        _why.append(f"only {len(args.assays)} of the 31 assays")
+    if _why:
+        print(f"\n[fz] PARTIAL: {' and '.join(_why)} were scored. The table "
+              f"above compares this against full-benchmark numbers and is "
+              f"NOT a ranking.")
     if problems:
         print(f"\n[fz] {len(problems)} PROBLEM(S):")
         for p in problems:

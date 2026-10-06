@@ -267,7 +267,10 @@ def main() -> int:
     print(f"  MODEL                          {h0/max(n0,1):.4f}")
 
     print("\n== does it use all four bases, or collapse? ==")
-    print(f"  {'true\\pred':>10s} " + " ".join(f"{b:>7s}" for b in BASES))
+    # same reason as verify_claims.py: no backslash in an f-string expression
+    # below Python 3.12, and pyproject declares ">=3.10"
+    _hdr = "true\\pred"
+    print(f"  {_hdr:>10s} " + " ".join(f"{b:>7s}" for b in BASES))
     for i, b in enumerate(BASES):
         row = conf[i]
         print(f"  {b:>10s} " + " ".join(f"{v:7,d}" for v in row)

@@ -29,7 +29,11 @@ cd "$REPO" || exit 1
 
 # `touch data/samples/analysis/cron/WATCH_HOLD` and this stops checking.
 #
-# A full tick runs verify_claims.py, which runs 13 test suites as subprocesses;
+# A full tick runs verify_claims.py, which runs EVERY test module in the tree
+# as a subprocess -- 21 of them today, and the gate now asserts it covers the
+# directory rather than a hand-kept list, so this count grows without anyone
+# editing this comment. It is written as the invariant and not as a number
+# because the number was 13 here while the gate ran 17 and the tree held 21;
 # test_diffusion.py alone took 38 minutes at 542% CPU on a loaded machine, and
 # a tick that outlasts the 30-minute interval is followed by another. There was
 # no way to tell this loop to stand down short of editing the crontab, so
@@ -42,7 +46,8 @@ if [ -f "$LOGDIR/WATCH_HOLD" ]; then
     exit 0
 fi
 
-# One at a time. A full check runs 13 test suites and can outlast the interval.
+# One at a time. A full check runs every suite in the tree and can outlast the
+# 30-minute interval; flock means the next tick is skipped rather than doubled.
 exec 9>"$LOCK"
 flock -n 9 || exit 0
 

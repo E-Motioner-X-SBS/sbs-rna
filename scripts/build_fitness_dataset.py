@@ -397,11 +397,52 @@ def main() -> int:
 
     (args.out / "wildtypes.json").write_text(json.dumps(wildtypes, indent=1))
 
-    # ---- the digest, in the shape `split_digest` already uses --------------
+    # ---- two digests, because they answer different questions -------------
+    #
+    # `digest` is composition, in the shape `split_digest` already uses: which
+    # assay is in which split. It is what a leak would move.
+    #
+    # `content_digest` is the data. The composition digest alone cannot see a
+    # changed score column -- if RNAGym reships the zip with the same 31
+    # assay names and different numbers, every result downstream changes and
+    # the composition digest does not move at all. That is the same shape as
+    # finding 39, where a `DMS_score` column turned out to be read counts: the
+    # name is stable and the quantity is not.
     pairs = sorted(f"{a}:{s}" for a, s in
                    set(zip(benchmark.assay, benchmark.split))
                    | set(zip(train.assay, train.split)))
     digest = hashlib.sha1("\n".join(pairs).encode()).hexdigest()[:8]
+
+    def _content(df: pd.DataFrame) -> str:
+        h = hashlib.sha1()
+        for a, g in df.groupby("assay", sort=True):
+            o = g.sort_values(["seq", "mutant_str"], kind="mergesort")
+            h.update(a.encode())
+            h.update(str(len(o)).encode())
+            # float64 repr, not a rounded one: a rounded hash is a hash that
+            # does not change when the thing it is hashing does
+            h.update("\n".join(f"{q}\t{v!r}" for q, v in
+                                zip(o["seq"], o["dms_score"])).encode())
+        return h.hexdigest()[:8]
+
+    content_digest = _content(pd.concat([benchmark, train], ignore_index=True))
+
+    # and the files it was all built from, so a corpus can be traced to the
+    # bytes it came from rather than to a directory name
+    def _sha(path: Path) -> str:
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for blk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(blk)
+        return h.hexdigest()[:16]
+
+    sources = {str(RNAGYM_ZIP.relative_to(ROOT)): _sha(RNAGYM_ZIP),
+               str(RNAGYM_REF.relative_to(ROOT)): _sha(RNAGYM_REF)}
+    nb_h = hashlib.sha256()
+    for q in sorted(NABENCH.glob("*.csv")):
+        nb_h.update(q.name.encode())
+        nb_h.update(_sha(q).encode())
+    sources[str(NABENCH.relative_to(ROOT)) + "/*.csv"] = nb_h.hexdigest()[:16]
 
     def per_assay(df: pd.DataFrame) -> List[Dict]:
         g = df.groupby("assay")
@@ -415,6 +456,8 @@ def main() -> int:
 
     manifest = {
         "digest": digest,
+        "content_digest": content_digest,
+        "sources": sources,
         "val_frac": VAL_FRAC,
         "split_salt": SPLIT_SALT,
         "transfer_family": TRANSFER_FAMILY,
@@ -441,7 +484,9 @@ def main() -> int:
         "leak_check": {"shared_assays": 0, "shared_sequences": 0},
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=1))
-    print(f"[fit] digest {digest}")
+    print(f"[fit] digest {digest} (composition)  "
+          f"content {content_digest}  sources "
+          + ", ".join(f"{Path(k).name} {v[:8]}" for k, v in sources.items()))
     print(f"[fit] -> {args.out}/manifest.json")
     return 0
 

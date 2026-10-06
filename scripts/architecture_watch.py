@@ -412,7 +412,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--quick", action="store_true",
-                    help="skip verify_claims (which runs 13 test suites)")
+                    help="skip verify_claims (which runs every test module in the tree as a subprocess)")
     ap.add_argument("--no-work", action="store_true",
                     help="check only; do not run any queued CPU work")
     args = ap.parse_args()

@@ -471,7 +471,7 @@ def _stage5_fields() -> list:
     for t in _TAGGED_BIN:
         parts += [f"{t}_{x}" for x in ("pos_rate", "auroc")]
     for t in _TAGGED_REG:
-        parts += [f"{t}_{x}" for x in ("r", "base")]
+        parts += [f"{t}_{x}" for x in ("r", "base", "pred_sd")]
     f += [f"part_{k}" for k in dict.fromkeys(parts)]
     f += [f"val_{k}" for k in _EVAL_KEYS]
     return list(dict.fromkeys(f))
@@ -509,7 +509,7 @@ def _binary_metrics(logit: torch.Tensor, target: torch.Tensor,
 
 def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
                         tag: str) -> Dict[str, float]:
-    """Correlation, and the loss a constant predictor would have reached.
+    """Correlation, the constant-predictor loss, and the prediction's spread.
 
     The rigidity target is a z-scored B-factor, so predicting zero everywhere
     is already a respectable smooth-L1 and the reported loss cannot distinguish
@@ -517,6 +517,15 @@ def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
     correlation, which is 0 for any constant prediction however well tuned, and
     `_base` is the constant-mean predictor's loss so the reported figure has a
     number to be better than.
+
+    `_pred_sd` is the third, and it is the one that says WHICH kind of zero a
+    zero correlation is. When the prediction is constant the denominator
+    vanishes and this function returns `r = 0.0` -- the same value it returns
+    for a head that varies freely and happens to be uncorrelated. A collapsed
+    head and an unlucky one were indistinguishable in the time series, which
+    is the defect stage 6's `DEAD_PRED_SD` exists for, one stage over.
+    `rigidity_r_pooled` in `evaluate()` already returns None rather than 0 in
+    the same situation; the per-step metric did not.
     """
     with torch.no_grad():
         p = pred.float().flatten()
@@ -526,7 +535,8 @@ def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
         yc = y - y.mean()
         den = pc.norm() * yc.norm()
         r = float((pc * yc).sum() / den) if float(den) > 1e-12 else 0.0
-        return {f"{tag}_r": r, f"{tag}_base": base}
+        return {f"{tag}_r": r, f"{tag}_base": base,
+                f"{tag}_pred_sd": float(p.std()) if p.numel() > 1 else 0.0}
 
 
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
@@ -1252,7 +1262,16 @@ def main() -> None:
                     loss, parts, _ = step_losses(
                         model, t, cfg, args.n_neg, n_loops=nl,
                         structure_weight=args.structure_weight)
-                check_loss(loss, gstep, parts)
+                # `step`, not `gstep`. Stage 5 has no `gstep`: its counter is
+                # `step`, restored from the resume record at line 1212. The
+                # guard this call implements was added to stop a NaN reaching
+                # the optimiser, and as written it raised NameError on the
+                # FIRST optimiser step of the stage -- so the check that
+                # existed to prevent a silent failure was itself a hard one,
+                # in a stage that has never run and therefore never reported
+                # it. Found by running `--smoke 2 --from-scratch`, which is
+                # what that flag is for.
+                check_loss(loss, step, parts)
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

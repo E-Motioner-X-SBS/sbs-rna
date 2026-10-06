@@ -160,7 +160,7 @@ Highest value first:
       all moves the span only from **1.760 to 1.757 sigma** (change 0.003), monotonic
       at every threshold. Removing the guard adds 4 structures and 43 nucleotides
       (+0.17%) because the excluded structures hold 2-28 residues each. It is a
-      variance control, not a bias. `scripts/sampling/test_residue_guard_bias.py`.
+      variance control, not a bias. `scripts/sampling/measure_residue_guard_bias.py`.
 - [ ] Remaining rigor TODOs: T2 (ion inventory re-derivation), T4b, T6, T9, T12,
       T17 (verify cited literature numbers), T19. See `plans/rigor-recheck/todo.md`.
 - [ ] **STILL OPEN (R1): train the block-detection scorer** and measure block recall with

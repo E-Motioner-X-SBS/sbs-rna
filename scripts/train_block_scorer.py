@@ -108,8 +108,23 @@ def evaluate(model: Optional[BlockScorer], ds: Pharos3DDataset, cfg: ScorerConfi
     if model is not None:
         model.eval()
     gen = torch.Generator(device="cpu").manual_seed(seed)
+    # `recovered_total` and `pos_total` are in this list because the micro
+    # average below APPENDS to them, and a dict comprehension that does not
+    # name a key raises KeyError on the first chain. They were not here: the
+    # commit that added the micro average added the two `append` calls and not
+    # the two keys, so `evaluate()` crashed on its first chain and the stage
+    # could not be re-run at all.
+    #
+    # Nothing caught it because nothing re-ran it. `block_scorer_results.json`
+    # was written on 2026-09-21 and the micro average arrived afterwards, so
+    # the saved report carries `l1_recall_micro: None` -- which is exactly
+    # what the guarded `sum(acc.get(f"{lvl}_pos_total", []))` three lines
+    # below produces when the key is missing. A reader sees "not measured",
+    # not "cannot be measured", and the metric this function's own comment
+    # argues is the only meaningful one had never executed once.
     acc: Dict[str, List] = {f"{lvl}_{m}": [] for lvl in ("l1", "l2")
-                            for m in ("recall", "precision", "pos", "kept")}
+                            for m in ("recall", "precision", "pos", "kept",
+                                      "recovered_total", "pos_total")}
     by_len: Dict[str, List] = {}
     n_chains = 0
 
@@ -183,8 +198,10 @@ def evaluate(model: Optional[BlockScorer], ds: Pharos3DDataset, cfg: ScorerConfi
             continue
         res[k] = round(float(np.mean(v)), 4) if v else None
     for lvl in ("l1", "l2"):
-        tot = sum(acc.get(f"{lvl}_pos_total", []))
-        rec = sum(acc.get(f"{lvl}_recovered_total", []))
+        # Indexed, not `.get(..., [])`. The default is what turned a
+        # KeyError into a plausible `None` in the saved report.
+        tot = sum(acc[f"{lvl}_pos_total"])
+        rec = sum(acc[f"{lvl}_recovered_total"])
         res[f"{lvl}_recall_micro"] = round(rec / tot, 4) if tot else None
         res[f"{lvl}_positives_total"] = int(tot)
     res["recall_by_length"] = {k: round(float(np.mean(v)), 4)
@@ -217,11 +234,24 @@ def gpu_free_gib(index: int = 0) -> Optional[tuple]:
 def require_gpu(args) -> torch.device:
     """Refuse to start rather than fall back to CPU or crash on a busy GPU."""
     if not args.device.startswith("cuda"):
+        if getattr(args, "smoke", 0):
+            # The same escape stage 5 and stages 2-3 already have, for the
+            # reason this file did not: GPU-only is the right rule for the
+            # four ablation passes that give the RESULT its meaning, and the
+            # wrong rule for "does the training loop start". There was no way
+            # to answer that without a free A100, and a `KeyError` in
+            # `evaluate()` consequently sat in this stage for two weeks behind
+            # a done-marker (finding 43), as did a `NameError` in stage 5's
+            # step loop until its own smoke flag was finally run (finding 46).
+            print("[bs] SMOKE TEST on CPU: startup path only, "
+                  "no checkpoint will be written", flush=True)
+            return torch.device(args.device)
         raise SystemExit(
             "This trainer is GPU-only by design (see the module docstring): the "
             "ablations that give the result its meaning are four full passes, "
             "and on CPU that is long enough to discourage running them. "
-            "Pass --device cuda once a GPU is free.")
+            "Pass --device cuda once a GPU is free. For a startup check "
+            "without a GPU use --smoke N --device cpu.")
     mem = gpu_free_gib(int(args.device.split(":")[-1]) if ":" in args.device else 0)
     if mem is None:
         raise SystemExit("no GPU visible to nvidia-smi")
@@ -235,7 +265,7 @@ def require_gpu(args) -> torch.device:
     return torch.device(args.device)
 
 
-def train(args) -> None:
+def train(args) -> int:
     device = require_gpu(args)
     enable_gpu_fast_paths()
 
@@ -332,7 +362,8 @@ def train(args) -> None:
         for bidx in epoch_batches[ep]:
             t = to_device(tr.collate(bidx), device)
             try:
-                with torch.autocast("cuda", dtype=torch.bfloat16):
+                with torch.autocast("cuda", dtype=torch.bfloat16,
+                                    enabled=(device.type == "cuda")):
                     out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"])
                     out = {k: (v.float() if v.dtype != torch.bool else v)
                            for k, v in out.items()}
@@ -358,6 +389,35 @@ def train(args) -> None:
             sched.step()
             run.append(float(loss.detach()))
             step += 1
+            if args.smoke:
+                print(f"[bs] smoke step {step}/{args.smoke} "
+                      f"loss {float(loss.detach()):.4f}  "
+                      + "  ".join(f"{k} {v:.4g}" for k, v in sorted(parts.items())),
+                      flush=True)
+                if step >= args.smoke:
+                    # and the evaluation, on the model-free mode as well as
+                    # the learned one -- `evaluate()` is where the KeyError
+                    # was, and a smoke test that stops before the new code
+                    # proves nothing about the new code
+                    for _m in ("separation", "learned"):
+                        _r = evaluate(model, va, cfg, device, _m,
+                                      max_batches=1, token_budget=2048)
+                        print(f"[bs] smoke eval {_m:11s} "
+                              f"L1 macro {_r['l1_recall']} micro "
+                              f"{_r['l1_recall_micro']}  |  L2 macro "
+                              f"{_r['l2_recall']} micro {_r['l2_recall_micro']}",
+                              flush=True)
+                        if _r["l1_recall_micro"] is None:
+                            print("[bs] SMOKE TEST FAILED: the micro average "
+                                  "is None, which is what a missing "
+                                  "accumulator key looks like", flush=True)
+                            return 1
+                    print("[bs] SMOKE TEST PASSED: the scorer starts, the "
+                          "backward pass completes, and both the model-free "
+                          "and learned evaluations report a micro average. "
+                          "No checkpoint written.", flush=True)
+                    return 0
+                continue
             if step % args.ckpt_every == 0:
                 save_state(ep, False)
             if step % args.log_every == 0:
@@ -429,7 +489,7 @@ def train(args) -> None:
     print(f"\n[bs] -> {OUT / 'block_scorer_results.json'}")
 
 
-def main() -> None:
+def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", type=Path, default=DATA)
@@ -453,6 +513,9 @@ def main() -> None:
     ap.add_argument("--eval-batches", type=int, default=None)
     ap.add_argument("--log-every", type=int, default=100)
     ap.add_argument("--eval-only", action="store_true")
+    ap.add_argument("--smoke", type=int, default=0, metavar="N",
+                    help="run N steps and stop, writing no checkpoint. Works "
+                         "on CPU. For checking that the stage STARTS.")
     ap.add_argument("--ckpt-every", type=int, default=200,
                     help="steps between resume-state saves")
     ap.add_argument("--restart", action="store_true",
@@ -470,9 +533,12 @@ def main() -> None:
         for mode in ("random", "separation", "learned_noprior", "learned"):
             r = evaluate(model, te, cfg, device, mode, max_batches=args.eval_batches)
             print(f"  {mode:16s} L1 {r['l1_recall']}  L2 {r['l2_recall']}")
-        return
-    train(args)
+        return 0
+    # The return value is USED. `train` returns 1 when the smoke test fails,
+    # and a smoke test whose failure does not set the exit code is a smoke
+    # test the cron runner would treat as a pass.
+    return train(args) or 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

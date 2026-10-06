@@ -167,7 +167,7 @@ write_status running "pipeline started" "$F2"
 
 # ---- 1. the architecture must agree with its own measurements first --------
 if [ ! -f "$LOGDIR/.done-verify" ]; then
-    note "=== verify_claims.py (259 checks, 9 test suites) ==="
+    note "=== verify_claims.py (every claim, every test module in the tree) ==="
     if $PY scripts/sampling/verify_claims.py >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-verify"
         note "verification passed"

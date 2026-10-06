@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Close OQ-1: does the >=30-RNA-residue guard bias the Mg2+/rigidity gradient?
 
+Named `measure_`, not `test_`, and renamed from the latter. It asserts
+nothing, reports no pass or fail, and exits 0 whatever it finds: it recomputes
+an analysis and writes `residue_guard_bias.json`. Under the old name it was
+swept into `verify_claims.py`'s suite list on the reasoning that every
+`test_*.py` in the tree should be gated -- where it added fifteen minutes of
+parsing 8,043 gzipped structures to a check that fires every thirty minutes
+and could not have failed. A file has to be what its name says, and
+`measure_*` is what the rest of this directory uses for exactly this.
+
 `analyze_rigidity.py` drops structures with fewer than 30 RNA residues. Small
 RNAs are exactly where the inner-sphere Mg2+ fraction was measured LOWEST
 (0.296 for chains <500 nt vs 0.511 overall), so excluding them could inflate

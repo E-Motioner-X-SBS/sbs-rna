@@ -337,26 +337,41 @@ def main() -> int:
             if not zs:
                 say("OK", "zero-shot fitness",
                     "no reading yet -- runs when the card frees")
-            else:
-                for z in zs:
-                    try:
-                        d = json.loads(z.read_text())
-                    except (OSError, ValueError):
-                        continue
+            for z in zs:
+                # Every field below is read defensively. This runs from cron
+                # and an exception here takes the WHOLE monitor down -- every
+                # check after it stops reporting, including the ones about
+                # the live run, because a results file written by an older
+                # version of the scorer was missing a key.
+                try:
+                    d = json.loads(z.read_text())
                     if d.get("partial"):
                         continue
-                    scored = sum(v["n_assays_scored"]
-                                 for v in d["per_category"].values())
+                    cats = d["per_category"]
+                    scored = sum(v["n_assays_scored"] for v in cats.values())
+                    base = d.get("macro_depth_baseline")
                     # A nan Spearman does not lower a mean, so the count of
                     # assays that contributed is the number that says whether
-                    # the macro means anything.
+                    # the macro means anything. And the macro itself means
+                    # nothing without the floor: on this benchmark "count the
+                    # mutations" scores 0.1868 and outranks 9 of the 12
+                    # published models.
+                    extra = ""
+                    if d.get("published_leaderboard"):
+                        extra += (f", rank {d['rank_of_this_run']} of "
+                                  f"{len(d['published_leaderboard']) + 1}")
+                    if base is not None:
+                        extra += (f", floor {base:+.4f} "
+                                  f"({'above' if d.get('beats_depth_baseline') else 'BELOW'})")
+                    else:
+                        extra += ", no floor recorded -- re-run the scorer"
                     say("OK" if scored == 31 else "ALERT",
-                        f"zero-shot fitness ({d['strategy']})",
+                        f"zero-shot fitness ({d.get('strategy', '?')})",
                         f"macro {d['macro_signed']:+.4f} over {scored}/31 "
-                        f"assays at {d['tokens']/1e9:.2f}B tokens"
-                        + (f", rank {d['rank_of_this_run']} of "
-                           f"{len(d['published_leaderboard']) + 1}"
-                           if d.get("published_leaderboard") else ""))
+                        f"assays at {d.get('tokens', 0)/1e9:.2f}B tokens{extra}")
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    say("WARN", f"zero-shot fitness ({z.stem})",
+                        f"unreadable: {type(exc).__name__} {exc}")
 
     # ---- headroom --------------------------------------------------------
     du = shutil.disk_usage(ROOT)

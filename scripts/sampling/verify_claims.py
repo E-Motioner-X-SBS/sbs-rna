@@ -1269,7 +1269,41 @@ def main() -> int:
               ROOT / "src/pharos/data/test_dataset.py",
               ROOT / "src/pharos/data/test_mlm_leak.py",
               ROOT / "src/pharos/data/test_fitness.py",
-              ROOT / "src/pharos/train/test_guard.py"]
+              ROOT / "src/pharos/train/test_guard.py",
+              # Four modules that existed, passed, and were not in this list.
+              # `test_head_metrics.py` is the one that matters: it is the test
+              # of the floors -- the AUROC that must be 0.5 for a constant,
+              # the correlation that must be 0, the class lift that must be 0
+              # for a prior-predictor -- and it caught two live defects the
+              # first time it was run after stage 6 landed. A gate that
+              # decides whether training may proceed, and does not run the
+              # test of the thing every head is judged against, is the same
+              # shape as everything else in this audit: the check exists, it
+              # passes, and nothing asks it.
+              ROOT / "scripts/test_head_metrics.py",
+              ROOT / "src/pharos/eval/test_metrics.py",
+              ROOT / "src/pharos/model/test_shared_moe.py"]
+    # Every test module in the tree must be in that list. Four were not, for
+    # weeks, and one of them was the test of the floors every head is judged
+    # against. A list maintained by hand drifts from the directory it is
+    # supposed to cover, and the drift is silent in the direction that
+    # matters: a suite nobody runs reports nothing, so the gate stays green.
+    _have = {str(q.relative_to(ROOT)) for q in ROOT.rglob("test_*.py")
+             if "archive" not in q.parts and ".git" not in q.parts
+             and "__pycache__" not in q.parts}
+    _listed = {str(q.relative_to(ROOT)) for q in suites}
+    _ungated = sorted(_have - _listed)
+    _ghost = sorted(_listed - _have)
+    print(f"  {'OK ' if not _ungated else 'FAIL'} "
+          f"{'every test module is in this gate':38s} "
+          f"{len(_listed)} of {len(_have)} on disk"
+          + (f" -- NOT RUN: {_ungated}" if _ungated else ""))
+    if _ungated:
+        fails.append(f"{len(_ungated)} test modules are never run: {_ungated}")
+    if _ghost:
+        print(f"  FAIL {'a gated suite does not exist':38s} {_ghost}")
+        fails.append(f"gated but missing: {_ghost}")
+
     # Forced onto CPU. These are correctness tests over tensors of a few
     # thousand elements, so the GPU buys nothing -- and a shared GPU costs
     # something real: with another job holding 80.9 of 81.9 GB, Adam's
@@ -1490,8 +1524,12 @@ def main() -> int:
     bsr_splits = load("block_scorer_results.json")["splits"]
     cr_n = load("cascade_recall.json")["learned"]["n_chains"]
     ok = cr_n == bsr_splits["test"]
+    # The label is a variable because a backslash inside an f-string
+    # expression is a SyntaxError before Python 3.12, and pyproject declares
+    # ">=3.10". See the parse check in the test suites section.
+    _lbl = "cascade scored the scorer's own split"
     print(f"  {'OK ' if ok else 'FAIL'} "
-          f"{'cascade scored the scorer\'s own split':34s} "
+          f"{_lbl:34s} "
           f"{cr_n:,} chains vs the scorer's test {bsr_splits['test']:,}")
     if not ok:
         fails.append("cascade_recall was measured on a different split from "
@@ -1576,6 +1614,16 @@ def main() -> int:
               f"benchmark {len(_b):,} rows / {_b.assay.nunique()} assays, "
               f"train+val {len(_t) - len(_t[_t.split == 'transfer']):,}, "
               f"transfer {int((_t.split == 'transfer').sum()):,}")
+        # Composition and content are different questions. The composition
+        # digest is what a leak moves; it cannot see a changed score column,
+        # and finding 39 was a score column that was not what it was named.
+        _cd = fm.get("content_digest")
+        chk("the corpus records a content digest, not only a split one",
+            int(_cd is not None), 1)
+        if _cd:
+            print(f"  OK  {'  content + sources':38s} {_cd}  "
+                  + ", ".join(f"{Path(k).name} {v[:8]}"
+                              for k, v in fm.get("sources", {}).items()))
 
         # and the zero-shot reading, if one has been taken
         zs = sorted(A.glob("fitness_zeroshot_*.json"))

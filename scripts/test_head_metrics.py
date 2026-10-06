@@ -216,6 +216,55 @@ def main() -> int:
     base = tp._regression_metrics(torch.zeros(5000), tgt, "rg")["rg_base"]
     chk("the constant-mean baseline loss is reported", base > 0.0, f"{base:.4f}")
 
+    # r = 0 is reported for BOTH a collapsed head and a live uncorrelated one,
+    # so the correlation alone cannot tell them apart. The prediction's own
+    # spread is the number that can, and it was not reported.
+    flat = tp._regression_metrics(torch.full((5000,), 0.3), tgt, "rg")
+    live = tp._regression_metrics(torch.randn(5000), tgt, "rg")
+    chk("a collapsed head and an uncorrelated one both score r = 0",
+        abs(flat["rg_r"]) < 1e-6 and abs(live["rg_r"]) < 0.1,
+        f"collapsed {flat['rg_r']:.2e}, live {live['rg_r']:+.4f}")
+    # NOT `== 0.0`. `torch.std` of a constant tensor returns 2.98e-08, not
+    # zero -- the two-pass variance does not cancel exactly in fp32. Which is
+    # the reason a collapsed head is detected with a THRESHOLD and not an
+    # equality, here and in stage 6's `DEAD_PRED_SD`.
+    chk("but only the collapsed one has a vanishing prediction spread",
+        flat["rg_pred_sd"] < 1e-6 and live["rg_pred_sd"] > 0.5,
+        f"collapsed sd {flat['rg_pred_sd']:.2e} (not exactly 0), "
+        f"live sd {live['rg_pred_sd']:.4f}")
+
+    print("\n== the block scorer's micro average can actually be computed ==")
+    # It could not. The commit that added the micro average added two
+    # `acc[...].append` calls and not the two dict keys they append to, so
+    # `evaluate()` raised KeyError on its first chain -- and the guarded
+    # `sum(acc.get(key, []))` three lines below turned that into a plausible
+    # `l1_recall_micro: None` in the saved report. The metric the function's
+    # own comment argues is the only meaningful one had never run once.
+    #
+    # Checked by RUNNING it, on the model-free `separation` mode so this needs
+    # no GPU and no checkpoint. A source-level check for the missing key would
+    # be a regex over code, which is how the last two of these tests got it
+    # wrong.
+    import torch as _t
+    from train_block_scorer import evaluate as _ev
+    from pharos.model.block_scorer import ScorerConfig as _SC
+    from pharos.data.loader import Pharos3DDataset as _DS
+    _corpus = ROOT / "data/derived/pharos3d"
+    if not _corpus.exists():
+        chk("corpus present to evaluate against", False, str(_corpus))
+    else:
+        _r = _ev(None, _DS(_corpus, split="test"), _SC(), _t.device("cpu"),
+                 "separation", max_batches=2, token_budget=2048)
+        chk("the micro average is a number, not None",
+            _r["l1_recall_micro"] is not None and _r["l2_recall_micro"] is not None,
+            f"L1 {_r['l1_recall_micro']}, L2 {_r['l2_recall_micro']} over "
+            f"{_r['l1_positives_total']:,} positive L1 blocks")
+        chk("and it differs from the chain-weighted macro",
+            _r["l1_recall_micro"] != _r["l1_recall"],
+            f"macro {_r['l1_recall']} vs micro {_r['l1_recall_micro']} -- "
+            f"93.6% of the test split is under 128 nt, where the budget keeps "
+            f"about one block")
+
     print("\n== class lift is 0 for a head that predicts only the prior ==")
     # 76.57% is the corpus's measured Leontis-Westhof majority share
     maj = torch.rand(5000) < 0.7657
@@ -241,6 +290,86 @@ def main() -> int:
     chk("every telemetry field the trainer logs is declared",
         check_runlog_fields() == 0,
         "extrasaction='ignore' drops undeclared keys without an error")
+
+    print("\n== no undefined name, at the Python this project declares ==")
+    # `check_loss(loss, gstep, parts)` in train_pharos.py raised NameError on
+    # the FIRST optimiser step of stage 5 -- `gstep` does not exist there, the
+    # counter is `step`. The guard added to stop a NaN reaching the optimiser
+    # was itself a hard crash, in the one stage that has never run, so nothing
+    # reported it for two weeks. `--help` exits before the loop and the unit
+    # tests never execute it; a static undefined-name pass costs a second and
+    # catches the whole class.
+    #
+    # Run at the FLOOR of `requires-python`, not at the interpreter running
+    # this file. Two modules used a backslash inside an f-string expression,
+    # which is a SyntaxError before 3.12 -- and one of them was
+    # `verify_claims.py`, the gate that decides whether training may proceed.
+    # A project that declares 3.10 and cannot parse its own gate on 3.10 has
+    # a declaration, not a floor.
+    import re as _re
+    import subprocess as _sp
+    _floor = _re.search(r'requires-python\s*=\s*"[^0-9]*(\d+)\.(\d+)',
+                        (ROOT / "pyproject.toml").read_text())
+    _tgt = f"py{_floor.group(1)}{_floor.group(2)}" if _floor else "py310"
+    _r = _sp.run(["ruff", "check", "--select", "F821", "--target-version",
+                  _tgt, "--no-cache", "--quiet", "scripts", "src", "research"],
+                 cwd=ROOT, capture_output=True, text=True)
+    if _r.returncode == 127 or "No such file" in _r.stderr:
+        chk(f"ruff present to run the parse check at {_tgt}", False, _r.stderr[:80])
+    else:
+        _bad = [ln for ln in (_r.stdout + _r.stderr).splitlines()
+                if "invalid-syntax" in ln or "undefined-name" in ln
+                or "F821" in ln]
+        chk(f"every module parses and resolves at {_tgt}",
+            _r.returncode == 0 and not _bad,
+            "clean" if not _bad else f"{len(_bad)}: {_bad[:2]}")
+
+    print("\n== the NaN guard cannot crash the thing it guards ==")
+    # `check_loss` exists so a non-finite loss cannot reach the optimiser. In
+    # stage 5 it was written `check_loss(loss, gstep, parts)` and stage 5 has
+    # no `gstep`, so it raised NameError on the first optimiser step -- the
+    # guard against a silent failure was a loud one, in the one stage that
+    # had never run. Both halves are checked here: the step argument must be
+    # a name the function binds, and it must be bound BEFORE the call, since
+    # a counter first assigned by `step += 1` further down is an
+    # UnboundLocalError on the first iteration and the static pass above
+    # cannot see it.
+    import ast as _ast
+    _probs = []
+    for _f in sorted((ROOT / "scripts").glob("*.py")):
+        try:
+            _tree = _ast.parse(_f.read_text())
+        except SyntaxError as _e:
+            _probs.append(f"{_f.name}: {_e}")
+            continue
+        for _fn in [n for n in _ast.walk(_tree)
+                    if isinstance(n, _ast.FunctionDef)]:
+            _calls = [n for n in _ast.walk(_fn) if isinstance(n, _ast.Call)
+                      and isinstance(n.func, _ast.Name)
+                      and n.func.id == "check_loss"]
+            if not _calls:
+                continue
+            # first line each local name is written on. A plain loop: the
+            # nested comprehension this replaced referred to a name its own
+            # outer scope did not bind, which is precisely the defect below.
+            _binds: dict = {a.arg: _fn.lineno for a in _fn.args.args}
+            for _nd in _ast.walk(_fn):
+                if isinstance(_nd, _ast.Name) and isinstance(_nd.ctx, _ast.Store):
+                    _binds[_nd.id] = min(_binds.get(_nd.id, _nd.lineno),
+                                         _nd.lineno)
+            for _c in _calls:
+                if len(_c.args) < 2 or not isinstance(_c.args[1], _ast.Name):
+                    continue
+                _n = _c.args[1].id
+                if _n not in _binds:
+                    _probs.append(f"{_f.name}:{_c.lineno} `{_n}` is undefined")
+                elif _binds[_n] > _c.lineno:
+                    _probs.append(f"{_f.name}:{_c.lineno} `{_n}` is first "
+                                  f"bound at line {_binds[_n]}, after the call")
+    chk("every check_loss step argument is bound before the call",
+        not _probs, "; ".join(_probs) if _probs else
+        "4 trainers: pretrain_mlm, train_pharos, train_sequence_stages, "
+        "train_block_scorer")
 
     print("\n== every trainer's --help runs ==")
     chk("no argparse help string has an unescaped %",

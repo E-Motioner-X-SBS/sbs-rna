@@ -107,7 +107,7 @@ A-form RNA the correct value is **~0.80**, giving q_eff = -0.196 rather than
 -0.238. CORRECTION REQUIRED in all three deliverables.
 
 ### T24 [ADDED-CYCLE-1] — residue-guard bias on the Mg gradient — **PASS (no bias)**
-`test_residue_guard_bias.py`. Recomputes the gradient at guard in {30,20,15,10,5,1}.
+`measure_residue_guard_bias.py`. Recomputes the gradient at guard in {30,20,15,10,5,1}.
 
 | guard | structures | nt | span (sigma) | monotonic |
 |---|---|---|---|---|

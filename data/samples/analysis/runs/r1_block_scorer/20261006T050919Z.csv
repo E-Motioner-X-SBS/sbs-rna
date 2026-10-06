@@ -1,0 +1,1 @@
+run_id,stage,kind,timestamp,elapsed_s,epoch,step,lr,loss,n_oom,best_val_l2,note,val_l1_recall,val_l1_precision,val_l2_recall,val_l2_precision
