@@ -397,7 +397,12 @@ def main() -> int:
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
         return 1
-    print("ALL CHANNELS CARRY INFORMATION AND REACH THE MODEL")
+    # The gate greps stdout for this exact sentinel -- `ok = returncode == 0
+    # and "ALL TESTS PASS" in stdout` -- so a probe that passes while printing
+    # its own wording is reported as DRIFT with every check green. That is the
+    # defect this file exists to catch, in the file itself.
+    print("ALL TESTS PASS -- every channel carries information "
+          "and reaches the model")
     return 0
 
 
