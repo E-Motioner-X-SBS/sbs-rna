@@ -190,6 +190,45 @@ worth no more than one that never does.
 (The draw itself is expected to be poor -- that checkpoint's structure head
 is untrained. The defect is that nothing in the inference path said so.)
 
+## 76–77 — the data path, and two statistics with one name
+
+| # | what | status |
+|---|---|---|
+| 76 | **WITHDRAWN.** I reported the GPU idling at 28% because `to_device(tr.collate(idxs), device)` sat inline in the training loop. The 28% was measured while two of my OWN CPU-heavy jobs were running beside the trainer. Sampled on a quiet machine the same loop reads **mean 66%, median 66%, no zero samples**, and an interleaved A/B reads 117/117/116/117 s -- the prefetch buys nothing measurable. The epoch scaling I cited as proof (227 -> 251 -> 399 s) was my own contention, which is exactly what it looked like | `WITHDRAWN` |
+| 77 | training reports `rigidity_r` as **per-batch Pearson averaged over batches**; validation reports `rigidity_r_pooled` as **pooled Pearson over all residues**. Near-identical names, different statistics, printed side by side -- 0.717 against 0.0874 reads as catastrophic overfitting. On the SAME data with the SAME model the per-batch mean is **+0.2075** and the pooled is **+0.0188**, an 11x gap from the statistic alone, with per-batch values ranging +0.006 to +0.482 | `RECORDED` |
+
+Finding 77 is not a bug in either number -- the pooled one is the honest
+summary and the per-batch one is a legitimate training signal. The defect is
+that they are named as though they were comparable, so the obvious reading of
+the training log is wrong. Measured rather than argued: two statistics, one
+model, one set of batches.
+
+Finding 76's fix carries its own hazard, because a prefetch can lose data
+without raising -- a dropped batch is a smaller epoch, a reordered one breaks
+nothing visible, and an exception swallowed on the worker hangs the consumer
+forever. The probe asserts all three, and `--no-prefetch` keeps the ablation
+runnable, since a speed claim with no way to turn it off is not a measurement.
+
+**Finding 76 is withdrawn, and the way it failed is worth more than the
+finding would have been.** The first A/B read 294.55 s inline against
+117.46 s prefetched -- a 2.5x win. The verification gate finished between
+the two runs and the load average fell from 9.45 to 2.96, so the second arm
+ran on a quieter machine. Interleaved, the four runs read 117, 117, 116,
+117 s: **no difference at all.**
+
+The diagnosis was contaminated the same way. The 28% utilisation and the
+227 -> 251 -> 399 s epoch scaling were both measured while my own rigidity
+job and the verification gate were running beside the trainer. On a quiet
+machine the same loop samples at mean 66%, median 66%, with no zero
+readings. I measured my own interference and attributed it to the code.
+
+The `Prefetcher` is kept, with no speed claim attached. It is a structural
+guard against exactly the contention that produced the false reading -- on a
+box with 73 logged-in users and a dozen long-lived services that is a real
+operating condition -- and `--no-prefetch` makes the claim falsifiable.
+Whether it earns its place under load is a separate measurement, not an
+assumption.
+
 ### A correction, and what it cost
 
 I first put head 2's lift at **+0.2761** and wrote that the head was
