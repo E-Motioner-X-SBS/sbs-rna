@@ -38,6 +38,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from pharos.data.chemistry import chain_chemistry                   # noqa: E402
 from pharos.data.vocab import encode_chain                          # noqa: E402
 from pharos.eval.blind_tests import all_targets                     # noqa: E402
+from pharos.model.moe import LENGTH_BIN_MAX                         # noqa: E402
 from pharos.eval.metrics import clash_score                         # noqa: E402
 from pharos.eval.structure import read_structure                    # noqa: E402
 from pharos.model.diffusion import N_ATOM                           # noqa: E402
@@ -103,8 +104,22 @@ def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
 
     with torch.autocast(device.type, dtype=torch.bfloat16,
                         enabled=(device.type == "cuda")):
+        # The router conditioning must be the one TRAINING built, or the
+        # experts are selected from a vector the model never saw. Stage 5
+        # sets length, in_complex and the pooled chemistry; this passed
+        # length alone, leaving 6 of the 14 conditioning dims at zero and
+        # moving the representation by 35% of signal scale on an untrained
+        # model. `chem` is already computed four lines up, so the omission
+        # bought nothing. `in_complex` is genuinely unknown for a bare
+        # sequence and stays absent -- that one is a real unknown, not an
+        # oversight, and it reads as zero exactly as §5.3 specifies.
         out = model(tok, mod, ch, msk, feats=RouterFeatures(
-            length=msk.sum(1).float()), n_loops=n_loops, mlm=False)
+            length=msk.sum(1).float(),
+            chem_summary=(ch.sum(1) / msk.sum(1, keepdim=True).clamp(min=1))[:, :5],
+            # the SAME binning stage 5 trained with. Left at the default,
+            # 800, 1,200 and 2,000 nt chains each land one bin off.
+            length_bin_max=LENGTH_BIN_MAX,
+        ), n_loops=n_loops, mlm=False)
     single = out["hidden"].float()
 
     head = model.heads.structure

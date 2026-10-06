@@ -81,7 +81,8 @@ CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
-from pharos.model.moe import RouterFeatures                       # noqa: E402
+from pharos.model.moe import (LENGTH_BIN_MAX as _LENGTH_BIN_MAX,  # noqa: E402
+                              RouterFeatures)
 from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
@@ -184,9 +185,9 @@ def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
         length_bin_max=LENGTH_BIN_MAX)
 
 
-#: Upper edge of the router's length binning for the 3D corpus, whose longest
-#: chain is 4,450 residues. See `router_features`.
-LENGTH_BIN_MAX = 4608
+#: Re-exported from `pharos.model.moe`, which is where the binning it
+#: parametrises lives. Defining it here is what let inference diverge.
+LENGTH_BIN_MAX = _LENGTH_BIN_MAX
 
 
 def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
@@ -984,9 +985,18 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
             pair3 = model.diff_pair(out["hidden"], cvd)
             with torch.autocast(device.type, dtype=torch.bfloat16,
                                 enabled=(device.type == "cuda")):
+                # `torch.Generator()` is a CPU generator whatever the
+                # tensors are, and `random_rigid` feeds it to a `torch.randn`
+                # on the coordinates' device: on CUDA that raises "Expected a
+                # 'cuda' device type for generator but found 'cpu'" at the
+                # FIRST eval batch, so stage 5 trained and then died before
+                # reporting a single validation number. The seed is per-batch
+                # and fixed so the augmentation is reproducible; the device
+                # has to follow the tensors for that to be reachable at all.
                 dl = sh.loss(t["coords"].to(out["hidden"].dtype),
                              out["hidden"], pair3, crm,
-                             generator=torch.Generator().manual_seed(1234 + bi))
+                             generator=torch.Generator(device=device
+                                                       ).manual_seed(1234 + bi))
             for k in ("loss", "mse", "violation", "bond_cn", "bond_pp"):
                 if k in dl:
                     acc.setdefault(f"structure_{k}", []).append(

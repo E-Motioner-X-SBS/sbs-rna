@@ -135,6 +135,33 @@ average. The positive tail is kept in full. The guard works on the corpus that
 exists today, where the fabricated values are finite, and becomes a no-op once
 the corpus is rebuilt.
 
+## 68–71 — running the 3D stage, and reading the router conditioning
+
+Three of these are reachable only by running stage 5 end to end or by reading
+every call site side by side; none would fail a unit test, and all four are
+the register's class.
+
+| # | what | status |
+|---|---|---|
+| 68 | `neff_over_l` is read at `moe.py:106` into `extra[:, 0]` of the router conditioning and is **set by no caller anywhere** -- not stage 5, not stages 2/3/6, not inference, not the router audit. One conditioning dimension is permanently zero | `DECLARED` |
+| 69 | `predict_structure.py` built `RouterFeatures(length=...)` alone while stage 5 trains with the pooled chemistry too, so **6 of 14 conditioning dims were zero at inference**. `chem` is computed four lines above the call, so the omission bought nothing. On a randomly-initialised model the representation moves **35.3% of signal scale** | `FIXED` |
+| 70 | `length_bin_max` was defined inside one trainer, so every other caller silently got the default octave bins. The same chain then lands in a **different router bin** at inference than it trained in: 800, 1,200 and 2,000 nt all move, which is exactly the long-chain regime the hierarchical pair track exists for. The constant now lives beside the binning it parametrises | `FIXED` |
+| 71 | stage 5's `evaluate` passed `torch.Generator()` -- a CPU generator whatever the tensors are -- into `random_rigid`, so every CUDA run trained to the end of the epoch and then **died on the first eval batch**: `Expected a 'cuda' device type for generator but found 'cpu'`. Stage-5 validation had never once reported a number on GPU | `FIXED` |
+
+Finding 71 sat in a structural blind spot. The gate runs every suite with
+`CUDA_VISIBLE_DEVICES=""`, deliberately -- a neighbour's OOM once turned a
+passing suite into DRIFT DETECTED -- and the cost is that **no
+device-placement bug can ever be caught by it**. The probe now carries a
+source-level check for the class, because a source check runs on CPU, which
+is where the gate runs. It reports only real code: comments and string
+literals that mention the pattern are tokenised away, after the first
+version of the check reported itself twice.
+
+Stage 5 otherwise learns on every head over 150 steps from the stage-1
+checkpoint: `mg_auroc` 0.692 -> 0.839, `rigidity_r` **0.134 -> 0.645** on the
+b-factor targets finding 66 corrected, `lw_lift` 0.000 -> +0.074, `motif_lift`
+-0.010 -> +0.190, contact 0.535 -> 0.373, structure 1.028 -> 0.911.
+
 ## Unnumbered, same class
 
 | what | status |

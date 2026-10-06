@@ -56,6 +56,15 @@ class MoEConfig:
     dropout: float = 0.0
 
 
+#: Upper edge of the router's length binning for the 3D corpus, whose longest
+#: chain is 4,450 residues. It lives HERE, beside the binning it parametrises,
+#: because it was defined in one trainer and every other caller silently got
+#: the default: the same chain then lands in a different bin at inference than
+#: it trained in -- 800, 1,200 and 2,000 nt all move, which is precisely the
+#: long-chain regime the hierarchical pair track exists for (finding 70).
+LENGTH_BIN_MAX = 4608
+
+
 @dataclass
 class RouterFeatures:
     """The conditioning §5.3 specifies. All optional; absent means zero.

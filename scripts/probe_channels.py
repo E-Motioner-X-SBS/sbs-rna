@@ -314,6 +314,97 @@ def probe_model() -> None:
         chk(f"{name} has a non-zero gradient", g > 0, f"|grad| {g:.3e}")
 
 
+#: Router-conditioning fields each call site must supply, and why anything
+#: missing is allowed to be missing. `RouterFeatures` reads an absent field as
+#: ZERO, so a call site that forgets one does not raise -- it silently hands
+#: the router a vector the model was never trained on. Inference passed
+#: `length` alone while stage 5 trained with the pooled chemistry too, which
+#: left 6 of 14 conditioning dims at zero (finding 69).
+#: `length_bin_max` is listed because it is not decoration: it changes WHICH
+#: bin a length maps to, so a caller that omits it routes 800, 1,200 and
+#: 2,000 nt chains one bin away from where they trained. Inference must match
+#: the stage whose weights it loads, which is stage 5.
+ROUTER_CALLERS = {
+    "scripts/train_pharos.py":           {"length", "in_complex", "chem_summary",
+                                          "length_bin_max"},
+    "scripts/train_sequence_stages.py":  {"length", "chem_summary"},
+    "scripts/predict_structure.py":      {"length", "chem_summary",
+                                          "length_bin_max"},
+    "scripts/audit_router.py":           {"length", "chem_summary"},
+}
+
+
+def probe_router_conditioning() -> None:
+    """Every call site builds the conditioning the model was trained on."""
+    import ast
+    for rel, expect in ROUTER_CALLERS.items():
+        f = ROOT / rel
+        if not f.exists():
+            chk(f"{rel} exists", False, "missing")
+            continue
+        got = set()
+        for node in ast.walk(ast.parse(f.read_text())):
+            if (isinstance(node, ast.Call)
+                    and getattr(node.func, "id", None) == "RouterFeatures"):
+                got |= {k.arg for k in node.keywords if k.arg}
+        got.discard("recycle")          # the trunk sets this per loop
+        chk(f"{rel.split('/')[-1]} conditions on the trained fields",
+            got == expect,
+            f"{sorted(got)}" + ("" if got == expect
+                                else f"  expected {sorted(expect)}"))
+    # and the one field NOTHING supplies, declared so it cannot go stale
+    import re
+    src = (ROOT / "src/pharos/model/moe.py").read_text()
+    consumed = "self.neff_over_l is not None" in src
+    setters = [rel for rel in ROUTER_CALLERS
+               if "neff_over_l" in (ROOT / rel).read_text()]
+    chk("neff_over_l is consumed but set by nobody, as declared",
+        consumed and not setters,
+        "extra[:, 0] is permanently zero in every path (finding 68)"
+        if not setters else f"now set by {setters} -- update the declaration")
+
+
+def probe_device_contracts() -> None:
+    """No production path builds a CPU generator for a CUDA tensor.
+
+    The gate runs every suite with `CUDA_VISIBLE_DEVICES=""`, deliberately --
+    a neighbour's OOM once turned a passing suite into DRIFT DETECTED. The
+    cost is that a device-placement bug is structurally invisible to it, and
+    one lived there: stage 5's `evaluate` passed `torch.Generator()`, which
+    is a CPU generator whatever the tensors are, into `random_rigid`, so
+    every stage-5 run trained to the end of the epoch and then died on the
+    FIRST eval batch with "Expected a 'cuda' device type for generator but
+    found 'cpu'". It never reported a validation number.
+
+    A source check catches that class on CPU, which is where the gate runs.
+    """
+    import io
+    import re
+    import tokenize
+    bad = []
+    for f in sorted((ROOT / "scripts").rglob("*.py")) + \
+             sorted((ROOT / "src").rglob("*.py")):
+        if f.name.startswith("test_") or f.name == "probe_channels.py":
+            continue   # tests pin their own device; this file states the rule
+        text = f.read_text()
+        # Strip comments and strings before matching. A scan that reads its
+        # own pattern, or the comment explaining the pattern, reports itself
+        # -- which is what the first version of this check did, twice.
+        try:
+            toks = list(tokenize.generate_tokens(io.StringIO(text).readline))
+        except (tokenize.TokenError, IndentationError, SyntaxError):
+            continue
+        for t in toks:
+            if t.type in (tokenize.COMMENT, tokenize.STRING):
+                continue
+            if t.type == tokenize.NAME and t.string == "Generator":
+                ln = text.split("\n")[t.start[0] - 1]
+                if re.search(r"torch\.Generator\(\s*\)", ln):
+                    bad.append(f"{f.relative_to(ROOT)}:{t.start[0]}")
+    chk("no production path builds a device-less torch.Generator",
+        not bad, "none" if not bad else f"{bad}")
+
+
 def probe_losses() -> None:
     """Does each head's loss actually respond to ITS target?
 
@@ -367,6 +458,22 @@ def probe_losses() -> None:
                 continue
             chk(f"perturbing {key} moves {w}", abs(float(a) - float(b)) > 1e-9,
                 f"{float(a):.5f} -> {float(b):.5f}")
+    # An absent target must never reach a loss. 11.49% of residues carry NaN
+    # for b_factor_z -- the entries that have no measured B-factor, which
+    # before finding 66 carried a fabricated one -- so the mask is now load
+    # bearing: one leak turns the whole rigidity loss into NaN.
+    import numpy as _np
+    leaked = tot_nan = 0
+    rng = _np.random.default_rng(0)
+    for _ in range(4):
+        idxs = rng.choice(len(tr), 6, replace=False).tolist()
+        tb = T.to_device(tr.collate(idxs), torch.device("cpu"))
+        nan = ~torch.isfinite(tb["b_factor_z"].float())
+        tot_nan += int(nan.sum())
+        leaked += int((nan & tb["rigidity_mask"]).sum())
+    chk("absent rigidity targets never reach the loss", leaked == 0,
+        f"{tot_nan:,} NaN targets, {leaked} inside rigidity_mask")
+
     # and the one invariance that must HOLD: a rigid translation changes
     # nothing, or the structure head is learning the crystal frame
     tt = dict(t)
@@ -387,7 +494,11 @@ def main() -> int:
     probe_corpus(a.shards)
     if not a.skip_model:
         probe_model()
-        section("B4. every head's loss responds to its own target")
+        section("B4. every call site conditions the router the same way")
+        probe_router_conditioning()
+        section("B5. device contracts the CPU-only gate cannot see")
+        probe_device_contracts()
+        section("B6. every head's loss responds to its own target")
         probe_losses()
     if notes:
         print("\nRecorded, not failures:")
