@@ -802,6 +802,38 @@ def main() -> None:
     per_epoch = max(1, total_steps // max(args.epochs, 1))
     print(f"[seq] schedule: warm-up 1% then cosine over ~{total_steps:,} steps "
           f"({args.epochs} epochs of {per_epoch:,})", flush=True)
+    # A RESUME INTO A DIFFERENT SCHEDULE IS A WARM RESTART, AND IT MUST SAY SO.
+    #
+    # `lr_at(gstep, total_steps, peak)` has no memory. A run that annealed a
+    # 541-step cosine to 3.4e-06 and is then resumed with --epochs 2, which
+    # estimates 3,626 steps, evaluates the new cosine at 15% of its length and
+    # gets 2.8e-04 -- an 82x jump onto a model sitting in a sharp minimum.
+    # That is sometimes exactly what is wanted (more training, annealed
+    # properly at the end) and sometimes an accident, and the two are
+    # indistinguishable in the log: the only evidence was three metrics
+    # quietly getting worse over five hundred steps.
+    #
+    # `train_pharos.py` already warns on precisely this ("schedule changed
+    # (N -> M steps)"); this stage did not notice.
+    if resume is not None:
+        _old_total = resume.get("total_steps")
+        _old_peak = resume.get("lr_peak", args.lr)
+        _g = int(resume.get("gstep", 0))
+        if _old_total and _old_total != total_steps:
+            _was = lr_at(_g, _old_total, _old_peak)
+            _now = lr_at(_g, total_steps, args.lr)
+            print(f"[seq] WARM RESTART: this checkpoint annealed a "
+                  f"{_old_total:,}-step schedule and is being resumed into a "
+                  f"{total_steps:,}-step one. At gstep {_g:,} the learning "
+                  f"rate goes {_was:.3e} -> {_now:.3e}"
+                  + (f", a {_now/_was:.0f}x increase. Expect the metrics to "
+                     f"get WORSE before they recover; that is the restart, "
+                     f"not divergence." if _now > 2 * _was else "."),
+                  flush=True)
+        elif _old_total is None and _g > 0:
+            print(f"[seq] note: {ck.name} predates `total_steps` being "
+                  f"recorded, so the schedule it annealed on is unknown and "
+                  f"a warm restart cannot be detected", flush=True)
     # The ratio the weights are set against, stated before a step is taken.
     # It lived in a comment that disagreed with the loop for the life of the
     # file: the comment said bpRNA was recycled ~31 times per Ribonanza pass
@@ -880,9 +912,16 @@ def main() -> None:
         runlog.event("resumed", epoch=start_ep, step=gstep, gstep=gstep)
 
     def save(ep: int, done: bool) -> None:
+        # `total_steps` goes in the file. The learning rate here is
+        # `lr_at(gstep, total_steps, peak)` -- a pure function of the step and
+        # the CURRENT total -- so a run resumed with a different epoch count
+        # or a different corpus size evaluates a DIFFERENT cosine at the same
+        # step. Without the old total in the checkpoint there is nothing to
+        # compare against and nothing to warn about. See the resume guard.
         atomic_save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
-                    "epoch": ep, "epoch_done": done,
+                    "epoch": ep, "epoch_done": done, "total_steps": total_steps,
+                    "lr_peak": args.lr,
                     "gstep": gstep, "history": hist}, ck)
 
     # Each stream restarts inside the epoch instead of going quiet when it
