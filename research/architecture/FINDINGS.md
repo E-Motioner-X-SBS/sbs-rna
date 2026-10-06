@@ -167,7 +167,8 @@ b-factor targets finding 66 corrected, `lw_lift` 0.000 -> +0.074, `motif_lift`
 | # | what | status |
 |---|---|---|
 | 72 | resuming stage 5 restored the scheduler to `step` and then replayed the partially-done epoch **from batch 0**, so OneCycleLR raised `Tried to step 151 times. The specified number of total steps is 150`. The checkpoint is written mid-epoch by design, so a mid-epoch resume is the normal case. Second time the schedule has killed a run that had finished its work; `_sched_step` now clamps | `FIXED` |
-| 73 | head 2 reported **bare accuracy** while heads 9 and 10 report theirs against the majority rate, through the helper written for exactly that. The distance bins are far from uniform -- over 221,521 sampled pairs the catch-all bin 39 alone takes 18.89% -- so 0.19 is a prior-predictor's score and the reported 0.47 reads as working either way. The measured lift is **+0.2761**, so the head is learning; that could not be stated until the floor was printed beside the accuracy | `FIXED` |
+| 73 | head 2 reported **bare accuracy** while heads 9 and 10 report theirs against the majority rate, through the helper written for exactly that. The floor was added -- and on the first run that printed it, **head 2 is collapsed**: see 75 | `FIXED` |
+| 75 | with the floor computed on the SAME batch, `dist_acc` tracks `dist_major` to the digit at every step -- 0.4830/0.4830, 0.4690/0.4690, 0.2900/0.2900 -- and `dist_macro` sits at 0.026-0.031 against 1/39 = 0.0256. Head 2 predicts **one bin and nothing else**. It had been reporting 0.47 accuracy for the whole of stage 5 and reading as a working head | `OPEN` |
 
 ## 74 — the inference path reported a clean number for an impossible structure
 
@@ -188,6 +189,39 @@ worth no more than one that never does.
 
 (The draw itself is expected to be poor -- that checkpoint's structure head
 is untrained. The defect is that nothing in the inference path said so.)
+
+### A correction, and what it cost
+
+I first put head 2's lift at **+0.2761** and wrote that the head was
+learning. That was wrong, and wrong in the way this register keeps finding:
+the 0.47 came from a training run and the 0.19 floor came from a majority
+share I had sampled MYSELF over different batches, where random negatives
+land in the catch-all bin at a different rate. Two numbers from two
+samplings, subtracted. The floor is only a floor when it is computed on the
+same data as the accuracy -- which is precisely why `_class_metrics`
+computes `*_major` per batch, and precisely the mistake the helper exists to
+prevent. Once head 2 went through the helper the lift read 0.000.
+
+Head 2's collapse is left `OPEN` rather than guessed at. What is established:
+the head predicts a single bin; `dist_macro` is at chance for 39 classes; at
+random init `dist_lift` is -0.1195, so it *moved* to the prior rather than
+starting there; and the contact head reads 1.78x lift from the SAME `pair`
+tensor, so the representation it is given carries signal. What is not yet
+established is why. One more measurement narrows it: the distance LOSS does
+improve, 2.546 -> 2.205 by step 200, against a bin-prior entropy of 2.872
+nats -- so the predicted DISTRIBUTION carries information while the argmax
+stays degenerate. That is a head spreading mass over neighbouring bins
+without ever peaking off the majority, which points at the 40-bin
+discretisation and the negative sampler (the catch-all bin beyond 41 A takes
+21-48% of pairs depending on batch composition) rather than at a severed
+gradient. Accuracy was the wrong statistic for this head either way: the
+loss and the macro recall disagree with it, and only the macro recall and
+the floor say what it is doing.
+
+A caution for reading any of the per-step numbers above: they are
+single-batch, and batch composition swings hard -- `dist_major` alone ranges
+0.29 to 0.48 across steps. The pooled epoch validation is the signal, and it
+improved on every head.
 
 ## Checked and not defects
 
