@@ -211,14 +211,19 @@ class SlidingWindowAttention(nn.Module):
 
 
 class FullAttention(nn.Module):
-    """Global softmax attention with an additive physics bias.
+    """Global softmax attention, with an additive physics bias it never gets.
 
-    The bias is where the Hamiltonian reaches the token track: a screened
-    electrostatic term computed from the previous loop's distance estimate
-    (§6.2) is added to the logits, so the ionic condition changes what attends
-    to what rather than only re-scoring the output. At recycle 0 there is no
-    distance estimate and the bias is zero -- the same circularity §5.3 records
-    for the router.
+    `pair_bias` is where §6.2's Hamiltonian was to reach the token track: a
+    screened electrostatic term from the previous loop's distance estimate,
+    added to the logits so the ionic condition changes what attends to what.
+
+    **In this model it is always `None`.** Nothing passes `pair_bias_fn` to
+    the trunk, so `bias_scale` -- 12 parameters per full block, 24 in
+    shared400 -- receives no gradient and the branch below never runs. See
+    `pharos.UNWIRED` for why, and for what wiring it would cost. The
+    parameter and the branch are kept because the mechanism is the intended
+    design and the code is correct; what was wrong was this docstring
+    asserting it in the present tense.
     """
 
     def __init__(self, d_model: int, n_heads: int = 8, dropout: float = 0.0):

@@ -36,9 +36,19 @@ from typing import Iterable, List
 import torch
 
 #: Quintic coefficients. They do not converge to exactly 1 -- the iteration is
-#: tuned to drive singular values into [~0.7, ~1.3] in five steps rather than to
-#: converge slowly to 1, because the update only needs to be approximately
-#: orthogonal and five matmuls is the budget.
+#: tuned to drive singular values TOWARD [~0.7, ~1.3] in five steps rather
+#: than to converge slowly to 1, because the update only needs to be
+#: approximately orthogonal and five matmuls is the budget.
+#:
+#: "Toward", not "into", and the difference is measured. Five steps reach that
+#: interval for a well-conditioned input -- a random (768, 2304) lands in
+#: [0.681, 1.140] -- and cannot reach it for a near-singular one. A random
+#: SQUARE Gaussian has its smallest singular value at the Marchenko-Pastur
+#: edge, so 768x768 goes from condition number 5,458 to 105: a 52x
+#: compression, bounded above at 1.204, and nowhere near orthogonal.
+#: **31% of shared400's 222 Muon tensors are square** (39.5M of 343M
+#: parameters), so this is not a corner case. The upper bound always holds,
+#: which is what stops the update exploding; the lower one does not.
 _NS_COEFFS = (3.4445, -4.7750, 2.0315)
 
 
@@ -50,20 +60,23 @@ def newton_schulz(g: torch.Tensor, steps: int = 5, eps: float = 1e-7
     error is dominated by the coefficient tuning, not by rounding, and the
     matmuls are the cost.
     """
-    if g.ndim != 2:
+    if g.ndim < 2:
         raise ValueError(f"newton_schulz needs a matrix, got {g.ndim} dims")
     a, b, c = _NS_COEFFS
     x = g.bfloat16()
-    x = x / (x.norm() + eps)
-    transposed = g.size(0) > g.size(1)
+    # Per-SLICE normalisation. A stacked expert tensor is `(E, d, f)` and each
+    # expert is its own matrix, so a single Frobenius norm over the whole
+    # stack would let one expert's scale set every other expert's step.
+    x = x / (x.flatten(-2).norm(dim=-1)[..., None, None] + eps)
+    transposed = g.size(-2) > g.size(-1)
     if transposed:
-        x = x.T
+        x = x.transpose(-1, -2)
     for _ in range(steps):
-        aa = x @ x.T
+        aa = x @ x.transpose(-1, -2)
         bb = b * aa + c * (aa @ aa)
         x = a * x + bb @ x
     if transposed:
-        x = x.T
+        x = x.transpose(-1, -2)
     return x.to(g.dtype)
 
 
@@ -94,15 +107,29 @@ class Muon(torch.optim.Optimizer):
                 buf = st["momentum_buffer"]
                 buf.mul_(mom).add_(g)
                 upd = g.add(buf, alpha=mom) if group["nesterov"] else buf
-                flat = upd.reshape(upd.size(0), -1)
-                flat = newton_schulz(flat, group["ns_steps"])
-                upd = flat.view_as(p)
+                # `upd.reshape(upd.size(0), -1)` for a 3-D tensor flattens
+                # `(E, d, f)` to `(E, d*f)` and orthogonalises ACROSS THE
+                # EXPERT AXIS -- it makes the experts mutually orthogonal
+                # instead of making each expert's weight matrix orthogonal,
+                # which is not what Muon means and is not what its spectral
+                # argument licenses. `GroupedExperts.w1` is `(32, 512, 512)`,
+                # so every independent-expert config -- mini, small, base400 --
+                # trained its MoE on a transform of the update rather than the
+                # update. shared400, the config stage 1 actually runs, has
+                # only 2-D tensors in Muon and is unaffected.
+                #
+                # The last two dimensions are the matrix; anything in front is
+                # a batch. `newton_schulz` handles both and the 2-D result is
+                # bit-identical to before.
+                upd = newton_schulz(upd if upd.ndim > 2
+                                    else upd.reshape(upd.size(0), -1),
+                                    group["ns_steps"]).view_as(p)
                 if group["weight_decay"]:
                     p.mul_(1 - lr * group["weight_decay"])
                 # An orthogonal update moves every direction by the same
                 # amount, so a tall matrix would take a larger step in aggregate
                 # than a wide one at the same lr. This restores parity.
-                scale = max(1.0, p.size(0) / p.size(-1)) ** 0.5
+                scale = max(1.0, p.size(-2) / p.size(-1)) ** 0.5
                 p.add_(upd, alpha=-lr * scale)
         return loss
 

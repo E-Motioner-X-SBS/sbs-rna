@@ -592,15 +592,34 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         # the ensemble's fluctuation amplitude predicts the same observable, so
         # it is supervised by it -- that is what makes the stiffness field
         # trainable without any measured stiffness
+        # The target has to be NON-NEGATIVE, because a fluctuation amplitude
+        # is. The shift that made it so was `- b_factor_z.min()` over the
+        # CURRENT BATCH, so the same residue's target moved with whichever
+        # other chains happened to share its batch: measured over 35 stage-5
+        # batches the offset ran from -1.225 to -6.051, a spread of 4.83
+        # against a signal whose standard deviation is 1.0 because
+        # `b_factor_z` is z-scored per chain.
+        #
+        # It was invisible in the metric printed beside it. `fluct_r` is
+        # Pearson, which is invariant to a constant offset, so the
+        # correlation read clean while the loss could not converge below the
+        # variance of the shift -- and `fluct_base`, the constant-predictor
+        # floor, moved with the batch too, so the two drifted together and
+        # their ratio looked stable.
+        #
+        # `softplus` is a FIXED map: monotone, non-negative, and defined by
+        # the residue alone. Measured on 200,000 standard normals it gives
+        # mean 0.806, sd 0.522, min 0.011 -- against the old shift's mean of
+        # about 2.5 and a batch-dependent offset, so it is better conditioned
+        # as well as well-defined. `rigidity` three lines above was always
+        # batch-independent; these two targets are now both functions of
+        # their own residue.
         fl = out["fluctuation"][rm]
-        l2 = F.smooth_l1_loss(fl, (t["b_factor_z"][rm].float() -
-                                   t["b_factor_z"][rm].float().min()).clamp(min=0))
+        fl_target = F.softplus(t["b_factor_z"][rm].float())
+        l2 = F.smooth_l1_loss(fl, fl_target)
         total = total + 0.1 * l2
         parts["fluctuation"] = float(l2.detach())
-        parts.update(_regression_metrics(
-            fl.detach(),
-            (t["b_factor_z"][rm].float()
-             - t["b_factor_z"][rm].float().min()).clamp(min=0), "fluct"))
+        parts.update(_regression_metrics(fl.detach(), fl_target, "fluct"))
 
     # base identity (unnumbered in §9), exactly where it was never assigned
     bm = t["base_mask"]
@@ -736,8 +755,8 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
             if bool(ok.any()):
                 dd = torch.linalg.norm(xyz[bidx, ii] - xyz[bidx, jj], dim=-1)
                 nb = model.heads.cfg.n_distance_bins
-                # 2-40 A in 1 A steps plus an overflow bin, the layout
-                # HeadConfig documents
+                # bins 0..38 are 1 A wide spanning 2-41 A, bin 39 is
+                # everything beyond -- see HeadConfig.n_distance_bins
                 b = torch.clamp(((dd - 2.0)).floor().long(), 0, nb - 1)
                 dl = model.heads.pair.distance(pair)
                 ld = (F.cross_entropy(dl[ok], b[ok], reduction="none")

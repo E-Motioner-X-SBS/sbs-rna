@@ -20,14 +20,22 @@ analysis credits HRM's outer loop but finds most of its benchmark performance
 comes from memorising evaluation-time tasks. The loop is adopted on its measured
 merits here; the *parameter-count* argument must not lean on HRM.
 
-Physics and refinement are coupled, not sequential
---------------------------------------------------
-The recycled signal is the previous iteration's distance estimate, and it enters
-the next pass through the electrostatic pair bias on the FULL-attention blocks
-(§6.2). So a change in ionic condition changes what attends to what on the next
-loop, rather than only re-scoring a finished representation. At recycle 0 there
-is no estimate, the bias is zero, and the router runs on sequence-only features
--- the circularity §5.3 records, made explicit rather than papered over.
+Physics and refinement are coupled, not sequential -- IN THE DESIGN ONLY
+------------------------------------------------------------------------
+§6.2 says the recycled signal is the previous iteration's distance estimate,
+entering the next pass through the electrostatic pair bias on the FULL
+blocks, so that a change in ionic condition changes what attends to what.
+`forward` takes a `pair_bias_fn` for exactly that, and **no caller passes
+one** -- see `pharos.UNWIRED`. `FullAttention` therefore always receives
+`pair_bias=None` and the coupling does not exist at runtime. The hook is
+kept because the mechanism is still the intended design; the paragraph above
+used to be written in the present tense and was describing a code path with
+no caller.
+
+What IS live is the representational recycle: loop `i>0` adds
+`recycle_proj(recycle_norm(h))` to the input, and the router sees
+`recycle` so pair-derived features stay masked at loop 0 -- the circularity
+§5.3 records, made explicit rather than papered over.
 """
 from __future__ import annotations
 

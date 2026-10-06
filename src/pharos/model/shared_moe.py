@@ -191,8 +191,26 @@ class SharedMoEFeedForward(nn.Module):
         mf = m.reshape(-1).float()
         fired = (w > 0).float()
         width = fired.sum(-1)
+        # ONE mean width, used by the balance loss and reported as
+        # `mean_width`. They were two: the loss divided by `width.mean()` over
+        # ALL rows while its own numerator summed over REAL tokens only, and
+        # `mean_width` four lines below was masked. `MoEFeedForward`, the
+        # version this was derived from, divides by the exact constant
+        # `top_k`, so the normaliser there cannot disagree with the numerator;
+        # variable width turned that constant into a quantity, and the
+        # quantity was measured over the wrong set.
+        #
+        # It is not only a reporting error. `sum_i frac_i` should be exactly 1
+        # so the Switch form has a floor of 1.0 at perfect uniformity -- the
+        # value the comment in `pretrain_mlm.py` states and the monitor's
+        # "0.18 floor" (0.01 x 18 blocks) is computed from. With the unmasked
+        # mean it is `masked_mean_width / all_rows_mean_width`, which at 20.3%
+        # padding measured between 0.766 and 1.215 ACROSS THE BLOCKS OF ONE
+        # FORWARD PASS. So the auxiliary's effective weight varied with how
+        # padded the batch happened to be, and with how the padding routed.
+        mean_width = (width * mf).sum().div(n_tok)
         frac = (fired * mf.unsqueeze(-1)).sum(0) / (
-            n_tok * width.mean().clamp(min=1.0))
+            n_tok * mean_width.clamp(min=1.0))
         pbar = (probs * m.unsqueeze(-1)).sum((0, 1)) / n_tok
         balance = cfg.n_experts * (frac * pbar).sum()
         return out + x, {
@@ -202,8 +220,10 @@ class SharedMoEFeedForward(nn.Module):
             "token_router_entropy": (
                 (-(probs.clamp_min(1e-9).log() * probs).sum(-1) * m).sum()
                 / n_tok).detach(),
-            #: what the fixed-k version could not report: how wide routing went
-            "mean_width": (width * mf).sum().div(n_tok).detach(),
+            #: what the fixed-k version could not report: how wide routing
+            #: went. The SAME tensor the balance loss normalises by, so the
+            #: reported width and the one in the gradient cannot drift apart.
+            "mean_width": mean_width.detach(),
             "max_width": width.max().detach(),
         }
 

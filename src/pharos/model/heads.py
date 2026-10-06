@@ -4,29 +4,45 @@
 v0.1 specified six. v0.2 specifies ten, and the four that were added sit on
 substantial supervised data that was already on disk and entirely unused:
 
-    1  contact map        L x L binary          raw PDB, 10,520 entries
+    1  contact            L x L binary          raw PDB, 10,520 entries
     2  distance           L x L binned          same
-    3  3D structure       coordinates, K states same
-    4  secondary structure per-residue symbol   bpRNA + pdb_hunter, ~126k
-    5  Mg2+ sites         per-residue           raw PDB, 816,270 sites
-    6  rigidity           normalised B-factor   X-RAY ONLY, 3.86M nt
-    7  reactivity         SHAPE / DMS           Ribonanza, 335,616 profiles
-    8  fitness            mutation effect       NABench + RNAGym, 620,372
-    9  splicing           site / outcome        147 species
-   10  base identity      recover N_struct      free, 0.025% of residues
+    3  structure          coordinates, K states same
+    4  secondary          dot-bracket           bpRNA + pdb_hunter, ~126k
+    5  reactivity         SHAPE / DMS           Ribonanza, 335,616 profiles
+    6  mg_sites           per-residue           raw PDB, 816,270 sites
+    7  rigidity           normalised B-factor   X-RAY ONLY, 3.86M nt
+    8  disorder           per-residue           unobserved residues, 46,448
+    9  geometry           Leontis-Westhof class 103,965 annotated pairs
+   10  motif              motif class           RNA 3D Motif Atlas, 667
 
-Two of these carry constraints that are not stylistic.
+**This table is `HEAD_SPEC` below, and `test_pharos.py` parses it out of this
+docstring and compares the two.** It is written twice because a docstring
+cannot be generated, and it had drifted: §9 renumbered when the diffusion
+decoder and the two base-pair heads arrived, and this table still read
+"5 Mg2+, 6 rigidity, 7 reactivity, 8 fitness, 9 splicing, 10 base identity"
+-- the scheme §9 abandoned -- thirty lines above the corrected `HEAD_SPEC`.
+Finding 37 of the 09-26 audit found that drift, fixed it in the TRAINERS, and
+recorded that "all references now agree with HEAD_SPEC". This file was not
+checked, so the claim was false in the one place the numbering is defined.
+The parse test exists so the next such claim is enforced rather than asserted.
 
-**Head 6 trains on X-ray B-factors only (D12).** The Mg-rigidity gradient is
-monotonic on 1,535 X-ray structures and *not* monotonic on cryo-EM, where the
-per-atom B is a fitted display parameter rather than a measured one. Mixing the
-two trains the head on a different physical quantity for 62% of the corpus, so
-the head carries its own validity mask and `rigidity_mask` is not optional.
+`fitness`, `splice_logits` and `base_logits` are produced and §9 does not
+number them -- see `EXTRA_HEAD_KEYS`.
 
-**Head 10 is free supervision.** `N_struct` residues have their ribose modelled
-but their identity unassigned, so predicting the base is a task with labels that
-cost nothing to produce and gradients that flow through the same trunk. v0.1
-mapped them to `N` and discarded the signal.
+Two heads carry constraints that are not stylistic.
+
+**Rigidity (head 7) trains on X-ray B-factors only (D12).** The Mg-rigidity
+gradient is monotonic on 1,535 X-ray structures and *not* monotonic on
+cryo-EM, where the per-atom B is a fitted display parameter rather than a
+measured one. Mixing the two trains the head on a different physical quantity
+for 62% of the corpus, so the head carries its own validity mask and
+`rigidity_mask` is not optional.
+
+**Base identity is free supervision.** `N_struct` residues have their ribose
+modelled but their identity unassigned, so predicting the base is a task with
+labels that cost nothing to produce and gradients that flow through the same
+trunk. v0.1 mapped them to `N` and discarded the signal. §9 does not number
+this head; it is `base_logits` in `EXTRA_HEAD_KEYS`.
 """
 from __future__ import annotations
 
@@ -44,7 +60,11 @@ from .diffusion import DiffusionConfig, DiffusionStructureHead
 class HeadConfig:
     d_model: int = 512
     d_pair: int = 128
-    #: distance bins: 2-40 A in 1 A steps plus an overflow bin, AlphaFold-style
+    #: Distance bins, AlphaFold-style. `floor(d - 2)` clamped to
+    #: `n_distance_bins - 1`, so bins 0..38 are 1 A wide and span **2-41 A**
+    #: and bin 39 is everything at or beyond 41 A. Documented as "2-40 A"
+    #: in three places, which is 38 bins and not 40 -- the off-by-one is in
+    #: the prose, the code is self-consistent.
     n_distance_bins: int = 40
     #: Head 9. Leontis-Westhof pair families, `_ndb_struct_na_base_pair.
     #: hbond_type_12` in every RNA mmCIF: 12 families (the three edges --
@@ -74,7 +94,7 @@ def _mlp(d_in: int, d_hidden: int, d_out: int, dropout: float) -> nn.Sequential:
 
 
 class PairHeads(nn.Module):
-    """Heads 1 and 2 — contact and distance, on the sparse pair features.
+    """contact, distance and Leontis-Westhof class, on the sparse pairs.
 
     Both read the pair track's output, so both are defined only on the pairs it
     selected. That is the design: a dense L x L output would cost what the pair
@@ -89,7 +109,7 @@ class PairHeads(nn.Module):
         super().__init__()
         self.contact = _mlp(cfg.d_pair, cfg.d_pair, 1, cfg.dropout)
         self.distance = _mlp(cfg.d_pair, cfg.d_pair, cfg.n_distance_bins, cfg.dropout)
-        # Head 9 -- Leontis-Westhof geometry class.
+        # lw_logits -- Leontis-Westhof geometry class.
         #
         # A contact says two residues touch and a distance says how far apart.
         # Neither says HOW they are paired, and for RNA that is most of the
@@ -106,7 +126,13 @@ class PairHeads(nn.Module):
 
 
 class StructureHead(nn.Module):
-    """Head 3 — coordinates for K states (§10's ensemble, not one structure).
+    """The RETAINED coordinate regressor, kept for the §5 ablation.
+
+    Not head 3. `HEAD_SPEC` entry 3 is `DiffusionStructureHead`, which
+    replaced this; `PharosHeads` does not instantiate this class and the
+    ablation the architecture doc cites is the only caller.
+
+    Coordinates for K states (§10's ensemble, not one structure).
 
     Predicts a backbone frame per residue per state plus a state weight, so the
     output is a small ensemble with probabilities rather than a single answer.
@@ -130,19 +156,21 @@ class StructureHead(nn.Module):
 
 
 class ResidueHeads(nn.Module):
-    """Heads 4, 5, 6, 7 and 10 — everything defined per nucleotide."""
+    """Everything defined per nucleotide. Keys, not numbers: `HEAD_SPEC`
+    below is the numbering, and writing it a second time here is how the
+    module docstring came to disagree with it."""
 
     def __init__(self, cfg: HeadConfig):
         super().__init__()
         d = cfg.d_model
-        self.secondary = _mlp(d, d, cfg.n_ss_symbols, cfg.dropout)   # 4
-        self.mg_site = _mlp(d, d // 2, 1, cfg.dropout)               # 5
-        self.rigidity = _mlp(d, d // 2, 1, cfg.dropout)              # 6
-        # 7: SHAPE and DMS are different chemistries probing different atoms,
-        # so they get separate outputs rather than one "reactivity" scalar
+        self.secondary = _mlp(d, d, cfg.n_ss_symbols, cfg.dropout)   # ss_logits
+        self.mg_site = _mlp(d, d // 2, 1, cfg.dropout)               # mg_logit
+        self.rigidity = _mlp(d, d // 2, 1, cfg.dropout)              # rigidity
+        # reactivity: SHAPE and DMS are different chemistries probing
+        # different atoms, so they get separate outputs rather than one scalar
         self.reactivity = _mlp(d, d, 2, cfg.dropout)
         self.base_identity = _mlp(d, d // 2, cfg.n_bases, cfg.dropout)
-        # Head 10 -- motif-class posterior, per RESIDUE.
+        # motif_logits -- motif-class posterior, per RESIDUE.
         #
         # The motif bank has always RETRIEVED a motif and mixed its descriptor
         # into the representation without ever committing to an answer that
@@ -168,7 +196,11 @@ class ResidueHeads(nn.Module):
 
 
 class FunctionHeads(nn.Module):
-    """Heads 8 and 9 — fitness and splicing, the two that speak to function.
+    """fitness and splicing, the two that speak to function.
+
+    Neither is numbered by §9 -- they are in `EXTRA_HEAD_KEYS`. This
+    docstring called them "heads 8 and 9", which are disorder and
+    Leontis-Westhof geometry.
 
     Fitness is the second-largest labelled channel after probing (620,372
     measurements) and was entirely unused by v0.1. It is a property of a
@@ -180,8 +212,9 @@ class FunctionHeads(nn.Module):
     def __init__(self, cfg: HeadConfig):
         super().__init__()
         d = cfg.d_model
-        self.fitness = _mlp(d, d, 1, cfg.dropout)                       # 8
-        self.splice = _mlp(d, d // 2, cfg.n_splice_classes, cfg.dropout)  # 9
+        self.fitness = _mlp(d, d, 1, cfg.dropout)              # fitness
+        self.splice = _mlp(d, d // 2, cfg.n_splice_classes,
+                           cfg.dropout)                       # splice_logits
 
     def forward(self, tok: torch.Tensor, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
         pooled = (tok * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True).clamp(min=1)

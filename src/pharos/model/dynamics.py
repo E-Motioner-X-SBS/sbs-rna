@@ -128,13 +128,35 @@ class StiffnessField(nn.Module):
 
     def forward(self, tok: torch.Tensor, mask: torch.Tensor
                 ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """`(F_diag (B, S, 6, 6), F_off (B, S-1, 6, 6))` for S = L-1 steps."""
+        """`(F_diag (B, S, 6, 6), F_off (B, S-1, 6, 6))` for S = L-1 steps.
+
+        `mask` DECOUPLES the padded steps, and it was previously accepted and
+        ignored. A step is real only if both of its residues are, and the
+        coupling into or out of an unreal step is zeroed -- which cuts the
+        chain at the boundary.
+
+        That is not cosmetic. `block_tridiagonal_variance` is a sequential
+        forward-backward recursion, so its backward sweep starts at the LAST
+        step and carries whatever the padded region computed inwards. With
+        the mask discarded, `fluctuation` at a REAL position moved by 0.206
+        when only the padded tokens were changed -- measured on a 14-of-24
+        batch -- and `fluctuation` is a stage-5 supervision target. The
+        diagonal blocks were always clean, because they are a local function
+        of two adjacent residues; it is the recursion that carried it.
+        """
         B, L, _ = tok.shape
         if L < 2:
             z = tok.new_zeros(B, 0, N_STEP_DOF, N_STEP_DOF)
             return z, z
         steps = self.step(torch.cat([tok[:, :-1], tok[:, 1:]], dim=-1))   # B,S,d
         Fd = _spd_from_cholesky(self.diag(steps), self.cfg.eig_floor)
+        step_ok = (mask[:, :-1] & mask[:, 1:]) if mask is not None else None
+        if step_ok is not None:
+            # an unreal step becomes the identity: well-conditioned, so the
+            # recursion's solves cannot see a singular block, and carrying no
+            # information of its own
+            eyeS = torch.eye(N_STEP_DOF, device=Fd.device, dtype=Fd.dtype)
+            Fd = torch.where(step_ok[..., None, None], Fd, eyeS)
         if steps.shape[1] < 2:
             return Fd, Fd.new_zeros(B, 0, N_STEP_DOF, N_STEP_DOF)
         pair = torch.cat([steps[:, :-1], steps[:, 1:]], dim=-1)
@@ -161,6 +183,13 @@ class StiffnessField(nn.Module):
         gm = (lam[:, :-1] * lam[:, 1:]).sqrt()                      # B, S-1
         fro = raw.flatten(-2).norm(dim=-1).clamp_min(1e-6)          # B, S-1
         Fo = raw * (self.cfg.max_coupling * gm / fro)[..., None, None]
+        if step_ok is not None:
+            # `Fo[i]` couples step i to step i+1, so it survives only when
+            # BOTH are real. Zeroing it makes `C = 0` in both sweeps, which
+            # makes the Schur correction exactly zero and leaves a real
+            # step's variance independent of everything past the boundary.
+            pair_ok = step_ok[:, :-1] & step_ok[:, 1:]
+            Fo = Fo * pair_ok[..., None, None].to(Fo.dtype)
         return Fd, Fo
 
 

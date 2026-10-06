@@ -343,6 +343,36 @@ def main() -> int:
                 f"median |centre| {float(_np.median(_np.abs(_c).max(-1))):.1f} A"
                 f" -- deposition frames really are far out")
 
+    print("\n== property 10: the token budget actually binds ==")
+    # `length_batches` sizes a batch as `(n+1) * longest`, because every chain
+    # pads to the longest. It compared against `cur[0]` -- the FIRST chain --
+    # and the bucket is shuffled, so every chain between the first and the
+    # longest was ignored. Measured on the training split, **71% of batches
+    # exceeded the budget**, the worst by 1.23x.
+    #
+    # The budget is what the cron runner sizes VRAM against, and stage 5's
+    # OOM handler skips a batch that does not fit -- so a budget that does
+    # not bind makes the skipped set length-correlated, which makes the loss
+    # length-correlated. Bounded by the bucket ratio, never unbounded, but a
+    # declared limit exceeded two batches in three is an advisory.
+    from pharos.data.loader import Pharos3DDataset as _DS
+    _corpus = ROOT / "data/derived/pharos3d"
+    if not _corpus.exists():
+        print(f"  SKIP  no corpus at {_corpus}")
+    else:
+        for _split in ("train", "val"):
+            _d = _DS(_corpus, split=_split, max_length=1024)
+            for _b in (8192, 16384, 32768):
+                _bs = _d.length_batches(token_budget=_b, seed=0)
+                if not _bs:
+                    continue
+                _cost = [len(x) * max(_d.meta[i]["length"] for i in x) for x in _bs]
+                _over = [c for c in _cost if c > _b]
+                chk(f"{_split} at {_b:,}: no batch exceeds the budget",
+                    not _over,
+                    f"{len(_bs)} batches, worst {max(_cost):,} "
+                    f"({max(_cost)/_b:.2f}x), {len(_over)} over")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

@@ -474,12 +474,28 @@ parameter is ξ = l_B/b; with b = 1.40 Å for A-form RNA, **ξ = 5.11** and the
 condensed fraction is **θ = 0.804**. Not the 0.76 quoted for B-DNA — A-RNA is
 more densely charged, and using the DNA value understates screening.
 
-### 6.2 Debye screening
+### 6.2 Debye screening — specified, NOT WIRED
 
 Effective charge and screening length follow from the ionic condition, giving a
-screened-Coulomb term that enters full attention as an additive bias. The ionic
-condition is therefore an input that changes *what attends to what*, not a label
-appended to the output.
+screened-Coulomb term that was to enter full attention as an additive bias, so
+that the ionic condition is an input that changes *what attends to what* rather
+than a label appended to the output.
+
+**The model does not do this.** `TokenTrunk.forward` accepts a `pair_bias_fn`
+and nothing passes one, so `FullAttention` always receives `pair_bias=None`
+and `ElectrostaticBias` is never called from anywhere in the repository. The
+closed-form physics of §6.1 is correct and tested (`test_manning.py`); it
+simply does not reach the token track.
+
+It is orphaned by the §9 change that made head 3 a diffusion decoder: the bias
+needs the previous loop's *distance estimate*, and a denoiser emits no
+coordinates in a forward pass. `Pharos.forward` also takes no ionic condition.
+Wiring it means running the pair track inside the trunk loop — 21M pairs at
+L = 4,608, every loop — so it is a costed decision, not a patch.
+
+Declared in `pharos.UNWIRED` and asserted by `test_pharos.py` property 7e,
+which fails if anyone wires it so the declaration cannot go stale. See finding
+51 in `AUDIT_2026-09-26.md`.
 
 ### 6.3 Mg²⁺ and rigidity
 
@@ -582,7 +598,8 @@ coordinates, by denoising diffusion** · 4. secondary structure · 5. per-residu
 6. Mg²⁺ site probability · 7. local rigidity · 8. disorder · 9. base-pair
 geometry class · 10. motif-class posterior.
 
-Head 2 is supervised over **40 bins, 2–40 Å plus overflow**, on the same
+Head 2 is supervised over **40 bins: 39 one-Å bins spanning 2–41 Å, plus
+an overflow bin at ≥41 Å**, on the same
 sampled pairs as head 1. A binary contact says two residues are within a
 cutoff; a binned distance says how far apart, which is strictly more
 information from the same coordinates — it is what AlphaFold trains its pair

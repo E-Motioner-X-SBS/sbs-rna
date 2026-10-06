@@ -142,6 +142,48 @@ def main() -> int:
         mm.experts.mod.grad is not None and float(mm.experts.mod.grad.abs().sum()) > 0,
         "the experts are learning, not dead weight")
 
+    print("\n== the balance loss has a floor of 1.0, whatever the padding ==")
+    # The Switch form is `E * sum_i(frac_i * pbar_i)`, which is 1.0 at perfect
+    # uniformity -- the value `pretrain_mlm.py` states and the monitor's
+    # "0.18 floor" (0.01 x 18 blocks) is computed from. It is 1.0 only if
+    # `sum_i frac_i` is exactly 1, and that requires the numerator and the
+    # normaliser to be taken over the SAME set of tokens.
+    #
+    # They were not. `frac` summed over real tokens and divided by
+    # `width.mean()` over ALL rows including padding, so the floor was
+    # `masked_mean_width / all_rows_mean_width` -- measured on shared400 at
+    # 20.3% padding as 0.766 to 1.215 across the blocks of a single forward
+    # pass. The auxiliary's effective weight moved with how padded the batch
+    # was. `MoEFeedForward` divides by the constant `top_k` and never had the
+    # problem; variable width turned that constant into a quantity.
+    cb = SharedMoEConfig(d_model=32, d_expert=32, n_experts=16, max_k=16,
+                         n_shared=1)
+    fb = SharedMoEFeedForward(cb).eval()
+    torch.manual_seed(7)
+    seen = []
+    for pad in (0.0, 0.2, 0.5, 0.8):
+        B, L = 8, 64
+        mk = torch.ones(B, L, dtype=torch.bool)
+        npad = int(L * pad)
+        if npad:
+            mk[:, L - npad:] = False
+        with torch.no_grad():
+            _, ax = fb(torch.randn(B, L, 32), mk)
+        seen.append(float(ax["balance_loss"]) / cb.balance_weight)
+    chk("at initialisation it sits at 1.0",
+        all(abs(v - 1.0) < 0.02 for v in seen),
+        "  ".join(f"{p:.0%} {v:.4f}" for p, v in zip((0, .2, .5, .8), seen)))
+    chk("and it does not move with the padding fraction",
+        max(seen) - min(seen) < 0.01,
+        f"spread {max(seen) - min(seen):.5f} from 0% to 80% padding")
+    # and the width the loss divides by is the width it reports
+    src = Path(__file__).resolve().read_text()
+    mod_src = Path(__file__).resolve().parent.joinpath("shared_moe.py").read_text()
+    chk("one mean width, used by the loss and reported",
+        mod_src.count("mean_width = (width * mf)") == 1
+        and '"mean_width": mean_width.detach()' in mod_src,
+        "so the reported width and the one in the gradient cannot drift")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

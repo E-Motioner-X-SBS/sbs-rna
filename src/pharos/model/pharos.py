@@ -235,8 +235,32 @@ class InputEmbedding(nn.Module):
                          + self.chem(chem) + self.pos(p)[None])
 
 
+#: Mechanisms that are BUILT and not WIRED, with the reason, in the shape
+#: `test_pharos.py` property 7c uses for the heads. An output nothing reads
+#: and a module nothing calls are the same defect; the heads got a pinned
+#: declaration during the 09-26 audit and the modules did not.
+UNWIRED: Dict[str, str] = {
+    "elec": (
+        "§6.2's screened-Coulomb pair bias. `TokenTrunk.forward` accepts a "
+        "`pair_bias_fn` and NO CALLER PASSES ONE, so `FullAttention` always "
+        "receives `pair_bias=None` and this module is never called. It is "
+        "orphaned by the §9 change that made head 3 a diffusion decoder: the "
+        "bias needs the previous loop's DISTANCE ESTIMATE, and a denoiser "
+        "emits no coordinates in a forward pass, so there is nothing to feed "
+        "it. `forward` also takes no ionic condition, which is the second "
+        "sign it was never plumbed. Wiring it means running the pair track "
+        "inside the trunk loop -- 21M pairs at L=4,608, every loop -- so it "
+        "is a costed architecture change, not an oversight to patch. Until "
+        "then §6.2 describes a mechanism this model does not have."),
+}
+
+
 class ElectrostaticBias(nn.Module):
     """§6.2 — screened Coulomb pair bias from the previous loop's distances.
+
+    **NOT WIRED.** See `UNWIRED` above: nothing calls this, because nothing
+    passes `pair_bias_fn` to the trunk. The class is correct and tested; it
+    has no caller.
 
     `B_elec(r) = -A * q_eff^2 * exp(-kappa r) / r`, with `q_eff = -0.196` for
     A-RNA from Manning condensation (§6.1) and `kappa` from the ionic condition.
@@ -325,8 +349,27 @@ class Pharos(nn.Module):
 
         pair = None
         if pair_index is not None:
-            ii, jj = pair_index
-            pair = self.pair_proj(torch.cat([h[0, ii], h[0, jj]], dim=-1))
+            # `(ii, jj)` indexes ONE sequence and `(bb, ii, jj)` says which.
+            # This read `h[0, ii]` unconditionally, so on a batch of more than
+            # one it built every pair from sequence 0's hidden states and
+            # returned a plausibly-shaped answer about the wrong chain.
+            # Nothing in training hit it -- `train_pharos.py` builds its own
+            # pairs with a real per-chain `bidx`, because it needs one index
+            # set per chain and the coevolution injection -- so the only
+            # caller of this path was the test that validates the interface,
+            # and it asserts shapes. Two implementations of one thing, and
+            # the public one was the broken one.
+            if len(pair_index) == 3:
+                bb, ii, jj = pair_index
+            else:
+                ii, jj = pair_index
+                if tokens.shape[0] != 1:
+                    raise ValueError(
+                        f"pair_index=(ii, jj) is ambiguous for a batch of "
+                        f"{tokens.shape[0]}: pass (bb, ii, jj) to say which "
+                        f"sequence each pair belongs to")
+                bb = torch.zeros_like(ii)
+            pair = self.pair_proj(torch.cat([h[bb, ii], h[bb, jj]], dim=-1))
             if self.motifs is not None:
                 retrieved, minfo = self.motifs(pair)
                 pair = pair + self.motif_mix(retrieved)

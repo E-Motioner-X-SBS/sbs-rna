@@ -233,6 +233,30 @@ def main() -> int:
         f"collapsed sd {flat['rg_pred_sd']:.2e} (not exactly 0), "
         f"live sd {live['rg_pred_sd']:.4f}")
 
+    print("\n== a supervision target is a function of its own residue ==")
+    # `fluctuation`'s target was `b_factor_z - b_factor_z.min()` over the
+    # CURRENT BATCH, so the same residue's target moved with whichever other
+    # chains shared its batch -- measured spread 4.83 over 35 stage-5
+    # batches, against a signal of sd 1.0. And `fluct_r` is Pearson, which is
+    # invariant to a constant offset, so the metric beside it could not see
+    # the defect in the quantity it measured.
+    _src_tp = Path(tp.__file__).read_text()
+    chk("the fluctuation target does not reduce over the batch",
+        ".min())" not in _src_tp.split("fl = out[\"fluctuation\"]")[1][:600]
+        and "F.softplus(t[\"b_factor_z\"]" in _src_tp,
+        "softplus of the residue's own z-scored B-factor")
+    # and the property itself: the same residue, two different batches
+    import torch.nn.functional as _F
+    _z = torch.randn(64)
+    _a = _F.softplus(_z)
+    _b = _F.softplus(torch.cat([_z, torch.randn(64) * 5 - 10]))[:64]
+    chk("so the same residue gets the same target in any batch",
+        float((_a - _b).abs().max()) == 0.0,
+        f"max delta {float((_a - _b).abs().max()):.2e} with a far more "
+        f"extreme batch-mate")
+    chk("and the target is non-negative, which the head's output is",
+        bool((_F.softplus(torch.randn(10000) * 3) >= 0).all()), "")
+
     print("\n== the block scorer's micro average can actually be computed ==")
     # It could not. The commit that added the micro average added two
     # `acc[...].append` calls and not the two dict keys they append to, so

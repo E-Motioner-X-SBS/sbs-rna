@@ -1270,6 +1270,7 @@ def main() -> int:
               ROOT / "src/pharos/data/test_mlm_leak.py",
               ROOT / "src/pharos/data/test_fitness.py",
               ROOT / "src/pharos/train/test_guard.py",
+              ROOT / "src/pharos/train/test_muon.py",
               # Four modules that existed, passed, and were not in this list.
               # `test_head_metrics.py` is the one that matters: it is the test
               # of the floors -- the AUROC that must be 0.5 for a constant,

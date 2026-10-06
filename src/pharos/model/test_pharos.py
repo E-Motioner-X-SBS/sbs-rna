@@ -72,6 +72,15 @@ SPEC_5_4 = {"PHAROS-Small": (149e6, 61e6), "PHAROS-Mini": (67e6, 30e6),
             "Base-v2": (1401e6, 269e6)}
 
 
+def _raises(fn) -> bool:
+    try:
+        with torch.no_grad():
+            fn()
+    except ValueError:
+        return True
+    return False
+
+
 def main() -> int:
     torch.manual_seed(0)
 
@@ -178,14 +187,51 @@ def main() -> int:
     chk("junk in the padded region is invisible",
         float((a - b).abs().max()) < 1e-4, f"max delta {float((a-b).abs().max()):.2e}")
 
+    # ...and that has to mean EVERY output, not just `hidden`. This property
+    # was checked on the trunk alone, and the leak was downstream of it:
+    # `StiffnessField` took a `mask` and ignored it, while
+    # `block_tridiagonal_variance` is a sequential forward-BACKWARD recursion
+    # whose backward sweep starts at the last step. So garbage in the padded
+    # region propagated inwards and moved `fluctuation` at real positions by
+    # 0.206 -- a stage-5 supervision target, under the one test written for
+    # exactly this property.
+    with torch.no_grad():
+        fa = model(tok, mod, chem, mask, dynamics=True)
+        fb = model(tok2, mod, chem2, mask, dynamics=True)
+    for key in ("fluctuation", "disorder_logit", "stiffness_diag"):
+        da = fa[key][1][:29] if key == "stiffness_diag" else fa[key][1][:30]
+        db = fb[key][1][:29] if key == "stiffness_diag" else fb[key][1][:30]
+        chk(f"  and in {key}", float((da - db).abs().max()) < 1e-4,
+            f"max delta {float((da - db).abs().max()):.2e}")
+
     print("\n== property 6: the pair track is optional and consistent ==")
     ii = torch.tensor([0, 1, 2])
     jj = torch.tensor([10, 11, 12])
+    bb = torch.tensor([0, 1, 1])
     with torch.no_grad():
-        o = model(tok, mod, chem, mask, pair_index=(ii, jj), dynamics=True)
+        o = model(tok, mod, chem, mask, pair_index=(bb, ii, jj), dynamics=True)
     chk("pair heads fire only when pair indices are given",
         "contact_logit" in o and o["contact_logit"].shape == (3,),
         str(tuple(o["contact_logit"].shape)))
+    # A pair must be built from the sequence it belongs to. `forward` read
+    # `h[0, ii]` unconditionally, so on a batch of more than one it answered
+    # about sequence 0 whatever `bb` said -- and this test asked only for the
+    # SHAPE, which was right. The trainer never hit it because
+    # `train_pharos.py` builds its own pairs with a real per-chain index; the
+    # only caller of the broken path was the test that validates the model's
+    # interface.
+    chk("a two-tuple is refused on a batch of more than one",
+        _raises(lambda: model(tok, mod, chem, mask, pair_index=(ii, jj))),
+        "ambiguous, so it raises instead of picking sequence 0")
+    with torch.no_grad():
+        o_a = model(tok, mod, chem, mask,
+                    pair_index=(torch.tensor([0]), ii[:1], jj[:1]))
+        o_b = model(tok, mod, chem, mask,
+                    pair_index=(torch.tensor([1]), ii[:1], jj[:1]))
+    chk("and the same pair on two sequences gives two answers",
+        float((o_a["contact_logit"] - o_b["contact_logit"]).abs().max()) > 1e-6,
+        f"delta {float((o_a['contact_logit'] - o_b['contact_logit']).abs().max()):.3e} "
+        f"-- zero here would mean `bb` is being ignored")
     with torch.no_grad():
         o2 = model(tok, mod, chem, mask)
     chk("and are absent otherwise", "contact_logit" not in o2, "")
@@ -208,11 +254,40 @@ def main() -> int:
     chk("the unnumbered heads are still produced", not extra_missing,
         f"missing: {extra_missing or 'none'}")
 
+    print("\n== property 7b2: the docstring's table IS HEAD_SPEC ==")
+    # §9's numbering is written twice -- once as `HEAD_SPEC`, once as a table
+    # in `heads.py`'s module docstring, because a docstring cannot be
+    # generated. Twice means drift, and it had: the docstring still read
+    # "5 Mg2+, 6 rigidity, 7 reactivity, 8 fitness, 9 splicing, 10 base
+    # identity" -- the scheme §9 ABANDONED -- thirty lines above the corrected
+    # `HEAD_SPEC`, plus six inline `# <n>` annotations in the same file.
+    #
+    # Finding 37 of the 09-26 audit found that drift, fixed the TRAINERS, and
+    # recorded "all references now agree with HEAD_SPEC". It did not check
+    # this file, which is where the numbering is defined, so the claim was
+    # false in the one place that matters. This parses the table rather than
+    # asserting agreement.
+    import re as _re
+    from pharos.model import heads as _H
+    _rows = _re.findall(r"^\s{3,4}(\d+)\s+(\w+)\s{2,}", _H.__doc__, _re.M)
+    _doc = {int(n): nm for n, nm in _rows}
+    _spec = {h["n"]: h["name"] for h in HEAD_SPEC}
+    chk("the docstring table parses to ten rows", len(_doc) == 10, f"{len(_doc)}")
+    chk("and every row matches HEAD_SPEC", _doc == _spec,
+        "; ".join(f"{n}: doc {_doc.get(n)} vs spec {_spec.get(n)}"
+                  for n in sorted(set(_doc) | set(_spec))
+                  if _doc.get(n) != _spec.get(n)) or "all ten agree")
+    # and no bare numeric head annotation survives anywhere in the file
+    _src_h = Path(_H.__file__).read_text()
+    _bare = _re.findall(r"#\s*(\d+)\s*$", _src_h, _re.M)
+    chk("no bare `# <n>` head annotation is left to drift",
+        not _bare, f"found {_bare}" if _bare else "keys are used instead")
+
     print("\n== property 7c: every head produced is either trained or declared ==")
     # every optional branch on at once, so the set below is the whole surface
     # the model can present and not whichever corner this test happened to run
     with torch.no_grad():
-        o_full = model(tok, mod, chem, mask, pair_index=(ii, jj),
+        o_full = model(tok, mod, chem, mask, pair_index=(bb, ii, jj),
                        dynamics=True, mlm=True)
     # A head that nothing supervises still emits a number, every forward pass,
     # for the rest of the project. `fitness` had a loss weight printed at
@@ -285,6 +360,87 @@ def main() -> int:
         all(f'STAGE_WEIGHTS["{k}"]' in _st
             for k in ("ss", "reactivity", "fitness")),
         "ss, reactivity, fitness")
+
+    print("\n== property 7e: a module nothing calls is declared, like a head ==")
+    # Property 7c pins every OUTPUT as trained / indirect / untrained-with-a
+    # reason. A module nothing calls is the same defect and had no equivalent:
+    # `ElectrostaticBias` is constructed in `Pharos.__init__`, `TokenTrunk`
+    # accepts a `pair_bias_fn` for it, and nothing anywhere passes one -- so
+    # §6.2's physics coupling, asserted in the present tense in three
+    # docstrings, did not exist at runtime.
+    from pharos.model.pharos import UNWIRED
+    import inspect as _ins
+    _fwd = _ins.getsource(Pharos.forward)
+    _trunk_src = (Path(__file__).resolve().parent / "trunk.py").read_text()
+    chk("the unwired mechanism is declared, at length",
+        "elec" in UNWIRED and len(UNWIRED["elec"]) > 200,
+        f"{len(UNWIRED)} declared")
+    # and the declaration must be TRUE: if someone wires it, this fails and
+    # the declaration has to be removed rather than quietly going stale
+    # The property is "nobody PASSES it", not "the string appears N times" --
+    # a count goes stale the moment a comment is reworded, which it did on
+    # the first run of this check.
+    _pkg = Path(__file__).resolve().parents[1]
+    # test files excluded: this one names the string in order to look for it,
+    # which is the same self-matching trap property 7c fell into when it
+    # grepped the trainers for `out["fitness"]` and found its own comment.
+    _repo = Path(__file__).resolve().parents[3]
+    _scan = [q for q in list(_pkg.rglob("*.py")) + list((_repo / "scripts").rglob("*.py"))
+             if not q.name.startswith("test_")]
+    _callers = sorted(q.name for q in _scan if "pair_bias_fn=" in q.read_text())
+    chk("and it really is unwired -- no caller passes pair_bias_fn",
+        not _callers and "pair_bias_fn" not in _fwd,
+        f"callers: {_callers or 'none'}  (remove the UNWIRED entry when one "
+        f"appears, rather than letting the declaration go stale)")
+    chk("the parameters it would scale get no gradient",
+        all(b.mixer.bias_scale.grad is None for b in model.trunk.blocks
+            if hasattr(b.mixer, "bias_scale")),
+        "FullAttention.bias_scale, 12 per full block")
+
+    print("\n== property 7f: every parameter gets a gradient, or is declared ==")
+    # The mechanical version of 7e. A module nothing calls shows up as
+    # parameters with no gradient, so exercise EVERY path at once -- pair
+    # track, mlm, dynamics, deep supervision, and the diffusion head's own
+    # loss -- and assert the dead set is exactly the declared one. A new
+    # unwired module then fails this test instead of sitting for weeks.
+    #
+    # 8 blocks, not 4: the period-8 pattern puts `full` last, so a 4-block
+    # model has no full-attention block and `bias_scale` -- one of the two
+    # things finding 51 left without a gradient -- would not exist to check.
+    cfg8 = PharosConfig(d_model=64, n_blocks=8, n_loops=2, n_heads=4, d_pair=32,
+                        n_experts=4, d_expert=32, top_k=2, n_shared=1,
+                        max_length=128)
+    g = Pharos(cfg8)
+    gB, gL = 2, 24
+    gt = torch.randint(0, 4, (gB, gL))
+    gm = torch.ones(gB, gL, dtype=torch.bool)
+    go = g(gt, torch.zeros_like(gt), torch.randn(gB, gL, cfg8.d_chem), gm,
+           pair_index=(torch.tensor([0, 1]), torch.tensor([1, 2]),
+                       torch.tensor([10, 11])),
+           mlm=True, dynamics=True, deep_supervision=True)
+    gloss = go["aux"]["balance_loss"]
+    for _k, _v in go.items():
+        if torch.is_tensor(_v) and _v.is_floating_point():
+            gloss = gloss + _v.float().sum()
+    _coev = torch.rand(gB, gL, gL)          # exercise BOTH coevolution paths
+    gloss = gloss + g.coev_proj(_coev[:, :2, 0].reshape(-1, 1)).sum()
+    _pf = g.diff_pair(go["hidden"], _coev)
+    gloss = gloss + g.heads.structure.loss(
+        torch.randn(gB, gL, 3, 3), go["hidden"], _pf, gm)["loss"]
+    gloss.backward()
+    _dead = sorted(n for n, q in g.named_parameters() if q.grad is None)
+    # `elec.log_scale` and the `bias_scale` of every full block: the two
+    # things §6.2's unwired bias leaves without a gradient.
+    _expect = sorted(["elec.log_scale"]
+                     + [f"trunk.blocks.{i}.mixer.bias_scale"
+                        for i, b in enumerate(g.trunk.blocks) if b.kind == "full"])
+    chk("the only parameters without a gradient are the declared ones",
+        _dead == _expect,
+        f"dead {_dead}" if _dead != _expect else
+        f"{len(_dead)}, all of them §6.2's unwired bias")
+    chk("and UNWIRED explains every one of them",
+        all(k.split(".")[0] in UNWIRED or "bias_scale" in k for k in _dead),
+        "see pharos.UNWIRED['elec']")
 
     print("\n== property 7d: the fitness head separates single-nt variants ==")
     # `fitness` is a MEAN-POOLED scalar. A one-nucleotide change in an 87 nt

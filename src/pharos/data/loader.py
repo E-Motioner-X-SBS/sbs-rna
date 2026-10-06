@@ -96,7 +96,10 @@ class Pharos3DDataset:
         import resource
         for si in range(len(self._files)):
             self._reader(si)
-        gib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
+        # ru_maxrss is in KILOBYTES on Linux, so GiB is /1024/1024, not /1e6.
+        # /1e6 gives GB and the label said GiB -- a 7.4% overstatement in a
+        # number that is printed next to a VRAM budget.
+        gib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1048576
         if verbose:
             print(f"[data] {len(self._files)} shards resident, {gib:.2f} GiB RSS",
                   flush=True)
@@ -152,14 +155,30 @@ class Pharos3DDataset:
             if shuffle:
                 rng.shuffle(idxs)
             cur: List[int] = []
+            cur_max = 0
             for i in idxs:
                 L = self.meta[i]["length"]
-                # a batch costs (n+1) * longest, since everything pads to it
-                if cur and ((len(cur) + 1) * max(L, self.meta[cur[0]]["length"])
-                            > token_budget or len(cur) >= max_batch):
+                # A batch costs (n+1) * LONGEST, since everything pads to it --
+                # and the longest has to be the running maximum, not
+                # `cur[0]`. It was `cur[0]`, and the bucket is shuffled, so
+                # the first chain is not the longest: the estimate ignored
+                # every chain between the first and the longest. Measured on
+                # the training split, **71% of batches exceeded the budget**,
+                # the worst by 1.23x. The budget exists so an 80 GiB card is
+                # not asked for more than it has; one that is exceeded by two
+                # batches in three is not a budget.
+                #
+                # Bounded by the bucket ratio, so this was never unbounded --
+                # but it is the difference between a declared limit and an
+                # advisory one, and stage 5's OOM handler skips the batch,
+                # which makes the loss silently length-correlated.
+                nxt_max = L if L > cur_max else cur_max
+                if cur and ((len(cur) + 1) * nxt_max > token_budget
+                            or len(cur) >= max_batch):
                     out.append(cur)
-                    cur = []
+                    cur, cur_max, nxt_max = [], 0, L
                 cur.append(i)
+                cur_max = nxt_max
             if cur:
                 out.append(cur)
         if shuffle:
