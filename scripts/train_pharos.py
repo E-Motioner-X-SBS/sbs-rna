@@ -387,6 +387,19 @@ def lookup_coevolution(t: Dict, bidx: torch.Tensor, ii: torch.Tensor,
 
 
 
+def _sched_step(sched, n_steps: int) -> None:
+    """`sched.step()`, except never past the total it was built with.
+
+    OneCycleLR raises on the step past `total_steps`, and twice now that has
+    killed a run that had finished its work: once at the last step of a
+    completed 8-epoch run, once on a mid-epoch resume. Losing a trained model
+    to the learning-rate schedule is the wrong failure mode -- the curve is
+    flat at its own end anyway, so clamping costs nothing a run can notice.
+    """
+    if sched.last_epoch + 1 < n_steps:
+        sched.step()
+
+
 def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
                    n_classes: int) -> Dict[str, float]:
     """Accuracy, the majority-class rate it must beat, and macro recall.
@@ -448,7 +461,8 @@ def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
 _TAGGED_CLASS = ("lw", "motif", "base")      # _class_metrics
 _TAGGED_BIN = ("mg",)                        # _binary_metrics
 _TAGGED_REG = ("rigidity", "fluct")          # _regression_metrics
-_PART_SCALARS = ("contact", "distance", "dist_acc", "structure",
+_PART_SCALARS = ("contact", "distance", "dist_acc", "dist_major", "dist_lift",
+                 "dist_macro", "structure",
                  "structure_mse", "mg", "rigidity", "fluctuation", "base",
                  "lw", "motif", "balance", "coev_frac", "coev_norm",
                  "motif_gate", "motif_eff", "motif_top_share", "n_lw")
@@ -764,8 +778,17 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                       * wt[ok]).sum() / wt[ok].sum().clamp(min=1e-6)
                 total = total + 0.5 * ld
                 parts["distance"] = float(ld.detach())
-                parts["dist_acc"] = float(
-                    (dl[ok].argmax(-1) == b[ok]).float().mean().detach())
+                # Head 2 reported BARE accuracy while heads 9 and 10 report
+                # theirs against the majority rate -- the exact omission
+                # `_class_metrics` was written for, left in the one head that
+                # did not get it. The bins are far from uniform: over 221,521
+                # sampled pairs the catch-all bin 39 alone takes 18.89%, so
+                # 0.19 is the score of a head that has learned only the prior
+                # and 0.47 reads as working either way. Measured at stage-5
+                # step 150 the lift is +0.2761, so the head IS learning --
+                # which is a fact nobody could state until the floor was
+                # reported beside the accuracy.
+                parts.update(_class_metrics(dl[ok], b[ok], "dist", nb))
 
     # head 3 -- the backbone itself, by denoising diffusion.
     #
@@ -1234,7 +1257,7 @@ def main() -> None:
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr,
                                                 total_steps=n_steps, pct_start=0.05)
     history: List[Dict] = []
-    step, start_ep, n_oom = 0, 0, 0
+    step, start_ep, n_oom, skip_in_epoch = 0, 0, 0, 0
     if resume is not None:
         if "opt" in resume:
             opt.load_state_dict(resume["opt"])
@@ -1253,6 +1276,17 @@ def main() -> None:
                   flush=True)
             for _ in range(min(step, n_steps - 1)):
                 sched.step()
+        # Batches already consumed inside the PARTIALLY done epoch. Without
+        # this the loop replays `epoch_batches[start_ep]` from index 0 while
+        # the scheduler stays restored at `step`, so the two desynchronise and
+        # OneCycleLR raises "Tried to step 151 times ... total steps is 150"
+        # -- a resumed stage-5 run died on the step after its last. The
+        # checkpoint is written mid-epoch (`--ckpt-every`), so a mid-epoch
+        # resume is the normal case, not an edge one.
+        skip_in_epoch = max(0, step - sum(len(b) for b in epoch_batches[:start_ep]))
+        if skip_in_epoch:
+            print(f"[pharos] resuming {skip_in_epoch} batches into epoch "
+                  f"{start_ep} of {len(epoch_batches[start_ep])}", flush=True)
         if start_ep >= args.epochs:
             print(f"[pharos] all {args.epochs} epochs already done", flush=True)
             return
@@ -1281,7 +1315,10 @@ def main() -> None:
     for ep in range(start_ep, args.epochs):
         model.train()
         t0, run = time.time(), []
-        for idxs in epoch_batches[ep]:
+        _batches = epoch_batches[ep][skip_in_epoch:] if ep == start_ep \
+            else epoch_batches[ep]
+        skip_in_epoch = 0
+        for idxs in _batches:
             t = to_device(tr.collate(idxs), device)
             # sampled recycling: 1..max_loops, uniform
             nl = int(rng.integers(1, cfg.n_loops + 1)) if args.sample_loops \
@@ -1317,14 +1354,14 @@ def main() -> None:
                 opt.zero_grad(set_to_none=True)
                 del t
                 torch.cuda.empty_cache()
-                sched.step()
+                _sched_step(sched, n_steps)
                 step += 1
                 if n_oom <= 5 or n_oom % 50 == 0:
                     print(f"[pharos] OOM #{n_oom} at step {step}; batch skipped",
                           flush=True)
                 runlog.event(f"OOM #{n_oom}", epoch=ep, step=step, n_oom=n_oom)
                 continue
-            sched.step()
+            _sched_step(sched, n_steps)
             run.append(float(loss.detach()))
             step += 1
             if args.smoke:
