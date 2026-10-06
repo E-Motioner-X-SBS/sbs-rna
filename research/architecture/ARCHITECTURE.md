@@ -758,6 +758,19 @@ regression loss would be dominated by whichever assay was measured on the
 larger instrument. The raw score is kept beside the target, because Spearman
 must not be computed on the thing that was fitted.
 
+**The benchmark is reported against a floor, like every other head.** A
+fitness Spearman means nothing on its own, for the same reason a dot-bracket
+accuracy means nothing without the majority-class rate. The floor here is the
+negative mutation count — a predictor that reads no sequence and runs no
+model — and on these 31 assays it scores a macro of **0.1868**, which places
+fourth of thirteen, outranks 9 of the 12 published entries, and is ahead of
+every one of them on both the ribozyme and the tRNA column. `eval_fitness_zeroshot.py`
+prints it as a row of the table on every run. At 3.34B tokens PHAROS scores
+0.0913 under the published `masked-marginals` convention and 0.1700 under
+`wt-marginals`; both are below the floor, and the gap between them is a
+property of the model's masked marginals rather than of the scorer — see
+findings 42 and the three diagnostics beside it in `AUDIT_2026-09-26.md`.
+
 ### 12.5 Optimiser and schedule
 
 **Muon on the 2-D weights, AdamW on everything else.** AdamW rescales each

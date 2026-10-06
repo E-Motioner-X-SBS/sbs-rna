@@ -272,8 +272,16 @@ fi
 # not attempted on a card that is not.
 if [ ! -f "$LOGDIR/.done-fitness-zeroshot" ] && [ -f "$CKPT_DIR/pretrain_${SIZE}.pt" ]; then
     note "=== eval_fitness_zeroshot.py (RNAGym ncRNA, masked-marginals) ==="
+    # Both strategies RNAGym's own baseline scripts offer, because they give
+    # materially different numbers for this model and reporting only the
+    # flattering one would be the defect. masked-marginals is the published
+    # column and runs first; wt-marginals is 97 s and is reported beside it.
     if $PY -u scripts/eval_fitness_zeroshot.py \
-            --device cuda --size "$SIZE" \
+            --device cuda --size "$SIZE" --strategy masked-marginals \
+            --token-budget 16384 --max-rows 256 \
+            --checkpoint "$CKPT_DIR/pretrain_${SIZE}.pt" >> "$LOG" 2>&1 \
+       && $PY -u scripts/eval_fitness_zeroshot.py \
+            --device cuda --size "$SIZE" --strategy wt-marginals \
             --checkpoint "$CKPT_DIR/pretrain_${SIZE}.pt" >> "$LOG" 2>&1; then
         touch "$LOGDIR/.done-fitness-zeroshot"
         note "zero-shot fitness scored"

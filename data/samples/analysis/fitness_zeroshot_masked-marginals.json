@@ -3,9 +3,9 @@
  "tokens": 3340096189.0,
  "size": "shared400",
  "n_loops": 3,
- "strategy": "wt-marginals",
- "device": "cpu",
- "amp": "fp32",
+ "strategy": "masked-marginals",
+ "device": "cuda",
+ "amp": "torch.bfloat16",
  "benchmark_digest": "b0109fc7",
  "limit_per_assay": null,
  "partial": false,
@@ -95,40 +95,32 @@
    "macro": -0.0338479083518109
   }
  ],
- "rank_of_this_run": 5,
+ "rank_of_this_run": 10,
  "per_category": {
   "Ribozyme": {
    "n_assays_expected": 26,
    "n_assays_scored": 26,
-   "signed": 0.15597943488525517,
-   "abs": 0.1874627475945352,
-   "auc": 0.5901646473057788,
-   "depth_baseline": 0.19467156074806977,
-   "depth_baseline_undefined": 1
+   "signed": -0.006114684394840567,
+   "abs": 0.08670659130906426,
+   "auc": 0.5450723021783447
   },
   "tRNA": {
    "n_assays_expected": 3,
    "n_assays_scored": 3,
-   "signed": 0.4406914602632221,
-   "abs": 0.4406914602632221,
-   "auc": 0.7179699725954762,
-   "depth_baseline": 0.48315201686679493,
-   "depth_baseline_undefined": 0
+   "signed": 0.21995860673047443,
+   "abs": 0.21995860673047443,
+   "auc": 0.6088656521923933
   },
   "Aptamer": {
    "n_assays_expected": 2,
    "n_assays_scored": 2,
-   "signed": -0.08668049099077652,
-   "abs": 0.1044827070260777,
-   "auc": 0.5345365626389293,
-   "depth_baseline": -0.11731970551260044,
-   "depth_baseline_undefined": 0
+   "signed": 0.06019610981808006,
+   "abs": 0.08042579510904026,
+   "auc": 0.5423849698110115
   }
  },
- "macro_signed": 0.16999680138590026,
- "macro_abs": 0.24421230496127833,
- "macro_depth_baseline": 0.1868346240340881,
- "beats_depth_baseline": false,
+ "macro_signed": 0.0913466773845713,
+ "macro_abs": 0.1290303310495263,
  "problems": [],
- "seconds": 122.3
+ "seconds": 4133.7
 }

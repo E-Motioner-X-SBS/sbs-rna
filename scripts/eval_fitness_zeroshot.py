@@ -118,6 +118,33 @@ def load_leaderboard() -> List[Tuple[str, float, float, float, float]]:
 CATEGORIES = ("Ribozyme", "tRNA", "Aptamer")
 
 
+def depth_baseline(d: pd.DataFrame, trips: Sequence[Sequence]) -> float:
+    """Spearman of MINUS THE MUTATION COUNT against the measured fitness.
+
+    The floor every number on this leaderboard has to clear, and it was not
+    stated anywhere. This predictor reads no sequence, runs no model and knows
+    only how many positions changed -- and on these 31 assays it scores a
+    macro of 0.187, which is second of the thirteen published entries and
+    ahead of every one of them on BOTH the ribozyme and the tRNA column.
+
+    Every other head in this project is reported against its floor: secondary
+    structure against the majority class, the MLM against the corpus unigram,
+    accuracy against chance. A fitness Spearman quoted without this one is the
+    same omission, and it is the difference between "the model ranks RNA
+    variants" and "the model has noticed that more mutations are worse".
+
+    NaN where the assay has one depth -- `Pitt_2010_ribozyme` is a pure single
+    mutant scan, so counting mutations cannot rank it at all. Returned as NaN
+    and counted, not silently dropped into a mean.
+    """
+    from scipy.stats import spearmanr
+    depth = np.array([len(t) for t in trips], dtype=float)
+    if len(set(depth)) < 2:
+        return float("nan")
+    r = spearmanr(-depth, d["dms_score"].to_numpy()).correlation
+    return float(r) if np.isfinite(r) else float("nan")
+
+
 def encode_wt(wt: str) -> np.ndarray:
     """Wild-type bases to token ids. ACGUN only; the builder guarantees it."""
     return np.array([SYM2ID.get(c, SYM2ID["UNK"]) for c in wt], dtype=np.int64)
@@ -204,8 +231,12 @@ def score_assay(model, wt: str, muts: Sequence[Sequence[Tuple[str, int, str]]],
             tok = torch.as_tensor(arr, device=device)
             lp = _logprobs(model, tok, n_loops, chem_fn).cpu().numpy()
             for r, pat in enumerate(chunk):
-                # keep only the rows that are read: the masked positions
-                table[pat] = {int(i): lp[r, int(i)] for i in pat}
+                # Keep only the rows that are read -- the masked positions --
+                # and COPY them. A numpy slice is a view that keeps its whole
+                # batch array alive, and the largest assay has 85,567 patterns
+                # over 424 batches, so holding views pins 360 MB to retain
+                # 27 MB of it.
+                table[pat] = {int(i): lp[r, int(i)].copy() for i in pat}
 
     for key, idxs in groups.items():
         lp = table[key]
@@ -327,6 +358,7 @@ def main() -> int:
         rows.append({"assay": a, "category": cat_of[a], "n": int(len(d)),
                      "n_scored": int(fin.sum()), "n_distinct_scores": n_distinct,
                      "length": len(wt), "spearman": rho,
+                     "depth_baseline": depth_baseline(d, trips),
                      "abs_spearman": abs(rho) if np.isfinite(rho) else float("nan"),
                      "auc": auc, "mcc": mcc,
                      "seconds": round(time.time() - t1, 1)})
@@ -356,30 +388,48 @@ def main() -> int:
         sub = res[res.category == c]
         want = int(manifest["benchmark"]["categories"].get(c, 0))
         got = int(np.isfinite(sub.spearman).sum())
+        # The baseline is averaged over the SAME assays, with an assay it
+        # cannot rank counted as 0 rather than skipped -- `np.nanmean` would
+        # quietly average the baseline over 25 ribozymes and the model over
+        # 26 and print them in the same row.
+        base = sub.depth_baseline.fillna(0.0)
         per_cat[c] = {"n_assays_expected": want, "n_assays_scored": got,
                       "signed": float(np.nanmean(sub.spearman)) if got else float("nan"),
                       "abs": float(np.nanmean(sub.abs_spearman)) if got else float("nan"),
-                      "auc": float(np.nanmean(sub.auc)) if got else float("nan")}
+                      "auc": float(np.nanmean(sub.auc)) if got else float("nan"),
+                      "depth_baseline": float(base.mean()) if len(sub) else float("nan"),
+                      "depth_baseline_undefined": int(sub.depth_baseline.isna().sum())}
         if got != want and not args.assays:
             problems.append(f"{c}: {got} of {want} assays contributed to the "
                             f"category mean")
     macro = float(np.mean([per_cat[c]["signed"] for c in CATEGORIES]))
     macro_abs = float(np.mean([per_cat[c]["abs"] for c in CATEGORIES]))
+    macro_base = float(np.mean([per_cat[c]["depth_baseline"] for c in CATEGORIES]))
 
     print(f"\n[fz] ==== RNAGym ncRNA leaderboard, {args.strategy} ====")
     hdr = f"{'model':26s} {'ribozyme':>9s} {'tRNA':>8s} {'aptamer':>8s} {'macro':>8s}"
     print("  " + hdr)
     me = ("PHAROS " + args.size, per_cat["Ribozyme"]["signed"],
           per_cat["tRNA"]["signed"], per_cat["Aptamer"]["signed"], macro)
+    floor = ("-- mutation count only", per_cat["Ribozyme"]["depth_baseline"],
+             per_cat["tRNA"]["depth_baseline"],
+             per_cat["Aptamer"]["depth_baseline"], macro_base)
     published = load_leaderboard()
     if not published:
         print(f"  (no published table at {LEADERBOARD_CSV.name}; "
               f"showing this run only)")
-    table = published + [me]
+    table = published + [me, floor]
     table.sort(key=lambda t: -(t[4] if np.isfinite(t[4]) else -9))
     for i, (nm, rz, tr, ap_, mc) in enumerate(table, 1):
-        star = "  <<<" if nm.startswith("PHAROS") else ""
+        star = ("  <<<" if nm.startswith("PHAROS")
+                else ("  <-- reads no sequence" if nm.startswith("--") else ""))
         print(f"  {i:2d} {nm:26s} {rz:9.4f} {tr:8.4f} {ap_:8.4f} {mc:8.4f}{star}")
+    above = sum(1 for t in published if t[4] < macro_base)
+    print(f"\n  The mutation-count baseline -- no sequence, no model -- "
+          f"outranks {above} of the {len(published)} published entries. "
+          f"A fitness Spearman on this benchmark is substantially a "
+          f"measurement of how well a score tracks mutation count, and this "
+          f"row is the floor to read every other row against.")
 
     if args.limit_per_assay:
         print(f"\n[fz] PARTIAL: only the first {args.limit_per_assay:,} variants "
@@ -410,6 +460,8 @@ def main() -> int:
         "rank_of_this_run": 1 + sum(1 for t in published if t[4] > macro),
         "per_category": per_cat,
         "macro_signed": macro, "macro_abs": macro_abs,
+        "macro_depth_baseline": macro_base,
+        "beats_depth_baseline": bool(macro > macro_base),
         "problems": problems,
         "seconds": round(time.time() - t0, 1),
     }

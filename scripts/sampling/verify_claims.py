@@ -1610,6 +1610,24 @@ def main() -> int:
                 print(f"  OK  {'  rank among the published 12':38s} "
                       f"{d['rank_of_this_run']} of "
                       f"{len(d['published_leaderboard']) + 1}")
+            # The floor, printed beside it the way every other head's floor
+            # is. Not a pass/fail: the model is currently BELOW it, and a
+            # check that failed on that would be failing on a true
+            # measurement. What must not happen is the macro being quoted
+            # without it.
+            if "macro_depth_baseline" in d:
+                base = d["macro_depth_baseline"]
+                lab2 = "  vs 'count the mutations'"
+                print(f"  OK  {lab2:38s} floor {base:+.4f}  "
+                      f"ribozyme {cats['Ribozyme']['depth_baseline']:+.4f}  "
+                      f"tRNA {cats['tRNA']['depth_baseline']:+.4f}  "
+                      f"aptamer {cats['Aptamer']['depth_baseline']:+.4f}  "
+                      f"-- model is "
+                      f"{'ABOVE' if d['beats_depth_baseline'] else 'below'} it")
+            else:
+                print(f"  WARN {f.stem} predates the mutation-count floor; "
+                      f"re-run eval_fitness_zeroshot.py")
+                warns.append(f"{f.stem} has no floor recorded")
 
     print("\n== the held-out curve is one series, not two spliced ==")
     # `heldout_files` reserves the last two shards of each corpus directory BY

@@ -154,8 +154,24 @@ the fresh harvest, RNA3DB `.cif` filenames and gRNASolo `.pdb` filenames →
 | RNAGym processed | `https://marks.hms.harvard.edu/rnagym/fitness_prediction/fitness_processed_assays.zip` | 70 assays |
 | RNAGym raw | `https://marks.hms.harvard.edu/rnagym/fitness_prediction/fitness_raw_data.zip` | raw measurements |
 | RNAGym repo | `https://github.com/MarksLab-DasLab/RNAGym` | baselines |
-| NABench | `https://github.com/mrzzmrzz/NABench` | 162 assays, 2.6M mutations |
+| NABench | `https://github.com/mrzzmrzz/NABench` | 162 assays in the paper, **47 shipped** in `data/` |
 | CPEB3 | `https://huggingface.co/datasets/Marks-lab/RNAgym/resolve/main/fitness_prediction/assays/Zhang_2020_cpeb3_ribozyme.parquet` | 111,417 ribozyme variants |
+
+**These two sources are not independent.** 24 of the 31 assays on the RNAGym
+ncRNA leaderboard are also shipped by NABench, usually under the same file
+name, and two pairs are the same experiment under unrelated names
+(`Beck_2022_ribozyme` ≡ `Roberts_2023_cepeb3_ribozyme`, 21,321 identical
+sequences). `scripts/build_fitness_dataset.py` turns them into one corpus with
+the leaderboard held back, and refuses rather than reporting a leak:
+
+```bash
+python3 scripts/build_fitness_dataset.py      # -> data/derived/fitness_v1/
+```
+
+It also drops `NABench/Roberts_2023_HDV_ribozyme`, whose `DMS_score` column is
+a read count (integers 4 to 438,152) rather than a fitness — it correlates
+with RNAGym's copy of the same 33,930 sequences at Spearman 0.0056 — and
+`Gregory_2018_mRNA`, where all 287 sequences contain a literal `X`.
 
 ### 6.4 Splicing
 
