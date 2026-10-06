@@ -60,9 +60,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import queue
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -158,59 +156,6 @@ def to_device(b: Dict, device) -> Dict:
                      for c in b["contacts"]]
     t["meta"] = b["meta"]
     return t
-
-
-class Prefetcher:
-    """Collate the next batches on a worker thread.
-
-    The training loop ran `to_device(tr.collate(idxs), device)` inline, so
-    every step was collate, then a synchronous host-to-device copy, then the
-    forward and backward -- with the GPU idle for the first two. Sampled over
-    30 s mid-run the card sat at **28% utilisation** (7-43%), and the epoch
-    time tracked CPU load rather than GPU work: 227 s, then 251 s, then 399 s
-    as other jobs were started beside it. A GPU-bound stage does not do that.
-
-    `collate` is numpy-heavy and CUDA calls release the GIL too, so a plain
-    thread overlaps the two. Order is preserved, the queue is bounded so a
-    fast producer cannot grow memory without limit, and an exception on the
-    worker is re-raised on the consumer rather than hanging it -- a prefetch
-    that swallows a data error and stalls would be worse than no prefetch.
-    """
-
-    def __init__(self, ds, batches, depth: int = 3):
-        self._q: queue.Queue = queue.Queue(maxsize=max(1, depth))
-        self._ds, self._batches = ds, batches
-        self._stop = threading.Event()
-        self._t = threading.Thread(target=self._run, daemon=True)
-        self._t.start()
-
-    def _run(self) -> None:
-        try:
-            for idxs in self._batches:
-                if self._stop.is_set():
-                    break
-                self._q.put(self._ds.collate(idxs))
-        except BaseException as e:                      # noqa: BLE001
-            self._q.put(e)
-            return
-        self._q.put(None)
-
-    def __iter__(self):
-        while True:
-            item = self._q.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
-
-    def close(self) -> None:
-        self._stop.set()
-        try:
-            while True:
-                self._q.get_nowait()
-        except queue.Empty:
-            pass
 
 
 def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
@@ -1159,10 +1104,6 @@ def main() -> None:
                     help="steps between checkpoints. Epoch-end only meant an "
                          "interrupted epoch lost everything, and the next fire "
                          "restarted from the PREVIOUS stage's weights")
-    ap.add_argument("--no-prefetch", dest="prefetch", action="store_false",
-                    default=True,
-                    help="collate inline instead of on a worker thread. The "
-                         "ablation that gives the prefetch claim its meaning.")
     ap.add_argument("--restart", action="store_true",
                     help="ignore an existing checkpoint; it is RENAMED")
     ap.add_argument("--ckpt", type=Path, default=None,
@@ -1377,10 +1318,16 @@ def main() -> None:
         _batches = epoch_batches[ep][skip_in_epoch:] if ep == start_ep \
             else epoch_batches[ep]
         skip_in_epoch = 0
-        _pf = Prefetcher(tr, _batches) if args.prefetch else None
-        for _cpu in (_pf if _pf is not None
-                     else (tr.collate(i) for i in _batches)):
-            t = to_device(_cpu, device)
+        for idxs in _batches:
+            # Collated inline, deliberately. A prefetch thread was added here
+            # on the strength of a 28% GPU-utilisation reading, and the
+            # reading was taken while two other jobs of mine were running
+            # beside the trainer. Quiet, the same loop samples at mean 66%,
+            # and the prefetch measured 117/117/116/117 s interleaved,
+            # 912.5 against 900.0 ms/step with startup differenced out, and
+            # 117 against 116 s under sixteen CPU burners. No benefit in any
+            # condition tested, so the thread and its queue are not kept.
+            t = to_device(tr.collate(idxs), device)
             # sampled recycling: 1..max_loops, uniform
             nl = int(rng.integers(1, cfg.n_loops + 1)) if args.sample_loops \
                 else cfg.n_loops
@@ -1448,15 +1395,11 @@ def main() -> None:
                         print(f"[pharos] SMOKE TEST FAILED: validation is "
                               f"missing {_miss} -- head 3 has no held-out "
                               f"measurement", flush=True)
-                        if _pf is not None:
-                            _pf.close()
                         return 1
                     print("[pharos] SMOKE TEST PASSED: stage 5 starts, every "
                           "head this batch can supervise produced a loss, the "
                           "backward pass completes, and validation reports the "
                           "structure head. No checkpoint written.", flush=True)
-                    if _pf is not None:
-                        _pf.close()
                     return 0
                 continue
             if step % args.ckpt_every == 0:

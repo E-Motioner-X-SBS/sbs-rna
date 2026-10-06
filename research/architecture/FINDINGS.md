@@ -222,12 +222,31 @@ job and the verification gate were running beside the trainer. On a quiet
 machine the same loop samples at mean 66%, median 66%, with no zero
 readings. I measured my own interference and attributed it to the code.
 
-The `Prefetcher` is kept, with no speed claim attached. It is a structural
-guard against exactly the contention that produced the false reading -- on a
-box with 73 logged-in users and a dozen long-lived services that is a real
-operating condition -- and `--no-prefetch` makes the claim falsifiable.
-Whether it earns its place under load is a separate measurement, not an
-assumption.
+A third and fourth design agree. The 40-step runs are startup-heavy (a 6.46 GiB corpus
+and a 4.7 GB checkpoint), which could in principle hide a step-time
+difference, so both arms were rerun at 200 steps to difference the startup
+out: **912.5 ms/step prefetched against 900.0 ms/step inline**, i.e. 1.4%
+*slower*. Three measurements, two designs, one answer.
+
+The last defence of the `Prefetcher` was that it guards against exactly the
+contention that produced the false reading, which on a box with 73 logged-in
+users is a real operating condition. That was an assumption, so it was
+measured too: under **sixteen CPU burners**, at load 16.7-18.8, the arms
+read **117 s prefetched against 116 s inline**. It does not help there
+either -- the burners starve the worker thread and the main thread alike, so
+there is no spare core for the overlap to use.
+
+**The `Prefetcher` is reverted.** Four measurements in three conditions, no
+benefit in any, and marginally negative on the one with the tightest error
+bars. It was a thread, a bounded queue, and three tests' worth of
+concurrency failure surface added to a training loop on the strength of a
+reading that turned out to be my own interference. Keeping it because it
+might help somewhere unmeasured is the habit this register exists to break.
+
+What the numbers actually say: the step is **~900 ms** and collate is a
+small part of it, so the 66% utilisation is ordinary per-step overhead --
+optimiser, metrics, Python -- not a data stall. There is no data-loading
+problem in stage 5 to fix.
 
 ### A correction, and what it cost
 
