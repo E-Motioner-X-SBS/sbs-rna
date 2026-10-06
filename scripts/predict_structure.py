@@ -38,6 +38,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from pharos.data.chemistry import chain_chemistry                   # noqa: E402
 from pharos.data.vocab import encode_chain                          # noqa: E402
 from pharos.eval.blind_tests import all_targets                     # noqa: E402
+from pharos.model.diffusion import BOND_C4_N, BOND_P_P               # noqa: E402
 from pharos.model.moe import LENGTH_BIN_MAX                         # noqa: E402
 from pharos.eval.metrics import clash_score                         # noqa: E402
 from pharos.eval.structure import read_structure                    # noqa: E402
@@ -90,7 +91,8 @@ def write_pdb(path: Path, coords: np.ndarray, seq: str,
 @torch.no_grad()
 def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
             n_steps: int = 50, n_loops: Optional[int] = None,
-            seed: int = 0) -> tuple[np.ndarray, List[np.ndarray], List[float]]:
+            seed: int = 0) -> tuple[np.ndarray, List[np.ndarray], List[float],
+                                    List[tuple]]:
     """Draw `n_samples` backbones for one sequence; return the chosen one too."""
     comps = list(seq)
     tokens, mods = encode_chain(comps)
@@ -123,7 +125,7 @@ def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
     single = out["hidden"].float()
 
     head = model.heads.structure
-    draws, clashes = [], []
+    draws, clashes, bonds = [], [], []
     for s in range(n_samples):
         g = torch.Generator(device="cpu").manual_seed(seed + s)
         noise = torch.randn(1, L, N_ATOM, 3, generator=g).to(device)
@@ -133,8 +135,36 @@ def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
         c = x[0].float().cpu().numpy()
         draws.append(c)
         clashes.append(clash_score(c))
-    best = int(np.argmin(clashes))
-    return draws[best], draws, clashes
+        bonds.append(bond_violation(c))
+    # Selecting on clash ALONE is inert exactly when it matters: an exploded
+    # draw has no non-bonded neighbours to clash with, so every draw scores
+    # 0.000 and `argmin` returns draw 0 whatever the geometry. Rank on the
+    # bonded violation first, which an exploded draw cannot win.
+    best = int(min(range(len(draws)), key=lambda i: (bonds[i][0], clashes[i])))
+    return draws[best], draws, clashes, bonds
+
+
+def bond_violation(c: np.ndarray) -> tuple[float, float, float]:
+    """`(violation fraction, median C4'-N, median consecutive P-P)` in angstrom.
+
+    `clash_score` excludes pairs within one residue of each other, which is
+    right for a non-bonded clash and leaves it blind to the BONDED geometry.
+    A draw from an undertrained denoiser came back `clash 0.000` with a
+    consecutive P-P median of 40.35 A, a 118x122x109 A bounding box and two
+    atoms 0.59 A apart: a structure that cannot exist, reported as clean,
+    because every impossible distance was one the clash metric skips.
+
+    The bands are the ones the TRAINING loss already penalises
+    (`BOND_C4_N`, `BOND_P_P`), so inference is checked against the same
+    physics it was fitted to rather than against a second opinion.
+    """
+    cn_mu, cn_tol = BOND_C4_N
+    pp_mu, pp_tol = BOND_P_P
+    cn = np.linalg.norm(c[:, 1] - c[:, 2], axis=-1)          # C4' - glycosidic N
+    pp = np.linalg.norm(c[1:, 0] - c[:-1, 0], axis=-1)       # P(i) - P(i+1)
+    bad = int((np.abs(cn - cn_mu) > cn_tol).sum() + (np.abs(pp - pp_mu) > pp_tol).sum())
+    return (bad / max(len(cn) + len(pp), 1),
+            float(np.median(cn)), float(np.median(pp)))
 
 
 def _sample_with(head, single, mask, n_steps, noise):
@@ -214,7 +244,7 @@ def main() -> int:
             print(f"  {t.name}: {len(seq)} nt > --max-length, skipped")
             skipped += 1
             continue
-        best, draws, clashes = predict(model, seq, device,
+        best, draws, clashes, bonds = predict(model, seq, device,
                                        n_samples=args.n_samples,
                                        n_steps=args.n_steps,
                                        n_loops=args.n_loops)
@@ -222,8 +252,13 @@ def main() -> int:
         if args.write_all:
             for k, d in enumerate(draws, 1):
                 write_pdb(args.out / f"{t.name}_m{k}.pdb", d, seq)
+        bv, cn, pp = bonds[int(min(range(len(draws)),
+                                   key=lambda i: (bonds[i][0], clashes[i])))]
+        flag = "" if bv < 0.5 else "   <-- BACKBONE NOT CONNECTED"
         print(f"  {t.name}: L={len(seq):4d} {len(draws)} draws, "
-              f"clash {min(clashes):.3f}-{max(clashes):.3f}, wrote best")
+              f"clash {min(clashes):.3f}-{max(clashes):.3f}, "
+              f"bond-violation {bv:.3f} (C4'-N {cn:.2f} A, P-P {pp:.2f} A), "
+              f"wrote best{flag}")
         done += 1
 
     # relative_to raises when --out is outside the repo, which is the normal

@@ -162,6 +162,48 @@ checkpoint: `mg_auroc` 0.692 -> 0.839, `rigidity_r` **0.134 -> 0.645** on the
 b-factor targets finding 66 corrected, `lw_lift` 0.000 -> +0.074, `motif_lift`
 -0.010 -> +0.190, contact 0.535 -> 0.373, structure 1.028 -> 0.911.
 
+## 72–73 — the resume path, and the one head without a floor
+
+| # | what | status |
+|---|---|---|
+| 72 | resuming stage 5 restored the scheduler to `step` and then replayed the partially-done epoch **from batch 0**, so OneCycleLR raised `Tried to step 151 times. The specified number of total steps is 150`. The checkpoint is written mid-epoch by design, so a mid-epoch resume is the normal case. Second time the schedule has killed a run that had finished its work; `_sched_step` now clamps | `FIXED` |
+| 73 | head 2 reported **bare accuracy** while heads 9 and 10 report theirs against the majority rate, through the helper written for exactly that. The distance bins are far from uniform -- over 221,521 sampled pairs the catch-all bin 39 alone takes 18.89% -- so 0.19 is a prior-predictor's score and the reported 0.47 reads as working either way. The measured lift is **+0.2761**, so the head is learning; that could not be stated until the floor was printed beside the accuracy | `FIXED` |
+
+## 74 — the inference path reported a clean number for an impossible structure
+
+| # | what | status |
+|---|---|---|
+| 74 | `predict_structure.py`'s only geometric check is `clash_score`, which excludes pairs within one residue of each other -- correct for a non-bonded clash, and blind to the BONDED geometry. A draw came back **`clash 0.000`** with a consecutive P-P median of **40.35 A** against a real 5.88, a 118x122x109 A bounding box for a 46-nt chain, and two atoms **0.59 A** apart: a structure that cannot exist, reported as clean, because every impossible distance was one the metric skips. Sample selection was `argmin(clash)`, which is inert in exactly that case -- an exploded draw has no neighbours to clash with, so every draw scores 0.000 and `argmin` returns draw 0 whatever the geometry | `FIXED` |
+
+Inference now reports the bonded violation beside the clash, against the
+bands the TRAINING loss already penalises (`BOND_C4_N`, `BOND_P_P`), so the
+sampler is checked against the physics it was fitted to rather than a second
+opinion; and draws are ranked on the bonded violation first.
+
+It separates cleanly, which is the part worth stating: over 120 real corpus
+chains the violation runs **0.000–0.034** with C4'-N 3.37–3.41 A and P-P
+5.79–5.93 A, 119 of them under 0.10, while the undertrained draw scores
+**0.989** and prints `BACKBONE NOT CONNECTED`. A check that always fails is
+worth no more than one that never does.
+
+(The draw itself is expected to be poor -- that checkpoint's structure head
+is untrained. The defect is that nothing in the inference path said so.)
+
+## Checked and not defects
+
+Recorded so the same ground is not re-covered. Each looked like the register's
+class and was not, which is the other half of this work: a probe that reports
+a false positive costs exactly as much as one that misses a real defect.
+
+| what it looked like | what it is |
+|---|---|
+| `w = t["weights"]` assigned and seemingly unused | it reaches the contact and distance losses as a proper weighted mean, weight in numerator AND denominator. The weights are live: 0.30/0.55/0.80/1.00 over 5.0/8.6/28.3/58.1% of chains |
+| `method` is None for 78.7% of the loader's per-chain meta, and it drives `rigidity_valid` | `rigidity_valid` reads **32.9%**, matching the documented 32%: the flag was computed at build time where the method was known, and 2,345 chains carry `method=None` with `rigidity_valid=True` |
+| `in_complex` comes from `m.get("has_protein")`, a `.get()` that yields 0.0 forever if the key is misnamed | `has_protein` is a real meta key; `in_complex` reads mean 0.85 with both values present |
+| `coev_frac` read 0.0 on a real batch | the first six chains carry no Rfam family. Over random batches the rate is **3.99%** against 3.54% expected |
+| the structure loss did not move when coordinates were shifted +7 A | a rigid translation is one the loss must ignore. It moves under scaling and per-atom noise, and the invariance is now pinned as a property |
+| four chemistry dims constant, three parameters without a gradient, a `pair` key absent, `embed.mod` with no gradient | all four were my own probe's errors, not the model's -- `padding_idx=0` against all-zero ids, a key that does not exist by design, a head unreachable without its own loss, and a gate that is *supposed* to start closed |
+
 ## Unnumbered, same class
 
 | what | status |
