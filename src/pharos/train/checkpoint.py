@@ -101,3 +101,69 @@ def load_resume(model, state: dict, *, what: str,
             f"not be one. Use --restart to begin a new run, or --init-from to "
             f"treat it as initialisation rather than continuation.")
     return report
+
+
+def load_optimizer(opt, saved: dict, model, *, what: str,
+                   absent=()) -> str:
+    """Load optimiser state across a deliberate architecture change.
+
+    `load_resume` fixed the model load and stopped one line short. Two lines
+    below it every trainer does `opt.load_state_dict(resume["opt"])`, and
+    torch keys optimiser state by the PARAMETER'S POSITION in
+    `opt.param_groups[i]["params"]`. Insert one parameter anywhere but the
+    very end and every index after it shifts, so the load fails with
+
+        ValueError: loaded state dict contains a parameter group that
+        doesn't match the size of optimizer's group
+
+    which, like the model-side crash, says nothing about what changed.
+
+    Dropping the state instead would be quiet and wrong: Adam's moments are
+    most of what a resume is FOR, and a run that silently restarts them
+    reports as a resume while behaving like a warm restart -- a step-541
+    resume of a 3,626-step cosine would take a visible loss spike that
+    nothing in the log would explain.
+
+    So the state is transplanted by NAME. The old ordering is not stored, but
+    it is reconstructible: parameters are registered in module order, so the
+    names the optimiser saw are exactly this model's names minus the ones the
+    checkpoint did not carry. That reconstruction is CHECKED against the
+    saved group sizes rather than assumed -- if the arithmetic does not land,
+    the state is dropped loudly instead of transplanted wrongly.
+    """
+    new_names = [n for n, _ in model.named_parameters()]
+    absent = set(absent)
+    old_names = [n for n in new_names if n not in absent]
+    n_saved = sum(len(g["params"]) for g in saved.get("param_groups", []))
+    if n_saved == len(new_names):
+        opt.load_state_dict(saved)                  # nothing moved
+        return f"optimiser state loaded unchanged ({n_saved:,} parameters)"
+    if n_saved != len(old_names):
+        opt.state = type(opt.state)()
+        return (f"OPTIMISER STATE DROPPED: it holds {n_saved:,} parameters, "
+                f"the model has {len(new_names):,}, and removing the "
+                f"{len(absent)} tensor(s) the checkpoint lacks leaves "
+                f"{len(old_names):,} -- the two do not reconcile, so the "
+                f"moments are not transplanted. Expect a brief loss "
+                f"transient while Adam re-estimates them.")
+    pos = {n: i for i, n in enumerate(new_names)}
+    remap = {old_i: pos[n] for old_i, n in enumerate(old_names)}
+    out = {"state": {remap[k]: v for k, v in saved["state"].items()
+                     if k in remap},
+           "param_groups": []}
+    for g in saved["param_groups"]:
+        g2 = dict(g)
+        g2["params"] = [remap[p] for p in g["params"]]
+        out["param_groups"].append(g2)
+    # The fresh parameters have no moments and must still be IN a group, or
+    # they would silently stop being optimised -- a parameter that exists,
+    # takes gradient, and is never stepped.
+    covered = {p for g in out["param_groups"] for p in g["params"]}
+    missing = [i for i in range(len(new_names)) if i not in covered]
+    if missing:
+        out["param_groups"][0]["params"] = sorted(
+            out["param_groups"][0]["params"] + missing)
+    opt.load_state_dict(out)
+    return (f"optimiser state transplanted by name: {len(remap):,} parameters "
+            f"keep their moments, {len(missing)} start fresh "
+            f"({', '.join(sorted(absent)) if absent else 'none named'})")

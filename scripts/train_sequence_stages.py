@@ -112,7 +112,8 @@ from pharos.data.vocab import PAD_ID, SYMBOLS, encode_chain          # noqa: E40
 from pharos.model.moe import RouterFeatures                          # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig                 # noqa: E402
 from pharos.train.telemetry import RunLog                            # noqa: E402
-from pharos.train.checkpoint import atomic_save, load_resume
+from pharos.train.checkpoint import (atomic_save, load_optimizer,
+                                     load_resume)
 from pharos.train.guard import check_loss
 from train_block_scorer import gpu_free_gib                          # noqa: E402
 
@@ -815,7 +816,10 @@ def main() -> None:
     gstep, start_ep, n_oom = 0, 0, 0
     if resume is not None:
         if "opt" in resume:
-            opt.load_state_dict(resume["opt"])
+            # By NAME, not by position -- see `load_optimizer`. A bare
+            # load_state_dict here raised two lines after the model load was
+            # fixed, for the same one added parameter.
+            print(f"[seq] {load_optimizer(opt, resume['opt'], model, what='seq', absent=rep['fresh'])}", flush=True)
         gstep = int(resume.get("gstep", 0))
         hist = list(resume.get("history", []))
         # A checkpoint written at the end of an epoch resumes at the next one;

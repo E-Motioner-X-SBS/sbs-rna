@@ -255,7 +255,16 @@ def main() -> int:
     data["provenance"] = _provenance(args)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(data, indent=1))
-    print(f"\n[eval] -> {args.out.relative_to(ROOT)}")
+    # `relative_to` RAISES when the target is outside the tree, and it was
+    # raising on the very last line -- after 885 competitor models had been
+    # scored and the JSON had already been written. A run that did all its
+    # work and then exited non-zero on a cosmetic path shortening reads, to
+    # cron and to a pipeline driver, as a failed evaluation.
+    try:
+        shown = args.out.relative_to(ROOT)
+    except ValueError:
+        shown = args.out
+    print(f"\n[eval] -> {shown}")
     return 0
 
 

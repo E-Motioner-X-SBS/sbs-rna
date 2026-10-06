@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""The ten output heads of ARCHITECTURE v0.2 §9.
+"""The eleven output heads of ARCHITECTURE v0.2 §9.
 
-v0.1 specified six. v0.2 specifies ten, and the four that were added sit on
-substantial supervised data that was already on disk and entirely unused:
+v0.1 specified six. v0.2 specified ten, and the four that were added sat on
+substantial supervised data that was already on disk and entirely unused.
+Head 11 was added later, for the opposite reason: not unused data, but a
+quantity nothing was predicting at all.
 
     1  contact            L x L binary          raw PDB, 10,520 entries
     2  distance           L x L binned          same
@@ -14,6 +16,7 @@ substantial supervised data that was already on disk and entirely unused:
     8  disorder           per-residue           unobserved residues, 46,448
     9  geometry           Leontis-Westhof class 103,965 annotated pairs
    10  motif              motif class           RNA 3D Motif Atlas, 667
+   11  torsion            eta/theta/chi_tilde   derived from P/C4'/N
 
 **This table is `HEAD_SPEC` below, and `test_pharos.py` parses it out of this
 docstring and compares the two.** It is written twice because a docstring
@@ -37,6 +40,18 @@ cryo-EM, where the per-atom B is a fitted display parameter rather than a
 measured one. Mixing the two trains the head on a different physical quantity
 for 62% of the corpus, so the head carries its own validity mask and
 `rigidity_mask` is not optional.
+
+**Torsions (head 11) are derived, not stored.** The shards carry P, C4' and
+the glycosidic N -- not enough for the classical alpha..zeta, exactly enough
+for the eta/theta pseudotorsions of Duarte & Pyle, which were defined on
+these atoms for this reason. They are computed from the batch's own
+coordinates at each step rather than written into the corpus: a torsion is a
+deterministic function of coordinates already present, so a stored copy
+would be a second source of truth with nothing to gain. See
+`pharos.data.torsions`, whose torch path is checked against a numpy
+reference to 1e-9 and whose sign convention is pinned by planar cis/trans
+cases -- the first draft had every angle 180 degrees from IUPAC, which is
+self-consistent and therefore invisible to everything except that test.
 
 **Base identity is free supervision.** `N_struct` residues have their ribose
 modelled but their identity unassigned, so predicting the base is a task with
@@ -74,6 +89,12 @@ class HeadConfig:
     #: A pair that is not base-paired at all is handled by the mask, not by a
     #: class: absence of a pair is not a kind of pair.
     n_lw_classes: int = 13
+    #: Head 11. Backbone pseudotorsions, two per residue plus a glycosidic
+    #: pseudo-angle: eta, theta, chi_tilde. See `pharos.data.torsions` for
+    #: why these three and not the classical alpha..zeta -- the corpus stores
+    #: P, C4' and N, and eta/theta is the representation defined on exactly
+    #: those atoms. Each is emitted as an unnormalised (sin, cos) pair.
+    n_torsions: int = 3
     #: Head 10. Motif kind from the RNA 3D Motif Atlas bank on disk -- 413
     #: internal loops and 254 hairpin loops over 667 entries -- plus a "neither"
     #: class, because most pairs are in neither and a posterior that cannot say
@@ -183,6 +204,23 @@ class ResidueHeads(nn.Module):
         # self-pair -- `pair_proj(cat(h, h))` -- which is a shape that
         # typechecks and means nothing.
         self.motif = _mlp(d, d, cfg.n_motif_classes, cfg.dropout)
+        # torsion_sincos -- head 11, the LOCAL geometry.
+        #
+        # Every other structural head here is non-local: a contact, a
+        # distance, a pair family. None of them says what shape the backbone
+        # takes between two residues, and that is most of what distinguishes
+        # a fold from a contact map -- many geometries satisfy the same
+        # contacts, which is the ambiguity the diffusion head was added to
+        # resolve and the one it has the least supervision for.
+        #
+        # Emitted as an UNNORMALISED (sin, cos) per angle, AlphaFold-style:
+        # regressing the angle itself puts a discontinuity at +-pi, where
+        # 179 degrees and -179 are two degrees apart and a squared error
+        # calls them 358. The loss normalises and adds a term pulling the
+        # norm to 1, so the magnitude stays free to express confidence
+        # during training without the direction being distorted by it.
+        self.torsion = _mlp(d, d, cfg.n_torsions * 2, cfg.dropout)
+        self.n_torsions = cfg.n_torsions
 
     def forward(self, tok: torch.Tensor) -> Dict[str, torch.Tensor]:
         return {
@@ -192,6 +230,8 @@ class ResidueHeads(nn.Module):
             "reactivity": self.reactivity(tok),
             "base_logits": self.base_identity(tok),
             "motif_logits": self.motif(tok),
+            "torsion_sincos": self.torsion(tok).view(
+                *tok.shape[:-1], self.n_torsions, 2),
         }
 
 
@@ -305,6 +345,9 @@ HEAD_SPEC: List[Dict] = [
      "key": "lw_logits"},
     {"n": 10, "name": "motif", "output": "motif class, per residue",
      "key": "motif_logits"},
+    {"n": 11, "name": "torsion",
+     "output": "eta/theta/chi_tilde as (sin, cos), per residue",
+     "key": "torsion_sincos"},
 ]
 
 #: Heads the model produces that §9 no longer numbers. Listed rather than left

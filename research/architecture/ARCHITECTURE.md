@@ -22,9 +22,10 @@ refinement loops, and **512 experts that share one network**.
 all of it computable from sequence; and an ionic condition (Mg²⁺ and monovalent
 concentration), which is a real input the physics responds to.
 
-**Out:** ten heads (§9) — contact map, distance distribution, 3D coordinates,
+**Out:** eleven heads (§9) — contact map, distance distribution, 3D coordinates,
 secondary structure, per-residue reactivity, Mg²⁺ site probability, local
-rigidity, disorder, base-pair geometry class, and a motif-class posterior.
+rigidity, disorder, base-pair geometry class, a motif-class posterior, and
+backbone pseudotorsions.
 
 The design constraint that shapes everything: **the 3D corpus is saturated.**
 The whole PDB holds 29,038 RNA chains across 10,520 entries, and no amount of
@@ -610,7 +611,7 @@ result.
 1. contact map · **2. distance distribution (distogram)** · **3. backbone
 coordinates, by denoising diffusion** · 4. secondary structure · 5. per-residue reactivity ·
 6. Mg²⁺ site probability · 7. local rigidity · 8. disorder · 9. base-pair
-geometry class · 10. motif-class posterior.
+geometry class · 10. motif-class posterior · **11. backbone pseudotorsions**.
 
 Head 2 is supervised over **40 bins: 39 one-Å bins spanning 2–41 Å, plus
 an overflow bin at ≥41 Å**, on the same
@@ -619,6 +620,46 @@ cutoff; a binned distance says how far apart, which is strictly more
 information from the same coordinates — it is what AlphaFold trains its pair
 track on. It was defined but had no target until the corpus carried
 coordinates.
+
+### 9.0 Head 11 is the only head that describes LOCAL geometry
+
+Heads 1, 2 and 9 are all non-local: which residues touch, how far apart, and
+in what pair family. None of them says what shape the backbone takes between
+two residues, and many geometries satisfy the same contact map. That
+ambiguity is precisely what head 3 exists to resolve and what it has the
+least supervision for — a diffusion decoder learning global fold and local
+backbone shape from one loss on 7,653 chains.
+
+Head 11 supervises the local part directly. The corpus stores P, C4′ and the
+glycosidic N, which is not enough for the classical α…ζ torsions (they need
+O5′, C5′, C3′, O3′) and is exactly enough for the **η/θ pseudotorsions** of
+Duarte & Pyle (PNAS 95:11212, 1998), defined on P and C4′ for this reason:
+
+    η_i = torsion(C4′_{i−1}, P_i,   C4′_i,   P_{i+1})
+    θ_i = torsion(P_i,       C4′_i, P_{i+1}, C4′_{i+1})
+
+plus `χ̃_i = torsion(P_i, C4′_i, N_i, P_{i+1})`, which is **not** χ — real χ
+is O4′–C1′–N9–C4 and we store one of those four atoms. It is named `chi_tilde`
+everywhere so that no one reads a literature χ distribution against it.
+
+Targets are **derived from the batch's own coordinates at every step**, not
+stored in the shards: a torsion is a deterministic function of coordinates
+already present, so a stored copy would be a second source of truth with
+nothing to gain and staleness to lose. Angles are emitted as an unnormalised
+`(sin, cos)` pair per angle, AlphaFold-style, because regressing the angle
+itself puts a discontinuity at ±π where 179° and −179° are two degrees apart
+and a squared error calls them 358.
+
+Undefined angles are **masked, never zero-filled**: η is undefined at both
+chain ends, θ and χ̃ at the last residue, and all three across any break in
+the coordinate mask. Zero is a perfectly good torsion and a zero-filled one
+would be indistinguishable from a measured one.
+
+The head reports a floor, like every other head here. For an angle the best
+constant predictor is the **circular** mean — the arithmetic mean of 179° and
+−179° is 0°, the angle furthest from both — computed on the same residues in
+the same batch. `tors_*_lift` is the floor's mean angular error minus the
+head's.
 
 ### 9.1 Head 3 is a diffusion decoder, not a coordinate regressor
 

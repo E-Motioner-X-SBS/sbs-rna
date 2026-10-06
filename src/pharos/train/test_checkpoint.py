@@ -13,7 +13,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from pharos.train.checkpoint import atomic_save, load_resume     # noqa: E402
+from pharos.train.checkpoint import (atomic_save,                # noqa: E402
+                                     load_optimizer, load_resume)
 
 fails: list[str] = []
 
@@ -105,6 +106,52 @@ def main() -> int:
         chk("one small tensor passes, one large tensor does not",
             rep["frac"] < 0.01 < (full.big.weight.numel() / n_total),
             f"{rep['frac']:.4%} vs {full.big.weight.numel()/n_total:.1%}")
+
+        print("\n== and the optimiser moments survive the same change ==")
+        # Fixing the model load alone left `opt.load_state_dict` to raise two
+        # lines later: torch keys optimiser state by the parameter's POSITION,
+        # so inserting a parameter shifts every index after it.
+        old2 = Net(False)
+        o_old = torch.optim.AdamW(old2.parameters(), lr=1e-3)
+        old2.big.weight.grad = torch.ones_like(old2.big.weight)
+        old2.big.bias.grad = torch.ones_like(old2.big.bias)
+        o_old.step()                                   # give it real moments
+        saved_opt = o_old.state_dict()
+
+        new2 = Net(True)
+        o_new = torch.optim.AdamW(new2.parameters(), lr=1e-3)
+        raised = False
+        try:
+            o_new.load_state_dict(saved_opt)
+        except ValueError:
+            raised = True
+        chk("a positional load raises on the added parameter", raised)
+
+        o_new = torch.optim.AdamW(new2.parameters(), lr=1e-3)
+        msg = load_optimizer(o_new, saved_opt, new2, what="t",
+                             absent=["tiny.weight"])
+        chk("transplanting by name succeeds", "transplanted" in msg, msg)
+        names = [n for n, _ in new2.named_parameters()]
+        st = o_new.state_dict()["state"]
+        idx = {n: i for i, n in enumerate(names)}
+        chk("the pre-existing parameter KEPT its moment",
+            idx["big.weight"] in st
+            and torch.equal(st[idx["big.weight"]]["exp_avg"],
+                            o_old.state_dict()["state"][0]["exp_avg"]))
+        chk("the added parameter has no moment yet", idx["tiny.weight"] not in st)
+        covered = {q for g in o_new.param_groups for q in
+                   range(len(g["params"]))}
+        chk("and the added parameter is still IN a group, so it is stepped",
+            sum(len(g["params"]) for g in o_new.param_groups) == len(names),
+            f"{sum(len(g['params']) for g in o_new.param_groups)} of {len(names)}")
+
+        print("\n== an unreconcilable optimiser state is DROPPED, loudly ==")
+        # Wrong transplant is worse than no transplant: it would give a
+        # parameter another parameter's moments.
+        o_bad = torch.optim.AdamW(new2.parameters(), lr=1e-3)
+        msg = load_optimizer(o_bad, saved_opt, new2, what="t", absent=[])
+        chk("it refuses to guess when the counts do not reconcile",
+            "DROPPED" in msg, msg.split(":")[0])
     finally:
         shutil.rmtree(d, ignore_errors=True)
 

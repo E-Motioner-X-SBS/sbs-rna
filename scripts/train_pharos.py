@@ -81,13 +81,15 @@ CKPT_FORMAT = 2
 sys.path.insert(0, str(ROOT / "src"))
 
 from pharos.data.loader import Pharos3DDataset                    # noqa: E402
+from pharos.data.torsions import (TORSION_NAMES,                  # noqa: E402
+                                  pseudotorsions_torch)
 from pharos.model.moe import (LENGTH_BIN_MAX as _LENGTH_BIN_MAX,  # noqa: E402
                               RouterFeatures)
 from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
 from pharos.train.checkpoint import (atomic_save,          # noqa: E402
-                                     load_resume)
+                                     load_optimizer, load_resume)
 from pharos.train.guard import check_loss
 
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -462,11 +464,19 @@ def _class_metrics(logits: torch.Tensor, target: torch.Tensor, tag: str,
 _TAGGED_CLASS = ("lw", "motif", "base")      # _class_metrics
 _TAGGED_BIN = ("mg",)                        # _binary_metrics
 _TAGGED_REG = ("rigidity", "fluct")          # _regression_metrics
+#: head 11, three angles each with a mean error, its circular-mean floor and
+#: the lift between them. Derived from `TORSION_NAMES` for the same reason the
+#: tags above are: a head added to the model and not to this list trains with
+#: nothing in the csv to read it by.
+_TORSION_SCALARS = tuple(f"tors_{n}_{x}" for n in TORSION_NAMES
+                         for x in ("mae", "base", "lift")) \
+    + tuple(f"n_{n}" for n in TORSION_NAMES)
 _PART_SCALARS = ("contact", "distance", "dist_acc", "dist_major", "dist_lift",
                  "dist_macro", "structure",
                  "structure_mse", "mg", "rigidity", "fluctuation", "base",
                  "lw", "motif", "balance", "coev_frac", "coev_norm",
-                 "motif_gate", "motif_eff", "motif_top_share", "n_lw")
+                 "motif_gate", "motif_eff", "motif_top_share", "n_lw",
+                 "torsion") + _TORSION_SCALARS
 _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
               "contact_n", "coev_frac", "motif_eff",
               "lw_acc", "lw_major", "lw_lift", "lw_macro", "lw_n_class",
@@ -477,7 +487,9 @@ _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
               "mg_precision_at_calibrated_thr", "mg_recall_at_calibrated_thr",
               "rigidity_r_pooled", "rigidity_n",
               "motif_acc", "motif_major", "motif_lift", "motif_macro",
-              "motif_n_class")
+              "motif_n_class") + tuple(
+    f"tors_{n}_{x}" for n in TORSION_NAMES
+    for x in ("mae", "base", "lift", "n"))
 
 def _stage5_fields() -> list:
     f = ["lr", "loss", "n_oom", "peak_gib", "note"]
@@ -521,6 +533,51 @@ def _binary_metrics(logit: torch.Tensor, target: torch.Tensor,
         auc = (r[y].sum() - npos * (npos + 1) / 2.0) / (npos * nneg)
         return {f"{tag}_pos_rate": float(y.float().mean()),
                 f"{tag}_auroc": float(auc)}
+
+
+def _torsion_metrics(unit: torch.Tensor, ang: torch.Tensor,
+                     valid: torch.Tensor) -> Dict[str, float]:
+    """Mean angular error per angle, and the floor it has to beat.
+
+    A regression head needs a floor as much as a classifier does. The
+    classifier heads here report `*_major` -- the majority-class rate -- and
+    head 2 spent a stage reporting a bare accuracy that turned out to BE its
+    majority rate. The regression analogue is the best constant predictor,
+    and for an angle that is the CIRCULAR mean, not the arithmetic one: the
+    arithmetic mean of 179 and -179 degrees is 0, which is the angle furthest
+    from both.
+
+    So `*_mae` is the head's mean absolute angular error in degrees and
+    `*_base` is the circular mean predictor's, computed on the same residues
+    in the same batch -- the lesson of the +0.2761 correction, which compared
+    an accuracy against a floor sampled somewhere else.
+
+    A head that has learned nothing scores `lift` 0. A uniformly random
+    predictor would score about 90 degrees MAE; the circular-mean floor is
+    tighter than that wherever the distribution is peaked, which for eta and
+    theta it very much is.
+    """
+    out: Dict[str, float] = {}
+    with torch.no_grad():
+        for k, name in enumerate(TORSION_NAMES):
+            v = valid[..., k]
+            if not bool(v.any()):
+                continue
+            a = ang[..., k][v]
+            u = unit[..., k, :][v]
+            # angular error = acos(cos(pred - true)) via the dot product of
+            # the two unit vectors, which is exactly cos of the difference
+            dot = (u[:, 0] * a.sin() + u[:, 1] * a.cos()).clamp(-1.0, 1.0)
+            mae = float(dot.arccos().mean().rad2deg())
+            # the circular mean of the TARGETS on these same residues
+            cm = torch.atan2(a.sin().mean(), a.cos().mean())
+            bdot = (cm - a).cos().clamp(-1.0, 1.0)
+            base = float(bdot.arccos().mean().rad2deg())
+            out[f"tors_{name}_mae"] = mae
+            out[f"tors_{name}_base"] = base
+            out[f"tors_{name}_lift"] = base - mae
+            out[f"n_{name}"] = int(v.sum())
+    return out
 
 
 def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
@@ -670,6 +727,40 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         parts.update(_class_metrics(ml[lm], t["loop_class"][lm], "motif",
                                     ml.shape[-1]))
 
+    # head 11 -- backbone pseudotorsions, the LOCAL geometry.
+    #
+    # Every other structural head here is non-local -- a contact, a distance,
+    # a pair family -- and none of them says what shape the backbone takes.
+    # Many geometries satisfy the same contact map, and that ambiguity is
+    # what head 3 has to resolve with almost no supervision of its own.
+    #
+    # The targets are computed from the coordinates already in the batch
+    # rather than stored in the shards: a torsion is a deterministic function
+    # of three atoms we have, so precomputing it would be a second copy to go
+    # stale for no gain. `pseudotorsions_torch` is cross-checked against the
+    # numpy reference in `test_torsions.py` to 1e-9.
+    cmask_t = t.get("coord_residue_mask")
+    if cmask_t is not None and bool(cmask_t.any()) and "torsion_sincos" in out:
+        ang, tvalid = pseudotorsions_torch(t["coords"].float(), cmask_t)
+        tv = tvalid & m.unsqueeze(-1)
+        if bool(tv.any()):
+            pred = out["torsion_sincos"].float()
+            nrm = pred.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+            unit = pred / nrm
+            tgt = torch.stack([ang.sin(), ang.cos()], dim=-1)
+            # Squared error on the unit circle IS 2 - 2cos(delta): monotone in
+            # the angular error and free of the wrap at +-pi, where regressing
+            # the angle itself would call 179 and -179 degrees 358 apart.
+            l_ang = ((unit - tgt) ** 2).sum(-1)
+            # and a term pulling the magnitude to 1, so the head can express
+            # confidence during training without that distorting the direction
+            l_nrm = (nrm.squeeze(-1) - 1.0).abs()
+            n_tv = tv.sum().clamp(min=1)
+            l = (l_ang * tv).sum() / n_tv + 0.02 * (l_nrm * tv).sum() / n_tv
+            total = total + 0.3 * l
+            parts["torsion"] = float(l.detach())
+            parts.update(_torsion_metrics(unit.detach(), ang.detach(), tv))
+
     # head 1 -- contacts, on sampled pairs.
     #
     # ONE call, not one per chain. The per-chain version ran pair_proj, the
@@ -785,10 +876,14 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 # did not get it. The bins are far from uniform: over 221,521
                 # sampled pairs the catch-all bin 39 alone takes 18.89%, so
                 # 0.19 is the score of a head that has learned only the prior
-                # and 0.47 reads as working either way. Measured at stage-5
-                # step 150 the lift is +0.2761, so the head IS learning --
-                # which is a fact nobody could state until the floor was
-                # reported beside the accuracy.
+                # and 0.47 reads as working either way.
+                #
+                # This comment used to end "measured at stage-5 step 150 the
+                # lift is +0.2761, so the head IS learning". That figure was
+                # WITHDRAWN: it subtracted a floor sampled over different
+                # batches from an accuracy measured on these ones, and once
+                # both came from `_class_metrics` on the same data the lift
+                # read 0.000. Head 2 predicts a single bin. See finding 75.
                 parts.update(_class_metrics(dl[ok], b[ok], "dist", nb))
 
     # head 3 -- the backbone itself, by denoising diffusion.
@@ -900,6 +995,29 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                 out["mg_logit"][m].float().cpu().numpy())
             pool.setdefault("mg_label", []).append(
                 (t["mg_site"][m] > 0).cpu().numpy())
+        # head 11, pooled over the split rather than averaged per batch --
+        # the same correction this function's docstring records for the
+        # correlations. A mean of per-batch mean angular errors is not the
+        # split's mean angular error when the batches have different residue
+        # counts, and here they always do.
+        cmv = t.get("coord_residue_mask")
+        if cmv is not None and bool(cmv.any()) and "torsion_sincos" in out:
+            av, vv = pseudotorsions_torch(t["coords"].float(), cmv)
+            vv = vv & m.unsqueeze(-1)
+            if bool(vv.any()):
+                pr = out["torsion_sincos"].float()
+                pr = pr / pr.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+                for k, nm in enumerate(TORSION_NAMES):
+                    sel = vv[..., k]
+                    if not bool(sel.any()):
+                        continue
+                    a = av[..., k][sel]
+                    u = pr[..., k, :][sel]
+                    d = (u[:, 0] * a.sin() + u[:, 1] * a.cos()).clamp(-1, 1)
+                    pool.setdefault(f"tors_{nm}_err", []).append(
+                        d.arccos().rad2deg().cpu().numpy())
+                    pool.setdefault(f"tors_{nm}_true", []).append(
+                        a.cpu().numpy())
         rm = t["rigidity_mask"]
         if rm.any():
             pool.setdefault("rig_pred", []).append(
@@ -1076,6 +1194,18 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
         res["rigidity_r_pooled"] = (round(float(np.corrcoef(pr, tg)[0, 1]), 4)
                                     if pr.std() > 1e-6 and tg.std() > 1e-6 else None)
         res["rigidity_n"] = int(len(pr))
+    for nm in TORSION_NAMES:
+        if f"tors_{nm}_err" not in pool:
+            continue
+        err = np.concatenate(pool[f"tors_{nm}_err"])
+        tru = np.concatenate(pool[f"tors_{nm}_true"])
+        # the floor, on the WHOLE split's targets rather than per batch
+        cm = np.arctan2(np.sin(tru).mean(), np.cos(tru).mean())
+        base = np.degrees(np.arccos(np.clip(np.cos(cm - tru), -1, 1))).mean()
+        res[f"tors_{nm}_mae"] = round(float(err.mean()), 3)
+        res[f"tors_{nm}_base"] = round(float(base), 3)
+        res[f"tors_{nm}_lift"] = round(float(base - err.mean()), 3)
+        res[f"tors_{nm}_n"] = int(len(err))
     return res
 
 
@@ -1267,7 +1397,8 @@ def main() -> None:
     step, start_ep, n_oom, skip_in_epoch = 0, 0, 0, 0
     if resume is not None:
         if "opt" in resume:
-            opt.load_state_dict(resume["opt"])
+            # By NAME, not by position -- see `load_optimizer`.
+            print(f"[pharos] {load_optimizer(opt, resume['opt'], model, what='pharos', absent=rep['fresh'])}", flush=True)
         step = int(resume.get("step", 0))
         history = list(resume.get("history", []))
         start_ep = int(resume.get("epoch", 0)) + (1 if resume.get("epoch_done") else 0)

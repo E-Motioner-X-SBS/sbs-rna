@@ -59,9 +59,12 @@ def chk(name: str, ok, detail: str = "") -> None:
 #: loop. That is 0.0006% of Small and buys the electrostatic bias a distance
 #: estimate; the alternative, reading the pair track, was L^2 * d_pair.
 EXPECTED = {
-    "PHAROS-Small": (258_921_498, 82_760_730, 128),
-    "PHAROS-Mini": (113_506_832, 39_189_008, 144),
-    "Base-v2": (1_105_559_546, 312_836_090, 96),
+    # +266,758 / +150,918 / +596,742 over the pre-head-11 numbers: the torsion
+    # head is a `_mlp(d, d, 6)` on the residue track, so it lands on BOTH
+    # columns (it is dense, not routed) and scales with d_model alone.
+    "PHAROS-Small": (259_188_256, 83_027_488, 128),
+    "PHAROS-Mini": (113_657_750, 39_339_926, 144),
+    "Base-v2": (1_106_156_288, 313_432_832, 96),
 }
 #: What the DENSE diffusion decoder (head 3 plus its pair features) contributes
 #: to the active column at each scale. It is the reason the numbers above moved
@@ -240,12 +243,13 @@ def main() -> int:
         o2 = model(tok, mod, chem, mask)
     chk("and are absent otherwise", "contact_logit" not in o2, "")
 
-    print("\n== property 7: all ten heads are produced ==")
+    print("\n== property 7: all eleven heads are produced ==")
     from pharos.model.heads import EXTRA_HEAD_KEYS, HEAD_SPEC
     missing = [h["name"] for h in HEAD_SPEC
                if h.get("forward", True) and h["key"] not in o]
-    chk("§9 lists ten heads and every forward-pass head is produced",
-        len(HEAD_SPEC) == 10 and not missing, f"missing: {missing or 'none'}")
+    chk("§9 lists eleven heads and every forward-pass head is produced",
+        len(HEAD_SPEC) == 11 and not missing,
+        f"{len(HEAD_SPEC)} spec rows, missing: {missing or 'none'}")
     # Head 3 is the one entry whose output a forward pass cannot carry: the
     # diffusion decoder emits coordinates from `sample()`. Checked where it
     # actually lives rather than excused.
@@ -276,7 +280,8 @@ def main() -> int:
     _rows = _re.findall(r"^\s{3,4}(\d+)\s+(\w+)\s{2,}", _H.__doc__, _re.M)
     _doc = {int(n): nm for n, nm in _rows}
     _spec = {h["n"]: h["name"] for h in HEAD_SPEC}
-    chk("the docstring table parses to ten rows", len(_doc) == 10, f"{len(_doc)}")
+    chk("the docstring table parses to eleven rows", len(_doc) == 11,
+        f"{len(_doc)}")
     chk("and every row matches HEAD_SPEC", _doc == _spec,
         "; ".join(f"{n}: doc {_doc.get(n)} vs spec {_spec.get(n)}"
                   for n in sorted(set(_doc) | set(_spec))
@@ -315,7 +320,7 @@ def main() -> int:
         "distance_logits": "stage 5", "lw_logits": "stage 5",
         "mg_logit": "stage 5", "motif_logits": "stage 5",
         "rigidity": "stage 5", "fluctuation": "stage 5",
-        "base_logits": "stage 5",
+        "base_logits": "stage 5", "torsion_sincos": "stage 5",
         "fitness": "stage 6",
     }
     INDIRECT = {                     # no loss of its own; gradient arrives anyway
