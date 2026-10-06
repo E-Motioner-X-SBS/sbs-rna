@@ -405,6 +405,60 @@ def probe_device_contracts() -> None:
         not bad, "none" if not bad else f"{bad}")
 
 
+def probe_prefetcher() -> None:
+    """The prefetch thread must not silently reorder or drop a batch.
+
+    Moving `collate` off the critical path is worth ~3x of GPU utilisation,
+    and it is also the kind of change that can lose data without raising:
+    a dropped batch is a smaller epoch, a reordered one breaks nothing
+    visible, and an exception swallowed on the worker hangs the consumer
+    forever. All three are silent, so all three are asserted.
+    """
+    import time
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from train_pharos import Prefetcher
+
+    class _DS:
+        def collate(self, idxs):
+            return {"id": list(idxs)}
+
+    batches = [[i, i + 1] for i in range(37)]
+    got = [b["id"] for b in Prefetcher(_DS(), batches, depth=3)]
+    chk("the prefetcher preserves order and loses nothing", got == batches,
+        f"{len(got)} of {len(batches)} batches, in order")
+
+    class _Boom:
+        def collate(self, idxs):
+            if idxs[0] == 5:
+                raise ValueError("bad batch")
+            return {"id": idxs}
+
+    raised = False
+    try:
+        for _ in Prefetcher(_Boom(), [[i] for i in range(20)], depth=2):
+            pass
+    except ValueError:
+        raised = True
+    chk("a worker exception reaches the consumer rather than hanging it",
+        raised, "re-raised on the consuming thread")
+
+    class _Count:
+        def __init__(self):
+            self.n = 0
+
+        def collate(self, idxs):
+            self.n += 1
+            return {"id": idxs}
+
+    c = _Count()
+    pf = Prefetcher(c, [[i] for i in range(200)], depth=3)
+    next(iter(pf))
+    time.sleep(1.0)
+    pf.close()
+    chk("the queue is bounded, so a fast producer cannot grow memory",
+        c.n < 20, f"produced {c.n} of 200 while the consumer took one")
+
+
 def probe_losses() -> None:
     """Does each head's loss actually respond to ITS target?
 
@@ -498,7 +552,9 @@ def main() -> int:
         probe_router_conditioning()
         section("B5. device contracts the CPU-only gate cannot see")
         probe_device_contracts()
-        section("B6. every head's loss responds to its own target")
+        section("B6. the data path that feeds the GPU")
+        probe_prefetcher()
+        section("B7. every head's loss responds to its own target")
         probe_losses()
     if notes:
         print("\nRecorded, not failures:")
