@@ -62,7 +62,7 @@ this head; it is `base_logits` in `EXTRA_HEAD_KEYS`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn as nn
@@ -71,15 +71,74 @@ import torch.nn.functional as F
 from .diffusion import DiffusionConfig, DiffusionStructureHead
 
 
+#: Head 2's bin edges in angstrom, left-closed, with everything beyond the
+#: last edge in bin 39.
+#:
+#: THE UNIFORM SCHEME COLLAPSED THE HEAD, and the histogram says why. Head 2
+#: is scored on the pair population the CONTACT head samples: every true
+#: contact plus uniform random negatives at |i-j| >= 4. Measured over 891,804
+#: such pairs from 394 training chains, the old `floor(d - 2)` clamped to
+#: 2-41 A put **41.88% of all mass in the single catch-all bin**, all of it
+#: negatives, while no other bin held more than 3.74%. A head predicting that
+#: one bin scores the majority rate, which is exactly what finding 75
+#: measured: `dist_acc` 0.478 against `dist_major` 0.478, macro 0.026 against
+#: a 1/39 = 0.0256 chance.
+#:
+#: Narrowing the range makes it WORSE, which was the obvious fix and the
+#: wrong one: 2-22 A at 0.5 A pushes more of the population into the
+#: catch-all and takes the majority to 68.83%. The scheme scored best on the
+#: measured distribution is equal-frequency, which reaches the theoretical
+#: maximum entropy ln(40) with a 2.50% majority and by construction has no
+#: class to collapse onto.
+#:
+#: These edges are the hybrid: eight fixed 0.875 A bins over 3-10 A, then 32
+#: equal-frequency bins above. That costs 3.5% of the maximum entropy and
+#: buys 6.7x the resolution in the base-pairing range, where a Watson-Crick
+#: pair has a characteristic C4'-C4' distance and a 5.88 A first bin cannot
+#: see it. Majority 3.01%, entropy 3.5583 of a possible 3.6889 nats.
+#:
+#: FIXED CONSTANTS, derived once from the TRAINING split. Recomputing them
+#: per batch would make the target non-stationary -- the same label meaning a
+#: different distance from one step to the next -- and deriving them from
+#: anything but train would leak.
+DISTANCE_BIN_EDGES: Tuple[float, ...] = (
+    3.0000, 3.8750, 4.7500, 5.6250, 6.5000,
+    7.3750, 8.2500, 9.1250, 10.0001, 11.3619,
+    12.2427, 13.0706, 14.3230, 15.1573, 16.3933,
+    17.5547, 18.7989, 20.6606, 22.9835, 25.0816,
+    26.8192, 28.8208, 31.0584, 33.4061, 35.8351,
+    38.2468, 40.7319, 43.2079, 45.7963, 48.7638,
+    51.8173, 54.8410, 58.1599, 62.1919, 66.3752,
+    70.6863, 76.2620, 81.5226, 88.6063, 100.7812,
+)
+
+
+def distance_bin(d):
+    """Angstrom -> bin index, for a tensor or an array. The ONE definition.
+
+    The trainer used to inline `floor(d - 2).clamp(0, nb - 1)`. One equation
+    written in one place, because two copies of a binning rule drift and the
+    label silently changes meaning -- the same defect as `ElectrostaticBias`
+    carrying its own copy of `b_elec`.
+    """
+    import torch
+    if torch.is_tensor(d):
+        e = torch.as_tensor(DISTANCE_BIN_EDGES, device=d.device, dtype=d.dtype)
+        return torch.clamp(torch.searchsorted(e.contiguous(), d.contiguous(),
+                                              right=True) - 1,
+                           0, len(DISTANCE_BIN_EDGES) - 1)
+    import numpy as _np
+    return _np.clip(_np.searchsorted(DISTANCE_BIN_EDGES, d, side="right") - 1,
+                    0, len(DISTANCE_BIN_EDGES) - 1)
+
+
 @dataclass
 class HeadConfig:
     d_model: int = 512
     d_pair: int = 128
-    #: Distance bins, AlphaFold-style. `floor(d - 2)` clamped to
-    #: `n_distance_bins - 1`, so bins 0..38 are 1 A wide and span **2-41 A**
-    #: and bin 39 is everything at or beyond 41 A. Documented as "2-40 A"
-    #: in three places, which is 38 bins and not 40 -- the off-by-one is in
-    #: the prose, the code is self-consistent.
+    #: Distance bins. NOT uniform -- see `DISTANCE_BIN_EDGES` above for the
+    #: measured reason. Must equal `len(DISTANCE_BIN_EDGES)`, which the test
+    #: module asserts.
     n_distance_bins: int = 40
     #: Head 9. Leontis-Westhof pair families, `_ndb_struct_na_base_pair.
     #: hbond_type_12` in every RNA mmCIF: 12 families (the three edges --

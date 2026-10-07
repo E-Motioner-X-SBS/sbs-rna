@@ -86,6 +86,7 @@ from pharos.data.torsions import (TORSION_NAMES,                  # noqa: E402
 from pharos.model.moe import (LENGTH_BIN_MAX as _LENGTH_BIN_MAX,  # noqa: E402
                               RouterFeatures)
 from pharos.model.diffusion import BOND_C4_N, BOND_P_P
+from pharos.model.heads import distance_bin        # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
 from pharos.train.checkpoint import (atomic_save,          # noqa: E402
@@ -498,7 +499,7 @@ _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
               "motif_acc", "motif_major", "motif_lift", "motif_macro",
               "motif_n_class") + tuple(
     f"tors_{n}_{x}" for n in TORSION_NAMES
-    for x in ("mae", "base", "lift", "n"))
+    for x in ("mae_pooled", "base_pooled", "lift_pooled", "n"))
 
 def _stage5_fields() -> list:
     f = ["lr", "loss", "n_oom", "peak_gib", "note"]
@@ -871,9 +872,13 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
             if bool(ok.any()):
                 dd = torch.linalg.norm(xyz[bidx, ii] - xyz[bidx, jj], dim=-1)
                 nb = model.heads.cfg.n_distance_bins
-                # bins 0..38 are 1 A wide spanning 2-41 A, bin 39 is
-                # everything beyond -- see HeadConfig.n_distance_bins
-                b = torch.clamp(((dd - 2.0)).floor().long(), 0, nb - 1)
+                # `distance_bin` is the ONE definition -- see
+                # DISTANCE_BIN_EDGES. This was an inlined `floor(d - 2)`
+                # clamped to 2-41 A, which put 41.88% of the supervised pairs
+                # in the single catch-all bin and collapsed the head onto it
+                # (finding 75). The bins are now equal-frequency above 10 A
+                # and 0.875 A wide below, measured on 891,804 training pairs.
+                b = distance_bin(dd).long()
                 dl = model.heads.pair.distance(pair)
                 ld = (F.cross_entropy(dl[ok], b[ok], reduction="none")
                       * wt[ok]).sum() / wt[ok].sum().clamp(min=1e-6)
@@ -1211,9 +1216,16 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
         # the floor, on the WHOLE split's targets rather than per batch
         cm = np.arctan2(np.sin(tru).mean(), np.cos(tru).mean())
         base = np.degrees(np.arccos(np.clip(np.cos(cm - tru), -1, 1))).mean()
-        res[f"tors_{nm}_mae"] = round(float(err.mean()), 3)
-        res[f"tors_{nm}_base"] = round(float(base), 3)
-        res[f"tors_{nm}_lift"] = round(float(base - err.mean()), 3)
+        # `_pooled`, following `rigidity_r_pooled`. These are NOT the
+        # `tors_*_mae` the training loop reports: that one is the circular
+        # mean of ONE BATCH's targets and this is the circular mean of the
+        # whole split's, so they are two statistics and finding 77 is what
+        # happens when two statistics share a name and get printed side by
+        # side. Here it would have read as a generalisation gap that was
+        # partly a change of baseline.
+        res[f"tors_{nm}_mae_pooled"] = round(float(err.mean()), 3)
+        res[f"tors_{nm}_base_pooled"] = round(float(base), 3)
+        res[f"tors_{nm}_lift_pooled"] = round(float(base - err.mean()), 3)
         res[f"tors_{nm}_n"] = int(len(err))
     return res
 

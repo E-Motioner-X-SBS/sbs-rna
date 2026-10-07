@@ -515,6 +515,71 @@ draw, never the forward pass. It does mean `pharos_shared400.pt` was
 trained against the wrong distribution and its structure head has to be
 retrained.
 
+## 75 RESOLVED, and 86 — the floor that was built into the bins
+
+Finding 75 sat `OPEN` for two sessions: head 2 predicts one bin, `dist_acc`
+tracks `dist_major` to the digit, `dist_macro` is at 1/39. What was never
+established was why. Measuring the target distribution settles it.
+
+Over **891,804 supervised pairs from 394 training chains** — the population
+head 2 is actually scored on, which is every true contact plus the contact
+head's uniform random negatives at |i−j| ≥ 4:
+
+| bin | range | share | from contacts | from negatives |
+|---|---|---|---|---|
+| 10 | 12–13 Å | 3.74% | 28,778 | 4,574 |
+| … | every other bin | ≤ 3.1% | | |
+| **39** | **≥ 41 Å** | **41.88%** | **0** | **374,241** |
+
+**The floor was built into the binning.** `floor(d − 2)` clamped to 2–41 Å
+puts 41.88% of the population in one catch-all bin, every bit of it a
+negative, and a head that predicts that bin scores the majority rate. The
+observed `dist_major` of 0.42–0.478 is this number. Nothing was wrong with
+the head, the gradient or the representation — the task had a 42% majority
+class and no reason not to take it.
+
+| # | what | status |
+|---|---|---|
+| 75 | head 2 collapsed onto one bin | **RESOLVED** — 41.88% of the supervised population was that bin |
+| 86 | the obvious fix is the wrong one. Narrowing to 2–22 Å at 0.5 Å — "concentrate resolution where the contacts are" — pushes *more* of the sampled population into the catch-all and takes the majority to **68.83%**, worse than the scheme it replaces | `RECORDED` |
+
+Six schemes scored on the measured distribution:
+
+| scheme | majority | entropy / max | contacts resolved |
+|---|---|---|---|
+| current, 2–41 Å uniform | 41.88% | 2.707 / 3.689 | 100% |
+| 2–22 Å, 0.5 Å | **68.83%** | 1.653 | 99.91% |
+| 2–32 Å, 0.8 Å | 52.53% | 2.316 | 100% |
+| 40 equal-frequency | **2.50%** | **3.689 / 3.689** | 100% |
+| **8 fine (3–10 Å) + 32 equal-frequency** | **3.01%** | 3.558 / 3.689 | 100% |
+
+Equal-frequency reaches the theoretical maximum `ln(40)` and by construction
+has no class to collapse onto. The shipped scheme is the hybrid: pure
+quantiles leave a **5.88 Å first bin**, and a Watson–Crick pair has a
+characteristic C4′–C4′ distance that a 5.88 Å bin cannot see. Eight fixed
+0.875 Å bins over 3–10 Å cost 3.5% of the maximum entropy and buy 6.7× the
+resolution exactly where base pairing lives.
+
+The edges are **fixed constants derived once from the training split** —
+recomputing them per batch would make the label mean a different distance
+from one step to the next, and deriving them from anything but train would
+leak — and `distance_bin()` is the one definition, because the trainer
+inlining its own copy of a binning rule is how the label drifts from what
+the head was told it meant.
+
+### Also fixed here
+
+`tors_*_mae` was the name of two different statistics: the training loop's
+circular mean of **one batch's** targets, and `evaluate`'s circular mean of
+**the whole split's**. Printed side by side, that reads as a generalisation
+gap partly made of a change in baseline — finding 77 exactly. The eval keys
+are now `tors_*_{mae,base,lift}_pooled`, following `rigidity_r_pooled`, and
+the test asserts the two name sets are disjoint.
+
+The gap itself survives the rename and is real: training θ error 17.0° at
+step 250 against 29.8° on validation in the same epoch. On 317 steps that is
+finding 84, not a metric artefact.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

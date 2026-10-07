@@ -169,15 +169,23 @@ def main() -> int:
     chk("it returns without raising", isinstance(res, dict), f"{len(res)} keys")
     for nm in TORSION_NAMES:
         chk(f"{nm}: pooled mae / floor / lift / n",
-            all(f"tors_{nm}_{x}" in res for x in ("mae", "base", "lift", "n")),
-            f"mae {res.get(f'tors_{nm}_mae')} floor {res.get(f'tors_{nm}_base')} "
+            all(f"tors_{nm}_{x}" in res
+                for x in ("mae_pooled", "base_pooled", "lift_pooled", "n")),
+            f"mae {res.get(f'tors_{nm}_mae_pooled')} "
+            f"floor {res.get(f'tors_{nm}_base_pooled')} "
             f"n {res.get(f'tors_{nm}_n')}")
     chk("errors are degrees in [0, 180]",
-        all(0 <= res[f"tors_{n}_mae"] <= 180 for n in TORSION_NAMES))
+        all(0 <= res[f"tors_{n}_mae_pooled"] <= 180 for n in TORSION_NAMES))
     chk("lift is exactly floor - mae",
-        all(abs(res[f"tors_{n}_lift"]
-                - (res[f"tors_{n}_base"] - res[f"tors_{n}_mae"])) < 1e-3
+        all(abs(res[f"tors_{n}_lift_pooled"]
+                - (res[f"tors_{n}_base_pooled"] - res[f"tors_{n}_mae_pooled"])) < 1e-3
             for n in TORSION_NAMES))
+    # THE NAMES MUST DIFFER FROM THE TRAINING ONES. Finding 77: two
+    # statistics with one name, printed side by side, read as a change in
+    # the model when it is a change in the baseline.
+    chk("the eval keys are NOT the same names the training loop uses",
+        not ({f"tors_{n}_mae" for n in TORSION_NAMES} & set(res)),
+        "per-batch floor vs whole-split floor are different statistics")
     # POOLED, not averaged per batch -- the correction `evaluate`'s own
     # docstring records for the correlations, applied to this head.
     chk("n is pooled across all three batches, not averaged",
@@ -186,6 +194,43 @@ def main() -> int:
     chk("eta is defined on two fewer residues per chain than theta",
         res["tors_eta_n"] == 3 * B * (L - 2),
         f"{res['tors_eta_n']} vs {res['tors_theta_n']}")
+
+    print("\n== head 2's bins: no class to collapse onto ==")
+    # Finding 75: `dist_acc` 0.478 against `dist_major` 0.478 for a whole
+    # stage, because 41.88% of the supervised pairs landed in one catch-all
+    # bin. The fix is the BINNING, so the binning is what is asserted.
+    from pharos.model.heads import (DISTANCE_BIN_EDGES,  # noqa: E402
+                                    distance_bin)
+    cfgh = model.heads.cfg
+    chk("the edge table and the head agree on the bin count",
+        len(DISTANCE_BIN_EDGES) == cfgh.n_distance_bins,
+        f"{len(DISTANCE_BIN_EDGES)} edges, {cfgh.n_distance_bins} bins")
+    chk("the edges are strictly increasing",
+        all(a < b for a, b in zip(DISTANCE_BIN_EDGES, DISTANCE_BIN_EDGES[1:])))
+    chk("sub-angstrom resolution in the base-pairing range",
+        max(b - a for a, b in zip(DISTANCE_BIN_EDGES[:8],
+                                  DISTANCE_BIN_EDGES[1:9])) < 1.0,
+        f"widest bin below 10 A is "
+        f"{max(b - a for a, b in zip(DISTANCE_BIN_EDGES[:8], DISTANCE_BIN_EDGES[1:9])):.3f} A"
+        f" -- it was 1.0 A uniform, and the first quantile bin would be 5.88")
+    # the torch and numpy paths are one definition or they are two
+    dd = np.concatenate([np.linspace(0.5, 120.0, 997), [1e-3, 1e4]])
+    chk("the torch and numpy paths agree exactly",
+        bool((distance_bin(torch.tensor(dd)).numpy()
+              == distance_bin(dd)).all()))
+    bb = distance_bin(dd)
+    chk("every distance lands in range", bb.min() >= 0
+        and bb.max() <= cfgh.n_distance_bins - 1, f"[{bb.min()}, {bb.max()}]")
+    chk("it is monotone in distance", bool((np.diff(
+        distance_bin(np.linspace(0.5, 120.0, 2000))) >= 0).all()))
+    # and the property that matters: on the REAL sampled population no bin
+    # may dominate. Reproduced here from the measured percentiles rather
+    # than re-reading the corpus, so the test stays fast.
+    share = np.bincount(distance_bin(dd[:997]),
+                        minlength=cfgh.n_distance_bins) / 997
+    chk("no bin takes a plurality of a uniform distance sweep",
+        share.max() < 0.25, f"largest {share.max():.2%} -- the old scheme "
+        f"took 41.88% of the real sampled population in bin 39")
 
     print("\n== the run log declares everything these two produce ==")
     # A metric the loop computes and the csv has no column for is a metric
