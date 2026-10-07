@@ -824,6 +824,67 @@ contact head feeding the decoder (contact AP is 0.885, and none of that
 reaches head 3 except through `single` and `diff_pair`), and 3,069 steps
 on 6,585 chains is still a small run for a generative decoder.
 
+## 92 — the model predicts contacts well and never uses them to build
+
+Why is TM 0.0913 while lDDT is 0.2765 and contact AP is 0.885? The
+attention maps answer it.
+
+**Only 2 of the trunk's 18 blocks can see globally at all.** The §5.1
+period-8 pattern gives `Counter({'gdn': 12, 'swa': 4, 'full': 2})` — twelve
+linear-attention blocks, four sliding-window at 128, and **blocks 7 and 15**
+are the only full softmax attention. Those two are also the only ones
+carrying §6.2's `bias_scale`.
+
+Measured on 12 held-out chains, AUROC of the symmetrised attention weight
+against the true contact map, with the pair bias included in the logits
+(chance = 0.5 whatever the imbalance):
+
+| attention map | all \|i−j\|≥4 | long >24 | very long >64 |
+|---|---|---|---|
+| **trunk 7** (full) | 0.5039 | 0.4523 | 0.5213 |
+| **trunk 15** (full) | 0.4962 | 0.4452 | 0.4439 |
+| decoder 0 | **0.5967** | 0.5498 | **0.5875** |
+| decoder 1 | 0.5546 | 0.4967 | 0.4841 |
+| decoder 2 | 0.5450 | 0.4586 | 0.4059 |
+| decoder 3 | 0.5198 | 0.5066 | 0.4747 |
+| decoder 4 | 0.4823 | 0.4141 | 0.4852 |
+| decoder 5 | **0.5929** | **0.5579** | 0.5392 |
+
+| # | what | status |
+|---|---|---|
+| 92 | **Both globally-connected trunk blocks attend at chance with respect to the contact map, at every separation.** The decoder's first and last blocks carry weak signal (0.59) and its middle four are at chance. Meanwhile the contact head reaches **AP 0.885 against a 0.4541 base rate**. The model knows the contacts and no attention layer routes information along them | `OPEN` |
+
+The decoder's signal is **the pair bias, not learned content attention**.
+Recomputing the same logits without the bias term drops decoder 5 from
+0.5929 to 0.4700 and decoder 1 from 0.5546 to 0.4883, while the trunk
+numbers do not move at all — `bias_scale` is ~1e-2, so §6.2's bias is
+present (verified) and numerically negligible against the content term.
+
+**And the contact prediction never reaches the decoder.** Head 1 reads
+`pair_proj(cat(h_i, h_j))`; the decoder reads `diff_pair(single, coev)`,
+whose inputs are the hidden states and coevolution and nothing else. The
+two pair representations are built separately from the same `h` and never
+meet. AlphaFold's structure module reads the same pair representation the
+distogram head does; here they are disjoint.
+
+That is the shape of the TM/lDDT gap, stated as architecture rather than
+as a training deficit: the decoder is biased by relative **sequence**
+position, which is what gives it correct bonds and an lDDT of 0.2765, and
+by nothing that encodes predicted **spatial** proximity, which is what a
+TM of 0.0913 reflects. Local geometry is solved; global topology has no
+path into the decoder.
+
+**Not yet acted on.** Wiring the contact/distance logits into `diff_pair`
+is the obvious move and it is a change to the architecture, not a fix to a
+defect, so it is recorded here and not made silently. What is established
+is the measurement; that a fix would help is a prediction.
+
+A note on the first draft of this probe: it reconstructed `q @ k.T` only
+and omitted the bias both block types add before the softmax. That
+understated the decoder by up to 0.12 AUROC and changed nothing for the
+trunk. Measuring the content term alone and calling it "the attention" is
+wrong by construction when the bias is where structure would enter.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's
