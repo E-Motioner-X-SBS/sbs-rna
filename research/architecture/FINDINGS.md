@@ -454,6 +454,67 @@ Two heads are flat on validation and both are already on the register:
 still collapsed — `dist_acc` 0.480 against `dist_major` 0.477, macro 0.030
 against a 1/39 = 0.026 chance. Finding 75 reproduces exactly.
 
+## 85 — the denoiser was asked for 0.035% of its task
+
+The structure head produces disconnected backbones (finding 83): P–P at
+16–19 Å against 5.95 Å, TM 0.0546 against a field median of 0.3013. The
+obvious explanation was the 317 optimiser steps. It is not the whole
+explanation, and the real one is a two-character omission.
+
+| # | what | status |
+|---|---|---|
+| 85 | `DiffusionConfig` raised `sigma_data` from the image-diffusion default 0.5 to **16.0** for ångström coordinates — correctly — and left `p_mean` at Karras's **−1.2**, which is the value *for* `sigma_data = 0.5`. The training noise is set in units of the data's own scale, so the median `sigma/sigma_data` fell by the same 32× it was raised by: from 0.602 to **0.0188** | `FIXED` |
+
+**What that does is visible in the preconditioning, not in the loss.**
+`D(x;σ) = c_skip(σ)·x + c_out(σ)·F(…)` with `c_skip = σ_d²/(σ² + σ_d²)`, so
+`c_skip` is the fraction of the answer handed to the network for free:
+
+| | median σ | median `c_skip` | draws asking >10% of the work | draws above σ=40 |
+|---|---|---|---|---|
+| shipped | 0.301 | **0.99965** | 2.78% | **0.06%** |
+| derived | 9.626 | 0.73426 | 68.9% | 11.7% |
+
+At the median training draw the network was asked for **0.035%** of the
+task. The loss it reported was therefore honest and meaningless: a near-
+identity is a very good denoiser at σ = 0.3.
+
+**Measured on the trained checkpoint**, denoising real validation
+structures at a sweep of σ:
+
+| σ | RMSE after denoising | RMSE of the noise alone | reduction | P–P median |
+|---|---|---|---|---|
+| 0.1 | 0.100 | 0.100 | **1.00×** | 5.96 |
+| 0.3 | 0.295 | 0.300 | **1.02×** | 5.94 |
+| 3.0 | 2.217 | 3.009 | 1.36× | 6.08 |
+| 20 | 8.369 | 20.08 | 2.40× | 7.51 |
+| 160 | 12.932 | 160.7 | 12.43× | **18.46** |
+
+(true P–P on that batch: 5.95 Å)
+
+At σ = 0.3, where half the training mass sits, it removes **2%** of the
+error. At σ = 160, where the sampler starts, one step leaves P–P at 18.46 Å
+— which is exactly the 16–19 Å the seventeen RNA-Puzzles predictions came
+out at. **It learned to polish a structure that was already there and never
+learned to make one**, because it was almost never asked to.
+
+**The fix is a derivation, not a number.** `p_mean` is now
+`ln(0.6016 · sigma_data)` in `__post_init__` and cannot be typed beside
+`sigma_data` again; `p_std = 1.2` is Karras's and is scale-free, being a
+width in log-σ. At `sigma_data = 0.5` the derivation returns **−1.2013**,
+reproducing the paper, which is the check that it is the right derivation
+and not a fitted constant. An explicit `p_mean` still overrides, for the
+ablation.
+
+The test asserts the coupling at four scales, asserts the live config's
+median `c_skip` is in `(0.5, 0.85)` — **and asserts that the configuration
+that shipped would fail that check**, at `c_skip` 0.99965. A test that only
+passes on the fixed code proves nothing about the bug.
+
+No checkpoint changes numerically: `p_mean` enters only the training noise
+draw, never the forward pass. It does mean `pharos_shared400.pt` was
+trained against the wrong distribution and its structure head has to be
+retrained.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

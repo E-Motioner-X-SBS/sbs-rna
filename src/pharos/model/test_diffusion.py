@@ -12,6 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -230,6 +231,54 @@ def main() -> int:
     s2 = head.sample(s1, p1, m1, n_steps=32, generator=torch.Generator().manual_seed(9))
     chk("different seeds give different structures",
         rmsd(s, s2, m1) > 1e-3, f"rmsd between samples {rmsd(s, s2, m1):.3f}")
+
+    print("\n== the training noise distribution is TIED to sigma_data ==")
+    # The defect this exists to stop: `sigma_data` was correctly raised from
+    # the image default 0.5 to 16.0 for angstrom coordinates, and `p_mean`
+    # was left at Karras's -1.2, which is the value FOR sigma_data = 0.5.
+    # The median training draw became sigma = 0.301 against data of scale 16,
+    # so `c_skip = sd^2/(s^2 + sd^2)` was 0.99965 and the network was asked
+    # for 0.035% of the task. It learned to polish and never learned to build.
+    import math as _math
+    from pharos.model.diffusion import DiffusionConfig as _DC
+
+    def _cskip(sg, sd):
+        return sd ** 2 / (sg ** 2 + sd ** 2)
+
+    k = _DC(sigma_data=0.5)
+    chk("at sigma_data = 0.5 the derivation reproduces Karras's -1.2",
+        abs(k.p_mean - (-1.2)) < 0.01, f"p_mean {k.p_mean:+.4f}")
+    for sd_ in (0.5, 4.0, 16.0, 64.0):
+        c_ = _DC(sigma_data=sd_)
+        ratio = _math.exp(c_.p_mean) / sd_
+        chk(f"sigma_data {sd_:5.1f}: median sigma/sigma_data is scale-free",
+            abs(ratio - 0.6016) < 1e-3,
+            f"p_mean {c_.p_mean:+.4f}, median sigma {_math.exp(c_.p_mean):8.3f}, "
+            f"ratio {ratio:.4f}")
+    live = _DC()
+    chk("the live config's median draw asks the network for real work",
+        0.5 < _cskip(_math.exp(live.p_mean), live.sigma_data) < 0.85,
+        f"c_skip at the median draw {_cskip(_math.exp(live.p_mean), live.sigma_data):.5f} "
+        f"-- it was 0.99965 before p_mean was derived")
+    # and the bad configuration must FAIL this, or the test proves nothing
+    bad = _DC(sigma_data=16.0, p_mean=-1.2)
+    chk("the configuration that shipped would FAIL that check",
+        _cskip(_math.exp(bad.p_mean), bad.sigma_data) > 0.99,
+        f"c_skip {_cskip(_math.exp(bad.p_mean), bad.sigma_data):.5f} at "
+        f"p_mean = -1.2, sigma_data = 16")
+    chk("an explicit p_mean is still honoured, for the ablation",
+        bad.p_mean == -1.2)
+    # the sampler must start where training actually has mass
+    rng_ = np.random.default_rng(0)
+    draws = np.exp(rng_.normal(live.p_mean, live.p_std, 200_000)).clip(
+        live.sigma_min, live.sigma_max)
+    above = float((draws > live.sigma_data).mean())
+    chk("a third of training draws sit above sigma_data, where the fold is built",
+        0.2 < above < 0.5, f"{above:.1%} above sigma_data = {live.sigma_data}")
+    chk("and the sampler starts inside the trained range, not past it",
+        live.sigma_max <= float(np.percentile(draws, 99.99)) * 3.0,
+        f"sigma_max {live.sigma_max} against a 99.99th percentile draw of "
+        f"{float(np.percentile(draws, 99.99)):.1f}")
 
     print()
     if fails:

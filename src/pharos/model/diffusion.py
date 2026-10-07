@@ -79,8 +79,38 @@ class DiffusionConfig:
     #: span tens of angstroms, so sigma_data is set from the corpus rather than
     #: the image-diffusion default of 0.5.
     sigma_data: float = 16.0
-    p_mean: float = -1.2
-    p_std: float = 1.5
+    #: `p_mean` is DERIVED from `sigma_data`, never typed beside it.
+    #:
+    #: Karras et al. (2022) recommend `P_mean = -1.2` **for `sigma_data =
+    #: 0.5`**, which is a median `sigma/sigma_data` of 0.602 -- the training
+    #: noise is set in units of the data's own scale. This file correctly
+    #: raised `sigma_data` to 16.0 for angstroms and left `P_mean` at -1.2,
+    #: so the ratio fell by the same 32x and the median training draw became
+    #: `sigma = 0.301` against data of scale 16.
+    #:
+    #: What that does is visible in the preconditioning. `D(x;s) =
+    #: c_skip(s)*x + c_out(s)*F(...)` with `c_skip = sd^2/(s^2 + sd^2)`, so
+    #: c_skip is the fraction of the answer handed over for free, and at the
+    #: median training draw it was **0.99965**: the network was asked for
+    #: 0.035% of the task. Only 2.78% of draws asked it for even a tenth,
+    #: and 0.06% landed above `sigma = 40` where the fold has to be BUILT
+    #: rather than polished.
+    #:
+    #: Measured on the trained checkpoint, that is exactly what came out: a
+    #: denoiser that reduces the error by 1.02x at sigma = 0.3 -- where half
+    #: its training mass sits -- and leaves consecutive P-P at 18.5 A when
+    #: run from noise, against a true 5.95. It learned to polish a structure
+    #: that was already there and never learned to make one.
+    #:
+    #: `None` means "derive it", which is the default and the only value
+    #: anything should use. A float overrides, for the ablation.
+    p_mean: Optional[float] = None
+    #: Karras's own value. Scale-free -- it is a width in log-sigma -- so
+    #: unlike p_mean it does not move with sigma_data.
+    p_std: float = 1.2
+    #: The median of `sigma/sigma_data` the derivation targets, which is
+    #: `exp(-1.2)/0.5` from the paper.
+    sigma_ratio: float = 0.6016
     sigma_min: float = 0.002
     sigma_max: float = 160.0
     rho: float = 7.0              # sampling schedule curvature
@@ -89,6 +119,10 @@ class DiffusionConfig:
     #: constraint, not an objective, and it must not outrun the denoising loss
     #: it is protecting.
     violation_weight: float = 0.1
+
+    def __post_init__(self) -> None:
+        if self.p_mean is None:
+            self.p_mean = math.log(self.sigma_ratio * self.sigma_data)
 
 
 def _timestep_embedding(t: torch.Tensor, dim: int) -> torch.Tensor:
