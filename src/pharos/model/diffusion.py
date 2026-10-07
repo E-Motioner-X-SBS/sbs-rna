@@ -424,6 +424,27 @@ class DiffusionPairFeatures(nn.Module):
         self.coev = nn.Linear(1, d_pair, bias=False)
         nn.init.zeros_(self.coev.weight)
         self.norm = nn.LayerNorm(d_pair)
+        # FINDING 92. The decoder's attention was measured at chance against
+        # the true contact map -- AUROC 0.41-0.52 on its four middle blocks --
+        # while head 1 reaches AP 0.885 on the same chains. The model knows
+        # the contacts and nothing routes them into the structure head: head 1
+        # reads `pair_proj(cat(h_i, h_j))` and the decoder reads this module,
+        # and the two pair representations are built from the same `h` and
+        # never meet.
+        #
+        # This is the cheapest thing that could close that gap. It adds no
+        # path and changes no forward pass: it is a READOUT, `d_pair -> 1`
+        # on a tensor the decoder already materialises, supervised with the
+        # contact targets head 1 already has. If `diff_pair`'s output must
+        # predict contacts then it must encode them, and `DenoiseBlock`'s
+        # `pair_bias` reads that same tensor straight into the attention
+        # logits. The decoder gets the contact map by being made to carry it,
+        # rather than by being handed another tensor.
+        #
+        # Because it is only a readout, the sampled structure at a given
+        # checkpoint is bit-identical with it present and absent, so the A/B
+        # is a clean one: the only thing that changes is the gradient.
+        self.contact = nn.Linear(d_pair, 1)
 
     def forward(self, single: torch.Tensor,
                 coev: Optional[torch.Tensor] = None) -> torch.Tensor:
