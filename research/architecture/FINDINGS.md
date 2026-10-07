@@ -785,6 +785,45 @@ The adjacency claim is checked rather than asserted: adjacent pairs embed
 0.52 — so it is the relative-position table carrying it, not the single
 projections.
 
+## 91 — and the re-run's result
+
+| # | what | status |
+|---|---|---|
+| 91 | `--sync-ckpt`'s help text, added with finding 88, contained a literal `%` ("the 20.4% measured"). argparse %-formats help strings, so `train_pharos.py --help` exited 1. `test_head_metrics.py` caught it on the post-training re-verify and blocked the gate — which is the whole reason that check exists: "a literal % raises only when --help is run, which nobody does on a trainer" | `FIXED` |
+
+### The re-run, against the baseline
+
+Findings 75, 83, 85, 86 and 90 fixed; stage 5 restarted from
+`seqstages_shared400.pt` with 3,069 optimiser steps against 317.
+
+**P–P, which was the question:**
+
+| | before | after | true |
+|---|---|---|---|
+| median over 17 targets | 16.26 – 19.31 Å | **5.67 – 6.69 Å** | 5.95 Å |
+
+Every one of the seventeen. The backbone is a chain.
+
+**RNA-Puzzles, 17 targets against 885 submitted competitor models:**
+
+| | before | after | field median | field best |
+|---|---|---|---|---|
+| mean TM | 0.0546 | **0.0913** | 0.3013 | 0.4592 |
+| mean lDDT | 0.125 | **0.2765** | — | — |
+| targets beating the field median | 0 | **0** | — | — |
+
+TM up 67%, lDDT up 121%, **and still nowhere near the field.** Best single
+target is rp15 at 0.1145 against a 0.2271 median on that target. The
+geometry is now locally correct and globally wrong: bonds right, fold
+wrong, which is what an lDDT of 0.2765 against a TM of 0.0913 says — local
+environments are starting to be recovered and the global superposition is
+not.
+
+What that leaves, in order: the fold itself needs the pair track and the
+contact head feeding the decoder (contact AP is 0.885, and none of that
+reaches head 3 except through `single` and `diff_pair`), and 3,069 steps
+on 6,585 chains is still a small run for a generative decoder.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

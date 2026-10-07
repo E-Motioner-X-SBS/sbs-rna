@@ -1256,7 +1256,7 @@ def main() -> None:
     ap.add_argument("--sync-ckpt", action="store_true",
                     help="write checkpoints on the training thread, as this "
                          "used to. The ablation arm for the background "
-                         "saver; see BackgroundSaver for the 20.4% measured.")
+                         "saver; see BackgroundSaver for the 20.4%% measured.")
     ap.add_argument("--ckpt-every", type=int, default=100,
                     help="steps between checkpoints. Epoch-end only meant an "
                          "interrupted epoch lost everything, and the next fire "
