@@ -89,8 +89,9 @@ from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.heads import distance_bin        # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
-from pharos.train.checkpoint import (atomic_save,          # noqa: E402
-                                     load_optimizer, load_resume)
+from pharos.train.checkpoint import (BackgroundSaver,      # noqa: E402
+                                     atomic_save, load_optimizer,
+                                     load_resume)
 from pharos.train.guard import check_loss
 
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -1252,6 +1253,10 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
+    ap.add_argument("--sync-ckpt", action="store_true",
+                    help="write checkpoints on the training thread, as this "
+                         "used to. The ablation arm for the background "
+                         "saver; see BackgroundSaver for the 20.4% measured.")
     ap.add_argument("--ckpt-every", type=int, default=100,
                     help="steps between checkpoints. Epoch-end only meant an "
                          "interrupted epoch lost everything, and the next fire "
@@ -1464,8 +1469,17 @@ def main() -> None:
     if step:
         runlog.event("resumed", epoch=start_ep, step=step)
 
+    # OFF THE TRAINING THREAD. Measured: sampling the A100 at 1 Hz for 253 s
+    # during this stage, against the checkpoint's mtime, gave three stalls of
+    # 10, 11 and 13 s and three checkpoint rewrites, every pair aligned --
+    # 20.4% of wall-clock below 50% GPU and 6.2% at exactly 0%, all of it
+    # `torch.save` plus `fsync` of a 4.73 GB file while the card sat idle.
+    # `--sync-ckpt` is the ablation arm; a speed claim with no way to turn it
+    # off is not a measurement, which is the lesson of withdrawn finding 76.
+    saver = BackgroundSaver(enabled=not args.sync_ckpt)
+
     def save(ep: int, done: bool, val=None) -> None:
-        atomic_save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
+        saver.save({"format": CKPT_FORMAT, "cfg": cfg.__dict__,
                     "model": model.state_dict(), "opt": opt.state_dict(),
                     "sched": sched.state_dict(), "n_steps": n_steps,
                     "epoch": ep, "epoch_done": done, "step": step,
@@ -1597,6 +1611,17 @@ def main() -> None:
                       if isinstance(v, (int, float))})
         save(ep, True, ev)
 
+    # WAIT FOR THE WRITER before anything else can exit. A daemon thread
+    # would be killed at interpreter shutdown and the last checkpoint would
+    # be the one the process did not finish writing -- which is worse than
+    # the stall this saver removes, because it is silent.
+    saver.close()
+    if saver.n_saved:
+        print(f"[pharos] checkpoints: {saver.n_saved} written, "
+              f"{saver.n_dropped} dropped (a save still running when the next "
+              f"was due); last write {saver.last_seconds:.1f}s off-thread, "
+              f"{saver.last_snapshot_seconds:.2f}s snapshotting on it",
+              flush=True)
     if not history:
         # A run that trained no epochs has nothing to report, and writing the
         # report anyway CLOBBERS the last real one. A guard test run with

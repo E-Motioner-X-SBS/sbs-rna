@@ -612,6 +612,67 @@ a finding. Finding 75 held for an entire stage, so nothing real is lost by
 waiting two steps, and a watcher that fires on ordinary start-up behaviour
 is one nobody reads.
 
+## 88 — a fifth of the run spent writing a file with the card idle
+
+The user noticed the GPU utilisation fluctuating. It does, and the cause is
+exact rather than jittery.
+
+Sampling the A100 at 1 Hz for 253 s during stage 5, alongside the
+checkpoint file's mtime, on a quiet machine with the trainer as the only
+GPU process and a load average of 2.50:
+
+| stall start | duration below 50% | checkpoint rewritten |
+|---|---|---|
+| t = 18 s | 10 s | t = 27 s |
+| t = 100 s | 11 s | t = 111 s |
+| t = 219 s | 13 s | t = 232 s |
+
+Three stalls, three writes, every pair aligned.
+
+| # | what | status |
+|---|---|---|
+| 88 | `atomic_save` writes a **4.73 GB** checkpoint — model plus optimiser state plus scheduler — with an `fsync`, **on the training thread**, every `--ckpt-every 100` steps. Measured: **20.4% of wall-clock below 50% GPU and 6.2% at exactly 0%**, mean utilisation 71.5% where the busy stretches run at 86–100% | `FIXED` |
+
+Not thermal and not contention: SM clock held 1335–1410 MHz against a
+1410 nominal, power averaged 207 W of a 300 W cap, and `nvidia-smi` showed
+one compute process. The trace is unambiguous:
+
+```
+#++#+#########+##+........C##+####+######+#+###.######+##+#+###+#####+##########
+#++#+###++#+++#..........C#######+#+######+####+####+##+++####+##+#+#######++#+#
+####+##+#+##+##+##+#+#+####+###+####.######+#+#+...........C##+##+######+#++####
+```
+
+(`#` ≥75%, `+` ≥25%, `.` <25%, `C` the second the checkpoint was rewritten)
+
+**`BackgroundSaver` moves the write off the training thread**, and two
+things make it safe where finding 76's prefetch thread was not:
+
+* **the state is snapshotted to CPU before the thread starts.** A
+  `state_dict()` handed to another thread is a view of tensors the
+  optimiser is about to update, so the file would be a mixture of two
+  steps. The test asserts exactly this: it mutates the live tensor the
+  instant `save()` returns and requires the file to hold the value as of
+  the call — and separately asserts the mutation really happened, because
+  otherwise the first assertion proves nothing.
+* **`atomic_save` already renames into place**, so a reader sees one whole
+  version whichever thread wrote it.
+
+One writer at a time; a save due while one is running is **dropped and
+counted**, because queueing lets a slow disk grow memory without bound and
+a checkpoint is worth exactly as much as the next one. `close()` is called
+before any exit path that follows training — a daemon thread would be
+killed at interpreter shutdown and the last checkpoint would be the one the
+process did not finish writing, which is worse than the stall, because it
+is silent.
+
+**The 20.4% is measured; the improvement is not yet.** `--sync-ckpt` is the
+ablation arm and the A/B has to be run on a quiet card against a run that
+is not already in flight. Finding 76 was withdrawn for claiming a speed-up
+measured against my own interference, and this entry will not repeat it:
+what is established is the cost of the current behaviour, not the size of
+the saving.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

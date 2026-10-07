@@ -13,8 +13,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from pharos.train.checkpoint import (atomic_save,                # noqa: E402
-                                     load_optimizer, load_resume)
+from pharos.train.checkpoint import (BackgroundSaver,            # noqa: E402
+                                     atomic_save, load_optimizer,
+                                     load_resume)
 
 fails: list[str] = []
 
@@ -154,6 +155,63 @@ def main() -> int:
             "DROPPED" in msg, msg.split(":")[0])
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+        print("\n== the background saver: snapshot first, write later ==")
+        import threading
+        import time as _time
+        q = d / "bg.pt"
+        sv = BackgroundSaver()
+        w = torch.arange(16, dtype=torch.float32)
+        obj = {"step": 1, "model": {"w": w}}
+        chk("the first save is accepted", sv.save(obj, q))
+        # THE REASON THE SNAPSHOT EXISTS. Mutate the live tensor the instant
+        # the call returns: a saver that handed the thread a view would
+        # write the mutated value, i.e. a file from two different steps.
+        w.fill_(999.0)
+        sv.close()
+        got = torch.load(q, weights_only=False)["model"]["w"]
+        chk("the file holds the state AS OF THE CALL, not as of the write",
+            bool(torch.equal(got, torch.arange(16, dtype=torch.float32))),
+            f"first element {float(got[0])} -- 999 would mean the writer "
+            f"saw a live view")
+        chk("and the live tensor really was mutated", float(w[0]) == 999.0,
+            "otherwise the test above proves nothing")
+
+        print("\n== one writer at a time; a second is dropped, not queued ==")
+        slow = d / "slow.pt"
+        sv2 = BackgroundSaver()
+        big = {"model": {"w": torch.zeros(2_000_000)}}
+        sv2.save(big, slow)
+        dropped_any = False
+        for _ in range(50):
+            if not sv2.save(big, slow):
+                dropped_any = True
+                break
+        sv2.close()
+        chk("a save during a save is dropped and counted",
+            dropped_any and sv2.n_dropped >= 1,
+            f"{sv2.n_saved} saved, {sv2.n_dropped} dropped -- queueing would "
+            f"let a slow disk grow memory without bound")
+        chk("and the file is still valid afterwards",
+            torch.load(slow, weights_only=False)["model"]["w"].numel() == 2_000_000)
+
+        print("\n== close() waits, so the last checkpoint is whole ==")
+        sv3 = BackgroundSaver()
+        last = d / "last.pt"
+        sv3.save({"step": 7, "model": {"w": torch.ones(1_000_000)}}, last)
+        sv3.close()
+        chk("after close() the file is complete and readable",
+            torch.load(last, weights_only=False)["step"] == 7
+            and not sv3.busy())
+        chk("no .writing temp file survives", not (d / "last.pt.writing").exists())
+
+        print("\n== disabled, it is exactly atomic_save ==")
+        sv4 = BackgroundSaver(enabled=False)
+        sync = d / "sync.pt"
+        sv4.save({"step": 3, "model": {"w": torch.full((8,), 2.0)}}, sync)
+        chk("a disabled saver writes synchronously, no thread",
+            not sv4.busy() and torch.load(sync, weights_only=False)["step"] == 3,
+            "the ablation arm, so the speed claim can be turned off")
 
     print()
     if fails:
