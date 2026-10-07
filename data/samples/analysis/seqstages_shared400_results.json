@@ -1,11 +1,11 @@
 {
  "size": "shared400",
  "params": {
-  "total": 394695810,
-  "active": 325658754,
+  "total": 395294856,
+  "active": 326257800,
   "embedding": 3854592,
   "trunk": 340755768,
-  "heads": 47961398,
+  "heads": 48558140,
   "experts": 187564032,
   "effective_layers": 54
  },
@@ -49,132 +49,166 @@
    "fitness_transfer_assays": 5,
    "fitness_transfer_degenerate": 0,
    "fitness_generalisation_gap": 0.51937
+  },
+  {
+   "epoch": 1,
+   "steps": 1813,
+   "ss_loss": 1.276089192258674,
+   "ss_accuracy": 0.569993261829372,
+   "ss_val_loss": 1.1175406404903956,
+   "ss_val_accuracy": 0.5896833198411124,
+   "ss_generalisation_gap": -0.01969,
+   "ss_val_batches": 7,
+   "ss_majority": 0.539198748837238,
+   "ss_macro_recall": 0.2049928603994866,
+   "ss_val_majority": 0.5320791006088257,
+   "ss_val_macro_recall": 0.28098646444933756,
+   "ss_val_lift": 0.0576,
+   "probing_loss": 0.45226477126817444,
+   "probing_pearson": 0.42621366240181435,
+   "ss_batches": 1813,
+   "probing_batches": 1813,
+   "fitness_batches": 1813,
+   "ss_passes": 39,
+   "probing_passes": 0,
+   "fitness_passes": 7,
+   "fitness_loss": 1.333146868985592,
+   "fitness_spearman": 0.4266122818814041,
+   "fitness_pred_sd": 0.37922963278108185,
+   "fitness_val_spearman": 0.5072613856934358,
+   "fitness_val_assays": 12,
+   "fitness_val_degenerate": 0,
+   "fitness_val_min_pred_sd": 0.33646774,
+   "fitness_transfer_spearman": 0.006789385979438416,
+   "fitness_transfer_assays": 5,
+   "fitness_transfer_degenerate": 0,
+   "fitness_generalisation_gap": 0.50047
   }
  ],
  "fitness_per_assay": [
   {
-   "epoch": 0,
+   "epoch": 1,
    "val": [
     {
      "assay": "Julien_2016_mRNA",
-     "n": 2048,
-     "spearman": 0.5927847639043149,
-     "pred_sd": 0.28261858224868774,
-     "distinct": 2048
+     "n": 3296,
+     "spearman": 0.5468523787026794,
+     "pred_sd": 0.3364677429199219,
+     "distinct": 3296
     },
     {
      "assay": "Ke_2017_mRNA",
      "n": 1060,
-     "spearman": 0.8650845785001519,
-     "pred_sd": 0.8822023868560791,
+     "spearman": 0.8671031476832566,
+     "pred_sd": 0.8022063970565796,
      "distinct": 1056
     },
     {
      "assay": "Rachapun_2022_L1_R1_R2_ribozyme",
      "n": 1983,
-     "spearman": 0.6821088364971374,
-     "pred_sd": 0.6428921818733215,
+     "spearman": 0.5271677937791445,
+     "pred_sd": 0.44390201568603516,
      "distinct": 1983
     },
     {
      "assay": "Rachapun_2022_L2_R1_R2_ribozyme",
      "n": 410,
-     "spearman": 0.6609829077631049,
-     "pred_sd": 0.5823304057121277,
+     "spearman": 0.5273527632607081,
+     "pred_sd": 0.43763381242752075,
      "distinct": 410
     },
     {
      "assay": "Rachapun_2022_L3_R1_R2_ribozyme",
      "n": 386,
-     "spearman": 0.5826812702098881,
-     "pred_sd": 0.5349474549293518,
+     "spearman": 0.5205514251182404,
+     "pred_sd": 0.39286142587661743,
      "distinct": 386
     },
     {
      "assay": "Rachapun_2022_L4B_R1_R2_ribozyme",
      "n": 386,
-     "spearman": 0.36190590948995577,
-     "pred_sd": 0.44686776399612427,
+     "spearman": 0.34057480455841704,
+     "pred_sd": 0.37037625908851624,
      "distinct": 386
     },
     {
      "assay": "Rachapun_2022_L4_R1_R2_ribozyme",
      "n": 392,
-     "spearman": 0.4835844361477384,
-     "pred_sd": 0.5155609250068665,
+     "spearman": 0.4034976891847471,
+     "pred_sd": 0.3917071521282196,
      "distinct": 392
     },
     {
      "assay": "Rachapun_2022_L5_R1_R2_ribozyme",
      "n": 1198,
-     "spearman": 0.4626363547624696,
-     "pred_sd": 0.5204849243164062,
+     "spearman": 0.3483022768452317,
+     "pred_sd": 0.41759660840034485,
      "distinct": 1198
     },
     {
      "assay": "Rachapun_2022_L6_R1_R2_ribozyme",
      "n": 1190,
-     "spearman": 0.6489390983431216,
-     "pred_sd": 0.5350608229637146,
+     "spearman": 0.4233025719292313,
+     "pred_sd": 0.3998907804489136,
      "distinct": 1190
     },
     {
      "assay": "Rachapun_2022_L7_R1_R2_ribozyme",
      "n": 1957,
-     "spearman": 0.5642163627730056,
-     "pred_sd": 0.5089165568351746,
+     "spearman": 0.4143700308815601,
+     "pred_sd": 0.392067015171051,
      "distinct": 1957
     },
     {
      "assay": "Rachapun_2022_L8_R1_R2_ribozyme",
-     "n": 2048,
-     "spearman": 0.5487799285384399,
-     "pred_sd": 0.4099454879760742,
-     "distinct": 2047
+     "n": 2438,
+     "spearman": 0.4379929897269723,
+     "pred_sd": 0.378053218126297,
+     "distinct": 2438
     },
     {
      "assay": "Rachapun_2022_f1u_ribozyme",
-     "n": 2048,
-     "spearman": 0.7989344257183495,
-     "pred_sd": 0.7815397381782532,
-     "distinct": 2048
+     "n": 4096,
+     "spearman": 0.7300687566510407,
+     "pred_sd": 0.6839309930801392,
+     "distinct": 4096
     }
    ],
    "transfer": [
     {
      "assay": "Townshend_2015_4nt_aptamer",
      "n": 207,
-     "spearman": 0.1441874749705058,
-     "pred_sd": 0.06966060400009155,
+     "spearman": 0.247912404887922,
+     "pred_sd": 0.15830297768115997,
      "distinct": 207
     },
     {
      "assay": "Townshend_2015_5nt_aptamer",
      "n": 713,
-     "spearman": 0.1684548711143376,
-     "pred_sd": 0.07914766669273376,
+     "spearman": -0.2125665589998547,
+     "pred_sd": 0.16952507197856903,
      "distinct": 713
     },
     {
      "assay": "Townshend_2015_6nt_aptamer",
-     "n": 2048,
-     "spearman": 0.06118995013146404,
-     "pred_sd": 0.10353817045688629,
-     "distinct": 2048
+     "n": 2748,
+     "spearman": -0.09561935050904094,
+     "pred_sd": 0.12650541961193085,
+     "distinct": 2748
     },
     {
      "assay": "Townshend_2015_7nt_aptamer",
-     "n": 2048,
-     "spearman": 0.060784091298214514,
-     "pred_sd": 0.07534383237361908,
-     "distinct": 2048
+     "n": 4096,
+     "spearman": 0.07580218677300957,
+     "pred_sd": 0.18789921700954437,
+     "distinct": 4096
     },
     {
      "assay": "Townshend_2015_8nt_aptamer",
-     "n": 2048,
-     "spearman": -0.00955197861912337,
-     "pred_sd": 0.06970728933811188,
-     "distinct": 2048
+     "n": 4096,
+     "spearman": 0.01841824774515615,
+     "pred_sd": 0.10145937651395798,
+     "distinct": 4096
     }
    ]
   }
