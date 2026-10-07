@@ -673,6 +673,69 @@ measured against my own interference, and this entry will not repeat it:
 what is established is the cost of the current behaviour, not the size of
 the saving.
 
+## 89 — P–P is not a stage-1 problem, and the data is not the problem either
+
+The P–P bond is the chain: consecutive phosphates at 16–19 Å instead of
+5.9 Å is not a bad structure, it is not a structure. Two hypotheses were
+worth testing before blaming the head, and **both are refuted by
+measurement**.
+
+**Hypothesis 1: chain breaks are poisoning the target.** The violation
+mask is `mask[1:] & mask[:-1]` — the *residue* mask — which never asks
+whether residues i and i+1 are consecutive in the chain, and the corpus
+carries `unobserved_seq_id`. If unmodelled gaps were being taught as
+bonds, the loss would be pushing 20 Å apart pairs toward 6 Å.
+
+Measured over **2,227,344 array-adjacent P–P pairs from 3,072 chains**:
+
+| | |
+|---|---|
+| median / mean / sd | 5.88 / 5.96 / 0.78 Å |
+| inside the flat bottom [4.51, 7.51] | **99.09%** |
+| below | 0.59% |
+| above | 0.32% |
+| above 10 Å (real breaks) | **0.11%** |
+
+The targets are clean. **REFUTED.**
+
+Worth keeping from it: a *perfect* prediction scores `structure_bond_pp` =
+**0.0149 Å**, not 0, because 0.32% of true pairs sit outside the band and
+contribute 90.2% of that floor. The metric has a floor and it is now
+written down.
+
+**Hypothesis 2: it is stage 1 — the representation does not carry what the
+bond needs.** This is testable without touching the model, because if P–P
+is a geometric constant then no representation is needed to predict it.
+Over 2,224,936 pairs, grouped by dinucleotide — the only sequence
+information the head could use:
+
+| | |
+|---|---|
+| overall mean / sd | 5.9465 / 0.5508 Å |
+| pooled within-dinucleotide sd | 0.5485 Å |
+| between-dinucleotide sd | 0.0527 Å |
+| **variance explained by sequence** | **0.9151%** |
+
+A constant predictor of 5.947 Å scores RMSE 0.5508 Å on every pair in the
+corpus. The best possible sequence-conditioned predictor reaches 0.5485 Å
+— an improvement of **0.0023 Å**. The sixteen dinucleotide means span
+5.845 to 6.032 Å against a within-group sd ten times larger.
+
+**P–P is a geometric constant. Stage 1 cannot be the cause, because there
+is nothing in the representation for it to get right.** REFUTED.
+
+What is left is the head's own training, and that is findings 85 and 83:
+the denoiser was trained almost entirely at σ where the input already had
+correct bonds, so it never had to *create* them, and it had 317 steps in
+which not to. The run with both fixed has taken `structure_bond_pp` from
+2.538 at epoch 0 to 0.307 at epoch 21 and it is still falling — against a
+floor of 0.0149.
+
+The prediction that follows, and that the next blind-test run will settle:
+if 85 and 83 were the cause, P–P at inference comes down with it; if it
+does not, the remaining suspect is the sampler, not the representation and
+not the corpus.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's
