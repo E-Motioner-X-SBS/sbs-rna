@@ -885,6 +885,58 @@ understated the decoder by up to 0.12 AUROC and changed nothing for the
 trunk. Measuring the content term alone and calling it "the attention" is
 wrong by construction when the bias is where structure would enter.
 
+## 93 — the decoder got the contacts and the fold did not improve
+
+Finding 92's prediction, tested and **refuted**. The experiment is
+reverted; it is recorded because a negative result that cost two training
+runs is worth more than the guess it replaced.
+
+**The design.** `DiffusionPairFeatures.contact`, a readout `d_pair -> 1`
+on the tensor the decoder already materialises, supervised with the
+contact targets head 1 already uses. A readout and not a new input, so the
+forward pass is unchanged — verified at weight 0.0 against 0.5 that the
+totals differ, `dec_contact` is reported only in the second, and **no
+other part differs by more than 1e-9**. The A/B isolates the gradient.
+
+**Both arms re-run**, identical code, seed, 40 epochs, 3,069 steps,
+16,384-token budget; the only difference is `--decoder-contact-weight`.
+This morning's finished run was not reused as the baseline, because adding
+the readout shifts the initialisation RNG and a baseline that differs in
+init is not a baseline.
+
+**The mechanism worked.** The decoder's pair representation went from not
+predicting contacts at all to predicting them at **AUROC 0.611 -> 0.926 ->
+0.938**, against the 0.41–0.52 finding 92 measured in the baseline
+decoder's attention. The information is unambiguously in there, and
+`DenoiseBlock` reads that same tensor into its attention logits.
+
+**The fold did not move.**
+
+| | arm A (control) | arm B (readout) | delta |
+|---|---|---|---|
+| mean TM, 17 targets | 0.0890 | 0.0914 | **+0.0025** |
+| mean lDDT | 0.2550 | 0.2648 | +0.0097 |
+| targets where B wins | — | **9 of 17** | sign test **p = 0.500** |
+
++0.0025 against a noise floor of **0.0023**, measured independently: arm A
+scored 0.0890 where this morning's identical-settings run scored 0.0913,
+and nothing differed between those two but the init RNG. Nine wins out of
+seventeen is a coin flip to three decimal places.
+
+**What it refines.** Finding 92 said the decoder has no path to the
+contacts. That was true and it was not the binding constraint. Giving the
+decoder's pair representation the contacts — provably, at AUROC 0.94 —
+buys nothing, so the deficit is not *information*, it is the decoder's
+ability to **use** it: six `DenoiseBlock` layers reading a pair bias, with
+no iterative refinement of the pair track and no structure-aware update
+between them. The next hypothesis has to be about capacity or about the
+sampler, and it is not this one.
+
+Reverted in full. `--decoder-contact-weight`, the readout, the loss, the
+three declared scalars and the test's explicit exercise of it are all
+gone: a flag that defaults to off and does nothing is the dead-parameter
+class this register exists for.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

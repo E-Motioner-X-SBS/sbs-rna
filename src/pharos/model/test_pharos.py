@@ -62,9 +62,9 @@ EXPECTED = {
     # +266,758 / +150,918 / +596,742 over the pre-head-11 numbers: the torsion
     # head is a `_mlp(d, d, 6)` on the residue track, so it lands on BOTH
     # columns (it is dense, not routed) and scales with d_model alone.
-    "PHAROS-Small": (259_188_899, 83_028_131, 128),
-    "PHAROS-Mini": (113_658_265, 39_340_441, 144),
-    "Base-v2": (1_106_157_187, 313_433_731, 96),
+    "PHAROS-Small": (259_188_770, 83_028_002, 128),
+    "PHAROS-Mini": (113_658_136, 39_340_312, 144),
+    "Base-v2": (1_106_157_058, 313_433_602, 96),
 }
 #: What the DENSE diffusion decoder (head 3 plus its pair features) contributes
 #: to the active column at each scale. It is the reason the numbers above moved
@@ -527,10 +527,6 @@ def main() -> int:
     _coev = torch.rand(gB, gL, gL)          # exercise BOTH coevolution paths
     gloss = gloss + g.coev_proj(_coev[:, :2, 0].reshape(-1, 1)).sum()
     _pf = g.diff_pair(go["hidden"], _coev)
-    # the finding-92 readout: trained by `step_losses` when
-    # --decoder-contact-weight is non-zero, and reached by no forward pass,
-    # so it has to be exercised here the same way `coev_proj` is.
-    gloss = gloss + g.diff_pair.contact(_pf).sum()
     gloss = gloss + g.heads.structure.loss(
         torch.randn(gB, gL, 3, 3), go["hidden"], _pf, gm)["loss"]
     gloss.backward()

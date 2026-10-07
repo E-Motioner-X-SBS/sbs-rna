@@ -487,7 +487,6 @@ _PART_SCALARS = ("contact", "distance", "dist_acc", "dist_major", "dist_lift",
                  # a metric computed over 20 pairs and one computed over
                  # 20,000 were indistinguishable in the csv.
                  "dist_n_class", "n_pairs",
-                 "dec_contact", "dec_contact_pos_rate", "dec_contact_auroc",
                  "torsion") + _TORSION_SCALARS
 _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
               "contact_n", "coev_frac", "motif_eff",
@@ -626,8 +625,7 @@ def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
 
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 n_loops: Optional[int] = None,
-                structure_weight: float = 1.0,
-                decoder_contact_weight: float = 0.0) -> tuple:
+                structure_weight: float = 1.0) -> tuple:
     """One forward pass and every head that this batch can supervise.
 
     Two throughput decisions live here, both measured.
@@ -947,25 +945,6 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
         parts["structure"] = float(dl["loss"].detach())
         parts["structure_mse"] = float(dl["mse"])
 
-        # FINDING 92's experiment. Make the decoder's pair representation
-        # PREDICT contacts, on the same sampled pairs and against the same
-        # targets head 1 uses. It is a readout, not a new input: nothing in
-        # the forward pass changes, so a checkpoint samples bit-identically
-        # with this on or off and the A/B isolates the gradient.
-        #
-        # The claim being tested: `DenoiseBlock` reads `pair_bias(pair)`
-        # straight into its attention logits, so a pair tensor forced to
-        # encode contacts should put contact information into the decoder's
-        # attention -- which was measured at chance (AUROC 0.41-0.52 on the
-        # four middle blocks) while head 1 reached AP 0.885.
-        if decoder_contact_weight > 0 and ii_all:
-            dcl = model.diff_pair.contact(pair_feat).squeeze(-1)[bidx, ii, jj]
-            ldc = (F.binary_cross_entropy_with_logits(
-                dcl, y, reduction="none") * wt).sum() / wt.sum().clamp(min=1e-6)
-            total = total + decoder_contact_weight * ldc
-            parts["dec_contact"] = float(ldc.detach())
-            parts.update(_binary_metrics(dcl.detach(), y, "dec_contact"))
-
     total = total + out["aux"]["balance_loss"]
     parts["balance"] = float(out["aux"]["balance_loss"].detach())
     parts["n_pairs"] = n_pairs
@@ -1274,11 +1253,6 @@ def main() -> None:
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--eval-batches", type=int, default=40)
     ap.add_argument("--log-every", type=int, default=50)
-    ap.add_argument("--decoder-contact-weight", type=float, default=0.0,
-                    help="finding 92: make the decoder's pair representation "
-                         "predict contacts. It is a READOUT, so the forward "
-                         "pass is unchanged and 0.0 reproduces the baseline "
-                         "bit for bit -- the A/B isolates the gradient.")
     ap.add_argument("--sync-ckpt", action="store_true",
                     help="write checkpoints on the training thread, as this "
                          "used to. The ablation arm for the background "
@@ -1534,7 +1508,6 @@ def main() -> None:
                 with torch.autocast("cuda", dtype=torch.bfloat16):
                     loss, parts, _ = step_losses(
                         model, t, cfg, args.n_neg, n_loops=nl,
-                        decoder_contact_weight=args.decoder_contact_weight,
                         structure_weight=args.structure_weight)
                 # `step`, not `gstep`. Stage 5 has no `gstep`: its counter is
                 # `step`, restored from the resume record at line 1212. The
