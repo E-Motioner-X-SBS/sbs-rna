@@ -399,6 +399,61 @@ The physics was not quiet by design. It had never been reached. Reading a
 parameter's value out of a checkpoint says what that RUN did, and a run is
 identified by the code it had loaded, not by the commit that exists now.
 
+## 82–84 — the full run, end to end, and what it exposed
+
+The curriculum ran from the 3.340B-token stage-1 checkpoint to RNA-Puzzles
+scores in 4h24m: gate 611 s, zero-shot 2,095 s, stages 2/3/6 10,596 s,
+stage 5 1,062 s, prediction 38 s, scoring 73 s.
+
+| # | what | status |
+|---|---|---|
+| 82 | `probe_channels.py` perturbed `mod_ids` with `m2[0, 0] = 1` against a `mod` drawn from `randint(1, 4)`. When the draw was already 1 the "perturbed" input WAS the original and the delta was exactly 0.00e+00 — a dead channel reported for a live one. `torch.manual_seed(0)` is set three lines before the MODEL is built, and initialisation consumes the stream, so adding head 11 and `theta_head` shifted every subsequent draw, `mod[0,0]` became 1, and a probe that had passed all night started failing the gate and blocking the pipeline. **The seed made it deterministic, not correct** | `FIXED` |
+| 83 | stage 5 runs **317 optimiser steps over 8 epochs** — 40 per epoch, 1,062 s in total. A denoising diffusion decoder is being asked to learn a generative model of RNA backbone geometry in three hundred steps. At inference the consequence is unambiguous: consecutive P–P distances come out at **16–19 Å against a 5.88 Å target**, bond violation 0.79–0.93, and the structures are not connected chains | `OPEN` |
+| 84 | head 11 learns on the training batches and **does not generalise**: `tors_theta_lift` reaches **+9.79°** at step 250 and the same epoch's validation reads **−0.74°**; η +5.71 train against −1.27 val. On 317 steps and 6,585 chains that is the expected shape, but it is recorded rather than assumed, and the family-disjoint test agrees (η −0.60, θ −0.26, χ̃ **+0.45**, the only one positive) | `OPEN` |
+
+Finding 83 is the one that matters, and the inference guard of finding 74 is
+what made it visible rather than flattering: every one of the seventeen
+predictions carries `BACKBONE NOT CONNECTED`, and the clash score — the
+metric that would have been reported without that guard — reads a clean
+**0.001** on all of them, because `clash_score` skips pairs within one
+residue and every impossible distance here is exactly such a pair.
+
+**The blind-test result, stated plainly.** 17 RNA-Puzzles targets, scored
+against the 885 submitted competitor models:
+
+| | PHAROS | field best | field median |
+|---|---|---|---|
+| mean TM | **0.0546** | 0.4592 | 0.3013 |
+| best single target | 0.0725 (rp05) | 0.7629 (rp04) | — |
+| mean lDDT | 0.125 | — | — |
+
+That is random-coil territory and it is the honest number. The sequence-level
+heads are a different story on the same checkpoint — contact AP 0.8060
+against a 0.4541 base rate (1.77× lift), Mg AP lift 2.92×, and #6 of 14 on
+the RNAGym ncRNA leaderboard — so what is failing is specifically the
+generative decoder, not the representation it reads.
+
+### What stage 5 actually produced, epoch 0 → 7 (validation)
+
+| metric | ep 0 | ep 7 | floor |
+|---|---|---|---|
+| contact_ap | 0.5907 | **0.8060** | 0.4541 |
+| mg_ap_lift | 1.28× | **2.92×** | 1.0× |
+| lw_macro | 0.0887 | **0.1465** | — |
+| structure_violation | 1.1566 | **0.5087** | — |
+| structure_bond_pp | 0.571 | **0.2192** | — |
+| rigidity_r_pooled | 0.0384 | **0.1180** | 0.0 |
+| motif_lift | −0.0112 | −0.0102 | 0.0 |
+| dist_lift | 0.000 | 0.003 | 0.0 |
+
+Family-disjoint test: contact_ap 0.6755 against a 0.3475 base rate (1.94×,
+*higher* lift than validation), mg_ap_lift 1.98×, lw_lift +0.0181.
+
+Two heads are flat on validation and both are already on the register:
+`motif_lift` is −0.01 on val while training reaches +0.20, and head 2 is
+still collapsed — `dist_acc` 0.480 against `dist_major` 0.477, macro 0.030
+against a 1/39 = 0.026 chance. Finding 75 reproduces exactly.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

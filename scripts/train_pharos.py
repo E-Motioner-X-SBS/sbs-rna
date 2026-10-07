@@ -476,6 +476,15 @@ _PART_SCALARS = ("contact", "distance", "dist_acc", "dist_major", "dist_lift",
                  "structure_mse", "mg", "rigidity", "fluctuation", "base",
                  "lw", "motif", "balance", "coev_frac", "coev_norm",
                  "motif_gate", "motif_eff", "motif_top_share", "n_lw",
+                 # `dist_n_class` and `n_pairs` are computed on every step and
+                 # had no column, so they were measured and never read -- the
+                 # class this register is about, in the telemetry rather than
+                 # the model. `n_pairs` is the one that matters: the distance
+                 # and contact heads are scored on a SAMPLED pair population
+                 # and its size moves with the chain lengths in the batch, so
+                 # a metric computed over 20 pairs and one computed over
+                 # 20,000 were indistinguishable in the csv.
+                 "dist_n_class", "n_pairs",
                  "torsion") + _TORSION_SCALARS
 _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
               "contact_n", "coev_frac", "motif_eff",

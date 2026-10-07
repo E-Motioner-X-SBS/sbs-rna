@@ -213,9 +213,24 @@ def probe_model() -> None:
     t2 = tok.clone(); t2[0, 0] = (int(t2[0, 0]) + 1) % 4
     chk("tokens", float((run(tokens=t2) - base).abs().max()) > 1e-6,
         f"delta {float((run(tokens=t2)-base).abs().max()):.2e}")
-    m2 = mod.clone(); m2[0, 0] = 1
+    # ROTATE, like the token line above; do not assign a constant.
+    #
+    # This was `m2[0, 0] = 1` against a `mod` drawn from randint(1, 4), so
+    # whenever the draw was already 1 the "perturbed" input was the original
+    # and the delta was exactly 0.00e+00 -- a dead channel reported for a
+    # channel that is fine. It survived because `torch.manual_seed(0)` is set
+    # three lines before the MODEL is built, and the model's initialisation
+    # consumes the stream: adding head 11 and `theta_head` shifted every
+    # draw after it, `mod[0, 0]` became 1, and a probe that had passed all
+    # night started failing the gate and blocking the pipeline.
+    #
+    # The seed made it deterministic, not correct. A perturbation has to be
+    # different from what it perturbs by construction.
+    m2 = mod.clone(); m2[0, 0] = 1 + (int(mod[0, 0]) % 3)   # {1,2,3}, != itself
+    assert int(m2[0, 0]) != int(mod[0, 0]), "the perturbation must perturb"
     chk("mod_ids", float((run(mod_ids=m2) - base).abs().max()) > 1e-6,
-        f"delta {float((run(mod_ids=m2)-base).abs().max()):.2e}")
+        f"delta {float((run(mod_ids=m2)-base).abs().max()):.2e} "
+        f"({int(mod[0, 0])} -> {int(m2[0, 0])})")
     # EVERY chemistry dim, one at a time: a dim the embedding never reads is
     # the same defect as a dim the corpus never fills.
     dead = []

@@ -1303,6 +1303,12 @@ def main() -> int:
               # shape as everything else in this audit: the check exists, it
               # passes, and nothing asks it.
               ROOT / "scripts/test_head_metrics.py",
+              # stage 5's two central functions had no test at all. Everything
+              # around them did; the functions that assemble eleven losses and
+              # reduce a split to a dict were reached only by running the
+              # stage on a GPU for hours. Two defects in head 11's wiring
+              # survived review and were found by running them.
+              ROOT / "scripts/test_stage5_losses.py",
               ROOT / "src/pharos/eval/test_metrics.py",
               ROOT / "src/pharos/model/test_shared_moe.py",
               # Not named `test_*`, so the drift check below cannot see it and
