@@ -125,13 +125,19 @@ def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
     single = out["hidden"].float()
 
     head = model.heads.structure
+    # The SAME pair features stage 5 trains against -- `train_pharos.py`
+    # builds `model.diff_pair(hidden, cv_dense)` and passes it to
+    # `structure.loss`. Coevolution is left at zero here because a blind
+    # target has no MSA in this path and `diff_pair.coev` is zero-init, so
+    # absent and zero are the same tensor; the relative-position embedding,
+    # which is the part the backbone needs, is built from the length.
+    with torch.no_grad():
+        pair = model.diff_pair(out["hidden"], None)
     draws, clashes, bonds = [], [], []
     for s in range(n_samples):
         g = torch.Generator(device="cpu").manual_seed(seed + s)
         noise = torch.randn(1, L, N_ATOM, 3, generator=g).to(device)
-        x = head.sample(single, None, msk, n_steps=n_steps,
-                        generator=None) if noise is None else _sample_with(
-            head, single, msk, n_steps, noise)
+        x = _sample_with(head, single, pair, msk, n_steps, noise)
         c = x[0].float().cpu().numpy()
         draws.append(c)
         clashes.append(clash_score(c))
@@ -167,25 +173,40 @@ def bond_violation(c: np.ndarray) -> tuple[float, float, float]:
             float(np.median(cn)), float(np.median(pp)))
 
 
-def _sample_with(head, single, mask, n_steps, noise):
+def _sample_with(head, single, pair, mask, n_steps, noise):
     """`head.sample` seeded from a caller-supplied noise draw.
 
     The head seeds itself from the global RNG, which makes a prediction run
     unreproducible and makes several draws correlated with whatever ran before
     them. Threading the initial noise in is the only way to get five
     independent, reproducible samples.
+
+    **`pair` IS NOT OPTIONAL and this function used to hardcode `None`.**
+    This is a second implementation of `head.sample`, written to control the
+    seed, and it dropped an argument the original threads. The decoder is
+    trained with `diff_pair(hidden, coev)`, whose whole reason for existing
+    is the RELATIVE SEQUENCE POSITION embedding -- its own docstring says
+    "without it the decoder has to infer every geometric relationship from
+    per-residue embeddings". Sampling with `None` therefore asked the model
+    to build a chain without telling it which residues are adjacent, and it
+    produced exactly that: consecutive phosphates at 16-19 A against a true
+    5.95, on all seventeen RNA-Puzzles targets, while the training-time bond
+    violation looked fine because training had the features.
+
+    Two implementations of one thing, and the public one was the broken one
+    -- the same shape as the `pair_index` defect in `Pharos.forward`.
     """
     cfg = head.cfg
     steps = head.sigmas(n_steps or cfg.n_steps, single.device, torch.float32)
     x = noise * steps[0]
     for i in range(len(steps) - 1):
         s, s_next = steps[i], steps[i + 1]
-        d = head.denoise(x, s.expand(x.shape[0]), single, None, mask)
+        d = head.denoise(x, s.expand(x.shape[0]), single, pair, mask)
         deriv = (x - d) / s.clamp(min=1e-8)
         x_next = x + (s_next - s) * deriv
         if s_next > 0:                       # Heun's second-order correction
             d2 = head.denoise(x_next, s_next.expand(x.shape[0]), single,
-                              None, mask)
+                              pair, mask)
             deriv2 = (x_next - d2) / s_next.clamp(min=1e-8)
             x_next = x + (s_next - s) * 0.5 * (deriv + deriv2)
         x = x_next

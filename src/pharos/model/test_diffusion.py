@@ -280,6 +280,86 @@ def main() -> int:
         f"sigma_max {live.sigma_max} against a 99.99th percentile draw of "
         f"{float(np.percentile(draws, 99.99)):.1f}")
 
+    print("\n== the INFERENCE sampler must use the pair features ==")
+    # `predict_structure._sample_with` is a second implementation of
+    # `head.sample`, written to control the noise seed, and it hardcoded
+    # `pair=None`. The decoder is trained with `diff_pair(hidden, coev)`,
+    # whose reason for existing is the relative-position embedding, so
+    # sampling without it asked the model to build a chain without being
+    # told which residues are adjacent -- and all seventeen RNA-Puzzles
+    # predictions came back with consecutive P at 16-19 A against 5.95.
+    #
+    # The direct test: with the SAME noise, a sampler that threads `pair`
+    # gives a different answer with it than without it. One that ignores
+    # the argument gives the same answer, which is the bug.
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+    from predict_structure import _sample_with                # noqa: E402
+    from pharos.model.diffusion import DiffusionPairFeatures   # noqa: E402
+
+    _B, _L, _dm = 1, 14, 32
+    _head = DiffusionStructureHead(DiffusionConfig(
+        d_model=_dm, d_pair=16, n_layers=2, n_heads=2))
+    _dp = DiffusionPairFeatures(_dm, 16)
+    torch.manual_seed(0)
+    # OPEN THE ZERO-INITIALISED GATES FIRST, the same way property 7f opens
+    # `bias_scale`. `DenoiseBlock.out.weight` and `CoordDenoiser.out.weight`
+    # are zero by design -- a deep denoiser starts as a shallow one -- so on
+    # a freshly built head the attention output is exactly zero and `pair`
+    # provably cannot matter. Testing an untrained head would have reported
+    # "the sampler ignores pair" for a sampler that does not, which is the
+    # false positive this comment exists to stop being rediscovered.
+    with torch.no_grad():
+        for _m in _head.modules():
+            if isinstance(_m, torch.nn.Linear) and float(_m.weight.abs().max()) == 0:
+                _m.weight.normal_(0.0, 0.3)
+    _single = torch.randn(_B, _L, _dm)
+    _mask = torch.ones(_B, _L, dtype=torch.bool)
+    with torch.no_grad():
+        _pair = _dp(_single, None)
+    _noise = torch.randn(_B, _L, 3, 3)
+    with torch.no_grad():
+        _with = _sample_with(_head, _single, _pair, _mask, 6, _noise)
+        _without = _sample_with(_head, _single, None, _mask, 6, _noise)
+    _d = float((_with - _without).abs().max())
+    chk("the same noise with and without pair gives DIFFERENT structures",
+        _d > 1e-5, f"max |delta| {_d:.4e} -- zero would mean the sampler "
+        f"drops the argument, which is how it shipped (gates opened first, "
+        f"or a zero-init head makes this vacuous)")
+    # INSIDE no_grad, like the two calls above. Outside it the autograd
+    # path picks different kernels and the result differs in the last bits,
+    # so the first draft of this check reported the sampler as
+    # non-deterministic when the sampler is bit-exact -- verified
+    # separately: two identical calls give `torch.equal` True.
+    with torch.no_grad():
+        _again = _sample_with(_head, _single, _pair, _mask, 6, _noise)
+    chk("and it is deterministic given the noise",
+        bool(torch.equal(_with, _again)),
+        "otherwise the comparison above is meaningless")
+
+    print("\n== and the pair features carry ADJACENCY, which is the point ==")
+    # If the relative-position embedding did not distinguish |i-j| = 1 from
+    # |i-j| = 7 there would be nothing for the backbone to read.
+    with torch.no_grad():
+        _pp = _dp(_single, None)
+    _adj = _pp[0, torch.arange(_L - 1), torch.arange(1, _L)].mean(0)
+    _far = _pp[0, torch.arange(_L - 7), torch.arange(7, _L)].mean(0)
+    chk("adjacent pairs embed differently from |i-j| = 7",
+        float((_adj - _far).abs().max()) > 1e-3,
+        f"max |delta| {float((_adj - _far).abs().max()):.4e}")
+    # and that it is the REL table doing it, not the single projections
+    _dp2 = DiffusionPairFeatures(_dm, 16)
+    with torch.no_grad():
+        _dp2.rel.weight.zero_()
+        _q = _dp2(_single, None)
+    _adj2 = _q[0, torch.arange(_L - 1), torch.arange(1, _L)].mean(0)
+    _far2 = _q[0, torch.arange(_L - 7), torch.arange(7, _L)].mean(0)
+    chk("with the rel table zeroed the two collapse together",
+        float((_adj2 - _far2).abs().max()) < float((_adj - _far).abs().max()),
+        f"{float((_adj2 - _far2).abs().max()):.4e} against "
+        f"{float((_adj - _far).abs().max()):.4e} -- so it IS the relative "
+        f"position embedding that carries adjacency")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

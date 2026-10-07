@@ -736,6 +736,55 @@ if 85 and 83 were the cause, P–P at inference comes down with it; if it
 does not, the remaining suspect is the sampler, not the representation and
 not the corpus.
 
+## 90 — the sampler was never told which residues are adjacent
+
+Finding 89 ruled out the corpus and ruled out stage 1, and named the
+sampler as the remaining suspect. It is the sampler.
+
+| # | what | status |
+|---|---|---|
+| 90 | `predict_structure._sample_with` is a **second implementation** of `DiffusionStructureHead.sample`, written to control the noise seed, and it hardcoded `pair=None`. Training calls `structure.loss(coords, hidden, diff_pair(hidden, coev), mask)`; inference called `denoise(x, σ, single, None, mask)`. The decoder was trained with pair conditioning and sampled without it | `FIXED` |
+
+`DiffusionPairFeatures` exists for one reason and its own docstring says
+so: *"**Relative position**, clamped to ±max_rel. Without it the decoder
+has to infer every geometric relationship from per-residue embeddings."*
+Sampling with `None` asked the model to build a chain **without telling it
+which residues are adjacent**, which is precisely the information a P–P
+bond is. It produced exactly that: consecutive phosphates at 16–19 Å
+against a true 5.95, on all seventeen targets, while the training-time
+violation looked fine because training had the features.
+
+Two implementations of one thing, and the public one was the broken one —
+the same shape as the `pair_index` defect already recorded in
+`Pharos.forward`, where the only caller of the broken path was the test
+that validates the interface.
+
+Measured after the fix, same noise, gates opened: threading `pair` through
+changes the sampled structure by **19.70 Å** maximum. It is not a
+refinement.
+
+### Two false positives in my own test, both worth keeping
+
+**The first draft tested a freshly constructed head and reported max |Δ| =
+0.0000.** `DenoiseBlock.out.weight` and `CoordDenoiser.out.weight` are
+zero-initialised *by design* — a deep denoiser starts as a shallow one —
+so on an untrained head the attention output is exactly zero and `pair`
+provably cannot matter. The test now opens those gates first, the way
+property 7f opens `bias_scale`. Testing a zero-init model for whether an
+input matters is vacuous, and it reported "the sampler ignores pair" for a
+sampler that does not.
+
+**The second draft reported the sampler non-deterministic.** The repeat
+call sat *outside* the `torch.no_grad()` block, so autograd picked
+different kernels and the last bits differed. Verified separately: two
+identical calls under `no_grad` give `torch.equal` True. The sampler is
+bit-exact.
+
+The adjacency claim is checked rather than asserted: adjacent pairs embed
+2.16 apart from |i−j| = 7, and with `rel.weight` zeroed that collapses to
+0.52 — so it is the relative-position table carrying it, not the single
+projections.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's
