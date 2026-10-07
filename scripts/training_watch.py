@@ -169,7 +169,22 @@ def check_floors(F: List[Tuple[str, str, str]], stage: str,
             continue
         a, m = series(rs, acc), series(rs, major)
         n = min(len(a), len(m))
-        if n < 2:
+        # Three readings, like the lift and macro checks. On the first two
+        # steps of a restarted run every classifier sits on its majority
+        # class, and reporting that is noise; the finding is a head that has
+        # had several readings to leave it and has not. Finding 75 held for
+        # a whole stage, so nothing real is lost by waiting two steps.
+        if n < 3:
+            continue
+        # A HEAD WITH ONE CLASS HAS NO FLOOR TO BEAT. `base_acc` reads
+        # 1.0000 against a `base_major` of 1.0000 because `base_n_class` is
+        # 1: the base-identity head is supervised only at positions whose
+        # identity was unassigned, and a batch can contain exactly one
+        # base. "The head predicts the majority class" is vacuously true
+        # there and says nothing, so reporting it trains the reader to skip
+        # the section -- which is the cost this check exists to avoid.
+        ncl = series(rs, f"{base}_n_class")
+        if ncl and max(ncl[-n:]) <= 1.0:
             continue
         a, m = a[-n:], m[-n:]
         gap = [abs(x - y) for x, y in zip(a, m)]
@@ -183,10 +198,18 @@ def check_floors(F: List[Tuple[str, str, str]], stage: str,
         nc = f"{macro[:-6]}_n_class"
         v = series(rs, macro)
         k = series(rs, nc)
-        if v and k and k[-1] > 1 and v[-1] <= 1.15 / k[-1]:
+        # STILL at chance, not JUST at chance. On the first reading of a
+        # restarted run every head is at chance and saying so is noise; the
+        # finding is a head that has had several readings to leave it and
+        # has not. Same rule as the lift check below, for the same reason.
+        if len(v) < 3 or not k:
+            continue
+        tail = v[-min(3, len(v)):]
+        if k[-1] > 1 and max(tail) <= 1.15 / k[-1]:
             F.append(("WARN", "macro at chance",
-                      f"{stage} {macro} = {v[-1]:.4f}, chance for "
-                      f"{k[-1]:.0f} classes is {1/k[-1]:.4f}"))
+                      f"{stage} {macro} has been <= chance for "
+                      f"{len(tail)} readings (latest {v[-1]:.4f}, chance for "
+                      f"{k[-1]:.0f} classes is {1/k[-1]:.4f})"))
 
 
 def check_dead_regressions(F: List[Tuple[str, str, str]], stage: str,

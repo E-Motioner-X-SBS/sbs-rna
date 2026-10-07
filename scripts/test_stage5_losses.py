@@ -239,6 +239,19 @@ def main() -> int:
     undeclared = [k for k in parts if f"part_{k}" not in declared]
     chk("every key step_losses returns has a part_ column",
         not undeclared, f"undeclared: {undeclared or 'none'}")
+    # AND THE REVERSE. A declared column nothing writes is the same defect
+    # read the other way, and it is how `part_n_pairs` sat empty for 115
+    # rows: the key was filtered out at the `log()` call because it had no
+    # column, and declaring the column did not remove the filter. Parse the
+    # call site rather than trusting it.
+    import inspect as _inspect
+    _src = _inspect.getsource(TP.main)
+    _call = _src[_src.index('**{f"part_{k}"'):]
+    _call = _call[:_call.index("})") + 2]
+    chk("the log() call does not filter any part out of the csv",
+        " if " not in _call,
+        "a filter here silently empties a declared column: "
+        + " ".join(_call.split())[:90])
     und_val = [k for k in res if f"val_{k}" not in declared]
     chk("every key evaluate returns has a val_ column",
         not und_val, f"undeclared: {und_val or 'none'}")

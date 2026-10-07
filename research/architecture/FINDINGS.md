@@ -580,6 +580,38 @@ The gap itself survives the rename and is real: training θ error 17.0° at
 step 250 against 29.8° on validation in the same epoch. On 317 steps that is
 finding 84, not a metric artefact.
 
+## 87 — a column declared, and still nothing writing it
+
+The training watch, on its own, on the live run. Three of the four
+warnings it raised in this window were false and are fixed in the check;
+the fourth was real and was **mine, from an hour earlier**.
+
+| # | what | status |
+|---|---|---|
+| 87 | `part_n_pairs` was declared in `_PART_SCALARS` (fixing "computed every step, no column") and the `log()` call still read `for k, v in parts.items() if k != "n_pairs"`. The key had been filtered out at the call site *because* it had no column — RunLog says an undeclared key out loud, so it was silenced rather than declared — and declaring the column without removing the filter left a column nothing writes. The same defect, one layer along, introduced by the fix for it | `FIXED` |
+
+The test now **parses the call site** rather than trusting it: it extracts
+the `**{f"part_{k}": ...}` expression out of `main`'s source and asserts
+there is no ` if ` in it. Asserting "every key `step_losses` returns has a
+column" passes in both the broken and the fixed state, which is why it did
+not catch this.
+
+The run in flight has the old code loaded, so `part_n_pairs` stays empty
+for it and populates on the next.
+
+### Three false positives in the watch, and what each was
+
+| reported | verdict | fix |
+|---|---|---|
+| `base_acc` tracks `base_major`, 1.0000 vs 1.0000 | **false** — `base_n_class` is 1. The base-identity head is supervised only where identity was unassigned, and a batch can hold one base. "Predicts the majority class" is vacuous with one class | skip `n_class <= 1` |
+| five heads "macro at chance" | **false** — first reading of a restarted run, where every head is at chance | require three readings, as the lift check already did |
+| `lw_acc` tracks `lw_major` over 2 readings | **false** — same, two steps into a restart | require three readings |
+
+All three are the same mistake: reporting a true statement that is not yet
+a finding. Finding 75 held for an entire stage, so nothing real is lost by
+waiting two steps, and a watcher that fires on ordinary start-up behaviour
+is one nobody reads.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

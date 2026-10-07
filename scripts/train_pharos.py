@@ -1570,8 +1570,18 @@ def main() -> None:
                            n_oom=n_oom,
                            peak_gib=round(
                                torch.cuda.max_memory_allocated() / 2**30, 2),
+                           # No filter. `n_pairs` used to be excluded here,
+                           # because it was passed to `log()` with no column
+                           # declared for it and RunLog says an undeclared
+                           # key out loud -- so it was silenced at the call
+                           # site instead of being declared. Declaring the
+                           # column without removing this left a column that
+                           # nothing writes, which is the defect the
+                           # declaration was meant to fix, one layer along.
+                           # It is the denominator of every contact and
+                           # distance metric here and belongs in the csv.
                            **{f"part_{k}": round(float(v), 6)
-                              for k, v in parts.items() if k != "n_pairs"})
+                              for k, v in parts.items()})
                 print(f"[pharos] ep{ep} step{step} loss "
                       f"{np.mean(run[-args.log_every:]):.4f} "
                       f"{ {k: round(v, 3) for k, v in parts.items() if k != 'n_pairs'} }",
