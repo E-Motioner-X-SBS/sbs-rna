@@ -235,6 +235,14 @@ def check_lifts(F: List[Tuple[str, str, str]], stage: str,
         v = series(rs, lift)
         if len(v) < 3:
             continue
+        # ONE CLASS, NO LIFT TO HAVE. Same exemption as `check_floors`, and
+        # it was missing here: `base_lift` is exactly 0.0000 because
+        # `base_n_class` is 1, so accuracy and majority are both 1.0 by
+        # construction. Fixing the exemption in one check and not the other
+        # is how a false positive comes back wearing a different label.
+        ncl = series(rs, f"{lift[:-5]}_n_class")
+        if ncl and max(ncl[-min(5, len(v)):]) <= 1.0:
+            continue
         tail = v[-min(5, len(v)):]
         if max(tail) <= 0.0:
             F.append(("WARN", "no lift",
@@ -442,9 +450,40 @@ def main() -> int:
     warn = [f for f in F if f[0] == "WARN"]
     info = [f for f in F if f[0] == "INFO"]
 
+    # ACKNOWLEDGED FINDINGS. `watch/KNOWN` holds one `substring<TAB>reason`
+    # per line; a finding whose message contains the substring is moved to
+    # INFO instead of being dropped. It exists for the case this hit first:
+    # `part_n_pairs` was fixed in the source and the run in flight has the
+    # pre-fix code loaded, so the check is CORRECT and will stay correct for
+    # another ninety minutes. Leaving ALERT up for a known condition trains
+    # the reader to ignore it; deleting the check would blind it. An
+    # acknowledgement with a reason attached does neither.
+    known = {}
+    kf = OUT / "KNOWN"
+    if kf.exists():
+        for line in kf.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            sub, _, why = line.partition("\t")
+            known[sub.strip()] = why.strip() or "acknowledged"
+    def _ack(f):
+        for sub, why in known.items():
+            if sub and sub in f[2]:
+                return why
+        return None
+    still_crit, still_warn = [], []
+    for f in crit:
+        (still_crit if _ack(f) is None else info).append(
+            f if _ack(f) is None else ("INFO", "known", f"{f[2]}  [KNOWN: {_ack(f)}]"))
+    for f in warn:
+        (still_warn if _ack(f) is None else info).append(
+            f if _ack(f) is None else ("INFO", "known", f"{f[2]}  [KNOWN: {_ack(f)}]"))
+    crit, warn = still_crit, still_warn
     lines = [f"# training watch — {stamp}", ""]
     lines.append(f"**{len(crit)} CRIT, {len(warn)} WARN, {len(info)} INFO**"
-                 + (f", {len(broke)} CHECKS BROKEN" if broke else ""))
+                 + (f", {len(broke)} CHECKS BROKEN" if broke else "")
+                 + (f", {len(known)} acknowledged in KNOWN" if known else ""))
     lines.append("")
     for name, group in (("CRIT", crit), ("WARN", warn), ("INFO", info)):
         if not group:
