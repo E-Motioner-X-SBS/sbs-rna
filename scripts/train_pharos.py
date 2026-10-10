@@ -195,6 +195,13 @@ def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
 LENGTH_BIN_MAX = _LENGTH_BIN_MAX
 
 
+#: Chains up to this length get an EXACT all-pairs contact evaluation
+#: beside the sampled one. 320 is 50,560 pairs, which is a fraction of
+#: what the sampled path already scores across a batch, and it covers
+#: most of the corpus: the test split's mean length is 80.
+FULL_PAIR_MAX_L: int = 320
+
+
 def sample_pairs(contacts: torch.Tensor, L: int, n_neg: int,
                  device, min_sep: int = 4) -> tuple:
     """Positive contacts plus sampled negatives, for the contact head.
@@ -489,7 +496,9 @@ _PART_SCALARS = ("contact", "distance", "dist_acc", "dist_major", "dist_lift",
                  "dist_n_class", "n_pairs",
                  "torsion") + _TORSION_SCALARS
 _EVAL_KEYS = ("contact_ap", "contact_ap_lift", "contact_base_rate",
-              "contact_n", "coev_frac", "motif_eff",
+              "contact_n",
+              "contact_ap_full", "contact_ap_lift_full",
+              "contact_base_rate_full", "contact_n_full", "coev_frac", "motif_eff",
               "lw_acc", "lw_major", "lw_lift", "lw_macro", "lw_n_class",
               "structure_loss", "structure_mse", "structure_violation",
               "structure_bond_cn", "structure_bond_pp",
@@ -1081,6 +1090,22 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                 ii = torch.cat(ii_l); jj = torch.cat(jj_l)
                 yv = torch.cat(y_l); bidx = torch.cat(bi_l)
                 h = out["hidden"]
+
+                def _contact_scores(bidx_, ii_, jj_):
+                    """The contact logit for arbitrary pairs, by exactly the
+                    path the sampled evaluation uses. Factored out so the
+                    full-pair-set number below cannot drift from the sampled
+                    one by building its features differently."""
+                    pr = model.pair_proj(
+                        torch.cat([h[bidx_, ii_], h[bidx_, jj_]], -1))
+                    cv_ = lookup_coevolution(t, bidx_, ii_, jj_, Lv)
+                    if cv_ is not None:
+                        pr = pr + model.coev_proj(cv_.unsqueeze(-1).to(pr.dtype))
+                    if model.motifs is not None:
+                        r_, _ = model.motifs(pr)
+                        pr = pr + model.motif_mix(r_)
+                    return model.heads.pair.contact(pr).squeeze(-1).float()
+
                 pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], -1))
                 lwk = t.get("lw_key")
                 if lwk is not None and lwk.numel():
@@ -1113,6 +1138,47 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                     model.heads.pair.contact(pair).squeeze(-1).float().cpu().numpy())
                 pool.setdefault("contact_label", []).append(
                     (yv > 0.5).cpu().numpy())
+
+                # ---- and the SAME head on the REAL task ------------------
+                #
+                # Everything above scores a set that is ~45% positive, because
+                # `sample_pairs` takes every positive and at most 512 sampled
+                # negatives. The actual task is every pair with |i-j| >= 4,
+                # which on this corpus is **9.6%** positive. Average precision
+                # is strongly base-rate dependent, so `contact_ap = 0.89` at a
+                # 0.45 base is not comparable to a published contact-prediction
+                # number, nor to the model's own failure to fold -- and it is
+                # the number the whole "predicts contacts well, cannot build"
+                # diagnosis rests on. The comment on the sampled block even
+                # says "the positives are a few percent of sampled pairs".
+                # They are not, and nobody had computed the version where
+                # that sentence is true.
+                #
+                # Bounded by length rather than sampled, so it stays an exact
+                # measurement of a real subset instead of another estimate.
+                for b in range(Bv):
+                    Lb = int(t["lengths"][b])
+                    if Lb < 32 or Lb > FULL_PAIR_MAX_L:
+                        continue
+                    cb = t["contacts"][b]
+                    if cb is None or len(cb) == 0:
+                        continue
+                    gi, gj = torch.triu_indices(Lb, Lb, offset=4, device=device)
+                    if gi.numel() == 0:
+                        continue
+                    lab = torch.zeros(Lb, Lb, dtype=torch.bool, device=device)
+                    ok = (cb[:, 0] < Lb) & (cb[:, 1] < Lb)
+                    lab[cb[ok, 0].long(), cb[ok, 1].long()] = True
+                    lab[cb[ok, 1].long(), cb[ok, 0].long()] = True
+                    yfull = lab[gi, gj]
+                    if not bool(yfull.any()):
+                        continue
+                    bfull = torch.full((gi.numel(),), b, dtype=torch.long,
+                                       device=device)
+                    pool.setdefault("contact_score_full", []).append(
+                        _contact_scores(bfull, gi, gj).cpu().numpy())
+                    pool.setdefault("contact_label_full", []).append(
+                        yfull.cpu().numpy())
 
             # ---- HEAD 3, which had no validation metric at all -----------------
             #
@@ -1214,6 +1280,15 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
         res["contact_ap_lift"] = (round(res["contact_ap"] / base, 2)
                                   if base > 0 else None)
         res["contact_n"] = int(len(sc))
+    if "contact_score_full" in pool:
+        scf = np.concatenate(pool["contact_score_full"])
+        yyf = np.concatenate(pool["contact_label_full"])
+        bf = float(yyf.mean())
+        res["contact_base_rate_full"] = round(bf, 4)
+        res["contact_ap_full"] = round(average_precision(scf, yyf), 4)
+        res["contact_ap_lift_full"] = (round(res["contact_ap_full"] / bf, 2)
+                                       if bf > 0 else None)
+        res["contact_n_full"] = int(len(scf))
     if "mg_score" in pool:
         sc = np.concatenate(pool["mg_score"])
         yy = np.concatenate(pool["mg_label"])

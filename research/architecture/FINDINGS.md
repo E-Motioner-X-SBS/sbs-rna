@@ -1518,3 +1518,57 @@ epoch 24 of 40, and enabling a second architecture change now would
 confound it. The A/B for this one is queued behind it, and the honest
 position remains the one above — an encoder has no use for a causal mask,
 but *unforced* is not *harmful* until measured.
+
+## 107 — the contact head's headline number is measured on a 45%-positive set
+
+| # | what | status |
+|---|---|---|
+| 107 | `contact_ap = 0.8901` is computed on pairs from `sample_pairs`, which takes **every** positive plus at most 512 sampled negatives. That set is **45.4% positive**. The task — every pair with \|i−j\| ≥ 4 — is **9.6% positive** on this corpus. Average precision is strongly base-rate dependent, so the two numbers are not the same quantity | `FIXED` (the real metric is now computed) |
+
+This matters more than a mis-stated metric usually would, because
+**0.885–0.890 is the number the project's central diagnosis rests on**:
+finding 92 is titled *"the model predicts contacts well and never uses
+them to build"*, and the gap between that and TM 0.094 is what sent the
+search into the decoder. If the head is not in fact predicting contacts
+well on the real task, the diagnosis needs revisiting.
+
+The sampled block's own comment says *"the positives are a few percent
+of sampled pairs"*. They are 45.4%. The code and its description had
+drifted, in the direction that flatters.
+
+### What the floor actually is
+
+Measured on 200 test chains (mean length 80), all pairs with \|i−j\| ≥ 4:
+
+| predictor | mean AP |
+|---|---|
+| base rate (chance) | 0.0961 |
+| −\|i−j\| — sequence separation only | 0.1209 |
+| `deg_i · deg_j` — how many partners each residue has, not **who** | **0.3005** |
+| `deg_i·deg_j/(1+\|i−j\|)` — both, still partner-blind | 0.2354 |
+
+This was built to test a hypothesis — that the head scores well by
+predicting *which residues are paired* without knowing *with whom*,
+which an outer-sum pair feature `A s_i + B s_j` can do and which would
+have explained AP 0.89 beside TM 0.09 neatly. **The hypothesis is
+refuted.** A partner-blind oracle, given the true degrees, reaches only
+0.30. The head's 0.89 is far above that, so it does carry genuine
+pairing-partner information. Recorded because a refuted hypothesis costs
+the same to test as a confirmed one and is worth exactly as much.
+
+### The fix
+
+`evaluate()` now computes the same head's score on **every** pair with
+\|i−j\| ≥ 4 for chains up to `FULL_PAIR_MAX_L = 320`, through a closure
+that shares the sampled path's feature construction exactly — pair
+projection, coevolution lookup and motif mixture — so the two cannot
+drift by building features differently. It reports `contact_ap_full`,
+`contact_base_rate_full`, `contact_ap_lift_full` and `contact_n_full`
+beside the sampled four. Bounded by length rather than sampled again, so
+it is an exact measurement of a real subset instead of a second
+estimate; 320 is 50,560 pairs and the test split's mean length is 80.
+
+**The number itself is not yet known** — it needs a GPU, and the card is
+occupied. `contact_ap_full` on the existing checkpoint is the first thing
+to read when one frees, and it is the number that decides whether
+finding 92 still says what it says.

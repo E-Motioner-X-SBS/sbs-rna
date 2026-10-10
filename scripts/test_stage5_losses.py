@@ -295,6 +295,48 @@ def main() -> int:
                 f"unprotected after it -- a guard around half a step is "
                 f"a guard around nothing")
 
+    # ---- the contact metric must be reported on the real task too -------
+    # `sample_pairs` takes EVERY positive plus at most 512 negatives, so the
+    # set it builds is around 45% positive while the task -- every pair with
+    # |i-j| >= 4 -- is 9.6% positive on this corpus. Average precision is
+    # strongly base-rate dependent, so `contact_ap = 0.89` at base 0.45 is
+    # not the number it reads as, and it is the number the project's whole
+    # "predicts contacts well, cannot build" diagnosis rests on.
+    print("\n== the sampled contact set is not the contact task ==")
+    import train_pharos as _tp
+
+    _Lc = 256
+    torch.manual_seed(0)
+    # a plausible RNA contact load: ~4.5 partners per nucleotide
+    n_true = int(4.5 * _Lc / 2)
+    ci = torch.randint(0, _Lc - 8, (n_true,))
+    cj = (ci + torch.randint(4, 40, (n_true,))).clamp(max=_Lc - 1)
+    keep = (cj - ci) >= 4
+    con = torch.stack([ci[keep], cj[keep]], dim=1)
+
+    _, _, y = _tp.sample_pairs(con, _Lc, 512, torch.device("cpu"))
+    sampled_base = float(y.mean())
+    n_all = _Lc * (_Lc - 1) // 2 - sum(_Lc - d for d in range(1, 4))
+    true_base = len(con) / n_all
+
+    chk("the sampled evaluation set is NOT at the task's base rate",
+        sampled_base > 3 * true_base,
+        f"sampled {sampled_base:.3f} against the all-pairs {true_base:.3f} "
+        f"-- a {sampled_base/true_base:.1f}x inflation, and AP moves with it")
+
+    chk("evaluate declares a full-pair-set contact metric beside it",
+        all(k in _tp._EVAL_KEYS for k in
+            ("contact_ap_full", "contact_base_rate_full",
+             "contact_ap_lift_full", "contact_n_full")),
+        "the sampled number alone is not comparable to any published "
+        "contact-prediction result, nor to the model's failure to fold")
+
+    chk("and bounds its cost by chain length rather than sampling again",
+        isinstance(getattr(_tp, "FULL_PAIR_MAX_L", None), int)
+        and 64 <= _tp.FULL_PAIR_MAX_L <= 1024,
+        f"FULL_PAIR_MAX_L = {getattr(_tp, 'FULL_PAIR_MAX_L', None)}; an exact "
+        f"measurement of a real subset beats another estimate of all of it")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
