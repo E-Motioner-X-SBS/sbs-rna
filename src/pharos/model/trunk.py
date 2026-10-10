@@ -76,6 +76,11 @@ class TrunkConfig:
     #: bottleneck at small batch is kernel launch and memory bandwidth, not
     #: arithmetic. Measured in `scripts/bench_memory.py`.
     grad_checkpoint: bool = False
+    #: Finding 103. Run each `gdn` block's scan in both directions and sum
+    #: them through a zero-initialised per-head gate. Default OFF so no
+    #: existing run changes; it costs `n_heads` parameters per gdn block
+    #: (144 at shared400) and roughly doubles the gdn blocks' time.
+    bidirectional_gdn: bool = False
 
     def block_kinds(self) -> List[str]:
         return [self.pattern[i % len(self.pattern)] for i in range(self.n_blocks)]
@@ -88,7 +93,8 @@ class TrunkBlock(nn.Module):
         super().__init__()
         self.kind = kind
         self.norm = nn.LayerNorm(cfg.d_model)
-        self.mixer = make_mixer(kind, cfg.d_model, cfg.n_heads, cfg.window, cfg.dropout)
+        self.mixer = make_mixer(kind, cfg.d_model, cfg.n_heads, cfg.window,
+                                cfg.dropout, cfg.bidirectional_gdn)
         # Either flavour, chosen by the config object's type rather than by a
         # flag: a SharedMoEConfig can only mean shared-adapter experts, so there
         # is no way to pass one and get the other.

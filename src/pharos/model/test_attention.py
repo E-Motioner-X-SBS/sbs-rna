@@ -147,6 +147,73 @@ def main() -> int:
         (len(two), two.count("gdn"), two.count("swa"), two.count("full")) == (16, 10, 4, 2),
         f"{two.count('gdn')}/{two.count('swa')}/{two.count('full')}")
 
+    # ---- finding 103: the trunk is two-thirds causal ---------------------
+    print("\n== gdn is causal, and PHAROS is an encoder ==")
+    _L, _d, _h = 48, 64, 4
+    torch.manual_seed(0)
+    _x = torch.randn(1, _L, _d)
+    _m = torch.ones(1, _L, dtype=torch.bool)
+
+    def _right_dep(mod):
+        """Scramble the RIGHT half of the input; how much does the LEFT
+        half of the output move? Zero means the block cannot see forward."""
+        mod.eval()
+        with torch.no_grad():
+            o0 = mod(_x, mask=_m)
+            x2 = _x.clone()
+            x2[0, _L // 2:] = torch.randn(_L - _L // 2, _d)
+            o1 = mod(x2, mask=_m)
+        return float((o1 - o0)[0, :_L // 2].abs().max())
+
+    torch.manual_seed(1); uni = GatedDeltaNet(_d, _h, dropout=0.0)
+    torch.manual_seed(1); bi = GatedDeltaNet(_d, _h, dropout=0.0,
+                                             bidirectional=True)
+    chk("gdn as shipped cannot see to its right AT ALL",
+        _right_dep(uni) == 0.0,
+        "exactly 0; twelve of eighteen trunk blocks are this mixer, so a "
+        "nucleotide reaches a partner >128 nt to its right only through "
+        "the two full blocks")
+
+    with torch.no_grad():
+        uni.eval(); bi.eval()
+        d0 = float((uni(_x, mask=_m) - bi(_x, mask=_m)).abs().max())
+    chk("bidirectional is BIT-IDENTICAL at its zero init",
+        d0 == 0.0,
+        f"max |delta| {d0:.3e} -- a loaded checkpoint must not move when "
+        f"this is switched on, the same discipline as bias_scale")
+    chk("and costs exactly n_heads parameters",
+        sum(p.numel() for p in bi.parameters())
+        - sum(p.numel() for p in uni.parameters()) == _h,
+        f"+{_h}: the projections are SHARED between directions, because a "
+        f"direction is a reading order and not a different feature set")
+
+    with torch.no_grad():
+        bi.bwd_scale.fill_(0.5)
+    chk("with the gate open it really is bidirectional",
+        _right_dep(bi) > 1e-3,
+        f"left-half change {_right_dep(bi):.4e} against exactly 0 for the "
+        f"causal form")
+
+    # padding must not leak: reversing a right-padded row puts the pads first
+    _Lv = 30
+    xp = torch.randn(1, _L, _d); xp[0, _Lv:] = 0.0
+    mp = torch.zeros(1, _L, dtype=torch.bool); mp[0, :_Lv] = True
+    with torch.no_grad():
+        pad_run = bi(xp, mask=mp)[0, :_Lv]
+        short_run = bi(xp[:, :_Lv], mask=mp[:, :_Lv])[0]
+    chk("the reversed scan is exactly padding-safe",
+        float((pad_run - short_run).abs().max()) == 0.0,
+        f"max |delta| {float((pad_run - short_run).abs().max()):.3e} between "
+        f"a right-padded row and the same row unpadded -- reversal turns "
+        f"trailing pads into leading ones")
+
+    bi.train(); bi.zero_grad(); bi.bwd_scale.data.zero_()
+    bi(_x, mask=_m).sum().backward()
+    chk("the gate takes gradient at its CLOSED init, so it can open itself",
+        float(bi.bwd_scale.grad.abs().max()) > 0.0,
+        f"|grad| {float(bi.bwd_scale.grad.abs().max()):.3e} -- a gate that "
+        f"starts at zero and has no gradient there is finding 64's shape")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

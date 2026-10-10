@@ -86,6 +86,10 @@ class PharosConfig:
     #: Mean nucleus-routing width, for the ACTIVE parameter count only. See
     #: `SharedMoEConfig.typical_width`; `None` falls back to `max_k // 4`.
     typical_width: Optional[float] = None
+    #: Finding 103: make the twelve causal `gdn` blocks bidirectional.
+    #: Default OFF; zero-gated, so turning it on does not change a loaded
+    #: checkpoint's forward pass.
+    bidirectional_gdn: bool = False
 
     @classmethod
     def shared400(cls) -> "PharosConfig":
@@ -189,6 +193,7 @@ class PharosConfig:
         return TrunkConfig(grad_checkpoint=self.grad_checkpoint, 
             d_model=self.d_model, n_blocks=self.n_blocks, n_loops=self.n_loops,
             n_heads=self.n_heads, window=self.window, dropout=self.dropout,
+            bidirectional_gdn=self.bidirectional_gdn,
             moe=(SharedMoEConfig(
                     d_model=self.d_model, d_expert=self.d_expert,
                     n_experts=self.n_experts, n_shared=self.n_shared,

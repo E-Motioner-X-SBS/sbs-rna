@@ -1297,7 +1297,7 @@ historical run records, which are left as they were written.
 
 | # | what | status |
 |---|---|---|
-| 103 | 12 of the trunk's 18 blocks are `GatedDeltaNet`, which is **strictly causal**. PHAROS is an encoder, not a language model, and nothing in the task calls for a causal mask | `DECLARED` — the fact is measured, the consequence is not |
+| 103 | 12 of the trunk's 18 blocks are `GatedDeltaNet`, which is **strictly causal**. PHAROS is an encoder, not a language model, and nothing in the task calls for a causal mask | `FIX BUILT, OFF BY DEFAULT` — the fact is measured, the consequence is not |
 
 `BLOCK_PATTERN` is `(gdn, gdn, swa, gdn, gdn, swa, gdn, full)` tiled to 18,
 giving `G G S G G S G F G G S G G S G F G G`: twelve `gdn`, four `swa`
@@ -1488,3 +1488,33 @@ screened-Coulomb term, as delivered through two full-attention blocks of
 eighteen, is not something this model finds useful at this scale of
 training. Recorded so the next person does not rediscover the tempting
 fix and ship it.
+
+### 103, continued — the fix, built and not yet enabled
+
+`GatedDeltaNet(bidirectional=True)` runs the same scan over the reversed
+sequence and adds it back through a per-head gate. The projections are
+**shared** between the two directions, because a direction is a reading
+order and not a different feature set, so the entire cost is `n_heads`
+parameters per `gdn` block — **+144** at shared400, taking the total from
+395,295,754 to 395,295,898. The output gate and output projection apply
+once, to the combined signal.
+
+Four properties, all pinned in `test_attention.py`:
+
+| property | measured |
+|---|---|
+| bit-identical at its zero init | `0.000e+00` |
+| genuinely bidirectional once open | left-half change `1.21e-01` against exactly 0 |
+| exactly padding-safe | `0.000e+00` padded vs unpadded |
+| gate takes gradient at closed init | `5.52` |
+
+Padding needs no special handling: the scan already multiplies `b` by the
+mask so a pad writes nothing and forces `a` to 1 so a pad forgets
+nothing, which makes right-padding-reversed-to-left-padding a no-op.
+
+`bidirectional_gdn` defaults to **False** on `PharosConfig` and
+`TrunkConfig`. It is off deliberately: finding 100's A/B is mid-flight at
+epoch 24 of 40, and enabling a second architecture change now would
+confound it. The A/B for this one is queued behind it, and the honest
+position remains the one above — an encoder has no use for a causal mask,
+but *unforced* is not *harmful* until measured.

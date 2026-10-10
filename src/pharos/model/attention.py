@@ -61,7 +61,8 @@ class GatedDeltaNet(nn.Module):
     """
 
     def __init__(self, d_model: int, n_heads: int = 8, d_head: Optional[int] = None,
-                 chunk: int = 128, dropout: float = 0.0):
+                 chunk: int = 128, dropout: float = 0.0,
+                 bidirectional: bool = False):
         # chunk 128, measured. The cost has two terms pulling opposite ways:
         # L/chunk sequential iterations, each with O(chunk^2) within-chunk work.
         # At d=512, L=1024: 64 -> 13.4 ms, **128 -> 8.8 ms**, 256 -> 12.7,
@@ -83,9 +84,26 @@ class GatedDeltaNet(nn.Module):
         # start near "remember everything, write moderately"
         nn.init.constant_(self.a.bias, 3.0)
         nn.init.constant_(self.b.bias, 0.0)
+        #: Finding 103. The recurrence above is strictly left-to-right, and
+        #: twelve of the trunk's eighteen blocks are this mixer, so two
+        #: thirds of the trunk cannot see to its right. PHAROS is an
+        #: ENCODER -- nothing in the task asks for a causal mask; it is
+        #: inherited from language-model architectures. When
+        #: `bidirectional`, the same scan also runs over the reversed
+        #: sequence and is added back through a per-head gate.
+        #:
+        #: The projections are SHARED between the two directions, so the
+        #: whole cost is `n_heads` parameters: a direction is a reading
+        #: order, not a different feature set. `bwd_scale` is
+        #: zero-initialised, so a loaded checkpoint's forward pass is
+        #: bit-identical until the backward pass earns its way in -- the
+        #: same discipline as `bias_scale` and `GeometricBias.proj`.
+        self.bidirectional = bidirectional
+        self.bwd_scale = (nn.Parameter(torch.zeros(n_heads))
+                          if bidirectional else None)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None,
-                **_) -> torch.Tensor:
+    def _scan(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+              ) -> torch.Tensor:
         """Chunkwise-parallel evaluation of the recurrence in the class docstring.
 
         The rearrangement, which `test_attention.py` checks against a
@@ -162,8 +180,32 @@ class GatedDeltaNet(nn.Module):
             outs.append(o)
             S = (S + torch.einsum("bhid,bhie->bhde", kc, Up)) * g[..., -1:].unsqueeze(-1)
 
-        o = torch.cat(outs, dim=2)[:, :, :L]
-        o = _merge(o) * torch.sigmoid(self.g(x))
+        return _merge(torch.cat(outs, dim=2)[:, :, :L])
+
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None,
+                **_) -> torch.Tensor:
+        """One scan, or two in opposite directions summed through a gate.
+
+        The output gate and the output projection are applied ONCE, to the
+        combined signal, so the backward pass is an extra reading of the
+        same sequence rather than a second mixer bolted alongside.
+
+        Reversal is safe against padding because padding is already a no-op
+        in the scan -- `b` is multiplied by the mask so a pad writes nothing,
+        and `a` is forced to 1 so a pad forgets nothing. Right-padding
+        reversed becomes left-padding and is still a no-op, which is why
+        this needs no per-sequence roll.
+        """
+        o = self._scan(x, mask)
+        if self.bwd_scale is not None:
+            xr = torch.flip(x, dims=[1])
+            mr = None if mask is None else torch.flip(mask, dims=[1])
+            ob = torch.flip(self._scan(xr, mr), dims=[1])
+            B, L, _ = ob.shape
+            ob = ob.view(B, L, self.h, self.dk) * \
+                self.bwd_scale.to(ob.dtype).view(1, 1, -1, 1)
+            o = o + ob.reshape(B, L, self.h * self.dk)
+        o = o * torch.sigmoid(self.g(x))
         return self.drop(self.out(o))
 
 
@@ -257,9 +299,10 @@ BLOCK_PATTERN: Tuple[str, ...] = ("gdn", "gdn", "swa", "gdn", "gdn", "swa", "gdn
 
 
 def make_mixer(kind: str, d_model: int, n_heads: int, window: int,
-               dropout: float) -> nn.Module:
+               dropout: float, bidirectional_gdn: bool = False) -> nn.Module:
     if kind == "gdn":
-        return GatedDeltaNet(d_model, n_heads, dropout=dropout)
+        return GatedDeltaNet(d_model, n_heads, dropout=dropout,
+                             bidirectional=bidirectional_gdn)
     if kind == "swa":
         return SlidingWindowAttention(d_model, n_heads, window, dropout)
     if kind == "full":
