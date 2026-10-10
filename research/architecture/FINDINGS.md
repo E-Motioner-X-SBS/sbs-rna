@@ -1082,6 +1082,52 @@ change rather than a line.
 | 6 fitness (co-trained) | **97 OPEN** — worse after epoch 2 than epoch 1 |
 | all stages | **68 DECLARED** — one router conditioning channel is permanently zero |
 
+## 99 — editing a shell script while a shell is running it
+
+| # | what | status |
+|---|---|---|
+| 99 | The pipeline driver died **after stage 5 completed**, before prediction, with `unexpected EOF while looking for matching '"'`. The file on disk parsed clean. The cause was that I applied finding 95's fix to `run_fresh.sh` **while bash was executing it** | `FIXED` |
+
+Bash does not read a script into memory — it reads it incrementally by
+**byte offset**, re-seeking as it goes. An in-place rewrite moves every
+byte after the edit, so when the running interpreter next reads, it
+resumes at a position that is now the middle of a different token. Stage 5
+took 6,205 s; the edit landed somewhere in the middle of that, and the
+script only tripped over it when the long command finally returned and
+bash went looking for the next one.
+
+Nothing was lost — the checkpoint (10:32), the results JSON (10:33) and
+the family-disjoint test evaluation all landed before the crash, because
+they are the trainer's work and not the driver's. The remaining steps were
+run from a **new** script rather than by repairing the old one, which is
+the rule: a script a shell is currently executing is immutable until that
+shell exits.
+
+It is worth separating from finding 95, which it looks like but is not.
+95 was a logic error in the driver — `if cmd; then ... fi` returning 0 and
+swallowing a failed gate. 99 is the *act of fixing* 95 breaking the run it
+was fixing. The fix was right; applying it live was not.
+
+### The run it interrupted, completed
+
+Stage 5, 40/40 epochs, 3,069 optimiser steps, zero OOMs, on the
+post-revert architecture. 17 RNA-Puzzles targets:
+
+| | this run | arm A | first run | field median |
+|---|---|---|---|---|
+| mean TM | **0.0936** | 0.0890 | 0.0913 | 0.3013 |
+| mean lDDT | **0.2690** | 0.2550 | 0.2765 | — |
+| P–P median | 5.53–6.43 Å | — | — | true 5.95 |
+| beats field median | 0/17 | 0/17 | 0/17 | — |
+
+Three runs at identical settings now read 0.0890 / 0.0913 / 0.0936 — a
+spread of 0.0046, against the ~0.0023 init-RNG noise floor measured
+between two of them. **Nothing has moved.** Local geometry is right and
+the fold is wrong, which is where finding 93 left it and where it stays
+until the decoder-capacity or sampler hypothesis is tested.
+
+Re-verify after the run: **ALL CLAIMS REPRODUCE**, zero failures.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's
