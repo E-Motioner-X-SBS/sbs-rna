@@ -35,7 +35,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from pharos.data.msa import (alignment_for, apc_mutual_information,  # noqa: E402
+from pharos.data.msa import (full_alignment_rows, alignment_for, apc_mutual_information,  # noqa: E402
                              encode_msa, sequence_weights)
 
 MANIFEST = ROOT / "data/derived/pharos3d/manifest.json"
@@ -87,8 +87,11 @@ def top_couplings(mi: np.ndarray, per_column: int, min_sep: int
 
 
 def run(families: List[str], per_column: int, min_sep: int,
-        max_rows: int, force: bool) -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+        max_rows: int, force: bool, prefer_full: bool = False,
+        out: Path = OUT) -> None:
+    OUT_ = out
+    globals()["OUT"] = out
+    OUT_.mkdir(parents=True, exist_ok=True)
     index: Dict[str, Dict] = {}
     idx_path = OUT / "index.json"
     if idx_path.exists() and not force:
@@ -100,10 +103,24 @@ def run(families: List[str], per_column: int, min_sep: int,
         dest = OUT / f"{safe}.npz"
         if dest.exists() and not force:
             continue
-        rows = alignment_for(fam)
+        # Finding 112: the FULL alignment where one exists, the seed
+        # otherwise. Chain-weighted, 67.2% of family-assigned chains sit
+        # behind an effective depth under Neff 50 and the median family
+        # reads 4.0, which is noise; the full alignments lift the families
+        # that have one by 16x to 35x. The families that dominate the
+        # corpus (SSU/LSU rRNA, tRNA) have none, which is why this is a
+        # union and not a replacement.
+        source = "seed"
+        rows = None
+        if prefer_full:
+            rows = full_alignment_rows(fam, max_rows)
+            if rows:
+                source = "full"
+        if not rows:
+            rows = alignment_for(fam)
         if not rows:
             index[fam] = {"status": "no_alignment"}
-            print(f"[{n}/{len(families)}] {fam}: no seed alignment", flush=True)
+            print(f"[{n}/{len(families)}] {fam}: no alignment", flush=True)
             continue
         t0 = time.time()
         msa = encode_msa(rows)
@@ -115,10 +132,14 @@ def run(families: List[str], per_column: int, min_sep: int,
         w = sequence_weights(msa)
         mi = apc_mutual_information(msa, w)
         pairs, score = top_couplings(mi, per_column, min_sep)
+        # `source` is load-bearing: the pairs are indices into the
+        # alignment they were computed from, and `coevolution_pairs` must
+        # map them onto a chain through that same one.
         np.savez_compressed(dest, pairs=pairs, score=score,
                             n_cols=np.int32(msa.shape[1]),
-                            n_rows=np.int32(msa.shape[0]))
-        index[fam] = {"status": "ok", "file": dest.name,
+                            n_rows=np.int32(msa.shape[0]),
+                            source=np.str_(source))
+        index[fam] = {"status": "ok", "file": dest.name, "source": source,
                       "n_rows": int(msa.shape[0]), "n_cols": int(msa.shape[1]),
                       "n_pairs": int(len(pairs)),
                       "neff": round(float(w.sum()), 1),
@@ -132,7 +153,12 @@ def run(families: List[str], per_column: int, min_sep: int,
     ok = sum(1 for v in index.values() if v.get("status") == "ok")
     print(f"\n[coev] {ok} families cached, {len(index)-ok} without an alignment, "
           f"{time.time()-t_start:.0f}s total")
-    print(f"[coev] -> {OUT.relative_to(ROOT)}")
+    # `--out` may be given relative to the CWD, which is not ROOT.
+    try:
+        _shown = OUT.resolve().relative_to(ROOT)
+    except ValueError:
+        _shown = OUT.resolve()
+    print(f"[coev] -> {_shown}")
 
 
 def main() -> int:
@@ -147,6 +173,15 @@ def main() -> int:
     ap.add_argument("--max-rows", type=int, default=2000,
                     help="subsample alignments deeper than this")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--prefer-full", action="store_true",
+                    help="finding 112: use a family's FULL alignment when one "
+                         "exists, seed otherwise. Lifts the families that "
+                         "have one by 16x-35x in effective depth.")
+    ap.add_argument("--out", type=lambda x: Path(x).resolve(), default=OUT,
+                    help="cache directory. Write a --prefer-full build to a "
+                         "SEPARATE directory and select it with "
+                         "PHAROS_COEV_CACHE: swapping the feature under a "
+                         "trained checkpoint is an A/B, not a fix.")
     args = ap.parse_args()
 
     if args.family:
@@ -160,7 +195,8 @@ def main() -> int:
         # partial run still covers the chains that matter most
         fams = [f for f, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
         print(f"[coev] {len(fams)} families covering {sum(counts.values()):,} chains")
-    run(fams, args.per_column, args.min_sep, args.max_rows, args.force)
+    run(fams, args.per_column, args.min_sep, args.max_rows,
+        args.force, prefer_full=args.prefer_full, out=args.out)
     return 0
 
 

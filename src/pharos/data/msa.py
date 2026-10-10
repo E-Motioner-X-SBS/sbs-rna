@@ -431,18 +431,34 @@ def coevolution_matrix(family: str, query: str,
 # 1,980-column rRNA is the difference between 8k pairs and 3.9M mostly-noise
 # entries.
 
-CACHE = ROOT / "data/derived/coevolution"
+#: Which coevolution cache to read. `PHAROS_COEV_CACHE` selects an
+#: alternative build -- the union cache from finding 112 lives in
+#: `coevolution_full/` and is NOT the default, because switching the
+#: feature under a trained checkpoint is an A/B and not a fix.
+import os as _os
+CACHE = ROOT / _os.environ.get("PHAROS_COEV_CACHE", "data/derived/coevolution")
 
 
 @lru_cache(maxsize=512)
 def _cached_family(family: str):
-    """`(pairs (n,2), score (n,))` in ALIGNMENT-column indices, or None."""
+    """`(pairs (n,2), score (n,), source)` in ALIGNMENT-column indices.
+
+    `source` says WHICH alignment those column indices belong to, and it
+    is load-bearing. The pairs are indices into the alignment they were
+    computed from, and `coevolution_pairs` has to map them onto a chain
+    through that same alignment: 5S_rRNA's full alignment has 120 match
+    columns against the seed's 230, so reading full-built pairs through
+    seed columns attaches couplings to the wrong nucleotides -- silently,
+    and in exactly the way this module's docstring warns about. Caches
+    written before this field default to "seed", which is what they are.
+    """
     f = CACHE / f"{family.replace('/', '_')}.npz"
     if not f.exists():
         return None
     try:
         z = np.load(f)
-        return z["pairs"], z["score"]
+        src = str(z["source"]) if "source" in z.files else "seed"
+        return z["pairs"], z["score"], src
     except (OSError, ValueError, KeyError):
         return None
 
@@ -507,13 +523,16 @@ def coevolution_pairs(family: str, query: str, top_k: Optional[int] = None
     got = _cached_family(family)
     if got is None:
         return None
-    rows = alignment_for(family)
+    pairs, score, source = got
+    # THE ALIGNMENT THE PAIRS WERE COMPUTED FROM, not whichever one is
+    # cheapest to reach. See `_cached_family`.
+    rows = (full_alignment_rows(family) if source == "full"
+            else alignment_for(family))
     if not rows:
         return None
     cols = map_to_query(rows, query)          # (L,) alignment column per residue
     if cols is None:
         return None
-    pairs, score = got
 
     # invert: alignment column -> residue index, -1 where this chain has a gap
     n_cols = int(max(pairs.max(initial=0), cols.max(initial=0))) + 1
