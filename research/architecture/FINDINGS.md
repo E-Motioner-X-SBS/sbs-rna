@@ -993,6 +993,54 @@ uses `if cmd; then ...; else ...; exit 1; fi`, which is correct. This was
 my scratchpad driver, and it had already mis-reported `FAIL reverify2
 rc=0` the day before; I read that as cosmetic and it was not.
 
+## 96–97 — auditing stages 2, 3 and 4
+
+§12.1's **stage 4 is "physics — closed form, no stage"**: there is no
+stage-4 training run, and that term is already independently validated
+against `md_rnaions` (findings 80–81, agreement to 1 part in 10⁴). So the
+audit is of stages 2, 3 and the co-trained 6.
+
+**Both working heads check out.**
+
+| stage | head | result | floor | verdict |
+|---|---|---|---|---|
+| 2 secondary structure | 4 | val acc **0.5897**, macro **0.2810**, gap **−0.0197** | majority 0.5321, chance macro 0.1250 | **lift +0.0576, macro 2.25× chance**, and the negative gap means val beat train |
+| 3 chemical probing | 5 | Pearson **0.4262** over 1,813 batches | — | learning |
+
+Measured directly off the corpus to settle the macro: the bpRNA validation
+split is 1,330 rows / 173,729 characters with **all 8 symbols present**
+(`.` 53.7%, `(` and `)` 22.5% each, `[`/`]` 0.63%, `{`/`}` 0.02%, `<`
+0.005%), so chance is 0.1250. The run's reported `ss_val_majority` of
+0.5321 against a true 0.5368 is sampling over 7 validation batches.
+
+`probing_passes: 0` against 1,813 batches pulled is the documented
+artefact, not a defect: a pass is credited only when a generator runs out,
+and the longest stream finishes exactly as the loop stops.
+
+| # | what | status |
+|---|---|---|
+| 96 | `ss_val_macro_recall` is reported with **no class count**, while every other head in the tree reports `*_n_class` beside its macro — `lw_n_class`, `motif_n_class`, `dist_n_class`, `base_n_class`. Chance is 1/n_class, so the metric is unreadable alone: **0.2810 is 2.25× chance over 8 classes and BELOW chance over 3**, and nothing in the log said which. `ss_step` already computes `present = cnt > 0` — the mask it averages over — so the number existed and was discarded | `FIXED` |
+| 97 | Stage 6's fitness head is **worse after the second epoch than after the first**: val Spearman **+0.6044 → +0.5073**, transfer **+0.0850 → +0.0068**. Not overfitting — train rho 0.4266 is *below* val 0.5073 | `OPEN` |
+
+96 is fixed by returning the count `ss_step` already had and declaring
+`ss_n_class` / `ss_val_n_class`. Verified on synthetic input: 3 distinct
+symbols → `n_class` 3, 7 → 7.
+
+**97's most consistent explanation is the warm restart**, and I am not
+claiming more than that. Epoch 1 *is* the restarted epoch — the run
+resumed a checkpoint that had annealed a ~541-step cosine to 3.4e-06 into
+a 3,626-step schedule evaluating 2.8e-04 at that step. The within-epoch
+trajectory matches: fitness rho fell +0.6617 → +0.2475 by step 900 and
+recovered only to ~+0.53 by step 1400. So 1,813 steps did not buy back
+what the restart cost, and the transfer number — already the weakest thing
+in the model — took the worst of it, falling 12×.
+
+What would settle it is re-running epoch 1 from the epoch-0 checkpoint
+without a schedule change, which needs the card. The schedule guard added
+with finding 95's sibling now prints the before/after rate and the ratio,
+so a future resume of this shape announces itself instead of being
+reconstructed afterwards from three metrics drifting.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's

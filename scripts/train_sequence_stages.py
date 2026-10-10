@@ -625,7 +625,7 @@ def ss_step(model, seqs, ss, device, feats_fn
     lg = out["ss_logits"].float()
     valid = (y >= 0) & b["mask"]
     if not bool(valid.any()):
-        return None, 0.0, 0.0, 0.0
+        return None, 0.0, 0.0, 0.0, 0
     loss = F.cross_entropy(lg[valid], y[valid])
     with torch.no_grad():
         pred, tgt = lg[valid].argmax(-1), y[valid]
@@ -637,7 +637,16 @@ def ss_step(model, seqs, ss, device, feats_fn
         hit = torch.bincount(tgt[pred == tgt], minlength=k).float()
         macro = (float((hit[present] / cnt[present]).mean())
                  if bool(present.any()) else 0.0)
-    return loss + out["aux"]["balance_loss"], acc, major, macro
+        # MACRO RECALL IS UNREADABLE WITHOUT ITS CLASS COUNT. Chance is
+        # 1/n_class, and `present` is already the mask this function averages
+        # over, so the number was computed here and thrown away. Reported,
+        # `ss_val_macro_recall` 0.2810 is 2.25x chance over 8 classes; absent,
+        # it is indistinguishable from BELOW chance over 3 -- the whole
+        # interpretation turns on a count the log did not carry, and settling
+        # it took a pass over the corpus. Every other head in the tree reports
+        # `*_n_class` beside its macro; this one did not. Finding 96.
+        n_class = int(present.sum())
+    return loss + out["aux"]["balance_loss"], acc, major, macro, n_class
 
 
 def probing_step(model, seqs, react, kinds, device, feats_fn):
@@ -900,7 +909,7 @@ def main() -> None:
     # from it, so the record and the row cannot drift apart again.
     runlog = RunLog(ROOT, "stage23_seq", [
         "gstep", "lr", "ss_loss", "ss_accuracy",
-        "ss_majority", "ss_macro_recall",
+        "ss_majority", "ss_macro_recall", "ss_n_class", "ss_val_n_class",
         "ss_val_loss", "ss_val_accuracy", "ss_val_majority",
         "ss_val_macro_recall", "ss_val_lift", "ss_generalisation_gap",
         "ss_val_batches", "probing_loss", "probing_pearson",
@@ -979,6 +988,7 @@ def main() -> None:
         ss_loss, ss_acc, pr_loss, pr_r, step = [], [], [], [], 0
         ss_major: List[float] = []
         ss_macro: List[float] = []
+        ss_ncl: List[float] = []
         fit_loss: List[float] = []
         fit_r: List[float] = []
         fit_sd: List[float] = []
@@ -1002,7 +1012,7 @@ def main() -> None:
             try:
                 seqs, ss = next(gen_ss)
                 with torch.autocast("cuda", dtype=torch.bfloat16):
-                    l, a, a_maj, a_mac = ss_step(model, seqs, ss, device,
+                    l, a, a_maj, a_mac, a_ncl = ss_step(model, seqs, ss, device,
                                                  feats_fn)
                 if l is not None:
                     total = STAGE_WEIGHTS["ss"] * l
@@ -1011,6 +1021,7 @@ def main() -> None:
                     ss_acc.append(a)
                     ss_major.append(a_maj)
                     ss_macro.append(a_mac)
+                    ss_ncl.append(a_ncl)
             except StopIteration:
                 done_ss = True
             # stage 3
@@ -1157,6 +1168,7 @@ def main() -> None:
                            # `ss_step` returns it, and it was going nowhere.
                            ss_majority=_m(ss_major, args.log_every),
                            ss_macro_recall=_m(ss_macro, args.log_every),
+                           ss_n_class=_m(ss_ncl, args.log_every),
                            probing_loss=_m(pr_loss, args.log_every),
                            probing_pearson=_m(pr_r, args.log_every),
                            fitness_loss=_m(fit_loss, args.log_every),
@@ -1192,7 +1204,7 @@ def main() -> None:
         # A split that exists and is never read is not a split. Run at every
         # epoch, capped so it costs a fraction of one, and reported beside the
         # training figure so the GAP is the thing on the page.
-        vs_loss, vs_acc, vs_major, vs_macro = [], [], [], []
+        vs_loss, vs_acc, vs_major, vs_macro, vs_ncl = [], [], [], [], []
         model.eval()
         with torch.no_grad():
             for vb, (vseq, vdot) in enumerate(
@@ -1206,6 +1218,7 @@ def main() -> None:
                 vs_acc.append(float(r[1]))
                 vs_major.append(float(r[2]))
                 vs_macro.append(float(r[3]))
+                vs_ncl.append(float(r[4]))
         model.train()
 
         # ---- stage 6: unseen variants, then an unseen construct family ----
@@ -1255,8 +1268,10 @@ def main() -> None:
                      "ss_val_batches": len(vs_acc),
                      "ss_majority": float(np.mean(ss_major)) if ss_major else None,
                      "ss_macro_recall": float(np.mean(ss_macro)) if ss_macro else None,
+                     "ss_n_class": float(np.mean(ss_ncl)) if ss_ncl else None,
                      "ss_val_majority": float(np.mean(vs_major)) if vs_major else None,
                      "ss_val_macro_recall": float(np.mean(vs_macro)) if vs_macro else None,
+                     "ss_val_n_class": float(np.mean(vs_ncl)) if vs_ncl else None,
                      "ss_val_lift": (None if not (vs_acc and vs_major) else
                                      round(float(np.mean(vs_acc))
                                            - float(np.mean(vs_major)), 5)),
