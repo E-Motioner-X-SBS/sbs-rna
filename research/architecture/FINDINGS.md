@@ -1915,3 +1915,56 @@ mapping change plus a stage-5 run to see whether deeper MI moves
 anything, and the card is busy with another job. The measurements, the
 streaming reader and the trap are recorded so the work is a decision and
 not a rediscovery.
+
+## 113 — a smoke test blinded the monitor, and the monitor said nothing
+
+| # | what | status |
+|---|---|---|
+| 113 | `newest_run` returned the newest run csv by mtime. A `--smoke` run writes a run record and stops after a step or two, so its csv is a **header and nothing else** — and being newest, it became THE record for every check. The dispatch loop's `if not rs: continue` then skipped **every stage-5 check** in silence | `FIXED` |
+
+Two CPU smoke tests of mine at 18:00 and 18:10 — run to verify the new
+A/B flags — left two 0-row stage-5 records. From then on the watch read
+one of those instead of the 109-row record of the real run, and reported:
+
+```
+**0 CRIT, 0 WARN, 6 INFO**
+```
+
+against the 8 INFO of the cycle before. The two missing lines were the
+stage-5 run line and its OOM line. **Nothing said the stage was no
+longer being checked.** A report with fewer lines reads as less to worry
+about, which is the opposite of what it meant: had the real run been
+producing NaNs or OOMs, the watch would have been blind to it because a
+ten-minute diagnostic from hours earlier was newer.
+
+This is the register's class, in the monitor itself: the check exists,
+it runs, it passes, and it has stopped covering the thing it is for.
+It is the third time the watch has been the defect (105, the stale CRIT;
+the 22-of-23 false positives before that), and the reason it keeps
+earning entries is that a monitor's failures are invisible by
+construction — a missing alarm looks exactly like nothing being wrong.
+
+### The fix, and what it immediately found
+
+`newest_run` now returns the newest record that **has data rows**, and
+`check_empty_newest` reports when the newest is empty and an older one
+is in use, as INFO — an old-but-real record is the right thing to read,
+so this is news and not a fault. On the first run after the fix:
+
+```
+INFO empty run — stage5_3d: the newest record 20261010T124003Z.csv has no
+     data rows (a smoke test, most likely); checks are reading
+     20261010T054625Z.csv
+INFO empty run — r1_block_scorer: the newest record 20261006T050919Z.csv
+     has no data rows; checks are reading nothing -- no record has rows
+```
+
+The second line is a case I did not know about. **`r1_block_scorer` has
+no run record with any rows at all**, so that stage has never been
+covered by the watch — since 2026-10-06. Found only because the fix for
+the first instance prints instead of skipping.
+
+Three assertions in `scripts/test_training_watch.py`, on a synthetic run
+directory with a real record and a newer header-only one: that
+`newest_run` picks the real one, that the watch says so, and that it
+says so as INFO.

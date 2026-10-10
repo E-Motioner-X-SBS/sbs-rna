@@ -77,12 +77,60 @@ def series(rs: List[Dict], k: str) -> List[float]:
     return [v for v in (num(r, k) for r in rs) if v is not None]
 
 
+def _has_rows(p: Path) -> bool:
+    """At least one data line beyond the header."""
+    try:
+        with open(p, "r") as fh:
+            next(fh, None)                    # header
+            return next(fh, None) is not None
+    except OSError:
+        return False
+
+
 def newest_run(stage: str) -> Optional[Path]:
+    """The newest run csv that actually has data in it.
+
+    Strictly-newest was wrong, and silently. A `--smoke` run writes a run
+    record and stops after a step or two, so its csv is a header and
+    nothing else; being the newest file, it became THE run for every
+    check, and the dispatch loop's `if not rs: continue` then skipped
+    every stage-5 check without a word. Two CPU smoke tests at 18:00 and
+    18:10 blinded the watch to a 109-row stage-5 record, and the report
+    said "0 CRIT, 0 WARN" with two INFO lines quietly missing.
+
+    That is this register's class exactly, in the monitor: the check
+    exists, it runs, it passes, and it has stopped covering the thing it
+    is for. An empty newest file is now reported rather than silently
+    stepped over -- see `check_empty_newest`.
+    """
     d = RUNS / stage
     if not d.is_dir():
         return None
     cs = sorted(d.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return cs[0] if cs else None
+    if not cs:
+        return None
+    return next((c for c in cs if _has_rows(c)), cs[0])
+
+
+def check_empty_newest(F: List[Tuple[str, str, str]]) -> None:
+    """Say so when the newest record is empty and an older one is in use.
+
+    Silence here is what made the defect above invisible: the watch simply
+    reported fewer lines, and fewer lines looks like less to worry about.
+    """
+    for stage in STAGES:
+        d = RUNS / stage
+        if not d.is_dir():
+            continue
+        cs = sorted(d.glob("*.csv"), key=lambda p: p.stat().st_mtime,
+                    reverse=True)
+        if not cs or _has_rows(cs[0]):
+            continue
+        used = next((c for c in cs if _has_rows(c)), None)
+        F.append(("INFO", "empty run",
+                  f"{stage}: the newest record {cs[0].name} has no data rows "
+                  f"(a smoke test, most likely); checks are reading "
+                  f"{used.name if used else 'nothing -- no record has rows'}"))
 
 
 # ---------------------------------------------------------------- checks ---
@@ -308,6 +356,10 @@ def check_loss_trend(F: List[Tuple[str, str, str]], stage: str,
 #: A run is "live" if its telemetry moved this recently. Stage 5 writes a
 #: row per epoch at roughly 150 s, so 30 min is several missed rows and
 #: not a tight race. Used to tell "still happening" from "happened".
+STAGES: Tuple[str, ...] = ("stage1_mlm", "stage23_seq",
+                           "stage5_3d", "r1_block_scorer")
+
+#: A run is "live" if its telemetry moved this recently.
 LIVE_MIN: float = 30.0
 
 
@@ -451,7 +503,8 @@ def main() -> int:
     run(check_disk)
     run(check_gpu)
     run(check_gates)
-    for stage in ("stage1_mlm", "stage23_seq", "stage5_3d", "r1_block_scorer"):
+    run(check_empty_newest)
+    for stage in STAGES:
         c = newest_run(stage)
         if c is None:
             continue

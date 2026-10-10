@@ -92,6 +92,45 @@ def main() -> int:
         f"LIVE_MIN = {getattr(tw, 'LIVE_MIN', None)}; stage 5 writes a row "
         f"per epoch at ~150 s, so this must be several missed rows")
 
+    print("\n== an empty newest record must not blind the watch ==")
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        d = Path(td) / "stage5_3d"
+        d.mkdir(parents=True)
+        real = d / "20260101T000000Z.csv"
+        real.write_text("epoch,n_oom\n0,0\n1,0\n")
+        smoke = d / "20260102T000000Z.csv"
+        smoke.write_text("epoch,n_oom\n")          # header only, as --smoke writes
+        import os, time as _t
+        os.utime(real, (_t.time() - 600, _t.time() - 600))
+        os.utime(smoke, (_t.time(), _t.time()))
+
+        saved = tw.RUNS
+        tw.RUNS = Path(td)
+        try:
+            picked = tw.newest_run("stage5_3d")
+            chk("newest_run skips a record with no data rows",
+                picked is not None and picked.name == real.name,
+                f"picked {picked.name if picked else None}; strictly-newest "
+                f"gives {smoke.name}, whose 0 rows make the dispatch loop "
+                f"skip EVERY check for that stage without a word")
+
+            F: list = []
+            tw.check_empty_newest(F)
+            hit = [f for f in F if f[1] == "empty run"]
+            chk("and the watch SAYS the newest record is empty",
+                len(hit) == 1 and "stage5_3d" in hit[0][2],
+                hit[0][2] if hit else "nothing reported -- silence here is "
+                                      "what made this invisible: the report "
+                                      "just had two fewer INFO lines")
+            chk("reported as INFO, not as an alarm",
+                bool(hit) and hit[0][0] == "INFO",
+                "an old-but-real record is the right thing to read, so this "
+                "is news and not a fault")
+        finally:
+            tw.RUNS = saved
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
