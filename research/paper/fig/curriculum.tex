@@ -1,0 +1,59 @@
+\begin{tikzpicture}[font=\small]
+\tikzset{
+  sg/.style={rounded corners=2.5pt, draw=#1, line width=0.8pt, fill=#1!7,
+             align=center, inner sep=4pt, font=\small, text width=30mm,
+             minimum height=19mm},
+  ck/.style={rounded corners=1.5pt, draw=datagrey, line width=0.5pt,
+             fill=databg, align=center, inner sep=2.5pt, font=\tiny,
+             text width=40mm},
+}
+\def\dx{3.75}
+
+\node[sg=trunkblue]  at (0*\dx,0) (s1)
+  {\textbf{1 \;\; MLM}\\[2pt]\tiny span masking, mean span 3\\[1pt]
+   \tiny Muon, lr 0.02\\[1pt]\tiny budget $8\!\times\!10^{9}$ tokens};
+\node[sg=headgreen]  at (1*\dx,0) (s2)
+  {\textbf{2 \;\; secondary}\\[2pt]\tiny dot-bracket, 8 symbols\\[1pt]
+   \tiny bpRNA-SPOT\\[1pt]\tiny CE at weight 0.5};
+\node[sg=headgreen]  at (2*\dx,0) (s3)
+  {\textbf{3 \;\; reactivity}\\[2pt]\tiny SHAPE and DMS\\[1pt]
+   \tiny Ribonanza\\[1pt]\tiny smooth-$L_1$ at 1.0};
+\node[sg=physteal]   at (3*\dx,0) (s4)
+  {\textbf{4 \;\; physics}\\[2pt]\tiny Manning condensation,\\[-1pt]
+   \tiny Debye screening\\[1pt]\tiny\textbf{closed form --- no stage}};
+\node[sg=diffpurple] at (4*\dx,0) (s5)
+  {\textbf{5 \;\; 3D structure}\\[2pt]\tiny heads 1,2,3,6,7,9,10,11\\[1pt]
+   \tiny 16{,}604-chain corpus\\[1pt]\tiny 40 epochs, 3{,}069 steps};
+\node[sg=moeorange]  at (5*\dx,0) (s6)
+  {\textbf{6 \;\; fitness}\\[2pt]\tiny 139{,}837 variants, 12 assays\\[1pt]
+   \tiny MSE at weight 0.3\\[1pt]\tiny co-trained with 2--3};
+
+\foreach \a/\b in {s1/s2, s2/s3, s3/s4, s4/s5, s5/s6}{
+  \draw[flowthick] (\a) -- (\b);}
+
+\node[ck] at (0*\dx,-1.75) {\code{pretrain\_shared400.pt}};
+\node[ck] at (1.5*\dx,-1.75) {\code{seqstages\_shared400.pt}\\stages 2, 3 and 6};
+\node[ck] at (4*\dx,-1.75) {\code{pharos\_shared400.pt}};
+\foreach \x in {0, 1.5, 4}{
+  \draw[flow, draw=datagrey] (\x*\dx,-0.98) -- (\x*\dx,-1.42);}
+
+% stage-1 progress bar
+\begin{scope}[shift={(0,-3.4)}]
+  \def\W{14.2}
+  \fill[databg, rounded corners=1.5pt] (0,0) rectangle (\W,0.42);
+  \fill[trunkblue!55, rounded corners=1.5pt] (0,0) rectangle (0.418*\W,0.42);
+  \draw[datagrey, line width=0.5pt, rounded corners=1.5pt] (0,0) rectangle (\W,0.42);
+  \node[font=\scriptsize, text=white, anchor=west] at (0.1,0.21)
+     {\textbf{3.340B tokens seen}};
+  \node[font=\scriptsize, text=datagrey, anchor=east] at (\W-0.1,0.21)
+     {budget $8.0$B};
+  \node[font=\scriptsize\bfseries, text=trunkblue, anchor=west] at (0.418*\W+0.12,0.21)
+     {41.8\,\%};
+  \node[note, anchor=north west, text width=\W cm] at (0,-0.16)
+     {\scriptsize Stage 1 is the only stage with a token budget it has not
+      met. At 3.340B tokens the trunk has seen \textbf{10.9} tokens per
+      active parameter against Chinchilla's 20, so roughly half the
+      pretraining it was specified for. How much of the structure result
+      is undertraining is \emph{not known}.};
+\end{scope}
+\end{tikzpicture}

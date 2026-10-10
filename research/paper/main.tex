@@ -1,0 +1,563 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+
+\title{\textbf{\textsc{Pharos}}\\[0.35em]
+\large A physics-grounded mixture-of-experts architecture\\
+for RNA three-dimensional structure prediction\\[0.7em]
+\normalsize Technical report --- the architecture as built, and what it measures}
+\author{SBS-RNA Project}
+\date{10 October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This report documents \pharos{} as it exists in code, not as it was
+designed. It is a 395.3M-parameter model (306.0M active) that predicts RNA
+secondary structure, chemical reactivity, contacts, distances,
+Leontis--Westhof pair geometry, Mg$^{2+}$ sites, crystallographic
+rigidity, backbone pseudotorsions and three-dimensional backbone
+coordinates, trained through a six-stage curriculum from a 41.2M-sequence
+masked-language-modelling corpus down to a 16{,}604-chain
+structural set.
+
+We report what it achieves, which is a mean TM-score of
+$\mathbf{0.094}$ over 17 RNA-Puzzles targets against a field median of
+$0.301$ --- last place on 15 of 17 --- alongside a contact average
+precision of $0.890$ and an lDDT of $0.269$. That combination is the
+central empirical fact of this report: \textbf{the model builds
+locally-valid RNA backbone and places it in the wrong global
+arrangement}. We trace it to a specific architectural omission, give the
+fix, and are explicit that the fix is not yet measured.
+
+The second contribution is methodological. The project maintains a
+numbered defect register, at present 104 entries, whose recurring class
+is \emph{a component that exists, is measured, and whose output is never
+checked for basic validity}. Several entries are errors in our own
+instrumentation rather than in the model, and are recorded as such.
+We argue this bookkeeping is not incidental to the work but is the main
+reason the negative results above can be trusted.
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+% =========================================================================
+\section{What problem this is}
+
+RNA structure prediction has not had its AlphaFold2 moment. On
+non-redundant benchmarks the best current methods reach mean TM-scores
+around $0.5$--$0.6$, where $0.45$ is roughly the threshold for having
+recovered the correct fold at all, against routine scores above $0.9$ for
+proteins. The usual explanations are that there are two orders of
+magnitude fewer RNA structures than protein structures, that RNA's
+functional unit is often a conformational ensemble rather than one
+structure, and that RNA folding is ion-dependent in a way protein folding
+is not.
+
+\pharos{} takes a position on which of these matters: that the binding
+constraint is \emph{inductive bias} rather than scale, and that the
+physics of ion condensation and the geometry of base pairing should enter
+the architecture rather than be left for the network to rediscover. This
+report does not defend that position --- it was argued in the design
+report that preceded the implementation --- but documents what was built
+from it and what that produced.
+
+\paragraph{A note on what this report is not.} It reports a model that
+does not work yet at the task it was built for. The results section is
+written to be useful to that end rather than flattering, and every number
+in it is traceable to a file in the repository.
+
+% =========================================================================
+\section{Architecture}
+
+\begin{figure}[H]\centering
+\resizebox{\textwidth}{!}{\input{fig/system}}
+\caption{\textbf{\pharos{} end to end.} A shared trunk produces one
+residue representation $h$ that every head reads. Ten heads are trained
+discriminative readouts; the eleventh, head~3, is a diffusion decoder
+that is the only component that places an atom. The physics module
+contributes a closed-form electrostatic pair bias and has no training
+stage of its own. Bracketed numbers are defect-register entries
+discussed in \S\ref{sec:register}.}
+\label{fig:system}
+\end{figure}
+
+\subsection{Inputs}
+
+Each residue carries four things, summed and layer-normalised:
+
+\begin{itemize}
+\item a \textbf{symbol} from a 13-token vocabulary
+  (\texttt{A C G U N DA DC DG DT DU I UNK PAD}), where \texttt{N} means
+  the ribose is modelled but the base identity is unassigned;
+\item a \textbf{modification} id over 371 species (index 0 is
+  \texttt{NO\_MOD}), derived from the chemical component dictionary, so
+  that a pseudouridine is not silently read as a uridine;
+\item 24 \textbf{chemistry} features through a single affine map ---
+  a 5-way one-hot, a purine flag, six per-edge hydrogen-bond
+  donor/acceptor counts (Watson--Crick, Hoogsteen/CH, sugar), the p$K_a$
+  of the protonating ring nitrogen and a shifted-p$K_a$ flag, two sugar
+  pucker propensities, polarisability and a stacking-energy prior, the
+  phosphate charge state, a 2$'$-OH flag, three modification-class
+  indicators, and local GC fraction in a $\pm16$ window;
+\item a \textbf{learned absolute position} embedding over 4{,}608 slots.
+  There is no rotary or sinusoidal encoding anywhere in the model.
+\end{itemize}
+
+\subsection{The trunk}
+
+\begin{figure}[H]\centering
+\resizebox{\textwidth}{!}{\input{fig/trunk}}
+\caption{\textbf{The 18-block trunk.} A period-8 attention pattern tiled
+to 18 blocks, run three times with the previous pass recycled in. The
+annotation records a property we measured rather than assumed, and which
+we regard as an open question rather than a settled defect.}
+\label{fig:trunk}
+\end{figure}
+
+The trunk is 18 pre-norm blocks following the period-8 pattern
+\texttt{(gdn, gdn, swa, gdn, gdn, swa, gdn, full)}, which tiles to twelve
+\texttt{gdn}, four \texttt{swa} and two \texttt{full} at indices 7
+and 15. Only the \texttt{full} blocks receive the electrostatic pair
+bias, through a per-head gate initialised to zero.
+
+\paragraph{\texttt{gdn} --- gated delta networks.} Linear attention with a
+delta rule, $O(L)$ in sequence length. Per head, with state
+$S \in \mathbb{R}^{d_k \times d_v}$,
+\begin{equation}
+S_t = a_t\,S_{t-1}\!\left(I - b_t k_t k_t^{\!\top}\right) + b_t v_t k_t^{\!\top},
+\qquad o_t = S_t^{\!\top} q_t ,
+\end{equation}
+with $a_t,b_t \in (0,1)$ sigmoid gates, $q$ and $k$ $\ell_2$-normalised,
+and an output gate on $o$. The delta term erases the component of the
+state already associated with $k$ before writing, so a recurring motif
+overwrites rather than accumulates --- on a helix, where the same local
+geometry recurs every ${\sim}11$ nt, accumulation is precisely the
+failure mode. It is evaluated chunkwise in blocks of 128 with a
+triangular solve.
+
+\paragraph{\texttt{swa} and \texttt{full}.} Sliding-window attention over
+a band of $\pm128$ (257 wide), implemented densely with a band mask, and
+ordinary global softmax attention.
+
+\paragraph{Recurrence.} The entire trunk is run $n=3$ times with shared
+weights, giving 54 effective layers. Loops $0$ and $1$ run under
+\code{no\_grad} and only the last carries gradients, so the memory cost
+is that of one pass. The recycled state enters as
+$x_0 + \code{recycle\_proj}(\code{norm}(h))$ with \code{recycle\_proj}
+initialised to zero, so loop 1 begins numerically identical to loop 0.
+Training samples the depth uniformly from $1\ldots3$. There is no halting
+mechanism.
+
+\subsection{The mixture of experts}
+
+\begin{figure}[H]\centering
+\resizebox{0.98\textwidth}{!}{\input{fig/moe}}
+\caption{\textbf{Shared-adapter MoE with nucleus routing.} An expert is a
+vector that modulates one shared SwiGLU, not a network of its own, so
+firing 300 experts costs the same matmul as firing one. Routing width is
+variable and measured, not assumed --- getting that wrong is
+finding~102.}
+\label{fig:moe}
+\end{figure}
+
+Every block's feed-forward is a mixture of 512 experts plus one
+always-on dense expert. Two choices distinguish it from the usual
+top-$k$ arrangement.
+
+\paragraph{Experts are vectors, not networks.} One shared SwiGLU
+$W_1 \in \mathbb{R}^{768 \times 4608}$,
+$W_2 \in \mathbb{R}^{2304 \times 768}$ is modulated per token by a convex
+combination of the selected experts' parameter vectors:
+\begin{equation}
+m = \textstyle\sum_e w_e\,\theta_e,\quad
+(\gamma, \beta, \gamma_{\text{out}}) = \mathrm{split}(m),\quad
+y = \big(\mathrm{SiLU}(a)\odot b\big)W_2 \cdot (1+\gamma_{\text{out}}),
+\end{equation}
+where $h = xW_1 \cdot (1+\gamma) + \beta$ and $(a,b) = \mathrm{chunk}(h)$.
+Each $\theta_e$ has $4 d_{\text{expert}} + d_{\text{model}} = 9{,}984$
+parameters. Because the merge happens \emph{before} the network runs, a
+variable number of active experts costs no extra matmul --- which is what
+makes the next choice affordable.
+
+\paragraph{Nucleus routing, not top-$k$.} An expert fires when its
+softmax probability clears $1/E$, i.e.\ when the token prefers it to
+chance, with the argmax always included so the width is never zero:
+\begin{equation}
+\mathcal{K}(x) = \{e : p_e \ge \tau/E\} \cup \{\arg\max_e p_e\},
+\qquad \tau = 1 .
+\end{equation}
+A relative threshold is scale-free in a way an absolute one is not: at
+initialisation every expert sits at $1/E$, so a fixed $0.02$ fires all 32
+experts of a small config and none of 256. The measured width on a
+trained checkpoint is $\mathbf{15.28}$ experts on average with a maximum
+of 330, 288.5 effective experts and no dead expert.
+
+\paragraph{Load balance.} With $m_i$ the padding mask, $f_{ie}$ the fired
+indicator and $\bar{k}$ the mean width,
+$\mathrm{bal} = E\sum_e \mathrm{frac}_e \cdot \bar{p}_e$ summed over
+blocks at weight $0.01$, giving a floor of $0.01 \times 18 = 0.18$ at
+perfect balance.
+
+\subsection{Parameter budget}
+
+\begin{table}[H]\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+& \textbf{shared400} & base400 & small & mini \\
+\midrule
+$d_{\text{model}}$        & 768 & 640 & 512 & 384 \\
+blocks $\times$ loops     & $18\times3$ & $18\times8$ & $16\times8$ & $12\times12$ \\
+heads                     & 12 & 10 & 8 & 6 \\
+$d_{\text{pair}}$         & 160 & 160 & 128 & 128 \\
+experts $\times$ $d_{\text{expert}}$ & $512\times2304$ & $48\times192$ & $32\times256$ & $32\times192$ \\
+routing                   & nucleus & top-6 & top-4 & top-4 \\
+\midrule
+total parameters          & \textbf{395{,}295{,}754} & 405{,}924{,}150 & 259{,}188{,}898 & 113{,}658{,}264 \\
+active parameters         & \textbf{306{,}001{,}570} & 127{,}232{,}310 & 83{,}028{,}130 & 39{,}340{,}440 \\
+\bottomrule
+\end{tabular}
+\caption{Configurations. For \textbf{shared400}, 3.85M of the total is
+embeddings, 340.8M the trunk (187.6M of it experts) and 48.6M the heads.
+The active count costs a token at the \emph{measured} routing width of
+15.28; it previously used $\texttt{max\_k}/4 = 128$ and overstated the
+figure by 20.3M (finding~102).}
+\end{table}
+
+% =========================================================================
+\section{The diffusion decoder}
+\label{sec:decoder}
+
+Head 3 is the only part of \pharos{} that places an atom. It denoises
+three backbone atoms per residue --- P, C4$'$ and the glycosidic
+nitrogen, the minimum that fixes a frame --- under EDM preconditioning:
+\begin{equation}
+D(x;\sigma) = c_{\text{skip}}(\sigma)\,x
+            + c_{\text{out}}(\sigma)\,F\!\big(c_{\text{in}}(\sigma)\,x,\;c_{\text{noise}}\big),
+\qquad
+c_{\text{skip}} = \frac{\sigma_d^2}{\sigma^2+\sigma_d^2}.
+\end{equation}
+with $\sigma_d = 16\,\Ang$ set from the corpus rather than inherited, and
+$\ln\sigma \sim \mathcal{N}(p_{\text{mean}}, 1.2^2)$ where
+$p_{\text{mean}} = \ln(0.6016\,\sigma_d) = 2.2644$ is \emph{derived} from
+$\sigma_d$ and never typed beside it. The derivation matters: Karras
+et al.\ recommend $P_{\text{mean}} = -1.2$ \emph{for} $\sigma_d = 0.5$,
+which is a median $\sigma/\sigma_d$ of $0.602$; carrying the $-1.2$ over
+while raising $\sigma_d$ to 16 for \aa ngstr\"oms puts the median draw at
+$c_{\text{skip}} = 0.99965$, where the network is asked to supply
+$0.035\%$ of the answer (finding~85).
+
+The loss is the $\sigma$-weighted denoising error plus a flat-bottomed
+geometry penalty at weight $0.1$:
+\begin{equation}
+\mathcal{L} = \mathbb{E}\!\left[\frac{\sigma^2+\sigma_d^2}{(\sigma\sigma_d)^2}
+  \lVert D(x_0+\sigma\epsilon;\sigma) - x_0 \rVert^2\right]
+  + 0.1\big(v_{\text{C4}'\text{-N}} + v_{\text{P-P}}\big),
+\end{equation}
+with $v = \max(0, |d - d_0| - \mathrm{tol})$ for
+$d_0 = 3.38\,\Ang$ ($\mathrm{tol}\,0.25$) and
+$d_0 = 6.01\,\Ang$ ($\mathrm{tol}\,1.50$). Sampling is 50 Heun steps on a
+$\rho=7$ schedule from $\sigma_{\max}=160$ to $\sigma_{\min}=0.002$.
+
+\subsection{What the decoder could not do}
+
+\begin{figure}[H]\centering
+\resizebox{\textwidth}{!}{\input{fig/decoder}}
+\caption{\textbf{Finding 100.} The decoder had no mechanism by which one
+residue's position could influence another's update. Coordinates entered
+through a per-residue linear map of that residue's own nine numbers, and
+the attention bias was built once from hidden states and relative
+\emph{sequence} position. Two residues $6\,\Ang$ apart in space were, to
+this attention, exactly as unrelated as two $60\,\Ang$ apart.}
+\label{fig:decoder}
+\end{figure}
+
+This is the architectural claim of the report, so it is worth stating
+carefully. In the shipped decoder,
+\begin{equation}
+h \leftarrow \code{in\_proj}\big(\mathrm{vec}(x_\sigma)_i\big)
+  + \code{cond\_proj}(s_i) + \code{time\_proj}(c_{\text{noise}}),
+\qquad
+h \leftarrow \mathrm{Block}(h,\; b^{\text{pair}}),
+\end{equation}
+where $\mathrm{vec}(x_\sigma)_i$ is residue $i$'s own nine coordinates and
+$b^{\text{pair}}$ is a function of $s$ and $|i-j|$ only. Neither term
+couples residue $i$ to \emph{where residue $j$ currently is}.
+
+This predicts exactly the failure we observe. Bonds come out right,
+because relative sequence position suffices for a bond. The fold comes
+out wrong, because nothing couples distant residues by proximity. And
+feeding the decoder a predicted contact map changed nothing
+(finding~93, $+0.0025$ TM against a $0.0023$ noise floor, sign test
+$p = 0.50$) --- because a static map is not current geometry: to decide
+how to move an atom the model must know where it is \emph{now}.
+
+The fix embeds the pairwise C4$'$ distances of the current iterate in a
+16-centre radial basis over $2$--$40\,\Ang$ and projects to a per-head
+additive attention bias,
+\begin{equation}
+b^{\text{geom}}_{hij} = \sum_{k} W_{hk}\,
+  \exp\!\left(-\frac{(d_{ij}-\mu_k)^2}{2s^2}\right),
+\qquad d_{ij} = \lVert c_i - c_j \rVert_2 ,
+\end{equation}
+recomputed on every call so the attention follows the structure as it
+forms. $W$ is zero-initialised, so a loaded checkpoint's forward pass is
+bit-identical until the bias earns its way in. The whole cost is
+\textbf{128 parameters}.
+
+Properties pinned by test: zero at initialisation; symmetric; SE(3)
+invariant to $2.03\times10^{-6}$, which matters because the loss augments
+with random rotations; and --- the property that was absent --- moving
+one residue changes the predicted update for \emph{the others}.
+
+\paragraph{Two defects in the fix itself.} The first version was fed
+$x_\sigma$, which is $c_{\text{in}}x$ and not \aa ngstr\"oms. At the
+median $\sigma$ that divides every distance by 18.7, putting the entire
+informative range below the first basis centre and cutting summed
+per-channel resolving power from 11.42 to \textbf{0.72}. It would have
+trained to nothing while all six tests passed, because all six called the
+module directly with \aa ngstr\"oms --- the module was right and its
+caller was wrong. The second built its basis in fp32 inside a bf16
+autocast region and cost twice the activation memory it needed, which
+turned a run that had always fitted into a fatal out-of-memory at
+epoch 25 of 40. Both are in the register as 100b and 104b.
+
+% =========================================================================
+\section{Heads, losses and curriculum}
+
+\begin{table}[H]\centering\small
+\begin{tabular}{clllr}
+\toprule
+\# & head & predicts & loss & weight \\
+\midrule
+1  & contact   & heavy-atom contact $<8\,\Ang$, $|i-j|\ge4$ & BCE, quality-weighted & 1.0 \\
+2  & distance  & C4$'$--C4$'$, 40 bins & cross-entropy & 0.5 \\
+3  & structure & backbone $(\mathrm{P},\mathrm{C4}',\mathrm{N})$ & EDM $+$ violation & 1.0 \\
+4  & secondary & dot-bracket, 8 symbols & cross-entropy & 0.5 \\
+5  & reactivity& SHAPE and DMS & smooth-$L_1$ & 1.0 \\
+6  & Mg$^{2+}$ & ion within $3\,\Ang$ & BCE, clamped pos-weight & 0.3 \\
+7  & rigidity  & $z$-scored B-factor, X-ray only & smooth-$L_1$ & 0.3 \\
+8  & disorder  & unobserved residue & \textcolor{newred}{none} & --- \\
+9  & geometry  & Leontis--Westhof class, 13 & cross-entropy & 0.5 \\
+10 & motif     & hairpin / internal / neither & cross-entropy & 0.3 \\
+11 & torsion   & $\eta,\theta,\tilde\chi$ as $(\sin,\cos)$ & unit-circle $+$ norm & 0.3 \\
+\midrule
+-- & base identity & 4 classes & cross-entropy & 0.2 \\
+-- & fluctuation   & ensemble amplitude & smooth-$L_1$ & 0.1 \\
+-- & fitness       & variant fitness & MSE & 0.3 \\
+-- & splice, ensemble state & --- & \textcolor{newred}{none} & --- \\
+\bottomrule
+\end{tabular}
+\caption{The head inventory. Three outputs are emitted and never trained:
+disorder needs \texttt{entity\_poly\_seq} in the corpus, splice needs a
+corpus that has not been acquired, and no observable distinguishes the
+$K$ ensemble states. They are recorded as untrained rather than quietly
+reported.}
+\end{table}
+
+\paragraph{Torsions.} Head 11 predicts the Duarte--Pyle pseudotorsions
+$\eta_i = \angle(\mathrm{C4}'_{i-1},\mathrm{P}_i,\mathrm{C4}'_i,\mathrm{P}_{i+1})$,
+$\theta_i = \angle(\mathrm{P}_i,\mathrm{C4}'_i,\mathrm{P}_{i+1},\mathrm{C4}'_{i+1})$
+and
+$\tilde\chi_i = \angle(\mathrm{P}_i,\mathrm{C4}'_i,\mathrm{N}_i,\mathrm{P}_{i+1})$
+as unnormalised $(\sin,\cos)$ pairs, with loss
+$\lVert u - t\rVert^2 = 2 - 2\cos\Delta$ on the normalised vector plus
+$0.02\,\big||p| - 1\big|$ on its magnitude. They are computed from batch
+coordinates on the fly, never stored.
+
+\paragraph{Distance bins.} 40 bins: eight uniform of $0.875\,\Ang$ over
+$3$--$10\,\Ang$, then 32 equal-frequency edges to $100.78\,\Ang$ with the
+last open-ended. Uniform binning over the whole range had put the
+majority class at a level the head could reach by constant prediction,
+which is finding 75.
+
+\begin{figure}[H]\centering
+\resizebox{0.96\textwidth}{!}{\input{fig/curriculum}}
+\caption{\textbf{The six-stage curriculum.} Each stage initialises from
+the previous one's checkpoint, and the driver refuses to start a stage
+from random weights.}
+\label{fig:curriculum}
+\end{figure}
+
+% =========================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{What the heads learn}
+
+At the end of a 40-epoch stage-5 run (3{,}069 optimiser steps,
+16{,}384-token budget) on the held-out test split:
+
+\begin{table}[H]\centering\small
+\begin{tabular}{lrr}
+\toprule
+metric & value & reference \\
+\midrule
+contact average precision & \textbf{0.8901} & base rate 0.4541 \\
+Mg$^{2+}$ average precision & 0.4167 & base rate 0.0254 ($16.4\times$) \\
+Leontis--Westhof accuracy & 0.8972 & majority 0.8532 \\
+motif accuracy & 0.7494 & majority 0.6925 \\
+$\eta$ MAE & $23.29^\circ$ & circular baseline $24.59^\circ$ \\
+$\theta$ MAE & $26.86^\circ$ & circular baseline $29.05^\circ$ \\
+$\tilde\chi$ MAE & $16.21^\circ$ & circular baseline $17.74^\circ$ \\
+structure MSE & 24.59 & --- \\
+P--P bond violation & 0.1934 & target $6.01\,\Ang$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Contacts are predicted well. Torsions beat their circular baselines by
+$1.3$--$2.2^\circ$, which is real but small. Ion sites are $16\times$
+better than chance.
+
+\subsection{What the model does not do}
+
+\begin{table}[H]\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+& run 1 & run 2 & run 3 & field median \\
+\midrule
+mean TM-score & 0.0890 & 0.0913 & \textbf{0.0936} & \textbf{0.3013} \\
+mean lDDT     & 0.2550 & 0.2765 & 0.2690 & --- \\
+targets above field median & 0/17 & 0/17 & 0/17 & --- \\
+targets above TM 0.45 & 0/17 & 0/17 & 0/17 & --- \\
+\bottomrule
+\end{tabular}
+\caption{17 RNA-Puzzles targets, scored against all submitted competitor
+models. Three runs at identical settings span $0.0046$ against a
+$0.0023$ initialisation-noise floor measured between two of them.
+Nothing has moved.}
+\end{table}
+
+The mean percentile against the field is 99.7\,\%: last or near-last on
+15 of 17 targets.
+
+\paragraph{The diagnostic.} lDDT $0.269$ beside TM $0.094$ is the whole
+story. lDDT is a local measure --- it asks whether each residue's
+neighbourhood is right --- and TM is a global one. A model that scored
+badly on both would be producing noise. A model that scores
+\emph{moderately} on the local measure and at floor on the global one is
+producing locally-valid RNA backbone in the wrong global arrangement.
+That is consistent with every other number here: bonds within tolerance,
+contacts at AP $0.890$, torsions beating their baselines, and a fold that
+is wrong.
+
+\paragraph{What has been ruled out.} Chain breaks: 99.09\,\% of
+2{,}227{,}344 P--P pairs lie inside tolerance. Stage-1 representation
+quality: sequence explains $0.92\%$ of P--P distance variance, so the
+bond is a geometric constant and not something the language model must
+supply. Decoder access to contacts: supplying a predicted contact map
+moved TM by $+0.0025$ against a $0.0023$ noise floor, 9 wins in 17, sign
+test $p = 0.50$ (finding 93, reverted).
+
+What that leaves is the decoder's ability to \emph{use} geometry, which
+is \S\ref{sec:decoder} and finding 100. At the time of writing that A/B
+has completed 25 of 40 epochs and \textbf{no claim is made about its
+outcome}. At matched epochs the two arms are indistinguishable on
+structure loss; the bias itself is demonstrably learning, with per-head
+attention offsets that are positive at $6$--$12\,\Ang$ and negative at
+$23$--$40\,\Ang$, which is the correct sign structure.
+
+% =========================================================================
+\section{The defect register as method}
+\label{sec:register}
+
+The repository carries \code{research/architecture/FINDINGS.md}, at
+present 104 numbered entries. It is not a changelog. Its recurring class
+is narrow and worth naming:
+
+\begin{quote}
+\emph{a component that exists, is measured, and whose output is never
+checked for basic validity.}
+\end{quote}
+
+Representative entries:
+
+\begin{itemize}
+\item \textbf{85} --- $P_{\text{mean}}$ carried over from a paper that
+  used $\sigma_d = 0.5$, leaving the denoiser responsible for $0.035\%$
+  of its task at the median training draw.
+\item \textbf{90} --- the inference sampler passed \code{pair=None},
+  withholding relative position from the decoder at sampling time only.
+  P--P went from $16$--$19\,\Ang$ to $5.53$--$6.43\,\Ang$ against a true
+  $5.95$.
+\item \textbf{102} --- the active parameter count costed a token at
+  $\texttt{max\_k}/4 = 128$ experts while an audit file in the same
+  repository recorded a measured width of 15.28. Both numbers were on
+  disk; nothing compared them.
+\item \textbf{104} --- the training loop skipped out-of-memory batches
+  and the validation ten lines below it did not, so a batch that costs
+  one gradient in training killed a 40-epoch run at epoch 25.
+\end{itemize}
+
+Three disciplines follow from this, and they are the reason the negative
+results in \S\ref{sec:results} can be relied on.
+
+\paragraph{Every new pathway is zero-initialised.} \code{bias\_scale},
+\code{site\_scale}, \code{coev\_proj}, \code{recycle\_proj} and
+\code{GeometricBias.proj} all start at exactly zero, so adding a feature
+cannot regress a working checkpoint and the feature has to earn its
+contribution.
+
+\paragraph{Every metric is reported against its floor.} Accuracy against
+the majority class, average precision against the base rate, angular MAE
+against the circular mean, correlation pooled over the split rather than
+averaged per batch. Finding 75 was a head that looked like it was
+learning because its floor had never been computed.
+
+\paragraph{Refutations are recorded as prominently as confirmations.}
+The register contains a withdrawn finding (76, where we measured our own
+interference and blamed the code), a refuted experiment (93), a
+corrected claim (a $+0.2761$ distance lift computed against a floor
+sampled over different batches), and a section titled \emph{Checked and
+not defects}. Twenty-two of a monitoring script's first twenty-three
+warnings were false positives, and fixing the script was treated as
+equal in value to fixing the model.
+
+% =========================================================================
+\section{Limitations, and what we think is wrong}
+
+\begin{enumerate}
+\item \textbf{The fold is wrong and the fix is unmeasured.} Finding 100
+  has a mechanism that explains the observations and a bias that
+  demonstrably learns the right sign structure, and that is all that can
+  honestly be said until the A/B finishes.
+
+\item \textbf{Two thirds of the trunk cannot see to its right.}
+  \texttt{gdn} is strictly causal --- scrambling the right half of the
+  input moves the left half of its output by exactly zero. \pharos{} is
+  an encoder and nothing in the task asks for a causal mask. We record
+  this as declared rather than as a defect, because contact AP of $0.890$
+  shows the information does arrive, by two routes that do not need
+  \texttt{gdn}: the pair features are an outer sum that sees both
+  endpoints, and three recycled passes carry right-context back
+  (finding 103).
+
+\item \textbf{The trunk's global attention does not attend to contacts.}
+  The two \code{full} blocks score AUROC $0.44$--$0.52$ against the
+  contact map while the contact head reaches AP $0.890$ --- so contacts
+  are being read off the pair features, not built by attention
+  (finding 92, open).
+
+\item \textbf{Three heads are emitted and untrained}, and one declared
+  router feature is read by the model and written by no caller
+  (finding 68, open).
+
+\item \textbf{Stage 1 is at 41.8\% of its token budget.} At 3.340B of
+  8B tokens the trunk has seen 10.9 tokens per active parameter, about
+  half Chinchilla-optimal. Some of the gap is undertraining and we do not
+  know how much.
+
+\item \textbf{The fitness head barely transfers.} Validation Spearman
+  $+0.604$ over 12 assays of seen constructs against $+0.085$ on a
+  held-out aptamer family (finding 97, open).
+\end{enumerate}
+
+\paragraph{The honest summary.} \pharos{} is a working multi-task RNA
+model with a non-functioning structure decoder. The discriminative heads
+do what they were built to do. The generative head does not, we believe
+we know why, and the experiment that would settle it is running.
+
+\end{document}

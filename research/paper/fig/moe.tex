@@ -1,0 +1,88 @@
+\begin{tikzpicture}[font=\small]
+\tikzset{
+  mb/.style={rounded corners=2pt, draw=#1, line width=0.7pt, fill=#1!7,
+             align=center, inner sep=4pt, font=\small},
+  ex/.style={draw=moeorange, line width=0.5pt, fill=moebg,
+             minimum width=3.2mm, minimum height=3.2mm, inner sep=0pt},
+  exon/.style={draw=moeorange, line width=0.9pt, fill=moeorange,
+               minimum width=3.2mm, minimum height=3.2mm, inner sep=0pt},
+}
+
+% ---------------- token in -----------------------------------------------
+\node[mb=datagrey, text width=22mm] at (0,0) (tok)
+   {token $x$\\[-2pt]\tiny $d=768$};
+
+% ---------------- router --------------------------------------------------
+\node[mb=moeorange, text width=34mm] at (3.3,0) (gate)
+   {\textbf{router}\\[-1pt]
+    \tiny $\mathrm{Linear}(768{+}14 \to 512)$\\[-2pt]
+    \tiny input: $\mathrm{LN}(h)\,\Vert\,$ 6 length bins $+$ 8 extras\\[-2pt]
+    \tiny $p = \softmax(\text{gate} + \text{bias})$};
+\draw[flow] (tok) -- (gate);
+
+% ---------------- nucleus selection --------------------------------------
+\node[font=\scriptsize\bfseries, text=moeorange] at (8.6,1.55)
+  {nucleus selection: fire $e$ iff $p_e \ge 1/512$};
+\foreach \i in {0,...,23}{
+  \pgfmathsetmacro{\xx}{7.0 + mod(\i,12)*0.38}
+  \pgfmathsetmacro{\yy}{0.62 - floor(\i/12)*0.42}
+  \node[ex] at (\xx,\yy) {};
+}
+\foreach \i in {1,4,5,9,14,18,21}{
+  \pgfmathsetmacro{\xx}{7.0 + mod(\i,12)*0.38}
+  \pgfmathsetmacro{\yy}{0.62 - floor(\i/12)*0.42}
+  \node[exon] at (\xx,\yy) {};
+}
+\node[note, align=center, text width=52mm] at (9.1,-1.35)
+  {\scriptsize 512 experts \;|\; \textbf{measured} mean width
+   $\mathbf{15.28}$, max 330\\[-2pt]
+   \scriptsize 288.5 effective, 0 dead \;|\; width is never 0 (argmax always fires)};
+\draw[flow] (gate) -- (6.80,0.39);
+
+% ---------------- the merge ----------------------------------------------
+\node[mb=moeorange, text width=46mm] at (4.6,-3.15) (merge)
+   {\textbf{merge the experts, not their outputs}\\[2pt]
+    $m = \sum_{e\in\mathcal{K}} w_e\,\theta_e$,
+      \;\; $\theta_e \in \mathbb{R}^{9984}$\\[2pt]
+    \tiny $(\gamma,\beta,\gamma_{\text{out}})
+      = \mathrm{split}(m)$, \;$4d_{\text{expert}}{+}d_{\text{model}}$};
+\draw[flow] (9.1,-1.95) to[out=270,in=0] (merge.east);
+
+\node[mb=trunkblue, text width=46mm] at (4.6,-6.75) (swiglu)
+   {\textbf{one shared SwiGLU}, run once\\[2pt]
+    \tiny $h = xW_1\!\cdot\!(1{+}\gamma) + \beta$,\quad
+      $(a,b)=\mathrm{chunk}(h)$\\[1pt]
+    \tiny $y = \big(\mathrm{SiLU}(a)\odot b\big)W_2
+      \cdot (1{+}\gamma_{\text{out}})$\\[2pt]
+    \tiny $W_1\!\in\!\mathbb{R}^{768\times4608}$,\;
+      $W_2\!\in\!\mathbb{R}^{2304\times768}$};
+\draw[flow] (merge) -- (swiglu);
+
+\node[mb=physteal, text width=30mm] at (11.1,-6.75) (shared)
+   {\textbf{shared dense expert}\\[-2pt]\tiny always on, added to $y$};
+\draw[flow] (shared) -- (swiglu);
+
+\node[mb=datagrey, text width=22mm] at (0,-6.75) (out) {output $y + x$};
+\draw[flow] (swiglu) -- (out);
+
+% ---------------- the point ----------------------------------------------
+\node[draw=moeorange, fill=moebg, rounded corners=2pt, line width=0.7pt,
+      text width=150mm, align=left, font=\scriptsize, inner sep=5pt]
+   at (5.6,-9.65)
+   {\textbf{Why this makes variable width free.} An expert here is a
+    \emph{vector} that modulates a shared network, not a network of its
+    own, and the merge happens \emph{before} that network runs. Firing
+    330 experts is therefore the same two matmuls as firing one --- only
+    the $\sum_e w_e\theta_e$ changes size. The usual alternative builds
+    the (token, expert) pair list and pushes every pair through, which
+    costs $k\times$ the activations and a pair count that changes every
+    step; that recompiled \code{torch.compile} on eight consecutive steps
+    before it gave up, and profiled at 70\,\% of GPU time in gathers and
+    scatters against 19\,\% in the matmuls doing the work.
+    \\[3pt]
+    \textbf{Finding 102.} The \emph{active} parameter count costed a
+    token at $\texttt{max\_k}/4 = 128$ experts --- an assumption --- while
+    \code{router\_audit.json} in the same repository recorded the
+    measured 15.28. An $8.4\times$ overstatement, worth 20.3M parameters,
+    in every log line and budget table the project had reasoned with.};
+\end{tikzpicture}
