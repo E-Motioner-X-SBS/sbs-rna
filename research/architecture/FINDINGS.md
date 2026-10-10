@@ -1158,6 +1158,7 @@ a false positive costs exactly as much as one that misses a real defect.
 | Muon had no test module at all | `FIXED` |
 | the training watch had no test module at all, and 22 of its first 23 warnings were false | `FIXED` |
 | the new watch test module was not in the gate's suite list, so it would never have run — caught by the gate's own drift check on the first try | `FIXED` |
+| I edited `geom_ab_resume.sh` **while a shell was executing it** — finding 99's exact mistake, repeated by the person who wrote finding 99. No corruption resulted, because the script is one `while` loop and bash had parsed it whole, but the running watcher kept the pre-edit logic. Watchers are now launched from a **copy** outside the repo, so the tracked file stays editable | `FIXED` |
 | head 11's new claims were written as **R8**, a label already used by the chemistry-dimension group, making every `R8` citation ambiguous. Renamed **R16**; the gate now checks that no label names two non-contiguous groups, and that check reports `R8` if the collision is reinstated | `FIXED` |
 
 ## Open questions, recorded and not acted on

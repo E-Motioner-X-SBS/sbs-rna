@@ -38,7 +38,41 @@ PY
     PYTHONPATH=src nice -n 5 /store/shuvam/.venv/bin/python -u scripts/train_pharos.py \
       --device cuda --min-free-gib 60 --size shared400 --epochs 40 \
       --token-budget 16384 --ckpt "$CK" >> "$LOG" 2>&1
-    echo "[resume] $(date -Is) trainer exited rc=$?" | tee -a "$LOG"
+    rc=$?
+    echo "[resume] $(date -Is) trainer exited rc=$rc" | tee -a "$LOG"
+    [ "$rc" -ne 0 ] && { sleep 120; continue; }
+
+    # Training alone is not the experiment. Without this the card frees,
+    # the arm finishes, and the A/B still has no number -- which is how an
+    # hour of GPU turns into nothing. Predict and score in the same run.
+    if ! /store/shuvam/.venv/bin/python - <<'PY' 2>/dev/null
+import sys, torch
+ck = torch.load("data/derived/checkpoints/pharos_shared400_geom.pt",
+                map_location="cpu", mmap=True, weights_only=False)
+sys.exit(0 if (ck.get("epoch", 0) + 1) >= 40 and ck.get("epoch_done") else 1)
+PY
+    then
+      echo "[resume] $(date -Is) not at epoch 40 yet; will resume again" | tee -a "$LOG"
+      sleep 120; continue
+    fi
+
+    echo "[resume] $(date -Is) predicting 17 RNA-Puzzles targets" | tee -a "$LOG"
+    PYTHONPATH=src nice -n 5 /store/shuvam/.venv/bin/python -u scripts/predict_structure.py \
+      --ckpt "$CK" --size shared400 --targets rna_puzzles \
+      --out "$REPO/data/samples/analysis/pred_geom" >> "$LOG" 2>&1
+    echo "[resume] $(date -Is) predict rc=$?" | tee -a "$LOG"
+
+    echo "[resume] $(date -Is) scoring against the field" | tee -a "$LOG"
+    PYTHONPATH=src nice -n 5 /store/shuvam/.venv/bin/python -u scripts/eval_blind_tests.py \
+      --pred "$REPO/data/samples/analysis/pred_geom" --ckpt "$CK" \
+      --out "$REPO/data/samples/analysis/blind_geom.json" >> "$LOG" 2>&1
+    echo "[resume] $(date -Is) eval rc=$?" | tee -a "$LOG"
+
+    # And the comparison, written where it cannot be missed.
+    PYTHONPATH=src /store/shuvam/.venv/bin/python scripts/geom_ab_report.py \
+      >> "$LOG" 2>&1
+    echo "[resume] $(date -Is) A/B COMPLETE -- see geom_ab/RESULT.md" | tee -a "$LOG"
+    exit 0
   fi
   sleep 120
 done
