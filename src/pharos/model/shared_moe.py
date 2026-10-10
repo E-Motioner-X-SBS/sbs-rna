@@ -41,6 +41,17 @@ import torch.nn.functional as F
 from .moe import RouterFeatures
 
 
+#: Mean nucleus-routing width measured on a trained shared400 checkpoint at
+#: step 7,000 (992.8M tokens), recorded in
+#: `data/samples/analysis/router_audit.json` and pinned as claim R2 in the
+#: gate. The active parameter count costs a token at this width.
+#:
+#: Re-measure it with `scripts/audit_router.py` when the router changes; the
+#: test in `test_shared_moe.py` reads the audit file and fails if this
+#: constant has drifted from it.
+MEASURED_WIDTH_SHARED400: float = 15.28
+
+
 @dataclass
 class SharedMoEConfig:
     d_model: int = 640
@@ -63,6 +74,21 @@ class SharedMoEConfig:
     d_router_extra: int = 8
     balance_weight: float = 0.01
     dropout: float = 0.0
+    #: The routing width `n_active_params` costs a token at. It USED to be
+    #: `max_k // 4`, which for shared400's `max_k = 512` is 128 -- against a
+    #: measured **15.28** on a trained checkpoint at step 7,000 / 992.8M
+    #: tokens (`data/samples/analysis/router_audit.json`, pinned as claim R2
+    #: in the gate). An 8.4x overstatement, so every log line, every budget
+    #: table and every tokens-per-active-parameter figure the project has
+    #: reasoned with was 20.3M parameters too high.
+    #:
+    #: Both numbers were already in the repo. Nothing compared them: the
+    #: measurement went into an audit file and the estimate stayed a constant
+    #: four lines from the docstring promising it was "the AVERAGE routing
+    #: width". `test_shared_moe.py` now fails if they drift apart.
+    #:
+    #: `None` keeps the old `max_k // 4` for configs with no measurement.
+    typical_width: Optional[float] = None
 
 
 class SharedAdapterExperts(nn.Module):
@@ -232,12 +258,17 @@ class SharedMoEFeedForward(nn.Module):
         """Parameters touched by a token at the AVERAGE routing width.
 
         Variable width makes this a mean rather than a constant, which is the
-        point: a simple token is cheaper than a hard one.
+        point: a simple token is cheaper than a hard one -- and which is
+        exactly why the width here must be a MEASUREMENT and not `max_k // 4`.
+        See `SharedMoEConfig.typical_width`.
         """
         cfg = self.cfg
         shared = sum(p.numel() for e in self.shared for p in e.parameters())
         trunk = self.experts.w1.numel() + self.experts.w2.numel()
         per_adapter = 2 * 2 * cfg.d_expert + cfg.d_model   # gain, bias, out_gain
-        typical = max(1, min(cfg.max_k, cfg.n_experts) // 4)
+        typical = (cfg.typical_width if cfg.typical_width is not None
+                   else max(1, min(cfg.max_k, cfg.n_experts) // 4))
         gate = sum(p.numel() for p in self.gate.parameters())
-        return shared + trunk + typical * per_adapter + gate + cfg.n_experts
+        # `typical` is a measured mean, so this rounds rather than truncates.
+        return int(round(shared + trunk + typical * per_adapter
+                         + gate + cfg.n_experts))

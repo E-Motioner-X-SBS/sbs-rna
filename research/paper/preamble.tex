@@ -1,0 +1,81 @@
+% ---------------------------------------------------------------------------
+%  PHAROS technical paper -- shared preamble
+% ---------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{siunitx}
+\usepackage[hidelinks,colorlinks=true,linkcolor=linknavy,citecolor=linknavy,
+            urlcolor=linknavy]{hyperref}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,shapes.geometric,
+                decorations.pathreplacing,decorations.pathmorphing,patterns,
+                shadows.blur,matrix,chains,shapes.misc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% ---- palette -------------------------------------------------------------
+\definecolor{linknavy}{HTML}{1F3A5F}
+\definecolor{trunkblue}{HTML}{2C5282}
+\definecolor{trunkbg}{HTML}{EBF2FA}
+\definecolor{moeorange}{HTML}{B45309}
+\definecolor{moebg}{HTML}{FEF3C7}
+\definecolor{headgreen}{HTML}{276749}
+\definecolor{headbg}{HTML}{E6F4EA}
+\definecolor{diffpurple}{HTML}{553C9A}
+\definecolor{diffbg}{HTML}{EDE9F7}
+\definecolor{datagrey}{HTML}{4A5568}
+\definecolor{databg}{HTML}{EDF2F7}
+\definecolor{physteal}{HTML}{14687A}
+\definecolor{physbg}{HTML}{E0F2F5}
+\definecolor{newred}{HTML}{9B2C2C}
+\definecolor{newbg}{HTML}{FDE8E8}
+\definecolor{rule1}{HTML}{CBD5E0}
+
+% ---- shared tikz styles --------------------------------------------------
+\tikzset{
+  blk/.style={rounded corners=2pt, draw=#1, line width=0.7pt, fill=#1!6,
+              align=center, inner sep=4pt, font=\small},
+  tag/.style={font=\scriptsize\itshape, text=datagrey},
+  flow/.style={-{Stealth[length=2.4mm,width=1.8mm]}, line width=0.75pt,
+               draw=datagrey},
+  flowthick/.style={-{Stealth[length=3mm,width=2.4mm]}, line width=1.3pt,
+                    draw=datagrey},
+  dashflow/.style={-{Stealth[length=2.4mm,width=1.8mm]}, line width=0.7pt,
+                   draw=datagrey, dashed, dash pattern=on 2.4pt off 1.8pt},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt, fill=white, text=datagrey},
+  note/.style={font=\scriptsize, text=datagrey, align=left},
+}
+
+% ---- semantic macros -----------------------------------------------------
+\newcommand{\pharos}{\textsc{Pharos}}
+\newcommand{\fnd}[1]{\textcolor{newred}{\footnotesize\,[F#1]}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\angs}{\si{\angstrom}}
+\newcommand{\Ang}{\text{\AA}}
+\DeclareMathOperator{\RBF}{RBF}
+\DeclareMathOperator{\softmax}{softmax}
+\DeclareMathOperator{\cdist}{cdist}
+
+\captionsetup{font=small,labelfont=bf,width=0.95\textwidth}
+\setlist{itemsep=1pt,topsep=3pt,parsep=0pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textsc{Pharos}: architecture as built}
+\rhead{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}

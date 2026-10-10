@@ -1,0 +1,76 @@
+\begin{tikzpicture}[font=\small]
+\tikzset{
+  dbox/.style={rounded corners=2pt, draw=#1, line width=0.7pt, fill=#1!5,
+               align=center, inner sep=3.5pt, font=\small, text width=36mm},
+  gbox/.style={rounded corners=2pt, draw=newred, line width=0.8pt,
+               fill=newbg, align=center, inner sep=3.5pt, font=\small,
+               text width=46mm},
+}
+
+% ========================= PANEL (a) =====================================
+\begin{scope}[shift={(0,0)}]
+  \node[dbox=datagrey]                   at (0,  0   ) (ax)   {$x_\sigma\in\mathbb{R}^{B\times L\times 3\times 3}$\\[-2pt]\tiny the noised iterate};
+  \node[dbox=diffpurple]                 at (0, -1.45) (ain)  {\code{in\_proj}: $\mathbb{R}^{9}\!\to\!\mathbb{R}^{d}$\\[-2pt]\tiny per residue, on its \textbf{own} 9 numbers};
+  \node[dbox=trunkblue]                  at (0, -2.95) (aadd) {$h \mathrel{+}= \code{cond\_proj}(s)$\\[-2pt]$+\;\code{time\_proj}(c_{\text{noise}})$};
+  \node[dbox=diffpurple, text width=40mm, minimum height=13mm]
+                                         at (0, -4.75) (ablk) {\textbf{DenoiseBlock} $\times\,8$\\[2pt]\tiny$\softmax\!\big(QK^{\!\top}\!/\!\sqrt{d_h}+\textcolor{trunkblue}{b^{\text{pair}}}\big)V$};
+  \node[dbox=trunkblue, text width=22mm] at (-3.6,-4.75) (apair){$b^{\text{pair}}$\\[-2pt]\tiny from $s$, $|i\!-\!j|$\\[-3pt]\tiny\textbf{static}};
+  \node[dbox=datagrey]                   at (0, -6.5 ) (aout) {\code{out}: $\mathbb{R}^{d}\!\to\!\mathbb{R}^{9}$};
+
+  \draw[flow] (ax) -- (ain);  \draw[flow] (ain) -- (aadd);
+  \draw[flow] (aadd) -- (ablk); \draw[flow] (apair) -- (ablk);
+  \draw[flow] (ablk) -- (aout);
+
+  % the path that does not exist
+  \draw[line width=1.1pt, draw=newred, dash pattern=on 2.6pt off 2.2pt,
+        -{Stealth[length=2.6mm]}]
+     (ax.east) to[out=0,in=0,looseness=1.5] (ablk.east);
+  \node[draw=newred, fill=white, line width=1pt, circle, inner sep=1.2pt,
+        font=\bfseries\footnotesize, text=newred] at (3.05,-2.35) (axx) {$\times$};
+  \node[font=\scriptsize\bfseries, text=newred, align=left, anchor=west]
+     at (3.35,-1.75) {no such\\[-2pt]path};
+\end{scope}
+
+% ========================= PANEL (b) =====================================
+\begin{scope}[shift={(10.9,0)}]
+  \node[dbox=datagrey]                   at (0,  0   ) (bx)   {$x_\sigma\in\mathbb{R}^{B\times L\times 3\times 3}$\\[-2pt]\tiny the noised iterate, \textbf{in \Ang}};
+  \node[dbox=diffpurple]                 at (0, -1.45) (bin)  {\code{in\_proj}: $\mathbb{R}^{9}\!\to\!\mathbb{R}^{d}$};
+  \node[dbox=trunkblue]                  at (0, -2.95) (badd) {$h \mathrel{+}= \code{cond\_proj}(s)$\\[-2pt]$+\;\code{time\_proj}(c_{\text{noise}})$};
+  \node[dbox=diffpurple, text width=40mm, minimum height=13mm]
+                                         at (0, -4.75) (bblk) {\textbf{DenoiseBlock} $\times\,8$\\[2pt]\tiny$\softmax\!\big(QK^{\!\top}\!/\!\sqrt{d_h}+\textcolor{trunkblue}{b^{\text{pair}}}+\textcolor{newred}{b^{\text{geom}}}\big)V$};
+  \node[dbox=trunkblue, text width=22mm] at (-3.6,-4.75) (bpair){$b^{\text{pair}}$\\[-2pt]\tiny static};
+  \node[dbox=datagrey]                   at (0, -6.5 ) (bout) {\code{out}: $\mathbb{R}^{d}\!\to\!\mathbb{R}^{9}$};
+
+  % --- the new path, in its own column ---
+  \node[gbox] at (5.2, -0.1 ) (bc4)  {$\mathrm{C4}'$ coordinates\\[-2pt]\tiny$c_i = x[:,:,1]$ \quad(\code{C4\_IDX})};
+  \node[gbox] at (5.2, -1.55) (bd)   {$d_{ij}=\lVert c_i-c_j\rVert_2$\\[-2pt]\tiny row-chunked, $128$ at a time};
+  \node[gbox] at (5.2, -3.15) (brbf) {$\phi_k(d_{ij})=e^{-(d_{ij}-\mu_k)^2/2s^2}$\\[-2pt]\tiny $16$ centres, $\mu_k\in[2,40]\,\Ang$, $s=2.375$};
+  \node[gbox] at (5.2, -4.85) (bpr)  {$b^{\text{geom}}_{hij}=\sum_k W_{hk}\,\phi_k(d_{ij})$\\[-2pt]\tiny $W\!\in\!\mathbb{R}^{8\times16}$ zero-init \;|\; $128$ parameters};
+
+  \draw[flow] (bx) -- (bin);  \draw[flow] (bin) -- (badd);
+  \draw[flow] (badd) -- (bblk); \draw[flow] (bpair) -- (bblk);
+  \draw[flow] (bblk) -- (bout);
+
+  \draw[flowthick, draw=newred] (bx.east) -- (bc4.west);
+  \draw[flow, draw=newred] (bd)  -- (brbf);
+  \draw[flow, draw=newred] (bc4) -- (bd);
+  \draw[flow, draw=newred] (brbf)-- (bpr);
+  \draw[flowthick, draw=newred] (bpr.west) -- (bblk.east);
+
+  \node[note, text=newred, align=center, text width=52mm] at (5.4,-6.5)
+     {\textbf{recomputed every call}, so as the\\[-2pt]
+      fold forms the attention follows it};
+\end{scope}
+
+% ========================= titles & divider ==============================
+\node[font=\bfseries, align=center, text width=72mm] at (0, 1.35)
+   {(a) as shipped};
+\node[font=\small\itshape, align=center, text width=76mm, text=datagrey] at (0, 0.92)
+   {coordinates never reach the attention};
+\node[font=\bfseries, align=center, text width=90mm] at (12.9, 1.35)
+   {(b) with \code{GeometricBias} \fnd{100}};
+\node[font=\small\itshape, align=center, text width=94mm, text=datagrey] at (12.9, 0.92)
+   {the current iterate steers its own attention};
+
+\draw[rule1, line width=0.7pt] (5.35,1.75) -- (5.35,-7.3);
+\end{tikzpicture}

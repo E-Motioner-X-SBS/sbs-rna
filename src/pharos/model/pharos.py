@@ -38,7 +38,7 @@ import torch.nn.functional as F
 from .dynamics import DynamicsConfig, HarmonicEnsemble
 from .diffusion import DiffusionPairFeatures
 from .heads import HeadConfig, PharosHeads
-from .shared_moe import SharedMoEConfig
+from .shared_moe import MEASURED_WIDTH_SHARED400, SharedMoEConfig
 from .motif_bank import MotifBankConfig, load_bank
 from .moe import MoEConfig, RouterFeatures
 from .trunk import TokenTrunk, TrunkConfig
@@ -83,6 +83,9 @@ class PharosConfig:
     rank: int = 16
     max_k: int = 32
     threshold_rel: float = 1.0
+    #: Mean nucleus-routing width, for the ACTIVE parameter count only. See
+    #: `SharedMoEConfig.typical_width`; `None` falls back to `max_k // 4`.
+    typical_width: Optional[float] = None
 
     @classmethod
     def shared400(cls) -> "PharosConfig":
@@ -133,6 +136,10 @@ class PharosConfig:
         # cap the width would be to force specialisation -- and the nucleus
         # threshold already does that, adaptively, per token.
         c.max_k, c.threshold_rel = 512, 1.0
+        # MEASURED, not max_k // 4. The nucleus router fires 15.28 experts on
+        # average at step 7,000; the old estimate said 128 and overstated the
+        # active count by 20.3M. See `SharedMoEConfig.typical_width`.
+        c.typical_width = MEASURED_WIDTH_SHARED400
         # 12 MiB/token without it, 0.9 with; the recompute costs ~30% and buys
         # 13x the batch, and on this card the bigger batch is worth more
         c.grad_checkpoint = True
@@ -186,7 +193,8 @@ class PharosConfig:
                     d_model=self.d_model, d_expert=self.d_expert,
                     n_experts=self.n_experts, n_shared=self.n_shared,
                     rank=self.rank, max_k=self.max_k,
-                    threshold_rel=self.threshold_rel, dropout=self.dropout)
+                    threshold_rel=self.threshold_rel, dropout=self.dropout,
+                    typical_width=self.typical_width)
                  if self.shared_experts else
                  MoEConfig(d_model=self.d_model, d_expert=self.d_expert,
                            n_experts=self.n_experts, n_shared=self.n_shared,

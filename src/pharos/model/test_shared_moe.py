@@ -184,6 +184,41 @@ def main() -> int:
         and '"mean_width": mean_width.detach()' in mod_src,
         "so the reported width and the one in the gradient cannot drift")
 
+    # ---- the active parameter count must cost a MEASURED width ----------
+    # `n_active_params` used `max_k // 4`, which for shared400 is 128, while
+    # the router audit in the same repository measured 15.28. Nothing
+    # compared them, and every log line and budget table carried the 8.4x
+    # overstatement. This test is the comparison.
+    print("\n== the active count's routing width is the measured one ==")
+    import json as _json
+    from pharos.model.shared_moe import MEASURED_WIDTH_SHARED400
+    audit = (Path(__file__).resolve().parents[3]
+             / "data/samples/analysis/router_audit.json")
+    if audit.exists():
+        rj = _json.loads(audit.read_text())
+        meas = float(rj["mean_width"])
+        chk("the constant matches scripts/audit_router.py's measurement",
+            abs(MEASURED_WIDTH_SHARED400 - meas) < 0.01,
+            f"constant {MEASURED_WIDTH_SHARED400} against measured {meas:.4f} "
+            f"at step {rj.get('step')} -- re-run audit_router.py and update "
+            f"the constant together, or they drift apart again")
+        chk("and it is nowhere near the max_k // 4 it replaced",
+            abs(meas - 128.0) > 50.0,
+            f"measured {meas:.2f} against the old estimate 128.0, a "
+            f"{128.0 / meas:.1f}x overstatement worth 20.3M parameters")
+    else:
+        chk("router audit present to check the constant against", False,
+            f"{audit} is missing, so the width is unverifiable")
+
+    from pharos.model.pharos import PharosConfig, Pharos
+    with torch.device("meta"):
+        _m = Pharos(PharosConfig.shared400())
+    _pc = _m.param_counts()
+    chk("shared400's active count uses it",
+        _pc["active"] == 306_001_570,
+        f"{_pc['active']:,} active of {_pc['total']:,} total; the old "
+        f"assumed-width number was 326,258,698")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

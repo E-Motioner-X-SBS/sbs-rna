@@ -1253,3 +1253,79 @@ callers — the training loss, the internal sampler, and
 settings read TM 0.0890 / 0.0913 / 0.0936 against a ~0.0023 noise floor;
 whether this moves them is the next experiment, and it is the first
 change since 90 with a mechanism that predicts it should.
+
+## 102 — the active parameter count assumed a width the repo had already measured
+
+| # | what | status |
+|---|---|---|
+| 102 | `SharedMoE.n_active_params` costed a token at `max_k // 4` experts, which for shared400's `max_k = 512` is **128**. The router audit in the same repository measured the mean nucleus width at **15.28**. An 8.4x overstatement, carried in every training log, every budget table and every tokens-per-active-parameter figure | `FIXED` |
+
+The docstring four lines above the constant says it returns "parameters
+touched by a token at the AVERAGE routing width", and the body of the
+same property then used a constant fraction of a cap. Nothing ever
+compared the two, although both numbers were already on disk:
+`data/samples/analysis/router_audit.json` records `mean_width` 15.2750 at
+step 7,000 (992.8M tokens, shared400, 512 experts, `max_k` 512), and the
+gate has pinned it as claim R2 since it was measured.
+
+| | assumed | measured |
+|---|---|---|
+| routing width | 128 | **15.28** |
+| per-adapter parameters | 9,984 | 9,984 |
+| over-count per block | — | 1,125,446 |
+| over-count, 18 blocks | — | **20,258,027** |
+
+| | reported | corrected |
+|---|---|---|
+| active parameters | 326,258,698 | **306,001,570** |
+| tokens/active-param at 3.340B | 10.24 | **10.92** |
+| at the 8e9 budget | 24.5 | **26.1** |
+| Chinchilla-optimal (20/param) | 6.53B tokens | **6.12B** |
+
+Only the shared path is affected. `mini`, `small` and `base400` route
+top-k, where exactly `top_k` experts fire and the count is exact.
+
+`typical_width` is now a config field defaulting to the measured constant,
+and `test_shared_moe.py` reads `router_audit.json` and fails if the two
+drift apart. The width is a measurement that has to be re-taken when the
+router changes, not a number anyone may type.
+
+Nothing in the gate or the tests pinned the old figure; it appears only in
+historical run records, which are left as they were written.
+
+## 103 — two thirds of the trunk cannot see to its right
+
+| # | what | status |
+|---|---|---|
+| 103 | 12 of the trunk's 18 blocks are `GatedDeltaNet`, which is **strictly causal**. \pharos{} is an encoder, not a language model, and nothing in the task calls for a causal mask | `DECLARED` — the fact is measured, the consequence is not |
+
+`BLOCK_PATTERN` is `(gdn, gdn, swa, gdn, gdn, swa, gdn, full)` tiled to 18,
+giving `G G S G G S G F G G S G G S G F G G`: twelve `gdn`, four `swa`
+banded at ±128, and two `full` at indices **7 and 15**.
+
+Measured directly — scramble the right half of the input and watch the
+left half of the output:
+
+| mixer | left-half change |
+|---|---|
+| `gdn` | **0.000e+00** |
+| `swa` (w=8) | 2.012e-01 |
+| `full` | 1.445e-01 |
+
+Exactly zero, as the `tril` masks and the chunk-ordered state recurrence
+require. So a nucleotide can be paired with a partner more than 128 nt to
+its **right** only through the two `full` blocks — and those are the two
+blocks finding 92 measured at chance against the contact map (AUROC
+0.44–0.52).
+
+**Why this is DECLARED and not a defect.** The contact head reaches
+AP 0.885, so the information plainly arrives. Two routes explain that
+without any help from `gdn`: the pair features are an outer sum
+`A s_i + B s_j`, which sees both endpoints whatever the attention did, and
+the trunk is run three times with the previous pass recycled in, so
+right-context gathered by `swa`/`full` in loop 0 reaches left positions in
+loop 1. The causal mask is an unforced restriction inherited from
+language-model architectures, and removing it is a strict increase in
+capacity — but "unforced" is not "harmful", and this register does not
+promote a hypothesis to a defect without an A/B. That experiment is
+queued behind finding 100's.
