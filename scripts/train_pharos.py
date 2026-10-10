@@ -991,187 +991,215 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
     model.eval()
     acc: Dict[str, List[float]] = {}
     pool: Dict[str, List[np.ndarray]] = {}
+    n_oom_eval = 0
     for bi, batch in enumerate(ds.iter_batches(token_budget=token_budget,
                                                shuffle=False)):
         if max_batches is not None and bi >= max_batches:
             break
-        t = to_device(batch, device)
-        # `enabled=`, not an unconditional cuda autocast. Every other autocast
-        # in this file is guarded; this one was not, so a cpu run entered a
-        # cuda autocast region on a machine that may have no cuda at all.
-        with torch.autocast(device.type, dtype=torch.bfloat16,
-                            enabled=(device.type == "cuda")):
-            out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
-                        feats=router_features(t),
-                        dynamics=bool(t["rigidity_mask"].any()))
-        m = t["mask"]
-        if m.any():
-            pool.setdefault("mg_score", []).append(
-                out["mg_logit"][m].float().cpu().numpy())
-            pool.setdefault("mg_label", []).append(
-                (t["mg_site"][m] > 0).cpu().numpy())
-        # head 11, pooled over the split rather than averaged per batch --
-        # the same correction this function's docstring records for the
-        # correlations. A mean of per-batch mean angular errors is not the
-        # split's mean angular error when the batches have different residue
-        # counts, and here they always do.
-        cmv = t.get("coord_residue_mask")
-        if cmv is not None and bool(cmv.any()) and "torsion_sincos" in out:
-            av, vv = pseudotorsions_torch(t["coords"].float(), cmv)
-            vv = vv & m.unsqueeze(-1)
-            if bool(vv.any()):
-                pr = out["torsion_sincos"].float()
-                pr = pr / pr.norm(dim=-1, keepdim=True).clamp(min=1e-8)
-                for k, nm in enumerate(TORSION_NAMES):
-                    sel = vv[..., k]
-                    if not bool(sel.any()):
-                        continue
-                    a = av[..., k][sel]
-                    u = pr[..., k, :][sel]
-                    d = (u[:, 0] * a.sin() + u[:, 1] * a.cos()).clamp(-1, 1)
-                    pool.setdefault(f"tors_{nm}_err", []).append(
-                        d.arccos().rad2deg().cpu().numpy())
-                    pool.setdefault(f"tors_{nm}_true", []).append(
-                        a.cpu().numpy())
-        rm = t["rigidity_mask"]
-        if rm.any():
-            pool.setdefault("rig_pred", []).append(
-                out["rigidity"][rm].float().cpu().numpy())
-            pool.setdefault("rig_true", []).append(
-                t["b_factor_z"][rm].float().cpu().numpy())
-
-        # ---- HEAD 1, which had no validation metric either ----------------
+        # An OOM in VALIDATION used to be fatal. The training loop above
+        # skips an OOM batch and carries on -- chain lengths run to 4,298
+        # and batches are packed to a token budget, so one long-chain
+        # batch can cost several times the median -- but `evaluate` had no
+        # such guard, so the same unlucky batch that costs one gradient
+        # during training killed the whole run during validation. It did:
+        # a 40-epoch stage-5 run died at epoch 25, after 25 successful
+        # validations, with the traceback in `DiffusionPairFeatures`. The
+        # guard existed and was exercised five times in that very run; it
+        # simply did not cover the other half of the step.
         #
-        # `val_contact_ap` was a DECLARED telemetry column for a number this
-        # function never computed. Contacts are the head the pair track exists
-        # for and the one every other head's features route through, and the
-        # only thing said about it on held-out data was nothing at all.
-        #
-        # Scored exactly as training scores it -- the same sampled pairs, the
-        # same coevolution lookup, the same motif mixture -- because a
-        # validation path that builds the features differently measures a
-        # different model. Average precision with the base rate beside it,
-        # for the same reason the Mg head is: the positives are a few percent
-        # of sampled pairs and accuracy at any threshold is uninformative.
-        Bv, Lv = t["tokens"].shape
-        ii_l, jj_l, y_l, bi_l = [], [], [], []
-        for b in range(Bv):
-            Lb = int(t["lengths"][b])
-            ii, jj, y = sample_pairs(t["contacts"][b], Lb, 512, device)
-            if ii is None or len(ii) == 0:
-                continue
-            ii_l.append(ii); jj_l.append(jj); y_l.append(y)
-            bi_l.append(torch.full((len(ii),), b, dtype=torch.long,
-                                   device=device))
-        if ii_l:
-            ii = torch.cat(ii_l); jj = torch.cat(jj_l)
-            yv = torch.cat(y_l); bidx = torch.cat(bi_l)
-            h = out["hidden"]
-            pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], -1))
-            lwk = t.get("lw_key")
-            if lwk is not None and lwk.numel():
-                lo = torch.minimum(ii, jj).to(torch.int64)
-                hi = torch.maximum(ii, jj).to(torch.int64)
-                want = bidx.to(torch.int64) * Lv * Lv + lo * Lv + hi
-                pos = torch.searchsorted(lwk, want).clamp(max=lwk.numel() - 1)
-                hitlw = lwk[pos] == want
-                if bool(hitlw.any()):
-                    # `lwl.shape[-1]`, not a config attribute. `cfg.heads`
-                    # does not exist -- it is `cfg.head_cfg()` -- and this is
-                    # the second time in this file that reaching for the class
-                    # count through the config has been wrong where the
-                    # logits' own width is right by construction.
-                    lwl = model.heads.pair.geometry(pair[hitlw])
-                    for k, v in _class_metrics(lwl, t["lw_val"][pos[hitlw]],
-                                               "lw", lwl.shape[-1]).items():
-                        acc.setdefault(k, []).append(float(v))
-            cv = lookup_coevolution(t, bidx, ii, jj, Lv)
-            if cv is not None:
-                acc.setdefault("coev_frac", []).append(
-                    float((cv != 0).float().mean()))
-                pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))
-            if model.motifs is not None:
-                r, minfo = model.motifs(pair)
-                acc.setdefault("motif_eff", []).append(
-                    float(minfo["effective_motifs"]))
-                pair = pair + model.motif_mix(r)
-            pool.setdefault("contact_score", []).append(
-                model.heads.pair.contact(pair).squeeze(-1).float().cpu().numpy())
-            pool.setdefault("contact_label", []).append(
-                (yv > 0.5).cpu().numpy())
-
-        # ---- HEAD 3, which had no validation metric at all -----------------
-        #
-        # This function returned Mg and rigidity. Two heads of ten, and not the
-        # one the project exists for: the structure head trains against a
-        # denoising loss and its only report was that loss on TRAINING batches.
-        # A stage whose deliverable is coordinates could not say whether the
-        # coordinates were improving on held-out data.
-        #
-        # The EDM loss on val costs one extra forward through the decoder and
-        # is the like-for-like number. The GEOMETRY terms matter more: `bond_cn`
-        # and `bond_pp` are flat-bottomed violations in angstroms, and they are
-        # the only quantity that asks whether the output is a CHAIN. The blind
-        # test on rp01 reported 0.0% of bonds in tolerance with a median C4'-N
-        # of 37.95 A against a true 3.38 -- a gas of points -- and TM-score and
-        # lDDT cannot see that, because superposition metrics never ask whether
-        # anything is bonded.
-        crm = t.get("coord_residue_mask")
-        if crm is not None and bool(crm.any()) and "coords" in t:
-            sh = model.heads.structure
-            # `diff_pair(hidden, coev_dense)`, not `(hidden, mask)`. The second
-            # argument is a DENSE (B, L, L) coupling map, and passing the mask
-            # got as far as a shape error only because L happened to differ
-            # between the two -- with a square mask it would have silently fed
-            # the wrong tensor into the pair features. Validation must use the
-            # same couplings the training step does, or it is measuring a
-            # different model.
-            _B, _L = t["tokens"].shape
-            cvd = torch.zeros(_B, _L, _L, device=device,
-                              dtype=out["hidden"].dtype)
-            _k = t.get("coev_key")
-            if _k is not None and _k.numel():
-                _bb = torch.div(_k, _L * _L, rounding_mode="floor")
-                _rem = _k - _bb * _L * _L
-                _ii = torch.div(_rem, _L, rounding_mode="floor")
-                _jj = _rem - _ii * _L
-                _ok = (_bb < _B) & (_ii < _L) & (_jj < _L)
-                cvd[_bb[_ok], _ii[_ok], _jj[_ok]] = \
-                    t["coev_val"].to(cvd.dtype)[_ok]
-                cvd = cvd + cvd.transpose(1, 2)
-            pair3 = model.diff_pair(out["hidden"], cvd)
+        # Skipping costs a few metrics' worth of batch. Dying costs hours.
+        try:
+            t = to_device(batch, device)
+            # `enabled=`, not an unconditional cuda autocast. Every other autocast
+            # in this file is guarded; this one was not, so a cpu run entered a
+            # cuda autocast region on a machine that may have no cuda at all.
             with torch.autocast(device.type, dtype=torch.bfloat16,
                                 enabled=(device.type == "cuda")):
-                # `torch.Generator()` is a CPU generator whatever the
-                # tensors are, and `random_rigid` feeds it to a `torch.randn`
-                # on the coordinates' device: on CUDA that raises "Expected a
-                # 'cuda' device type for generator but found 'cpu'" at the
-                # FIRST eval batch, so stage 5 trained and then died before
-                # reporting a single validation number. The seed is per-batch
-                # and fixed so the augmentation is reproducible; the device
-                # has to follow the tensors for that to be reachable at all.
-                dl = sh.loss(t["coords"].to(out["hidden"].dtype),
-                             out["hidden"], pair3, crm,
-                             generator=torch.Generator(device=device
-                                                       ).manual_seed(1234 + bi))
-            for k in ("loss", "mse", "violation", "bond_cn", "bond_pp"):
-                if k in dl:
-                    acc.setdefault(f"structure_{k}", []).append(
-                        float(dl[k].detach()))
+                out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
+                            feats=router_features(t),
+                            dynamics=bool(t["rigidity_mask"].any()))
+            m = t["mask"]
+            if m.any():
+                pool.setdefault("mg_score", []).append(
+                    out["mg_logit"][m].float().cpu().numpy())
+                pool.setdefault("mg_label", []).append(
+                    (t["mg_site"][m] > 0).cpu().numpy())
+            # head 11, pooled over the split rather than averaged per batch --
+            # the same correction this function's docstring records for the
+            # correlations. A mean of per-batch mean angular errors is not the
+            # split's mean angular error when the batches have different residue
+            # counts, and here they always do.
+            cmv = t.get("coord_residue_mask")
+            if cmv is not None and bool(cmv.any()) and "torsion_sincos" in out:
+                av, vv = pseudotorsions_torch(t["coords"].float(), cmv)
+                vv = vv & m.unsqueeze(-1)
+                if bool(vv.any()):
+                    pr = out["torsion_sincos"].float()
+                    pr = pr / pr.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+                    for k, nm in enumerate(TORSION_NAMES):
+                        sel = vv[..., k]
+                        if not bool(sel.any()):
+                            continue
+                        a = av[..., k][sel]
+                        u = pr[..., k, :][sel]
+                        d = (u[:, 0] * a.sin() + u[:, 1] * a.cos()).clamp(-1, 1)
+                        pool.setdefault(f"tors_{nm}_err", []).append(
+                            d.arccos().rad2deg().cpu().numpy())
+                        pool.setdefault(f"tors_{nm}_true", []).append(
+                            a.cpu().numpy())
+            rm = t["rigidity_mask"]
+            if rm.any():
+                pool.setdefault("rig_pred", []).append(
+                    out["rigidity"][rm].float().cpu().numpy())
+                pool.setdefault("rig_true", []).append(
+                    t["b_factor_z"][rm].float().cpu().numpy())
 
-        # ---- head 10, motif class, on val ---------------------------------
-        lm = t.get("loop_mask")
-        if lm is not None and bool(lm.any()):
-            ml = out["motif_logits"]
-            for k, v in _class_metrics(ml[lm].detach(), t["loop_class"][lm],
-                                       "motif", ml.shape[-1]).items():
-                # no `val_` here. The epoch log prefixes every key this
-                # function returns, so prefixing again produced
-                # `val_val_motif_acc` -- a column no field list declares, in
-                # the one metric block `evaluate` added for head 10.
-                acc.setdefault(k, []).append(float(v))
+            # ---- HEAD 1, which had no validation metric either ----------------
+            #
+            # `val_contact_ap` was a DECLARED telemetry column for a number this
+            # function never computed. Contacts are the head the pair track exists
+            # for and the one every other head's features route through, and the
+            # only thing said about it on held-out data was nothing at all.
+            #
+            # Scored exactly as training scores it -- the same sampled pairs, the
+            # same coevolution lookup, the same motif mixture -- because a
+            # validation path that builds the features differently measures a
+            # different model. Average precision with the base rate beside it,
+            # for the same reason the Mg head is: the positives are a few percent
+            # of sampled pairs and accuracy at any threshold is uninformative.
+            Bv, Lv = t["tokens"].shape
+            ii_l, jj_l, y_l, bi_l = [], [], [], []
+            for b in range(Bv):
+                Lb = int(t["lengths"][b])
+                ii, jj, y = sample_pairs(t["contacts"][b], Lb, 512, device)
+                if ii is None or len(ii) == 0:
+                    continue
+                ii_l.append(ii); jj_l.append(jj); y_l.append(y)
+                bi_l.append(torch.full((len(ii),), b, dtype=torch.long,
+                                       device=device))
+            if ii_l:
+                ii = torch.cat(ii_l); jj = torch.cat(jj_l)
+                yv = torch.cat(y_l); bidx = torch.cat(bi_l)
+                h = out["hidden"]
+                pair = model.pair_proj(torch.cat([h[bidx, ii], h[bidx, jj]], -1))
+                lwk = t.get("lw_key")
+                if lwk is not None and lwk.numel():
+                    lo = torch.minimum(ii, jj).to(torch.int64)
+                    hi = torch.maximum(ii, jj).to(torch.int64)
+                    want = bidx.to(torch.int64) * Lv * Lv + lo * Lv + hi
+                    pos = torch.searchsorted(lwk, want).clamp(max=lwk.numel() - 1)
+                    hitlw = lwk[pos] == want
+                    if bool(hitlw.any()):
+                        # `lwl.shape[-1]`, not a config attribute. `cfg.heads`
+                        # does not exist -- it is `cfg.head_cfg()` -- and this is
+                        # the second time in this file that reaching for the class
+                        # count through the config has been wrong where the
+                        # logits' own width is right by construction.
+                        lwl = model.heads.pair.geometry(pair[hitlw])
+                        for k, v in _class_metrics(lwl, t["lw_val"][pos[hitlw]],
+                                                   "lw", lwl.shape[-1]).items():
+                            acc.setdefault(k, []).append(float(v))
+                cv = lookup_coevolution(t, bidx, ii, jj, Lv)
+                if cv is not None:
+                    acc.setdefault("coev_frac", []).append(
+                        float((cv != 0).float().mean()))
+                    pair = pair + model.coev_proj(cv.unsqueeze(-1).to(pair.dtype))
+                if model.motifs is not None:
+                    r, minfo = model.motifs(pair)
+                    acc.setdefault("motif_eff", []).append(
+                        float(minfo["effective_motifs"]))
+                    pair = pair + model.motif_mix(r)
+                pool.setdefault("contact_score", []).append(
+                    model.heads.pair.contact(pair).squeeze(-1).float().cpu().numpy())
+                pool.setdefault("contact_label", []).append(
+                    (yv > 0.5).cpu().numpy())
 
+            # ---- HEAD 3, which had no validation metric at all -----------------
+            #
+            # This function returned Mg and rigidity. Two heads of ten, and not the
+            # one the project exists for: the structure head trains against a
+            # denoising loss and its only report was that loss on TRAINING batches.
+            # A stage whose deliverable is coordinates could not say whether the
+            # coordinates were improving on held-out data.
+            #
+            # The EDM loss on val costs one extra forward through the decoder and
+            # is the like-for-like number. The GEOMETRY terms matter more: `bond_cn`
+            # and `bond_pp` are flat-bottomed violations in angstroms, and they are
+            # the only quantity that asks whether the output is a CHAIN. The blind
+            # test on rp01 reported 0.0% of bonds in tolerance with a median C4'-N
+            # of 37.95 A against a true 3.38 -- a gas of points -- and TM-score and
+            # lDDT cannot see that, because superposition metrics never ask whether
+            # anything is bonded.
+            crm = t.get("coord_residue_mask")
+            if crm is not None and bool(crm.any()) and "coords" in t:
+                sh = model.heads.structure
+                # `diff_pair(hidden, coev_dense)`, not `(hidden, mask)`. The second
+                # argument is a DENSE (B, L, L) coupling map, and passing the mask
+                # got as far as a shape error only because L happened to differ
+                # between the two -- with a square mask it would have silently fed
+                # the wrong tensor into the pair features. Validation must use the
+                # same couplings the training step does, or it is measuring a
+                # different model.
+                _B, _L = t["tokens"].shape
+                cvd = torch.zeros(_B, _L, _L, device=device,
+                                  dtype=out["hidden"].dtype)
+                _k = t.get("coev_key")
+                if _k is not None and _k.numel():
+                    _bb = torch.div(_k, _L * _L, rounding_mode="floor")
+                    _rem = _k - _bb * _L * _L
+                    _ii = torch.div(_rem, _L, rounding_mode="floor")
+                    _jj = _rem - _ii * _L
+                    _ok = (_bb < _B) & (_ii < _L) & (_jj < _L)
+                    cvd[_bb[_ok], _ii[_ok], _jj[_ok]] = \
+                        t["coev_val"].to(cvd.dtype)[_ok]
+                    cvd = cvd + cvd.transpose(1, 2)
+                pair3 = model.diff_pair(out["hidden"], cvd)
+                with torch.autocast(device.type, dtype=torch.bfloat16,
+                                    enabled=(device.type == "cuda")):
+                    # `torch.Generator()` is a CPU generator whatever the
+                    # tensors are, and `random_rigid` feeds it to a `torch.randn`
+                    # on the coordinates' device: on CUDA that raises "Expected a
+                    # 'cuda' device type for generator but found 'cpu'" at the
+                    # FIRST eval batch, so stage 5 trained and then died before
+                    # reporting a single validation number. The seed is per-batch
+                    # and fixed so the augmentation is reproducible; the device
+                    # has to follow the tensors for that to be reachable at all.
+                    dl = sh.loss(t["coords"].to(out["hidden"].dtype),
+                                 out["hidden"], pair3, crm,
+                                 generator=torch.Generator(device=device
+                                                           ).manual_seed(1234 + bi))
+                for k in ("loss", "mse", "violation", "bond_cn", "bond_pp"):
+                    if k in dl:
+                        acc.setdefault(f"structure_{k}", []).append(
+                            float(dl[k].detach()))
+
+            # ---- head 10, motif class, on val ---------------------------------
+            lm = t.get("loop_mask")
+            if lm is not None and bool(lm.any()):
+                ml = out["motif_logits"]
+                for k, v in _class_metrics(ml[lm].detach(), t["loop_class"][lm],
+                                           "motif", ml.shape[-1]).items():
+                    # no `val_` here. The epoch log prefixes every key this
+                    # function returns, so prefixing again produced
+                    # `val_val_motif_acc` -- a column no field list declares, in
+                    # the one metric block `evaluate` added for head 10.
+                    acc.setdefault(k, []).append(float(v))
+
+        except torch.OutOfMemoryError:
+            n_oom_eval += 1
+            t = out = None                      # drop this batch's activations
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+            if n_oom_eval <= 3:
+                print(f"[pharos] eval OOM #{n_oom_eval} at batch {bi}; "
+                      f"batch skipped", flush=True)
+            continue
     res: Dict = {k: round(float(np.mean(v)), 4) for k, v in acc.items()}
+    # Reported, not swallowed: a validation number computed from fewer
+    # batches than were offered is a different measurement, and the
+    # reader has to be told so.
+    if n_oom_eval:
+        res["eval_oom_batches"] = n_oom_eval
     # the geometry numbers carry their targets, so a reader does not have to
     # know that C4'-N is 3.38 A and P-P is 6.01 to see whether 0.4 is good
     if "structure_bond_cn" in res:

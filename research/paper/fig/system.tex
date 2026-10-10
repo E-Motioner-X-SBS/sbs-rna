@@ -1,0 +1,71 @@
+\begin{tikzpicture}[font=\small]
+\tikzset{
+  st/.style={rounded corners=2.5pt, draw=#1, line width=0.8pt, fill=#1!7,
+             align=center, inner sep=4pt, font=\small},
+  hd/.style={rounded corners=1.5pt, draw=headgreen, line width=0.6pt,
+             fill=headbg, align=center, inner sep=3pt, font=\scriptsize,
+             text width=32mm},
+}
+
+% ------------------------- inputs ---------------------------------------
+\node[st=datagrey, text width=33mm] at (0, 0.05) (seq)
+   {\textbf{sequence}\\[-1pt]\tiny 13 symbols, 371 modified species};
+\node[st=datagrey, text width=33mm] at (0,-1.30) (chem)
+   {\textbf{chemistry}\\[-1pt]\tiny 24 static features per residue};
+\node[st=datagrey, text width=33mm] at (0,-2.60) (msa)
+   {\textbf{coevolution}\\[-1pt]\tiny APC-corrected MI over Rfam};
+\node[st=physteal, text width=33mm] at (0,-4.05) (phys)
+   {\textbf{physics}\\[-1pt]\tiny Manning condensation, Debye\\[-3pt]
+    \tiny screening $\to$ pair bias.\\[-3pt]\tiny closed form, no training stage};
+
+\node[st=trunkblue, text width=18mm, minimum height=26mm] at (3.7,-0.95) (emb)
+   {\textbf{embed}\\[3pt]\tiny tok $+$ mod\\[-2pt]\tiny $+$ chem $+$ pos\\[-2pt]
+    \tiny LayerNorm};
+\draw[flow] (seq)  -- (emb); \draw[flow] (chem) -- (emb);
+
+% ------------------------- trunk ----------------------------------------
+\node[st=trunkblue, text width=44mm, minimum height=26mm] at (7.9,-0.95) (trunk)
+   {\textbf{token trunk}\\[3pt]
+    \tiny 18 blocks: 12 \code{gdn} $+$ 4 \code{swa} $+$ 2 \code{full}\\[1.5pt]
+    \tiny shared-adapter MoE, 512 experts, nucleus-routed\\[1.5pt]
+    \tiny $\times\,3$ recurrent loops $=$ 54 effective layers\\[3pt]
+    \scriptsize $395.3$M total \;|\; $306.0$M active \fnd{102}};
+\draw[flow] (emb) -- (trunk);
+\draw[dashflow, draw=datagrey]  (msa.east)  -| (6.3,-1.6) -- (trunk.west|-0,-1.6);
+\draw[dashflow, draw=physteal]  (phys.east) -| (6.0,-1.9) -- (trunk.west|-0,-1.9);
+
+% ------------------------- heads ----------------------------------------
+\node[hd] at (13.3, 1.30) (h1) {\textbf{1} contact\hfill\tiny $L\!\times\!L$ binary};
+\node[hd] at (13.3, 0.60) (h2) {\textbf{2} distance\hfill\tiny 40 bins};
+\node[hd] at (13.3,-0.10) (h9) {\textbf{9} Leontis--Westhof\hfill\tiny 13 classes};
+\node[hd] at (13.3,-0.80) (h6) {\textbf{6} Mg$^{2+}$ \;\; \textbf{7} rigidity};
+\node[hd] at (13.3,-1.50) (h10){\textbf{10} motif \;\; base identity};
+\node[hd] at (13.3,-2.20) (h11){\textbf{11} torsion\hfill\tiny $\eta,\theta,\tilde\chi$ as $(\sin,\cos)$};
+\node[hd, draw=datagrey, fill=datagrey!7] at (13.3,-2.95) (hu)
+   {\textbf{4} secondary \;\; \textbf{5} SHAPE\\[-2pt]\tiny trained in stages 2--3};
+\foreach \n in {h1,h2,h9,h6,h10,h11,hu}{\draw[flow] (trunk.east) -- (\n.west);}
+
+% ------------------------- decoder --------------------------------------
+\node[st=diffpurple, text width=52mm, minimum height=21mm] at (7.9,-5.55) (dec)
+   {\textbf{head 3 --- diffusion decoder}\\[3pt]
+    \tiny EDM preconditioning, $\sigma_{\text{data}}=16\,\Ang$,
+      $\ln\sigma\sim\mathcal{N}(2.264,1.2^2)$\\[1.5pt]
+    \tiny 8 \code{DenoiseBlock}s attending over residues\\[1.5pt]
+    \tiny\textcolor{newred}{\code{GeometricBias}: the \emph{current} $C4'$
+      distances} \fnd{100}\\[3pt]
+    \scriptsize output: $(P, C4', N)$ per residue};
+\draw[flowthick] (trunk.south) -- (dec.north);
+\node[lbl, anchor=west] at (8.1,-3.3)
+   {\scriptsize $h$, and \code{DiffusionPairFeatures}$(h,\text{coev})$};
+
+\node[st=datagrey, text width=30mm] at (13.3,-5.55) (out)
+   {\textbf{3D backbone}\\[-1pt]\tiny 50 Heun steps,
+    $\sigma:160\!\to\!0.002\,\Ang$};
+\draw[flowthick] (dec) -- (out);
+
+\node[note, align=center, text width=36mm, text=newred] at (1.3,-5.55)
+   {\textbf{the fold is built here}\\[1pt]
+    \tiny everything above only conditions it ---\\[-3pt]
+    \tiny no head above places an atom};
+\draw[dashflow, draw=newred] (3.3,-5.55) -- (dec.west);
+\end{tikzpicture}

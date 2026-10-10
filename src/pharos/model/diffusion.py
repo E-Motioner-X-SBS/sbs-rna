@@ -213,23 +213,54 @@ class GeometricBias(nn.Module):
         #: and no slower. The output is bit-identical either way.
         self.chunk = chunk
 
-    def _rows(self, c4: torch.Tensor, lo: int, hi: int) -> torch.Tensor:
+    def _rows(self, c4: torch.Tensor, lo: int, hi: int,
+              dt: torch.dtype) -> torch.Tensor:
         """Head bias for query rows `lo:hi` against every key. Separate so
-        `checkpoint` has a function to recompute."""
-        d = torch.cdist(c4[:, lo:hi].float(), c4.float())     # (B, hi-lo, L)
-        rbf = torch.exp(-((d[..., None] - self.mu) ** 2) / (2 * self.sigma ** 2))
-        return self.proj(rbf.to(self.proj.weight.dtype)).permute(0, 3, 1, 2)
+        `checkpoint` has a function to recompute.
+
+        `dt` is the working dtype, and casting to it BEFORE the basis is
+        expanded is the whole point. The first version expanded in fp32 --
+        `self.proj.weight.dtype` is fp32 even inside a bf16 autocast region,
+        because autocast casts at the operator and not on the parameter --
+        so the `(B, rows, L, n_rbf)` intermediate and the `(B, h, rows, L)`
+        output were both twice the size they needed to be. That is what
+        tipped a run which had always fitted into a fatal OOM at epoch 25.
+
+        The distances themselves are computed in fp32 and only then cast:
+        `cdist` in bf16 on coordinates that reach hundreds of angstroms
+        loses the low bits that matter. Once a distance is a distance, bf16
+        carries it to about 0.1 A against a basis width of 2.375.
+        """
+        d = torch.cdist(c4[:, lo:hi].float(), c4.float()).to(dt)
+        mu = self.mu.to(dt)
+        rbf = torch.exp(-((d[..., None] - mu) ** 2) / (2 * self.sigma ** 2))
+        return F.linear(rbf, self.proj.weight.to(dt)).permute(0, 3, 1, 2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """`x` is (B, L, N_ATOM, 3) in ANGSTROMS -> (B, n_heads, L, L)."""
         c4 = x[:, :, C4_IDX]                                  # (B, L, 3)
         L = c4.shape[1]
+        # Ask autocast, do not infer. `proj.weight` is fp32 inside a bf16
+        # region (autocast casts at the operator, not on the parameter) and
+        # `x` may be fp32 there too, so neither one answers the question
+        # "what width should this activation be". This bias is pure
+        # activation memory at (B, h, L, L); getting the width wrong doubles
+        # it, which is what turned a run that had always fitted into a fatal
+        # OOM at epoch 25.
+        dev = x.device.type
+        if torch.is_autocast_enabled(dev):
+            dt = torch.get_autocast_dtype(dev)
+        elif x.dtype in (torch.float16, torch.bfloat16):
+            dt = x.dtype
+        else:
+            dt = self.proj.weight.dtype
         ck = self.training and torch.is_grad_enabled()
         rows = []
         for lo in range(0, L, self.chunk):
             hi = min(lo + self.chunk, L)
-            rows.append(checkpoint(self._rows, c4, lo, hi, use_reentrant=False)
-                        if ck else self._rows(c4, lo, hi))
+            rows.append(checkpoint(self._rows, c4, lo, hi, dt,
+                                   use_reentrant=False)
+                        if ck else self._rows(c4, lo, hi, dt))
         return rows[0] if len(rows) == 1 else torch.cat(rows, dim=2)
 
 

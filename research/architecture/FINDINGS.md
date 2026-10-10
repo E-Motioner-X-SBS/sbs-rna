@@ -1297,7 +1297,7 @@ historical run records, which are left as they were written.
 
 | # | what | status |
 |---|---|---|
-| 103 | 12 of the trunk's 18 blocks are `GatedDeltaNet`, which is **strictly causal**. \pharos{} is an encoder, not a language model, and nothing in the task calls for a causal mask | `DECLARED` — the fact is measured, the consequence is not |
+| 103 | 12 of the trunk's 18 blocks are `GatedDeltaNet`, which is **strictly causal**. PHAROS is an encoder, not a language model, and nothing in the task calls for a causal mask | `DECLARED` — the fact is measured, the consequence is not |
 
 `BLOCK_PATTERN` is `(gdn, gdn, swa, gdn, gdn, swa, gdn, full)` tiled to 18,
 giving `G G S G G S G F G G S G G S G F G G`: twelve `gdn`, four `swa`
@@ -1329,3 +1329,63 @@ language-model architectures, and removing it is a strict increase in
 capacity — but "unforced" is not "harmful", and this register does not
 promote a hypothesis to a defect without an A/B. That experiment is
 queued behind finding 100's.
+
+## 104 — the OOM guard covered training and not validation
+
+| # | what | status |
+|---|---|---|
+| 104 | `evaluate()` had no `OutOfMemoryError` handler. The training loop beside it skips an OOM batch and carries on; validation did not, so the same unlucky batch that costs one gradient during training **killed the run** | `FIXED` |
+| 104b | `GeometricBias` expanded its radial basis in fp32 inside a bf16 autocast region, because `self.proj.weight.dtype` is fp32 there — autocast casts at the operator, not on the parameter. Twice the activation memory it needed | `FIXED` |
+
+The finding-100 A/B died at **epoch 25 of 40**, 2h in, with
+
+```
+File "scripts/train_pharos.py", line 1142, in evaluate
+File "src/pharos/model/diffusion.py", line 544, in forward
+torch.OutOfMemoryError: Tried to allocate 6.63 GiB
+```
+
+after **25 validations had already succeeded**, and in a run whose
+training loop had caught and skipped five OOMs. The comment on that
+handler states the reason it exists — "chain length here runs to 4,298
+and the batches are packed to a token budget, so one long-chain batch can
+cost several times the median. Skipping it costs one gradient; dying
+costs the epoch" — and every word of it applies equally to the
+evaluation that runs after each epoch. The guard existed, was exercised,
+and covered one of the two places that needed it.
+
+The whole batch body of `evaluate` is now inside the handler, which
+counts skips and reports `eval_oom_batches` in the returned metrics
+rather than silently averaging over fewer batches.
+
+The test is structural, because the defect is: it parses
+`scripts/train_pharos.py`, finds the batch loop in `evaluate`, and
+asserts both that a `torch.OutOfMemoryError` handler is there and that
+**nothing in the loop body sits outside it** — 16 statements inside, 0
+after. No amount of running short evaluations on small batches would have
+found this.
+
+### 104b — and the memory that provoked it
+
+`GeometricBias` is pure activation memory at `(B, h, L, L)`. It asked
+`self.proj.weight.dtype` for its working width, and inside a bf16
+autocast region that answer is **fp32**, so both the
+`(B, rows, L, n_rbf)` basis and the output were double width. It now asks
+`torch.is_autocast_enabled` / `get_autocast_dtype` instead, which is the
+only thing that actually knows.
+
+Measured on the path that died — `eval()`, `no_grad`, `L = 1024`:
+
+| batch | fp32 basis | bf16 basis | saved |
+|---|---|---|---|
+| B = 10 | 0.633 GiB | 0.321 GiB | **1.97x** |
+| B = 16 | 1.008 GiB | 0.508 GiB | **1.98x** |
+
+Distances are still computed in fp32 and cast afterwards: `cdist` in bf16
+on coordinates reaching hundreds of angstroms loses low bits that matter,
+while a *distance* in bf16 is good to about 0.1 Å against a basis width
+of 2.375.
+
+Taken together with finding 100's earlier 10.89 → 2.03 GiB chunking, the
+decoder's geometric bias now costs about a twentieth of what the first
+working version did, for a bit-identical result.

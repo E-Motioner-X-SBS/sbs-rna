@@ -256,6 +256,45 @@ def main() -> int:
     chk("every key evaluate returns has a val_ column",
         not und_val, f"undeclared: {und_val or 'none'}")
 
+    # ---- both halves of a step must survive an OOM ----------------------
+    # The training loop skipped OOM batches from early on. `evaluate` did
+    # not, so the same unlucky long-chain batch that costs one gradient in
+    # training killed a 40-epoch run during VALIDATION, at epoch 25, after
+    # the guard beside it had already fired five times. This test is
+    # structural because the failure is structural: it asks whether the
+    # handler covers the whole body, which no amount of running short
+    # evaluations on small batches would reveal.
+    print("\n== an OOM must be survivable in evaluation, not just training ==")
+    import ast as _ast
+    _src = (Path(__file__).resolve().parents[1]
+            / "scripts/train_pharos.py").read_text()
+    _tree = _ast.parse(_src)
+
+    def _batch_loop(fname, needle):
+        fn = next(n for n in _ast.walk(_tree)
+                  if isinstance(n, _ast.FunctionDef) and n.name == fname)
+        return next(n for n in _ast.walk(fn) if isinstance(n, _ast.For)
+                    and needle in _ast.dump(n.iter))
+
+    for fname, needle in (("evaluate", "iter_batches"),):
+        loop = _batch_loop(fname, needle)
+        tries = [n for n in loop.body if isinstance(n, _ast.Try)]
+        oom = [t for t in tries
+               if any(h.type is not None
+                      and "OutOfMemoryError" in _ast.unparse(h.type)
+                      for h in t.handlers)]
+        chk(f"{fname}() guards its batch loop against OutOfMemoryError",
+            bool(oom),
+            "without it one long-chain batch ends the run; chain lengths "
+            "reach 4,298 and batches are packed to a token budget")
+        if oom:
+            after = len(loop.body) - loop.body.index(oom[0]) - 1
+            chk(f"{fname}()'s guard covers the WHOLE body, with nothing after",
+                after == 0 and len(oom[0].body) > 5,
+                f"{len(oom[0].body)} statements inside the try, {after} "
+                f"unprotected after it -- a guard around half a step is "
+                f"a guard around nothing")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
