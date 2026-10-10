@@ -32,6 +32,7 @@ ARMS=(
   # environment selection, so the arm carries ENV= in its flags field and
   # `run_arm` exports it. Deeper MI for 58.5% of chains against 31.9%.
   "coevfull|$CKDIR/pharos_shared400_coevfull.pt|ENV:PHAROS_COEV_CACHE=data/derived/coevolution_full|$AN/pred_coevfull|$AN/blind_coevfull.json"
+  "cbias|$CKDIR/pharos_shared400_cbias.pt|--contact-bias|$AN/pred_cbias|$AN/blind_cbias.json"
 )
 
 done_at_40() {   # $1 = checkpoint path

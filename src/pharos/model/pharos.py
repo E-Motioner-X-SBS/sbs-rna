@@ -95,6 +95,10 @@ class PharosConfig:
     #: does not change a loaded checkpoint's forward pass.
     triangle_layers: int = 0
     triangle_c: int = 32
+    #: Finding 92: give the trunk's global attention a learned, BILINEAR
+    #: reason to attend to pairs. Off by default; zero-gated.
+    contact_bias: bool = False
+    contact_bias_rank: int = 32
 
     @classmethod
     def shared400(cls) -> "PharosConfig":
@@ -263,6 +267,58 @@ class InputEmbedding(nn.Module):
 #: rather than merely present: an entry here must really have no caller, and
 #: a module with a caller must not be listed.
 UNWIRED: Dict[str, str] = {}
+
+
+class ContactBias(nn.Module):
+    """A learned pairing bias for the trunk's global attention. Finding 92.
+
+    Finding 92 measured the two `full` blocks at AUROC **0.44-0.52**
+    against the contact map while the contact head reaches AP 0.885, and
+    read that as the model predicting contacts and not using them. The
+    rest of this register makes the simpler reading hard to avoid:
+    **nothing ever asks trunk attention to encode contacts.** The contact
+    head reads `h_i` and `h_j` directly through the pair track, so it
+    needs no help from attention; the only pair signal the full blocks
+    receive is the electrostatic bias, and finding 106 measured that at
+    **2.6e-04** of a logit. Attention at chance is the expected outcome
+    of an architecture with no mechanism for anything else.
+
+    This is that mechanism. It scores a pair **bilinearly**,
+
+        b_ij = <U h_i, V h_j> / sqrt(r)
+
+    which is the part that matters: `DiffusionPairFeatures` is an outer
+    SUM `A h_i + B h_j`, and a sum cannot represent complementarity --
+    "i pairs with j" is a statement about the two together, not about
+    each apart. A bilinear form can. Base pairing is complementarity, so
+    a sum is the wrong shape for it and a product is the right one.
+
+    `O(L^2 r)` at `r = 32`, one channel out, so it costs a single
+    `(B, L, L)` tensor -- the same shape the electrostatic bias already
+    produces and is added to it. `scale` is zero-initialised, so a loaded
+    checkpoint is bit-identical until it earns its way in.
+
+    It reaches the trunk through the EXISTING recycling hook: it is
+    computed from loop k's hidden state and biases loop k+1, so it cannot
+    see its own output and needs no extra pass.
+    """
+
+    def __init__(self, d_model: int, rank: int = 32):
+        super().__init__()
+        self.u = nn.Linear(d_model, rank, bias=False)
+        self.v = nn.Linear(d_model, rank, bias=False)
+        self.norm = nn.LayerNorm(d_model)
+        self.scale = nn.Parameter(torch.zeros(1))
+        self.r = rank
+
+    def forward(self, h: torch.Tensor,
+                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        hn = self.norm(h)
+        a, b = self.u(hn), self.v(hn)
+        bias = torch.einsum("bir,bjr->bij", a, b) / (self.r ** 0.5)
+        if mask is not None:
+            bias = bias * (mask[:, :, None] & mask[:, None, :]).to(bias.dtype)
+        return self.scale * bias
 
 
 class ElectrostaticBias(nn.Module):
@@ -453,6 +509,10 @@ class Pharos(nn.Module):
         # pretraining and structural vocabularies (D6) one model rather than two.
         self.mlm_norm = nn.LayerNorm(cfg.d_model)
         self.mlm_bias = nn.Parameter(torch.zeros(cfg.n_symbols))
+        #: Finding 92: a learned bilinear pairing bias for the full blocks.
+        #: None disables it; zero-gated, so a loaded checkpoint is unchanged.
+        self.contact_bias = (ContactBias(cfg.d_model, cfg.contact_bias_rank)
+                             if cfg.contact_bias else None)
 
     def forward(self, tokens: torch.Tensor, mod_ids: torch.Tensor,
                 chem: torch.Tensor, mask: torch.Tensor,
@@ -481,11 +541,20 @@ class Pharos(nn.Module):
         # attends to what, and that is only demonstrable against a run where
         # it does not.
         pair_bias_fn = None
-        if electrostatics:
+        if electrostatics or self.contact_bias is not None:
             def pair_bias_fn(hh: torch.Tensor, loop: int) -> torch.Tensor:
-                # `hh` goes in as well as the distance: the effective charge
-                # is per-residue now, not one rod value for the molecule.
-                return self.elec(self.vdist(hh), ionic, h=hh)
+                b = None
+                if electrostatics:
+                    # `hh` goes in as well as the distance: the effective
+                    # charge is per-residue now, not one rod value for the
+                    # molecule.
+                    b = self.elec(self.vdist(hh), ionic, h=hh)
+                if self.contact_bias is not None:
+                    # Finding 92. Added to the same tensor the full blocks
+                    # already gate, so it costs no extra (B, L, L).
+                    cb = self.contact_bias(hh, mask)
+                    b = cb if b is None else b + cb
+                return b
 
         h, aux = self.trunk(x, mask, feats, n_loops=n_loops,
                             pair_bias_fn=pair_bias_fn, supervise=supervise)

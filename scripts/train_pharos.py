@@ -1415,6 +1415,14 @@ def main() -> None:
                          "that conditioning slot has been a constant zero in "
                          "every stage. Off by default: it changes the router's "
                          "input distribution, so it is an A/B and not a fix.")
+    ap.add_argument("--contact-bias", dest="contact_bias",
+                    action="store_true", default=None,
+                    help="finding 92: give the trunk's global attention a "
+                         "learned BILINEAR pairing bias, through the pair_bias "
+                         "hook it already has. The pair track is an outer sum, "
+                         "which cannot represent complementarity -- fitted to "
+                         "a toy A-U/C-G rule it scores 0.681 against a 0.743 "
+                         "base rate, while a bilinear form fits it exactly.")
     ap.add_argument("--triangle-layers", type=int, default=None,
                     help="finding 109: rounds of triangle multiplicative "
                          "update on the decoder's pair representation. The "
@@ -1498,6 +1506,9 @@ def main() -> None:
     if args.bidirectional_gdn is not None:
         cfg.bidirectional_gdn = bool(args.bidirectional_gdn)
         _arch.append(f"bidirectional_gdn={cfg.bidirectional_gdn}")
+    if args.contact_bias is not None:
+        cfg.contact_bias = bool(args.contact_bias)
+        _arch.append(f"contact_bias={cfg.contact_bias}")
     if _arch:
         print(f"[pharos] architecture overrides for this run: "
               f"{', '.join(_arch)}", flush=True)

@@ -31,6 +31,7 @@ ARMS = {
     "109  triangle update": AN / "blind_tri.json",
     "103  bidirectional gdn": AN / "blind_bigdn.json",
     "112  union coevolution": AN / "blind_coevfull.json",
+    "92   bilinear contact bias": AN / "blind_cbias.json",
 }
 NOISE_FLOOR = 0.0023
 SPREAD = 0.0046

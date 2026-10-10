@@ -2004,3 +2004,53 @@ Selected with `PHAROS_COEV_CACHE=data/derived/coevolution_full`, and
 **not** the default — a deeper MI is a different input distribution under
 a trained checkpoint, so it is the fourth queued A/B arm and not a fix.
 112 stays `OPEN` until that arm reports.
+
+## 92, reread — the trunk was never asked to attend to contacts
+
+Finding 92 measured the two `full` blocks at AUROC **0.44–0.52** against
+the contact map while the contact head reaches AP 0.885, and read that
+as the model predicting contacts and declining to use them. Four later
+findings make a simpler reading hard to avoid.
+
+| | |
+|---|---|
+| the contact head reads `h_i` and `h_j` **directly** through the pair track | so it needs nothing from attention (109) |
+| the only pair signal the `full` blocks receive is the electrostatic bias | measured at **2.6e-04** of a logit (106) |
+| they are 2 blocks of 18, and the only globally bidirectional ones | (103) |
+| and the AP they are being compared against is on a 45%-positive sampled set | (107) |
+
+**Nothing in the architecture ever asks trunk attention to encode
+contacts.** Attention at chance is the expected outcome of that, not an
+anomaly in need of explanation. 92's observation stands; its framing —
+"predicts them and never uses them" — attributes to the model a choice
+it was never given.
+
+### The mechanism, built
+
+`ContactBias` scores a pair **bilinearly**, `<U h_i, V h_j>/sqrt(r)`, and
+adds it to the tensor the `full` blocks already gate. It reaches them
+through the **existing** `pair_bias_fn` recycling hook — computed from
+loop k's hidden state, biasing loop k+1 — so it cannot see its own
+output and needs no extra pass. 50,689 parameters at rank 32,
+zero-gated.
+
+**Why bilinear is the point.** `DiffusionPairFeatures` is an outer SUM,
+`A h_i + B h_j`, and a sum of per-endpoint terms cannot represent
+complementarity: "i pairs with j" is a statement about the two together.
+Base pairing *is* complementarity. Fitted to a toy A–U/C–G rule
+(`type_i + type_j == 3`):
+
+| shape | accuracy |
+|---|---|
+| outer sum `A h_i + B h_j` | **0.681** |
+| always-zero baseline | **0.743** |
+| bilinear `<U h_i, V h_j>` | **1.000** |
+
+The sum does not merely do worse — it cannot beat predicting "no pair"
+everywhere. That is the clearest statement in this register of why the
+pair track is the wrong shape for the thing it is asked to represent,
+and it is one toy problem rather than a measurement on the corpus, which
+is the honest weight to give it.
+
+Off by default behind `--contact-bias`, queued as the fifth A/B arm. 92
+stays `OPEN` until it reports.

@@ -1354,6 +1354,11 @@ def main() -> int:
               # of 306 -- because a test of the new module alone would not
               # say why it exists.
               ROOT / "src/pharos/model/test_triangle.py",
+              # Finding 92's mechanism. Its headline assertion is a
+              # comparison of SHAPES, not a property of the new module: an
+              # outer sum cannot represent complementarity and a bilinear
+              # form can, and base pairing is complementarity.
+              ROOT / "src/pharos/model/test_contact_bias.py",
               # Not named `test_*`, so the drift check below cannot see it and
               # it has to be listed deliberately. It is the standing check for
               # the defect class this whole register is about: a channel that
