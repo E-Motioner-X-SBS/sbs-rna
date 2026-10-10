@@ -2054,3 +2054,39 @@ is the honest weight to give it.
 
 Off by default behind `--contact-bias`, queued as the fifth A/B arm. 92
 stays `OPEN` until it reports.
+
+## The queue, audited before it runs
+
+Finding 111 was found by auditing the A/B queue rather than by running
+it, and it would have silently turned two arms into baseline runs. The
+rest of the chain is audited on the same principle: a queue that runs
+unattended overnight and produces plausible nonsense is worse than no
+queue.
+
+| what could silently invalidate an arm | checked | result |
+|---|---|---|
+| inference builds a different architecture than was trained | finding 111 | `FIXED` — cfg now comes from the checkpoint, unexpected tensors are fatal |
+| the resumed geom arm no longer loads under today's code | load into current `Pharos` | **0 missing, 0 unexpected**, geom bias present |
+| the new flags leak into the resumed arm | read its recorded cfg | `triangle_layers=0`, `bidirectional_gdn=False`, `contact_bias=False` |
+| finding 104b changed the geom arm's numerics mid-run | measured | **0.74%** of the bias; see below |
+| the `ENV:` arm form mis-parses and runs the default cache | exercised the parser | cli/env split correct, child process sees the variable |
+| the variable does not actually switch the cache | end to end | unset -> `source=seed`, set -> `source=full` |
+| fresh arms do not start from the stage-4 init | read the script | `--init-from` when no checkpoint exists, absent when resuming |
+
+### The one real caveat, quantified
+
+The geom arm trained epochs 0–24 with the fp32 radial basis and will
+train 25–39 with the bf16 one, because finding 104b landed in between.
+That is a numerical change inside a single arm, which is worth a number
+rather than a shrug:
+
+| | |
+|---|---|
+| bias magnitude | mean 0.04886, max 0.24623 |
+| fp32 vs bf16 | mean 3.6e-04, max 2.3e-03 |
+| relative | **0.74%** |
+| effect on an attention weight | the bias multiplies it by 1.0501; the dtype difference by **1.00036** |
+
+Immaterial against the quantity it perturbs, so the arm is resumed
+rather than restarted — which also costs an hour less of a card that is
+busy. Recorded because "immaterial" is a measurement and not an opinion.
