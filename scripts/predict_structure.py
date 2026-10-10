@@ -235,12 +235,45 @@ def main() -> int:
                     help="also write <target>_m<k>.pdb for every draw, the "
                          "form RNA-Puzzles accepts")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--allow-unexpected", action="store_true",
+                    help="sample even though the checkpoint carries tensors "
+                         "this model has no slot for. Off by default because "
+                         "that silently turns an architecture A/B into a "
+                         "baseline run scored under the arm's name.")
     args = ap.parse_args()
 
     device = torch.device(args.device)
-    cfg = getattr(PharosConfig, args.size)()
-    model = Pharos(cfg).to(device).eval()
     state = torch.load(args.ckpt, map_location=device, weights_only=False)
+
+    # THE CHECKPOINT'S OWN CONFIG, not `--size`'s defaults. This used to
+    # build `getattr(PharosConfig, args.size)()` and nothing else, which is
+    # fine while every run shares one architecture and silently fatal the
+    # moment one does not. An arm trained with `--triangle-layers 2` or
+    # `--bidirectional-gdn` writes weights this model would have no slot
+    # for; `strict=False` drops them into `unexpected`, and the line below
+    # used to count `unexpected` and warn only about `missing`. The arm
+    # would then be SAMPLED WITH THE BASELINE ARCHITECTURE and scored as
+    # "no effect" for a change that was never switched on at inference.
+    #
+    # Same shape as finding 90, in the same file: a second implementation
+    # of model construction that dropped something the first one threads.
+    cfg = getattr(PharosConfig, args.size)()
+    _saved = state.get("cfg")
+    if isinstance(_saved, dict):
+        _c = PharosConfig(**{k: v for k, v in _saved.items()
+                             if k in PharosConfig.__dataclass_fields__})
+        for k, v in _saved.items():
+            if not hasattr(_c, k):
+                setattr(_c, k, v)
+        _diff = {k: (getattr(cfg, k, None), v) for k, v in _c.__dict__.items()
+                 if getattr(cfg, k, None) != v}
+        if _diff:
+            print(f"[predict] architecture from the checkpoint, not --size: "
+                  + ", ".join(f"{k} {a}->{b}" for k, (a, b) in
+                              sorted(_diff.items())), flush=True)
+        cfg = _c
+
+    model = Pharos(cfg).to(device).eval()
     sd = state.get("model", state)
     sd = {k.replace("_orig_mod.", ""): v for k, v in sd.items()}
     missing, unexpected = model.load_state_dict(sd, strict=False)
@@ -250,6 +283,19 @@ def main() -> int:
         # head 3 untrained would silently emit noise that still scores
         print(f"[predict] WARNING missing: {missing[:4]}"
               f"{' ...' if len(missing) > 4 else ''}")
+    if unexpected:
+        # An unexpected key is a weight the checkpoint HAS and this model has
+        # nowhere to put. For an architecture A/B that is not a warning, it
+        # is the experiment silently not happening.
+        print(f"[predict] FATAL {len(unexpected)} unexpected tensors, i.e. "
+              f"the checkpoint carries weights this model has no slot for: "
+              f"{unexpected[:6]}{' ...' if len(unexpected) > 6 else ''}",
+              flush=True)
+        if not args.allow_unexpected:
+            print("[predict] refusing to sample a different architecture "
+                  "than the one that was trained; pass --allow-unexpected "
+                  "only if you know the extra tensors are inert.", flush=True)
+            return 1
 
     targets = all_targets()
     if args.targets != "all":

@@ -1806,3 +1806,47 @@ stored `n_rows` beside every cached family and nothing read it.
 rather than Neff, because by the measurements above it is a curated
 sample size and not an alignment depth. 68 stays `OPEN` until an A/B says
 whether a weak signal beats a constant zero.
+
+## 111 — inference would have sampled the baseline and scored it as the arm
+
+| # | what | status |
+|---|---|---|
+| 111 | `predict_structure.py` built its model from `getattr(PharosConfig, args.size)()` — the **defaults** — and loaded with `strict=False`, printing a warning for `missing` keys and **none for `unexpected`**. An arm trained with `--triangle-layers 2` or `--bidirectional-gdn` writes weights that model has no slot for, so they are dropped in silence and the arm is sampled as the **baseline**, then scored under the arm's name | `FIXED` |
+
+Measured, by loading an arm checkpoint into a baseline model:
+
+| | |
+|---|---|
+| missing tensors | **0** |
+| unexpected tensors | **60** |
+| of those, architecture (`triangle.*`, `bwd_scale`) | **60** |
+
+Nothing is missing, so a missing-only warning says **nothing at all**.
+The run prints `0 missing`, looks clean, and silently discards every
+tensor that makes the arm an arm.
+
+This was found by checking whether the queue I had just written would
+work, which is the only reason it was found at all: it is invisible at
+training time, invisible in the logs, and produces a *plausible* result.
+Two of the three queued A/Bs — findings 109 and 103 — would have come
+back "no effect" for changes that were never switched on at inference,
+and that answer would have been believed, because it is the same answer
+finding 93 legitimately got.
+
+It is the same shape as **finding 90**, in the same file: a second
+implementation of something the trainer already does correctly, which
+dropped an argument the first one threads. 90 was `pair=None` in a
+hand-written sampler; this is the config in a hand-written loader.
+
+### The fix
+
+`predict_structure.py` now takes its config from the checkpoint's
+recorded `cfg`, exactly as `train_pharos.py` does, and prints the
+difference when there is one. Unexpected tensors are **fatal** —
+the script refuses to sample rather than quietly run a different model —
+behind `--allow-unexpected` for the case where the extra tensors are
+genuinely inert.
+
+Three assertions in `test_stage5_losses.py`: that the config comes from
+the checkpoint, that unexpected keys are refused, and the demonstration
+that without the second one the failure is completely silent.

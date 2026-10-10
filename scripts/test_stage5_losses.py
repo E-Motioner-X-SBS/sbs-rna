@@ -337,6 +337,42 @@ def main() -> int:
         f"FULL_PAIR_MAX_L = {getattr(_tp, 'FULL_PAIR_MAX_L', None)}; an exact "
         f"measurement of a real subset beats another estimate of all of it")
 
+    # ---- inference must sample the architecture that was TRAINED --------
+    # predict_structure.py built `getattr(PharosConfig, args.size)()` and
+    # loaded with strict=False, printing a warning for `missing` and none
+    # for `unexpected`. Loading an arm checkpoint into a baseline model
+    # gives 0 missing and 60 unexpected, so every architecture tensor was
+    # dropped in silence and the arm sampled as the baseline -- then scored
+    # under the arm's name. An A/B that cannot fail that way is the whole
+    # point of running one.
+    print("\n== inference must sample the architecture that was trained ==")
+    _ps = (Path(__file__).resolve().parents[1]
+           / "scripts/predict_structure.py").read_text()
+    chk("predict_structure takes its config FROM THE CHECKPOINT",
+        'state.get("cfg")' in _ps and "PharosConfig(**{k: v" in _ps,
+        "--size's defaults carry triangle_layers=0 and "
+        "bidirectional_gdn=False, which is a different model")
+    chk("and refuses when the checkpoint carries tensors it cannot place",
+        "refusing to sample a different architecture" in _ps
+        and "allow_unexpected" in _ps,
+        "an unexpected key is a weight the checkpoint HAS and the model has "
+        "nowhere to put; for an A/B that is the experiment not happening")
+
+    import warnings as _w
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")
+        from pharos.model.pharos import PharosConfig as _PC, Pharos as _P
+        _ca = _PC.mini(); _ca.triangle_layers = 2; _ca.bidirectional_gdn = True
+        with torch.device("meta"):
+            _arm, _base = _P(_ca), _P(_PC.mini())
+        _sd = {k: torch.zeros(v.shape) for k, v in _arm.state_dict().items()}
+        _miss, _unex = _base.load_state_dict(_sd, strict=False)
+    _arch = [k for k in _unex if "triangle" in k or "bwd_scale" in k]
+    chk("an arm checkpoint in a baseline model is SILENT without that check",
+        len(_miss) == 0 and len(_arch) > 0,
+        f"{len(_miss)} missing, {len(_arch)} architecture tensors unexpected "
+        f"-- nothing is missing, so a missing-only warning says nothing at all")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))
