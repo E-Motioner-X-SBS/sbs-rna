@@ -920,6 +920,8 @@ def main() -> None:
         "fitness_loss", "fitness_spearman", "fitness_pred_sd",
         "ss_batches", "probing_batches", "fitness_batches",
         "ss_passes", "probing_passes", "fitness_passes",
+        "fitness_train_split_spearman", "fitness_train_split_assays",
+        "fitness_overfit_gap",
         "fitness_val_spearman", "fitness_val_assays",
         "fitness_val_degenerate", "fitness_val_min_pred_sd",
         "fitness_transfer_spearman", "fitness_transfer_assays",
@@ -1230,15 +1232,32 @@ def main() -> None:
         # five Townshend aptamers, a construct family no training step has
         # seen. Reporting the first alone would be reporting the training
         # accuracy under another name.
-        fit_val = fit_tr = None
+        fit_val = fit_tr = fit_trn = None
         if use_fitness:
             model.eval()
             fit_val = score_fitness(model, "val", device, feats_fn,
                                     args.batch, args.fitness_val_rows)
             fit_tr = score_fitness(model, "transfer", device, feats_fn,
                                    args.batch, args.fitness_val_rows)
+            # The TRAIN split, scored the SAME way -- per assay, then
+            # averaged over assays. Finding 97 ruled out overfitting on the
+            # grounds that "train rho 0.4266 is below val 0.5073", and those
+            # two numbers are not the same statistic. `fitness_spearman` is a
+            # running mean of PER-BATCH Spearman over batches that MIX
+            # assays, and `load_fitness`'s own docstring says why that cannot
+            # be compared: the targets are rank-normalised within each assay,
+            # so a cross-assay correlation "would mostly measure which assay
+            # a sequence came from" and is attenuated by construction. It
+            # would sit below a within-assay figure on a badly overfit model
+            # too, so it is no evidence either way.
+            #
+            # This is the comparable one. train-minus-val on these two means
+            # what a reader thinks it means.
+            fit_trn = score_fitness(model, "train", device, feats_fn,
+                                    args.batch, args.fitness_val_rows)
             model.train()
-            for nm, r in (("val", fit_val), ("transfer", fit_tr)):
+            for nm, r in (("train", fit_trn), ("val", fit_val),
+                          ("transfer", fit_tr)):
                 miss = r["n_assays"] - r["n_scored"]
                 bits = []
                 if miss:
@@ -1286,6 +1305,19 @@ def main() -> None:
                      "fitness_loss": float(np.mean(fit_loss)) if fit_loss else None,
                      "fitness_spearman": float(np.mean(fit_r)) if fit_r else None,
                      "fitness_pred_sd": float(np.mean(fit_sd)) if fit_sd else None,
+                     # Scored exactly as val is -- per assay, then averaged --
+                     # so this one may be subtracted from val. `fitness_spearman`
+                     # above may not: it is a per-batch mean over mixed-assay
+                     # batches. See the comment at the `score_fitness` calls.
+                     "fitness_train_split_spearman":
+                         (fit_trn or {}).get("mean_spearman"),
+                     "fitness_train_split_assays": (fit_trn or {}).get("n_scored"),
+                     "fitness_overfit_gap": (
+                         None if not (fit_trn and fit_val)
+                         or fit_trn.get("mean_spearman") is None
+                         or fit_val.get("mean_spearman") is None
+                         else round(fit_trn["mean_spearman"]
+                                    - fit_val["mean_spearman"], 4)),
                      "fitness_val_spearman": (fit_val or {}).get("mean_spearman"),
                      "fitness_val_assays": (fit_val or {}).get("n_scored"),
                      "fitness_val_degenerate": (fit_val or {}).get("n_degenerate"),

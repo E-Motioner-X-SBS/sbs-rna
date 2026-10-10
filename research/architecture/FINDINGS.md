@@ -1020,7 +1020,7 @@ and the longest stream finishes exactly as the loop stops.
 | # | what | status |
 |---|---|---|
 | 96 | `ss_val_macro_recall` is reported with **no class count**, while every other head in the tree reports `*_n_class` beside its macro — `lw_n_class`, `motif_n_class`, `dist_n_class`, `base_n_class`. Chance is 1/n_class, so the metric is unreadable alone: **0.2810 is 2.25× chance over 8 classes and BELOW chance over 3**, and nothing in the log said which. `ss_step` already computes `present = cnt > 0` — the mask it averages over — so the number existed and was discarded | `FIXED` |
-| 97 | Stage 6's fitness head is **worse after the second epoch than after the first**: val Spearman **+0.6044 → +0.5073**, transfer **+0.0850 → +0.0068**. Not overfitting — train rho 0.4266 is *below* val 0.5073 | `OPEN` |
+| 97 | Stage 6's fitness head is **worse after the second epoch than after the first**: val Spearman **+0.6044 → +0.5073**, transfer **+0.0850 → +0.0068**. ~~Not overfitting — train rho 0.4266 is *below* val 0.5073~~ — **see finding 108: that comparison is invalid and overfitting is back on the table** | `OPEN` |
 
 96 is fixed by returning the count `ss_step` already had and declaring
 `ss_n_class` / `ss_val_n_class`. Verified on synthetic input: 3 distinct
@@ -1572,3 +1572,53 @@ estimate; 320 is 50,560 pairs and the test split's mean length is 80.
 occupied. `contact_ap_full` on the existing checkpoint is the first thing
 to read when one frees, and it is the number that decides whether
 finding 92 still says what it says.
+
+## 108 — finding 97 ruled out overfitting by comparing two different statistics
+
+| # | what | status |
+|---|---|---|
+| 108 | Finding 97 rejected overfitting because "train rho 0.4266 is *below* val 0.5073". Those are not the same quantity: `fitness_spearman` is a running mean of **per-batch** Spearman over batches that **mix assays**, while `fitness_val_spearman` is **per-assay**, then averaged over assays | `FIXED` — a comparable train number is now computed |
+
+`load_fitness`'s own docstring states the problem exactly, two hundred
+lines above the comparison:
+
+> the metric is a WITHIN-ASSAY Spearman: the DMS score of a tRNA assay
+> and of a ribozyme assay are different quantities measured on different
+> instruments, and a correlation computed across a mixed batch would
+> mostly measure which assay a sequence came from. `target` is already
+> rank-normalised within its assay by the builder, so the regression
+> loss is comparable across a mixed batch **even though the correlation
+> is not**.
+
+Three things make the training number smaller regardless of fit:
+targets are rank-normalised *within* each assay, so cross-assay
+variation in a mixed batch is pure noise; the batch is small, so the
+correlation is attenuated by restricted range; and NaN batches are
+dropped. A badly overfit model would also show train-below-val here.
+**The comparison is no evidence either way, so finding 97's stated reason
+for excluding overfitting does not hold.**
+
+And the shape of the data points the other way. Over epochs 1→2:
+
+| split | epoch 1 | epoch 2 | what it holds out |
+|---|---|---|---|
+| val | +0.6044 | +0.5073 | unseen **variants** of seen constructs |
+| transfer | +0.0850 | **+0.0068** | an entire unseen **construct family** |
+
+Val falls by 16% and transfer by **92%**. Degrading fastest on the split
+that shares least with training is the signature of over-specialisation,
+which is what finding 97 ruled out.
+
+### The fix
+
+`score_fitness(model, "train", ...)` now runs beside val and transfer,
+scored identically — per assay, then averaged — and is reported as
+`fitness_train_split_spearman`, with `fitness_overfit_gap` = train − val
+as a number a reader may actually subtract. `train.parquet` was already
+on disk; nothing needed building. The existing `fitness_spearman` stays,
+with a comment at both ends saying what it is and why it is not the one
+to compare.
+
+This does not resolve 97 — it removes a wrong reason for an answer, and
+supplies the instrument that can give a right one on the next stage-6
+run. 97 stays `OPEN`.

@@ -395,7 +395,7 @@ At the end of a 40-epoch stage-5 run (3{,}069 optimiser steps,
 \toprule
 metric & value & reference \\
 \midrule
-contact average precision & \textbf{0.8901} & base rate 0.4541 \\
+contact average precision & \textbf{0.8901} & base rate \textbf{0.4541} \fnd{107} \\
 Mg$^{2+}$ average precision & 0.4167 & base rate 0.0254 ($16.4\times$) \\
 Leontis--Westhof accuracy & 0.8972 & majority 0.8532 \\
 motif accuracy & 0.7494 & majority 0.6925 \\
@@ -408,9 +408,35 @@ P--P bond violation & 0.1934 & target $6.01\,\Ang$ \\
 \end{tabular}
 \end{table}
 
-Contacts are predicted well. Torsions beat their circular baselines by
-$1.3$--$2.2^\circ$, which is real but small. Ion sites are $16\times$
-better than chance.
+Torsions beat their circular baselines by $1.3$--$2.2^\circ$, which is
+real but small. Ion sites are $16\times$ better than chance.
+
+\paragraph{The contact number needs a caveat, and it is a large one.}
+That average precision is computed on pairs from \code{sample\_pairs},
+which takes \emph{every} positive plus at most 512 sampled negatives, so
+the set it scores is \textbf{45.4\,\% positive}. The task --- every pair
+with $|i-j| \ge 4$ --- is \textbf{9.6\,\% positive} on this corpus, which
+we measured directly over 200 test chains. Average precision moves with
+the base rate, so $0.8901$ at a $0.4541$ base is not comparable to a
+published contact-prediction figure, and the honest normalised form is
+the lift the code also reports: $1.96\times$ base. The full-pair-set
+metric is implemented and has not yet been run, because it needs a GPU
+(finding 107).
+
+This matters beyond bookkeeping: $0.890$ is the number
+\S\ref{sec:results} and finding 92 use to argue that contacts are
+predicted well while the fold is not, and that argument is what sent the
+search into the decoder. It may survive --- see below --- but it has not
+been tested on the task it claims.
+
+\paragraph{One hypothesis, tested and refuted.} The pair feature is an
+outer sum $A s_i + B s_j$, which can score well by knowing \emph{which}
+residues are paired without knowing \emph{with whom} --- and that would
+have explained AP $0.89$ beside TM $0.09$ neatly. It does not. A
+partner-blind oracle handed the \emph{true} degree of every residue
+reaches only AP $0.3005$ on the real pair set, against a $0.0961$ base
+and $0.1209$ for sequence separation alone. The head sits far above that,
+so it does carry genuine pairing-partner information.
 
 \subsection{What the model does not do}
 
