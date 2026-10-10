@@ -325,6 +325,67 @@ turned a run that had always fitted into a fatal out-of-memory at
 epoch 25 of 40. Both are in the register as 100b and 104b.
 
 % =========================================================================
+\section{The pair representation is not constrained to be geometry}
+\label{sec:triangle}
+
+\S\ref{sec:decoder} is one half of the global-structure failure. This is
+the other, and it is a different gap.
+
+\begin{figure}[H]\centering
+\resizebox{\textwidth}{!}{\input{fig/triangle}}
+\caption{\textbf{Finding 109.} \code{DiffusionPairFeatures} is an outer
+sum, so $z_{ij}$ is a function of its two endpoints and of nothing else.
+Measured, not inferred: perturb one residue's hidden state and
+\textbf{0 of 342} pairs that exclude it move. With the triangle update,
+\textbf{306 of 306} do.}
+\label{fig:triangle}
+\end{figure}
+
+The pair representation the decoder reads is
+\begin{equation}
+z_{ij} = \mathrm{LN}\!\big(A s_i + B s_j + R_{\mathrm{clamp}(j-i)}
+         + C\,\mathrm{coev}_{ij}\big),
+\end{equation}
+an outer \emph{sum}. Its own docstring is candid about the limitation ---
+``it cannot represent interactions between the two endpoints that are not
+additive, and the attention layers above it exist to supply those'' ---
+but finding 92 measured those attention layers at chance against the
+contact map, so the non-additive part is not in fact being supplied.
+
+We measured the consequence directly. Perturbing residue 3's hidden state
+moves all 48 pair entries that involve residue 3, and \textbf{0 of the
+342} that do not. That is what an outer sum must give, and it is the
+precise sense in which the pair track cannot be geometry: distances obey
+$d_{ij} \le d_{ik} + d_{kj}$, and a predictor whose pairs are mutually
+independent has no mechanism that can know it. Such a model can emit a
+set of pairwise distances \emph{for which no three-dimensional structure
+exists at all} --- every pair locally plausible, the whole set globally
+incoherent.
+
+Seen from outside, that is lDDT $0.269$ beside TM $0.094$.
+
+The triangle multiplicative update is the standard remedy and the one
+ingredient of the AlphaFold-class pair stack this model never had. With
+$a, b$ gated projections to $c$ channels,
+\begin{equation}
+z_{ij} \mathrel{+}= g_{ij} \odot W_o\!\left(
+  \mathrm{LN}\sum_k a_{ik} \odot b_{jk}\right)
+\quad\text{(outgoing)},\qquad
+\sum_k a_{ki} \odot b_{kj} \quad\text{(incoming)} .
+\end{equation}
+Two rounds at $c = 32$ against $d_{\text{pair}} = 160$: the triangle term
+is a \emph{constraint} on the pair track, not a replacement for it. The
+cost is $O(L^3 c)$ per direction, about $1.1$\,TFLOP at $L = 1024$ and
+batch 16, and $W_o$ is zero-initialised so a loaded checkpoint is
+bit-identical until the update earns its way in.
+
+\paragraph{It is implemented and switched off.} \code{triangle\_layers}
+defaults to $0$, as does finding 103's bidirectional \code{gdn}. Three
+unmeasured architecture changes landing together would confound all
+three; the queue is 100, then 109, then 103, and \S\ref{sec:results}
+reports no outcome for any of them.
+
+% =========================================================================
 \section{Heads, losses and curriculum}
 
 \begin{table}[H]\centering\small
@@ -546,10 +607,13 @@ equal in value to fixing the model.
 \section{Limitations, and what we think is wrong}
 
 \begin{enumerate}
-\item \textbf{The fold is wrong and the fix is unmeasured.} Finding 100
-  has a mechanism that explains the observations and a bias that
-  demonstrably learns the right sign structure, and that is all that can
-  honestly be said until the A/B finishes.
+\item \textbf{The fold is wrong and two candidate fixes are
+  unmeasured.} Finding 100 (the decoder could not see current geometry)
+  and finding 109 (the pair track is not constrained to be
+  three-dimensionally embeddable) each have a mechanism that explains the
+  observations and an implementation whose effect is demonstrable on
+  synthetic input. Neither has been A/B'd. That is all that can honestly
+  be said.
 
 \item \textbf{Two thirds of the trunk cannot see to its right.}
   \texttt{gdn} is strictly causal --- scrambling the right half of the

@@ -1,0 +1,65 @@
+\begin{tikzpicture}[font=\small]
+\tikzset{
+  cell/.style={draw=#1, line width=0.5pt, minimum size=4.2mm, inner sep=0pt},
+  bx/.style={rounded corners=2pt, draw=#1, line width=0.7pt, fill=#1!6,
+             align=center, inner sep=4pt, font=\small},
+}
+\def\N{9}
+
+% ---------------- (a) the outer sum --------------------------------------
+\begin{scope}[shift={(0,0)}]
+  \node[font=\bfseries, text width=62mm, align=center] at (1.85,3.05)
+     {(a) outer sum $A s_i + B s_j$};
+  \node[font=\scriptsize\itshape, text=datagrey, text width=58mm, align=center] at (1.85,2.52)
+     {perturb residue 3; shaded cells move};
+  \foreach \i in {0,...,8}{\foreach \j in {0,...,8}{
+     \pgfmathtruncatemacro{\hit}{(\i==3 || \j==3) ? 1 : 0}
+     \ifnum\hit=1
+       \node[cell=trunkblue, fill=trunkblue!45] at (\i*4.6mm, -\j*4.6mm) {};
+     \else
+       \node[cell=rule1, fill=white] at (\i*4.6mm, -\j*4.6mm) {};
+     \fi}}
+  \node[font=\scriptsize, align=center, text=datagrey] at (1.85,-4.95)
+     {only row 3 and column 3\\[-2pt]
+      \textbf{0 of 342} other pairs move};
+\end{scope}
+
+% ---------------- (b) the triangle update --------------------------------
+\begin{scope}[shift={(6.4,0)}]
+  \node[font=\bfseries, text width=62mm, align=center] at (1.85,3.05)
+     {(b) $+$ triangle update \fnd{109}};
+  \node[font=\scriptsize\itshape, text=datagrey, text width=58mm, align=center] at (1.85,2.52)
+     {perturb edge $(3,6)$; shaded cells move};
+  \foreach \i in {0,...,8}{\foreach \j in {0,...,8}{
+     \node[cell=newred, fill=newred!35] at (\i*4.6mm, -\j*4.6mm) {};}}
+  \foreach \i in {0,...,8}{
+     \node[cell=newred, fill=newred!70] at (\i*4.6mm, -3*4.6mm) {};
+     \node[cell=newred, fill=newred!70] at (3*4.6mm, -\i*4.6mm) {};
+     \node[cell=newred, fill=newred!70] at (\i*4.6mm, -6*4.6mm) {};
+     \node[cell=newred, fill=newred!70] at (6*4.6mm, -\i*4.6mm) {};}
+  \node[font=\scriptsize, align=center, text=datagrey] at (1.85,-4.95)
+     {every pair, through the triangles\\[-2pt]
+      it shares --- \textbf{306 of 306}};
+\end{scope}
+
+% ---------------- the mechanism ------------------------------------------
+\begin{scope}[shift={(14.6,0.1)}]
+  \node[bx=newred, text width=52mm] at (0,1.55) (eq)
+    {\textbf{triangle multiplicative update}\\[3pt]
+     $z_{ij} \mathrel{+}= g_{ij}\odot W_o\!\left(
+        \mathrm{LN}\!\sum_k a_{ik}\odot b_{jk}\right)$\\[3pt]
+     \tiny outgoing (Alg.\ 11); incoming sums $a_{ki}\odot b_{kj}$};
+  \node[bx=datagrey, text width=52mm] at (0,-1.1) (why)
+    {\textbf{why it is needed}\\[2pt]
+     \tiny Distances obey $d_{ij} \le d_{ik} + d_{kj}$. A pair-independent
+     predictor has no mechanism that can know this, so it can emit a set of
+     distances for which \emph{no 3D structure exists} --- every pair
+     plausible, the whole set incoherent.};
+  \node[bx=diffpurple, text width=52mm] at (0,-3.5) (cost)
+    {\textbf{cost and discipline}\\[2pt]
+     \tiny $O(L^3c)$ per direction: $\approx1.1$\,TFLOP at $L{=}1024$,
+     batch 16, $c{=}32$. $W_o$ zero-initialised, so a loaded checkpoint is
+     bit-identical until it earns its way in.};
+  \draw[flow] (eq) -- (why); \draw[flow] (why) -- (cost);
+\end{scope}
+\end{tikzpicture}
