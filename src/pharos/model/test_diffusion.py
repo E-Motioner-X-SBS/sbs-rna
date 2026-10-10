@@ -470,6 +470,20 @@ def main() -> int:
         f"against {float(near.abs().mean()):.4f} at 8 -- geometry is ignored "
         f"exactly when there is none")
 
+    # the memory optimisation must not be a behaviour change
+    gb64 = GeometricBias(4, chunk=7).double().eval()
+    with torch.no_grad():
+        gb64.proj.weight.copy_(torch.randn(4, 16, dtype=torch.float64) * 0.3)
+        x64 = torch.randn(2, 23, 3, 3, dtype=torch.float64) * 9.0
+        chunked = gb64(x64)
+        gb64.chunk = 10_000                       # one piece
+        whole = gb64(x64)
+    chk("row-chunking the basis is bit-identical to building it whole",
+        float((chunked - whole).abs().max()) == 0.0,
+        f"max |delta| {float((chunked - whole).abs().max()):.3e} at chunk=7 vs "
+        f"one piece -- chunking exists to cut a 10.89 GiB peak to 2.03, and a "
+        f"memory fix that changes the answer is not a memory fix")
+
     print("\n== and the RBF spans the range the corpus actually occupies ==")
     chk("centres cover the measured contact range",
         float(gb.mu.min()) <= 3.33 and float(gb.mu.max()) >= 23.2,

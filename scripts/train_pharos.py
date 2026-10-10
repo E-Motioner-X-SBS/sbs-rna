@@ -1428,6 +1428,17 @@ def main() -> None:
         step = int(resume.get("step", 0))
         history = list(resume.get("history", []))
         start_ep = int(resume.get("epoch", 0)) + (1 if resume.get("epoch_done") else 0)
+        # BEFORE anything that indexes `epoch_batches[start_ep]`. This return
+        # used to sit at the bottom of the block, below a diagnostic print
+        # that does exactly that, so resuming a 40-epoch checkpoint with a
+        # SMALLER `--epochs` raised IndexError instead of saying "already
+        # done". That is the `--smoke` path against any finished run -- the
+        # one diagnostic for "does stage 5 still start" -- and it was dead.
+        if start_ep >= args.epochs:
+            print(f"[pharos] all {args.epochs} epochs already done "
+                  f"(checkpoint is at epoch {start_ep}); nothing to do",
+                  flush=True)
+            return
         # OneCycleLR carries an internal step count, so it has to be restored
         # rather than rebuilt -- and only if the schedule is the SAME schedule.
         # `n_steps` depends on the epoch count and the token budget, so a run
@@ -1451,9 +1462,6 @@ def main() -> None:
         if skip_in_epoch:
             print(f"[pharos] resuming {skip_in_epoch} batches into epoch "
                   f"{start_ep} of {len(epoch_batches[start_ep])}", flush=True)
-        if start_ep >= args.epochs:
-            print(f"[pharos] all {args.epochs} epochs already done", flush=True)
-            return
 
     runlog = RunLog(ROOT, "stage5_3d", STAGE5_FIELDS, manifest={
         "size": args.size, "config": cfg.__dict__, "params": pc,
