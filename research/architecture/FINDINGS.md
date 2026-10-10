@@ -1850,3 +1850,68 @@ genuinely inert.
 Three assertions in `test_stage5_losses.py`: that the config comes from
 the checkpoint, that unexpected keys are refused, and the demonstration
 that without the second one the failure is completely silent.
+
+## 112 — the coevolution feature is below its own noise floor for two thirds of the corpus
+
+| # | what | status |
+|---|---|---|
+| 112 | Chain-weighted, **67.2% of family-assigned chains** sit behind an alignment whose Henikoff **Neff is under 50**, and the median family reads **Neff 4.0**. APC-corrected mutual information from four effective sequences is noise. `index.json` has recorded `neff` per family since the cache was first built, and nothing has ever read it | `OPEN` — measured, with the fix built and its integration hazard identified |
+
+Finding 110 recorded the seed/full choice as **not a defect**, correctly:
+the families that dominate the corpus have no full alignment. This is the
+number that was missing from that entry, and it changes how much the
+union is worth.
+
+| effective depth behind the feature | chains | share |
+|---|---|---|
+| Neff < 10 | 1,745 | 12.4% |
+| 10 ≤ Neff < 50 | 7,721 | **54.8%** |
+| 50 ≤ Neff < 100 | 1,108 | 7.9% |
+| Neff ≥ 100 | 3,384 | 24.0% |
+
+and the 24% that clears 100 is almost entirely tRNA alone (3,303 chains,
+Neff 245.9). The next four families by size read **12.2, 10.9, 29.5 and
+7.3**.
+
+### What a union buys, measured
+
+`full_alignment_rows()` streams and reservoir-samples a family's full
+alignment — 5S_rRNA is **701 MiB** and only 2,000 rows are ever used, so
+it is read in **3 seconds** without loading it.
+
+| family | chains | seed Neff | full Neff | gain |
+|---|---|---|---|---|
+| 5S_rRNA | 2,235 | 12.2 | **433.5** | 35.5x |
+| Cobalamin | — | 63.1 | **1653.6** | 26.2x |
+| 5_8S_rRNA | 723 | 16.6 | **266.2** | 16.0x |
+| FMN | — | 21.2 | **336.9** | 15.9x |
+
+Every one of these crosses from below the noise floor to usable.
+
+### Two traps, both hit and both recorded
+
+**The first version produced Neff 1.0** and looked like it worked.
+Stockholm marks insert columns with lowercase residues and `.` gaps, and
+a full alignment is mostly inserts: FMN reads 816 columns of which 221
+are match states, and the raw rows are **84.6% dots**. `ALPHA` is
+`"ACGU-"`, so `encode_msa` maps every lowercase residue *and* every dot
+to GAP — all rows look alike and the weighting collapses. Reducing to
+match columns first is now part of the function and pinned by a test
+that fails on a stray dot or lowercase character.
+
+**A naive rebuild would silently corrupt the mapping.**
+`coevolution_pairs` takes cached pairs in alignment-column indices and
+maps them onto a chain through `rows = alignment_for(family)` — the
+**seed** rows. 5S_rRNA's full alignment has **120 match columns against
+the seed's 230**, so a cache rebuilt from the full alignment and read
+through the seed's columns would attach couplings to the wrong
+nucleotides — the exact failure the module's own docstring warns about
+("inventing one is how a feature ends up pointing at the wrong
+nucleotide"). A correct union needs the cache to record which alignment
+it came from and `coevolution_pairs` to map through that same one.
+
+Left open deliberately. The remaining work is a cache rebuild plus a
+mapping change plus a stage-5 run to see whether deeper MI moves
+anything, and the card is busy with another job. The measurements, the
+streaming reader and the trap are recorded so the work is a decision and
+not a rediscovery.

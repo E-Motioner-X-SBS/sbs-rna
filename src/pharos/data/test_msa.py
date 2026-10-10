@@ -152,6 +152,51 @@ def main() -> int:
         chk("and the absolute precision is usable", prec > 0.30,
             f"{100*prec:.1f}% -- from sequence alone, no structure")
 
+    # ---- full alignments: match columns, or the signal is destroyed -----
+    # Rfam full alignments mark insert columns with lowercase residues and
+    # `.` gaps, and are mostly inserts. ALPHA is "ACGU-", so encode_msa
+    # maps every lowercase residue AND every dot to GAP: FMN reads 84.6%
+    # gaps over 816 columns, every row looks alike, and the Henikoff
+    # weighting collapses to Neff 1.0 -- measured, on the first version of
+    # full_alignment_rows, which otherwise looked like it worked.
+    print("\n== full alignments must be reduced to their match columns ==")
+    from pharos.data.msa import (full_alignment_rows, alignment_for,
+                                 encode_msa, sequence_weights,
+                                 FULL_ALIGNMENTS)
+    if FULL_ALIGNMENTS.exists():
+        rows = full_alignment_rows("FMN", 400)
+        chk("a full alignment parses", rows is not None and len(rows) >= 8,
+            f"{0 if rows is None else len(rows)} rows sampled from the stream")
+        if rows:
+            bad = [c for r in rows[:20] for c in r if c not in "ACGUN-"]
+            chk("and comes back with no lowercase and no dots",
+                not bad,
+                f"{len(bad)} stray characters; a dot or a lowercase residue "
+                f"is an INSERT column and encode_msa would map it to GAP")
+            chk("every row has the same length",
+                len({len(r) for r in rows}) == 1,
+                f"{len({len(r) for r in rows})} distinct lengths")
+
+            w = sequence_weights(encode_msa(rows))
+            seed = alignment_for("FMN")
+            ws = sequence_weights(encode_msa(seed)) if seed else None
+            chk("the effective depth beats the seed by a wide margin",
+                ws is not None and float(w.sum()) > 3 * float(ws.sum()),
+                f"Neff {float(w.sum()):.1f} against the seed's "
+                f"{float(ws.sum()):.1f} -- the point of reading these at all; "
+                f"Neff 1.0 here is the insert-column bug")
+
+        # the hazard a naive rebuild would hit
+        _src = (Path(__file__).resolve().parent / "msa.py").read_text()
+        chk("coevolution_pairs still maps pairs through the SEED rows",
+            "rows = alignment_for(family)" in _src,
+            "so a cache rebuilt from full alignments would be indexed in a "
+            "DIFFERENT column space -- 5S_rRNA is 120 match columns against "
+            "the seed's 230 -- and the couplings would land on the wrong "
+            "nucleotides. The union needs the cache to record its source")
+    else:
+        chk("full alignments present", False, f"{FULL_ALIGNMENTS} missing")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

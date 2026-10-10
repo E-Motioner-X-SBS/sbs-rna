@@ -119,6 +119,85 @@ def alignment_for(family: str) -> Optional[List[str]]:
     return [s for _, s in seeds[ac]["rows"]]
 
 
+FULL_ALIGNMENTS = ROOT / "data/families/rfam/full_alignments"
+
+
+def full_alignment_rows(family: str, max_rows: int = 2000,
+                        seed: int = 0) -> Optional[List[str]]:
+    """Up to `max_rows` sequences from a family's FULL alignment, streamed.
+
+    The seed alignments this module reads by default are curated and tiny:
+    chain-weighted over the 3D corpus, **67.2% of family-assigned chains**
+    sit behind an effective depth (Henikoff Neff) **below 50**, and the
+    median family is Neff **4.0**. APC-corrected mutual information from
+    four effective sequences is noise, and the index has recorded that
+    number since the cache was first built.
+
+    For 213 of the corpus's 234 families a full alignment exists, covering
+    38.5% of family-assigned chains -- including 5S_rRNA, the second
+    largest at 2,235 chains, whose seed is 712 rows against **594,154** in
+    the full set. `msa.py`'s standing argument against the full alignments
+    is that the families that dominate the corpus (SSU/LSU rRNA, tRNA)
+    have none, and that is true and is why this is a UNION and not a
+    replacement: full where one exists, seed otherwise.
+
+    Streamed and reservoir-sampled because 5S_rRNA's file is **701 MiB**
+    and only `max_rows` of it is ever used. Rfam full alignments are one
+    line per sequence, which this relies on and checks: a wrapped file
+    would give a name twice, and it returns None rather than silently
+    building an alignment out of half-sequences.
+    """
+    import random
+    f = FULL_ALIGNMENTS / f"{family}.sto"
+    if not f.exists():
+        ac = name_to_accession().get(family)
+        f = FULL_ALIGNMENTS / f"{ac}.sto" if ac else f
+    if not f.exists():
+        return None
+    rng = random.Random(seed)
+    res: List[str] = []
+    names: List[str] = []
+    n = 0
+    try:
+        with open(f, "r", errors="ignore") as fh:
+            for ln in fh:
+                if not ln.strip() or ln[0] == "#" or ln.startswith("//"):
+                    continue
+                parts = ln.split(None, 1)
+                if len(parts) != 2:
+                    continue
+                nm, seq = parts[0], parts[1].strip()
+                n += 1
+                if len(res) < max_rows:
+                    res.append(seq); names.append(nm)
+                else:
+                    j = rng.randrange(n)
+                    if j < max_rows:
+                        res[j] = seq; names[j] = nm
+    except OSError:
+        return None
+    if len(set(names)) != len(names):      # wrapped: not one line per sequence
+        return None
+    if len(res) < 8 or len({len(r) for r in res}) != 1:
+        return None                        # below the MI noise floor, or ragged
+
+    # MATCH COLUMNS ONLY. Stockholm marks insert columns with lowercase
+    # residues and `.` gaps, and a full alignment is mostly inserts: FMN
+    # reads 816 columns of which 221 are match states, and the raw rows are
+    # 84.6% `.`. `ALPHA` is "ACGU-", so `encode_msa` maps every lowercase
+    # residue AND every dot to GAP -- which makes all rows look alike and
+    # collapses the Henikoff weighting to **Neff 1.0**. Measured, on the
+    # first version of this function, which otherwise looked like it
+    # worked: FMN full "2000 rows -> Neff 1.0" against the seed's 21.2.
+    #
+    # A column is match-or-insert for the whole alignment, so the mask
+    # comes from any one row: uppercase or `-` is a match state.
+    keep = [i for i, ch in enumerate(res[0]) if ch.isupper() or ch == "-"]
+    if len(keep) < 16:
+        return None
+    return ["".join(r[i] for i in keep).upper() for r in res]
+
+
 def encode_msa(rows: Sequence[str]) -> np.ndarray:
     """`(N, C)` uint8 over ALPHA."""
     if not rows:
