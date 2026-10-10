@@ -168,7 +168,7 @@ b-factor targets finding 66 corrected, `lw_lift` 0.000 -> +0.074, `motif_lift`
 |---|---|---|
 | 72 | resuming stage 5 restored the scheduler to `step` and then replayed the partially-done epoch **from batch 0**, so OneCycleLR raised `Tried to step 151 times. The specified number of total steps is 150`. The checkpoint is written mid-epoch by design, so a mid-epoch resume is the normal case. Second time the schedule has killed a run that had finished its work; `_sched_step` now clamps | `FIXED` |
 | 73 | head 2 reported **bare accuracy** while heads 9 and 10 report theirs against the majority rate, through the helper written for exactly that. The floor was added -- and on the first run that printed it, **head 2 is collapsed**: see 75 | `FIXED` |
-| 75 | with the floor computed on the SAME batch, `dist_acc` tracks `dist_major` to the digit at every step -- 0.4830/0.4830, 0.4690/0.4690, 0.2900/0.2900 -- and `dist_macro` sits at 0.026-0.031 against 1/39 = 0.0256. Head 2 predicts **one bin and nothing else**. It had been reporting 0.47 accuracy for the whole of stage 5 and reading as a working head | `OPEN` |
+| 75 | with the floor computed on the SAME batch, `dist_acc` tracks `dist_major` to the digit at every step -- 0.4830/0.4830, 0.4690/0.4690, 0.2900/0.2900 -- and `dist_macro` sits at 0.026-0.031 against 1/39 = 0.0256. Head 2 predicts **one bin and nothing else**. It had been reporting 0.47 accuracy for the whole of stage 5 and reading as a working head | **RESOLVED by 86** — see below: 41.88% of the supervised population was that one bin |
 
 ## 74 — the inference path reported a clean number for an impossible structure
 
@@ -408,7 +408,7 @@ stage 5 1,062 s, prediction 38 s, scoring 73 s.
 | # | what | status |
 |---|---|---|
 | 82 | `probe_channels.py` perturbed `mod_ids` with `m2[0, 0] = 1` against a `mod` drawn from `randint(1, 4)`. When the draw was already 1 the "perturbed" input WAS the original and the delta was exactly 0.00e+00 — a dead channel reported for a live one. `torch.manual_seed(0)` is set three lines before the MODEL is built, and initialisation consumes the stream, so adding head 11 and `theta_head` shifted every subsequent draw, `mod[0,0]` became 1, and a probe that had passed all night started failing the gate and blocking the pipeline. **The seed made it deterministic, not correct** | `FIXED` |
-| 83 | stage 5 runs **317 optimiser steps over 8 epochs** — 40 per epoch, 1,062 s in total. A denoising diffusion decoder is being asked to learn a generative model of RNA backbone geometry in three hundred steps. At inference the consequence is unambiguous: consecutive P–P distances come out at **16–19 Å against a 5.88 Å target**, bond violation 0.79–0.93, and the structures are not connected chains | `OPEN` |
+| 83 | stage 5 runs **317 optimiser steps over 8 epochs** — 40 per epoch, 1,062 s in total. A denoising diffusion decoder is being asked to learn a generative model of RNA backbone geometry in three hundred steps. At inference the consequence is unambiguous: consecutive P–P distances come out at **16–19 Å against a 5.88 Å target**, bond violation 0.79–0.93, and the structures are not connected chains | **ADDRESSED** — 3,069 steps since, and P–P came to 5.67–6.69 Å; the step count is no longer the binding constraint (93) |
 | 84 | head 11 learns on the training batches and **does not generalise**: `tors_theta_lift` reaches **+9.79°** at step 250 and the same epoch's validation reads **−0.74°**; η +5.71 train against −1.27 val. On 317 steps and 6,585 chains that is the expected shape, but it is recorded rather than assumed, and the family-disjoint test agrees (η −0.60, θ −0.26, χ̃ **+0.45**, the only one positive) | `OPEN` |
 
 Finding 83 is the one that matters, and the inference guard of finding 74 is
@@ -1040,6 +1040,47 @@ without a schedule change, which needs the card. The schedule guard added
 with finding 95's sibling now prints the before/after rate and the ratio,
 so a future resume of this shape announces itself instead of being
 reconstructed afterwards from three metrics drifting.
+
+## 98 — the register contradicted itself, and one declared defect is still live
+
+Asked whether stages 1–4 are clean, I went through every finding whose
+status is not closed. Two of them were **stale**, which makes the register
+itself unreliable in the direction that matters — it was overstating how
+much is broken, and a register nobody trusts is the thing this file exists
+to avoid.
+
+| # | was | now | why |
+|---|---|---|---|
+| 75 | `OPEN` on its original row while a later row said **RESOLVED** | RESOLVED by 86 | the file contradicted itself across 370 lines |
+| 83 | `OPEN` — "317 optimiser steps … structures are not connected chains" | ADDRESSED | 3,069 steps since, P–P 5.67–6.69 Å against a true 5.95 |
+
+**And one declared defect is still live.** Finding 68, rechecked today:
+
+```
+moe.py:79    neff_over_l: Optional[torch.Tensor] = None   # (B,) MSA depth
+moe.py:115   if self.neff_over_l is not None:
+moe.py:116       extra[:, 0] = self.neff_over_l.to(device).float()
+```
+
+Grepping every caller in `src/` and `scripts/` for an assignment: **none**.
+So `extra[:, 0]` of the router conditioning is permanently zero in every
+stage — stage 1, 2/3, 5, and the block scorer alike. The router has a
+declared MSA-depth input that no run has ever supplied, and the field is
+the first column of the conditioning vector, so the capacity is allocated
+and the signal is absent. Still `DECLARED`, not fixed: supplying it means
+computing Neff/L per chain from the coevolution data, which is a corpus
+change rather than a line.
+
+### So: what is actually clean
+
+| stage | verdict |
+|---|---|
+| 1 MLM | no open finding of its own; shares 68 |
+| 2 secondary structure | results verified — lift +0.0576, macro 2.25× chance, negative generalisation gap |
+| 3 chemical probing | results verified — Pearson 0.4262 |
+| 4 physics | **no code**; the closed form reproduces an independent implementation to 1 part in 10⁴ |
+| 6 fitness (co-trained) | **97 OPEN** — worse after epoch 2 than epoch 1 |
+| all stages | **68 DECLARED** — one router conditioning channel is permanently zero |
 
 ## Checked and not defects
 
