@@ -1168,3 +1168,88 @@ a false positive costs exactly as much as one that misses a real defect.
 | `ensemble_state_logits` is emitted and untrained | no observable in the corpus distinguishes the K states |
 | the supervised fitness head barely transfers across construct families | one bounded epoch from the 34%-budget stage-1 checkpoint reads val rho **+0.604** over 12/12 assays (unseen VARIANTS of seen constructs) against transfer rho **+0.085** over 5/5 (the Townshend aptamer family held out entirely). The split exists to expose exactly this, and the leaderboard's macro-mean includes an aptamer category, so the gap is the number to watch as training continues rather than a defect to fix now |
 | the block scorer's published numbers predate the split re-draw | re-measurable for the first time since finding 43; costs a GPU and ~30 epochs |
+
+## 100 — the decoder never looked at where the atoms were
+
+| # | what | status |
+|---|---|---|
+| 100 | The diffusion decoder had **no mechanism by which one residue's position could influence another's update**. Coordinates entered only through `self.in_proj(x_noisy.reshape(B, L, N_ATOM * 3))`, a per-residue linear map of that residue's own nine numbers, and the attention bias came from `pair`, built once from hidden states plus relative *sequence* position. Residue i could attend to residue j because they are adjacent in sequence, and by no other route | `FIXED` |
+| 100b | The fix, as first written, was **dead in production**: `GeometricBias` was fed `x_noisy`, which is `c_in * x`. Every test passed because every test called the module directly with angstroms | `FIXED` |
+
+### 100
+
+This is the mechanism behind 92 and 93, and it explains both results that
+did not fit.
+
+Bonds come out right because relative sequence position is sufficient for
+a bond: i and i+1 are adjacent, and that is in `pair`. The fold comes out
+wrong because nothing in the decoder couples residues by *proximity* —
+two residues 200 apart in sequence and 6 Å apart in space are, to this
+attention, exactly as unrelated as two residues 200 apart and 60 Å apart.
+And feeding the decoder a predicted contact map (93) changed nothing,
+because a static map is not current geometry: to decide how to move an
+atom the model has to know where it is **now**, and that information was
+never in the building.
+
+The fix is `GeometricBias`: embed the pairwise C4′–C4′ distances of the
+current iterate in a 16-centre radial basis over 2–40 Å and project to a
+per-head additive attention bias. It is recomputed from the coordinates
+on every call, so as the structure forms the attention follows it — the
+iterative part of iterative refinement. `proj` is zero-initialised, so a
+loaded checkpoint's forward pass is bit-identical until the bias earns
+its way in. **+128 parameters** at every scale — a `Linear(16, 8,
+bias=False)` — which is the whole cost.
+
+Properties pinned by test: zero at init; symmetric; moving one C4′ by
+25 Å moves the bias (1.9044); **moving one residue changes the predicted
+update for the OTHERS** (4.2504, and this is the one that was absent);
+and SE(3) invariant to 2.03e-06, which matters because the loss augments
+with random rotations and a bias that moved under one would fight its own
+training signal.
+
+### 100b — and the same class of defect, in the fix for it
+
+The first version was fed `x_noisy`. That is not the structure in
+angstroms; it is `c_in * x` with `c_in = 1/sqrt(sigma^2 + sigma_data^2)`,
+the EDM input preconditioner. At the median training sigma that divides
+every distance by **18.7**:
+
+| true gap | what the bias saw | nearest centre |
+|---|---|---|
+| 5.95 Å (a P–P bond) | 0.32 | `mu_0` = 2.0 |
+| 23.2 Å (contact limit) | 1.24 | `mu_0` = 2.0 |
+| 40 Å (basis maximum) | 2.14 | `mu_0` = 2.0 |
+
+The entire informative range collapsed below the first centre, inside a
+single basis width of 2.375. Channel 0 read 0.778 at 6 Å and 0.998 at
+40 Å. Summed per-channel variation over 5.95–40 Å: **0.72, against 11.42
+in angstroms — a 15.8× loss of resolving power.** It would have trained
+to approximately nothing, and the A/B would have come back "no effect",
+and the honest conclusion from that A/B would have been *wrong*.
+
+Nothing caught it because the module was correct and its *caller* was
+wrong, and all six tests called the module directly, with angstroms. The
+register's recurring class is a component that exists, is measured, and
+whose output is never checked for validity; this is its sharper form —
+a component checked thoroughly **in a frame the program never uses**.
+
+Two tests now cover the seam rather than the module. One registers a
+forward pre-hook on the bias, runs `denoise()`, and asserts the tensor
+that arrives is the unscaled coordinates. The other measures summed
+per-channel variation and requires > 10.0, which the scaled version fails
+at 0.72.
+
+Physical units also buy the sigma behaviour for free, and it is now
+pinned: at noise scale 160 the pairwise distances run off the top of the
+basis and mean |bias| falls to 0.0107 against 0.5179 at scale 8, a 48×
+decay. The decoder ignores geometry exactly when there is no geometry to
+read, with no sigma-conditioning needed to tell it so.
+
+`denoise()` is the only entry point into the network, and all five
+callers — the training loss, the internal sampler, and
+`predict_structure.py` — go through it, so the correction is universal.
+
+**Not yet measured against the baseline.** Three runs at identical
+settings read TM 0.0890 / 0.0913 / 0.0936 against a ~0.0023 noise floor;
+whether this moves them is the next experiment, and it is the first
+change since 90 with a mechanism that predicts it should.

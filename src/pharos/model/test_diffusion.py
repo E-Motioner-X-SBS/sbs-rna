@@ -360,6 +360,122 @@ def main() -> int:
         f"{float((_adj - _far).abs().max()):.4e} -- so it IS the relative "
         f"position embedding that carries adjacency")
 
+    print("\n== finding 100: the decoder can now see where the atoms are ==")
+    from pharos.model.diffusion import C4_IDX, GeometricBias   # noqa: E402
+
+    gcfg = DiffusionConfig(d_model=32, d_pair=16, n_layers=2, n_heads=4)
+    gh = DiffusionStructureHead(gcfg)
+    gB, gL2 = 2, 11
+    torch.manual_seed(3)
+    gx = torch.randn(gB, gL2, 3, 3) * 10.0
+    gsig = torch.full((gB,), 9.6)
+    gsingle = torch.randn(gB, gL2, 32)
+    gmask = torch.ones(gB, gL2, dtype=torch.bool)
+
+    gb = GeometricBias(4)
+    with torch.no_grad():
+        z = gb(gx)
+    chk("the bias is ZERO at init, so no checkpoint's forward pass moves",
+        bool((z == 0).all()), f"shape {tuple(z.shape)}")
+
+    # THE PROPERTY THAT WAS ABSENT. Move one atom a long way and the
+    # attention must change. On the old decoder it could not: coordinates
+    # reached attention through nothing at all.
+    with torch.no_grad():
+        gb.proj.weight.normal_(0.0, 0.5)
+        z0 = gb(gx)
+        gx2 = gx.clone(); gx2[0, 0, C4_IDX] += 25.0
+        z1 = gb(gx2)
+    chk("moving one C4' by 25 A changes the attention bias",
+        float((z1 - z0).abs().max()) > 1e-3,
+        f"max |delta| {float((z1 - z0).abs().max()):.4f} -- zero here is the "
+        f"old decoder, where geometry never reached the attention")
+    chk("and it changes the row AND column of the atom that moved",
+        float((z1 - z0)[0, :, 0, :].abs().max()) > 1e-3
+        and float((z1 - z0)[0, :, :, 0].abs().max()) > 1e-3,
+        "the bias is symmetric in the pair, as a distance is")
+
+    # SE(3) INVARIANCE. A structure is defined up to a rigid motion and the
+    # loss augments with random rotations, so a bias that moved under one
+    # would fight its own training signal.
+    Q, _ = torch.linalg.qr(torch.randn(3, 3))
+    if torch.det(Q) < 0:
+        Q[:, 0] *= -1
+    moved = gx @ Q.T + torch.tensor([13.0, -4.0, 7.5])
+    with torch.no_grad():
+        zr = gb(moved)
+    chk("invariant to rotation and translation",
+        float((zr - z0).abs().max()) < 1e-3,
+        f"max |delta| {float((zr - z0).abs().max()):.3e} -- it is built on "
+        f"distances, which is why")
+
+    # and end to end: the denoiser's OUTPUT must respond to geometry
+    with torch.no_grad():
+        for mm in gh.modules():
+            if isinstance(mm, torch.nn.Linear) and float(mm.weight.abs().max()) == 0:
+                mm.weight.normal_(0.0, 0.3)
+        o0 = gh.denoise(gx, gsig, gsingle, None, gmask)
+        gx3 = gx.clone(); gx3[0, 5, C4_IDX] += 20.0
+        o1 = gh.denoise(gx3, gsig, gsingle, None, gmask)
+    # residue 5 moved, so residue 5's own output must move; the TEST is that
+    # OTHER residues move too, which can only happen through the attention
+    other = (o1 - o0).clone()
+    other[0, 5] = 0.0
+    chk("moving one residue changes the prediction for the OTHERS",
+        float(other[0].abs().max()) > 1e-4,
+        f"max |delta| off the moved residue {float(other[0].abs().max()):.4e} "
+        f"-- this is the coupling the old decoder did not have")
+
+    # ---- THE UNITS CONTRACT -------------------------------------------
+    # Every assertion above passed on a version of this module that was
+    # DEAD IN PRODUCTION, because they all call `gb(gx)` with angstroms
+    # while the denoiser fed it `c_in * x`. The module was right and its
+    # caller was wrong, and no test looked at the caller. These two do.
+    print("\n== finding 100b: the bias must be fed angstroms, not c_in * x ==")
+
+    seen = []
+    hk = gh.net.geom.register_forward_pre_hook(lambda _m, inp: seen.append(inp[0]))
+    with torch.no_grad():
+        gh.denoise(gx, gsig, gsingle, None, gmask)
+    hk.remove()
+    c_in = 1.0 / (9.6 ** 2 + gcfg.sigma_data ** 2) ** 0.5
+    chk("denoise() hands the bias the UNSCALED coordinates",
+        len(seen) == 1 and torch.allclose(seen[0], gx, atol=1e-5),
+        f"c_in at sigma=9.6 is {c_in:.5f}; feeding the scaled iterate would "
+        f"shrink every distance {1/c_in:.1f}x and push the whole informative "
+        f"range below mu_0 = {float(gb.mu[0]):.1f}")
+
+    # and the consequence, measured rather than argued: how much the basis
+    # can actually tell apart across the range that matters.
+    def _spread(scale: float) -> float:
+        d = torch.tensor([5.95, 8.0, 12.0, 16.0, 23.2, 30.0, 40.0]) * scale
+        r = torch.exp(-((d[:, None] - gb.mu) ** 2) / (2 * gb.sigma ** 2))
+        return float((r.max(0).values - r.min(0).values).sum())
+
+    ang, scaled = _spread(1.0), _spread(c_in)
+    chk("the basis resolves the 5.95-40 A range it is given",
+        ang > 10.0,
+        f"summed per-channel variation {ang:.2f} in angstroms against "
+        f"{scaled:.2f} if c_in-scaled -- a {ang / scaled:.1f}x difference, "
+        f"and {scaled:.2f} is a bias that trains to nothing")
+
+    # the free sigma behaviour: pure noise has no geometry to read, and the
+    # basis runs out before it, so the bias silences itself.
+    with torch.no_grad():
+        far = gb(torch.randn(1, 24, 3, 3) * 160.0)
+        near = gb(torch.randn(1, 24, 3, 3) * 8.0)
+    chk("at sigma = 160 the distances leave the basis and the bias decays",
+        float(far.abs().mean()) < 0.25 * float(near.abs().mean()),
+        f"mean |bias| {float(far.abs().mean()):.4f} at noise scale 160 "
+        f"against {float(near.abs().mean()):.4f} at 8 -- geometry is ignored "
+        f"exactly when there is none")
+
+    print("\n== and the RBF spans the range the corpus actually occupies ==")
+    chk("centres cover the measured contact range",
+        float(gb.mu.min()) <= 3.33 and float(gb.mu.max()) >= 23.2,
+        f"[{float(gb.mu.min()):.1f}, {float(gb.mu.max()):.1f}] A against "
+        f"contacts at 3.33-23.2 and the distogram's informative mass to ~40")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

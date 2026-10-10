@@ -62,9 +62,13 @@ EXPECTED = {
     # +266,758 / +150,918 / +596,742 over the pre-head-11 numbers: the torsion
     # head is a `_mlp(d, d, 6)` on the residue track, so it lands on BOTH
     # columns (it is dense, not routed) and scales with d_model alone.
-    "PHAROS-Small": (259_188_770, 83_028_002, 128),
-    "PHAROS-Mini": (113_658_136, 39_340_312, 144),
-    "Base-v2": (1_106_157_058, 313_433_602, 96),
+    # +128 each for finding 100's `GeometricBias.proj`, a
+    # Linear(n_rbf=16, n_heads=8, bias=False) in the diffusion decoder. It is
+    # the same 128 parameters at every scale because the decoder is a
+    # fixed-shape stack, not part of the MoE recipe.
+    "PHAROS-Small": (259_188_898, 83_028_130, 128),
+    "PHAROS-Mini": (113_658_264, 39_340_440, 144),
+    "Base-v2": (1_106_157_186, 313_433_730, 96),
 }
 #: What the DENSE diffusion decoder (head 3 plus its pair features) contributes
 #: to the active column at each scale. It is the reason the numbers above moved

@@ -66,6 +66,10 @@ BOND_P_P = (6.01, 1.50)
 #: Three points fix a frame, which is the minimum for an orientation-aware
 #: backbone without modelling every atom.
 N_ATOM = 3
+#: Index of C4' in the stored atom triple (P, C4', N). The geometric bias is
+#: built on C4'-C4' because that is the distance the contact targets, the
+#: distogram and the eta/theta pseudotorsions are all defined on.
+C4_IDX = 1
 
 
 @dataclass
@@ -141,6 +145,73 @@ def _timestep_embedding(t: torch.Tensor, dim: int) -> torch.Tensor:
     return F.pad(emb, (0, dim - emb.shape[-1])) if emb.shape[-1] < dim else emb
 
 
+class GeometricBias(nn.Module):
+    """Attention bias from where the atoms CURRENTLY are. Finding 100.
+
+    The decoder could not do geometric reasoning, and this is the line that
+    made it so:
+
+        h = self.in_proj(x_noisy.reshape(B, L, N_ATOM * 3))
+
+    Coordinates entered through a per-residue linear projection of that
+    residue's own nine numbers, and the attention bias `pair` was built once
+    from `single` -- hidden states plus relative SEQUENCE position -- so it
+    was identical at every block and every denoising step. Residue i could
+    attend to residue j because they are near in sequence and by no other
+    route. Nothing in the decoder knew where anything was.
+
+    That is the whole shape of the failure measured in 92/93: bonds come out
+    right (relative position is enough for a bond), the fold comes out wrong
+    (no mechanism couples distant residues by proximity), and feeding the
+    decoder a PREDICTED CONTACT MAP changed nothing -- a static map is not
+    current geometry, and to move an atom the model has to know where it is
+    now.
+
+    So: embed the pairwise C4'-C4' distances of the current iterate in a
+    radial basis and project to a per-head additive bias. It is recomputed
+    from `x_noisy` on every call, so as the structure forms the attention
+    follows it -- the iterative part of iterative refinement.
+
+    Centres span 2-40 A: the measured contact range is <=23.2 A and the
+    distance histogram's informative mass runs out around 40 (finding 86).
+    `proj` is zero-initialised, so a loaded checkpoint's forward pass is
+    bit-identical until the bias earns its way in, the same discipline as
+    `bias_scale` and `site_scale`.
+
+    **The input must be in ANGSTROMS, not the `c_in`-scaled iterate the rest
+    of the denoiser consumes.** The first version of this module was fed
+    `x_noisy`, which is `c_in * x` with `c_in = 1/sqrt(sigma^2 + sigma_d^2)`.
+    At the median training sigma that divides every distance by 18.7, so a
+    5.95 A bond arrived as 0.32 and a 40 A pair as 2.14 -- the whole
+    informative range landed below `mu_0 = 2` inside a single basis width of
+    2.375. Channel 0 read 0.778 at 6 A and 0.998 at 40 A: a bias that cannot
+    tell a contact from the far side of the molecule. Summed per-channel
+    variation over 5.95-40 A was 0.72 against 11.42 in angstroms, a **15.8x**
+    loss of resolving power, and it would have trained to approximately
+    nothing while every test passed.
+
+    Physical units also give the sigma behaviour for free. At sigma = 160 the
+    iterate is noise of that scale, so pairwise distances run to hundreds of
+    angstroms, fall off the top of the basis, and the bias goes to zero by
+    itself -- geometry is ignored exactly when there is no geometry to read.
+    """
+
+    def __init__(self, n_heads: int, n_rbf: int = 16,
+                 d_min: float = 2.0, d_max: float = 40.0):
+        super().__init__()
+        self.register_buffer("mu", torch.linspace(d_min, d_max, n_rbf))
+        self.sigma = (d_max - d_min) / n_rbf
+        self.proj = nn.Linear(n_rbf, n_heads, bias=False)
+        nn.init.zeros_(self.proj.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """`x` is (B, L, N_ATOM, 3) -> (B, n_heads, L, L)."""
+        c4 = x[:, :, C4_IDX]                                  # (B, L, 3)
+        d = torch.cdist(c4.float(), c4.float())               # (B, L, L)
+        rbf = torch.exp(-((d[..., None] - self.mu) ** 2) / (2 * self.sigma ** 2))
+        return self.proj(rbf.to(self.proj.weight.dtype)).permute(0, 3, 1, 2)
+
+
 class DenoiseBlock(nn.Module):
     """Self-attention over residues with the pair representation as bias."""
 
@@ -162,7 +233,8 @@ class DenoiseBlock(nn.Module):
         nn.init.zeros_(self.ff[-1].bias)
 
     def forward(self, x: torch.Tensor, pair: Optional[torch.Tensor],
-                mask: Optional[torch.Tensor]) -> torch.Tensor:
+                mask: Optional[torch.Tensor],
+                geom: Optional[torch.Tensor] = None) -> torch.Tensor:
         B, L, D = x.shape
         h = self.norm1(x)
         q, k, v = (t.view(B, L, self.h, D // self.h).transpose(1, 2)
@@ -170,6 +242,8 @@ class DenoiseBlock(nn.Module):
         bias = None
         if pair is not None:
             bias = self.pair_bias(pair).permute(0, 3, 1, 2)          # B,h,L,L
+        if geom is not None:                       # finding 100: current geometry
+            bias = geom if bias is None else bias + geom
         if mask is not None:
             m = (mask[:, None, None, :] & mask[:, None, :, None])
             neg = torch.finfo(q.dtype).min
@@ -191,6 +265,11 @@ class CoordDenoiser(nn.Module):
         self.cond_proj = nn.Linear(d, d)
         self.time_proj = nn.Sequential(nn.Linear(d, d), nn.SiLU(), nn.Linear(d, d))
         self.blocks = nn.ModuleList([DenoiseBlock(cfg) for _ in range(cfg.n_layers)])
+        # One bias for the whole stack: `x_noisy` does not change inside a
+        # single forward, so recomputing it per block would be the same
+        # tensor at L^2 cost each time. It DOES change between denoising
+        # steps, which is the point.
+        self.geom = GeometricBias(cfg.n_heads)
         self.norm = nn.LayerNorm(d)
         self.out = nn.Linear(d, N_ATOM * 3)
         nn.init.zeros_(self.out.weight)        # start by predicting c_skip * x
@@ -198,13 +277,21 @@ class CoordDenoiser(nn.Module):
 
     def forward(self, x_noisy: torch.Tensor, c_noise: torch.Tensor,
                 single: torch.Tensor, pair: Optional[torch.Tensor],
-                mask: Optional[torch.Tensor]) -> torch.Tensor:
+                mask: Optional[torch.Tensor],
+                x_phys: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """`x_noisy` is the `c_in`-scaled iterate; `x_phys` is the SAME
+        iterate in angstroms, for the geometric bias. They differ by a scalar
+        that varies with sigma over two orders of magnitude, so the bias
+        cannot be built from `x_noisy` -- see `GeometricBias`. `x_phys=None`
+        means "already physical", which is only true when sigma is not in
+        play (unit tests constructing the stack directly)."""
         B, L = x_noisy.shape[:2]
         h = self.in_proj(x_noisy.reshape(B, L, N_ATOM * 3))
         h = h + self.cond_proj(single)
         h = h + self.time_proj(_timestep_embedding(c_noise, self.cfg.d_model))[:, None, :]
+        geom = self.geom(x_noisy if x_phys is None else x_phys)
         for blk in self.blocks:
-            h = blk(h, pair, mask)
+            h = blk(h, pair, mask, geom)
         return self.out(self.norm(h)).view(B, L, N_ATOM, 3)
 
 
@@ -267,7 +354,7 @@ class DiffusionStructureHead(nn.Module):
                 ) -> torch.Tensor:
         c_skip, c_out, c_in, c_noise = self._c(sigma)
         v = c_skip.view(-1, 1, 1, 1), c_out.view(-1, 1, 1, 1), c_in.view(-1, 1, 1, 1)
-        f = self.net(v[2] * x, c_noise, single, pair, mask)
+        f = self.net(v[2] * x, c_noise, single, pair, mask, x_phys=x)
         return v[0] * x + v[1] * f
 
     def loss(self, coords: torch.Tensor, single: torch.Tensor,
