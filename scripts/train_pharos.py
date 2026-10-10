@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -164,7 +165,8 @@ def to_device(b: Dict, device) -> Dict:
     return t
 
 
-def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
+def router_features(t: Dict, recycle: int = 0,
+                    with_neff: bool = False) -> RouterFeatures:
     """§5.3's conditioning, from what the batch actually knows.
 
     `Neff/L` is not in the 3D set, so it is left absent -- which the router
@@ -185,10 +187,26 @@ def router_features(t: Dict, recycle: int = 0) -> RouterFeatures:
     in_cx = torch.tensor([1.0 if m.get("has_protein") else 0.0 for m in t["meta"]],
                          device=dev)
     chem_summary = t["chem"].sum(1) / t["mask"].sum(1, keepdim=True).clamp(min=1)
+    neff = None
+    if with_neff:
+        # Finding 68. `log1p` because alignment depth spans four orders of
+        # magnitude across Rfam and the router's other conditioning inputs
+        # are O(1); divided by length because the feature is Neff PER
+        # residue, which is what makes a deep alignment on a short chain
+        # worth more than the same depth on a ribosome. Chains with no
+        # family keep the 0.0 the router has always seen, so the feature
+        # is strictly more information and never less.
+        from pharos.data.msa import family_depth
+        vals = []
+        for m, L in zip(t["meta"], t["lengths"]):
+            fam = (m or {}).get("rfam")
+            d = family_depth(fam) if fam else None
+            vals.append(math.log1p(d / max(int(L), 1)) if d else 0.0)
+        neff = torch.tensor(vals, dtype=torch.float32, device=dev)
     return RouterFeatures(
         length=torch.as_tensor(t["lengths"], dtype=torch.float32, device=dev),
         in_complex=in_cx, chem_summary=chem_summary[:, :5], recycle=recycle,
-        length_bin_max=LENGTH_BIN_MAX)
+        neff_over_l=neff, length_bin_max=LENGTH_BIN_MAX)
 
 
 #: Re-exported from `pharos.model.moe`, which is where the binning it
@@ -635,7 +653,8 @@ def _regression_metrics(pred: torch.Tensor, target: torch.Tensor,
 
 def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
                 n_loops: Optional[int] = None,
-                structure_weight: float = 1.0) -> tuple:
+                structure_weight: float = 1.0,
+                use_neff: bool = False) -> tuple:
     """One forward pass and every head that this batch can supervise.
 
     Two throughput decisions live here, both measured.
@@ -657,7 +676,8 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
     B, L = t["tokens"].shape
     want_dyn = bool(t["rigidity_mask"].any())
     out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
-                feats=router_features(t), n_loops=n_loops, dynamics=want_dyn)
+                feats=router_features(t, with_neff=use_neff),
+                n_loops=n_loops, dynamics=want_dyn)
     parts: Dict[str, float] = {}
     total = torch.zeros((), device=dev)
     w = t["weights"]
@@ -978,7 +998,8 @@ def average_precision(score: np.ndarray, label: np.ndarray) -> float:
 
 @torch.no_grad()
 def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
-             max_batches: Optional[int] = None, token_budget: int = 8192) -> Dict:
+             max_batches: Optional[int] = None, token_budget: int = 8192,
+             use_neff: bool = False) -> Dict:
     """Threshold-free where the task is imbalanced, pooled where it is thin.
 
     Two corrections over the first version, both of which made a working head
@@ -1026,7 +1047,7 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
             with torch.autocast(device.type, dtype=torch.bfloat16,
                                 enabled=(device.type == "cuda")):
                 out = model(t["tokens"], t["mod_ids"], t["chem"], t["mask"],
-                            feats=router_features(t),
+                            feats=router_features(t, with_neff=use_neff),
                             dynamics=bool(t["rigidity_mask"].any()))
             m = t["mask"]
             if m.any():
@@ -1387,6 +1408,13 @@ def main() -> None:
     # Every one is zero-gated, so turning it on does not change the loaded
     # checkpoint's forward pass; it only gives the model something new it may
     # learn to use.
+    ap.add_argument("--router-neff", action="store_true",
+                    help="finding 68: supply Neff/L to the router. The field "
+                         "is declared on RouterFeatures and read by moe.py "
+                         "into extra[:, 0], and no caller has ever set it, so "
+                         "that conditioning slot has been a constant zero in "
+                         "every stage. Off by default: it changes the router's "
+                         "input distribution, so it is an A/B and not a fix.")
     ap.add_argument("--triangle-layers", type=int, default=None,
                     help="finding 109: rounds of triangle multiplicative "
                          "update on the decoder's pair representation. The "
@@ -1676,7 +1704,8 @@ def main() -> None:
                 with torch.autocast("cuda", dtype=torch.bfloat16):
                     loss, parts, _ = step_losses(
                         model, t, cfg, args.n_neg, n_loops=nl,
-                        structure_weight=args.structure_weight)
+                        structure_weight=args.structure_weight,
+                        use_neff=args.router_neff)
                 # `step`, not `gstep`. Stage 5 has no `gstep`: its counter is
                 # `step`, restored from the resume record at line 1212. The
                 # guard this call implements was added to stop a NaN reaching
@@ -1725,7 +1754,8 @@ def main() -> None:
                     # and a smoke test that stops at step 1 never reaches it --
                     # which is exactly how `evaluate()` came to report two
                     # heads of ten without anyone noticing.
-                    _ev = evaluate(model, va, device, cfg, 2, args.token_budget)
+                    _ev = evaluate(model, va, device, cfg, 2, args.token_budget,
+                                   use_neff=args.router_neff)
                     print(f"[pharos] smoke validation ({len(_ev)} metrics): "
                           + "  ".join(f"{k} {v}" for k, v in sorted(_ev.items())),
                           flush=True)
@@ -1768,7 +1798,8 @@ def main() -> None:
                       f"{np.mean(run[-args.log_every:]):.4f} "
                       f"{ {k: round(v, 3) for k, v in parts.items() if k != 'n_pairs'} }",
                       flush=True)
-        ev = evaluate(model, va, device, cfg, args.eval_batches, args.token_budget)
+        ev = evaluate(model, va, device, cfg, args.eval_batches,
+                      args.token_budget, use_neff=args.router_neff)
         history.append({"epoch": ep, "loss": float(np.mean(run)), "val": ev})
         print(f"[pharos] epoch {ep}: loss {np.mean(run):.4f} val {ev} "
               f"({time.time()-t0:.0f}s)", flush=True)
@@ -1803,10 +1834,11 @@ def main() -> None:
               "splits": {"train": len(tr), "val": len(va), "test": len(te),
                          "test_ribosomal": len(tb)},
               "test": evaluate(model, te, device, cfg, args.eval_batches,
-                               args.token_budget),
+                               args.token_budget, use_neff=args.router_neff),
               # D25: reported under its own name, never averaged with `test`
               "test_ribosomal": evaluate(model, tb, device, cfg,
-                                         args.eval_batches, args.token_budget)}
+                                         args.eval_batches, args.token_budget,
+                                         use_neff=args.router_neff)}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"pharos_{args.size}_results.json").write_text(json.dumps(report, indent=1))
     print(f"\ntest (family-disjoint) : {report['test']}")

@@ -368,6 +368,40 @@ def _cached_family(family: str):
         return None
 
 
+@lru_cache(maxsize=512)
+def family_depth(family: str) -> Optional[int]:
+    """Rows in the family's alignment, or None if there is no cache.
+
+    `precompute_coevolution.py` has always stored `n_rows` beside the
+    couplings, and nothing ever read it. It is the numerator of `Neff/L`,
+    the router conditioning feature that `RouterFeatures` declares,
+    `moe.py` reads into `extra[:, 0]`, and no caller has ever set --
+    finding 68, open since it was declared. The trainer's note that
+    "Neff/L is not in the 3D set, so it is left absent rather than
+    invented" was true when written; building this cache made it
+    available and nobody went back.
+
+    It is the **Rfam SEED row count**, and neither a redundancy-weighted
+    Neff nor a full-alignment depth. Both distinctions matter and are
+    measured, not assumed: over 60 cached families the median seed depth
+    is **13** rows against a median **101** in the corresponding full
+    alignment, and 5S_rRNA reads 712 against **594,154** -- an 834x gap.
+    Calling this `Neff/L` without saying so would be inventing a feature
+    that looks like alignment depth and is a curated sample size.
+
+    It is still strictly more than the constant zero `extra[:, 0]` has
+    carried in every stage, which is why it is offered at all -- behind
+    `--router-neff`, off by default, as an A/B and not a fix.
+    """
+    f = CACHE / f"{family.replace('/', '_')}.npz"
+    if not f.exists():
+        return None
+    try:
+        return int(np.load(f)["n_rows"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 @lru_cache(maxsize=4096)
 def coevolution_pairs(family: str, query: str, top_k: Optional[int] = None
                       ) -> Optional[Tuple[np.ndarray, np.ndarray]]:

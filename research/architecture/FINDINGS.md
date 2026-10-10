@@ -1739,3 +1739,70 @@ channel count is a knob.
 103's bidirectional `gdn` is off: finding 100's A/B is parked at epoch 24
 of 40, and two unmeasured architecture changes landing together would
 confound all three. The queue is 100, then 109, then 103.
+
+## 110 — coevolution runs on seed alignments, and 3.1 GB of full ones are unread
+
+| # | what | status |
+|---|---|---|
+| 110 | The coevolution channel is computed from **Rfam seed** alignments, whose median depth over the cached families is **13 rows** — against the module's own stated MI noise floor of 8. `data/families/rfam/full_alignments/` holds **4,077 Stockholm files, 3.1 GB**, and nothing in the model pipeline reads them: the only references are `audit_data.py`, `verify_data_integrity.py` and the acquisition script | **NOT A DEFECT** — the choice is documented and correct. The refinement it leaves open is quantified below |
+
+The reason it is not a defect is in `msa.py`'s own docstring, and it is a
+good one:
+
+> `full_alignments/` ... is the wrong set for this corpus: the families
+> that dominate it are absent. SSU rRNA (RF00177), LSU rRNA
+> (RF02541/RF02543) and tRNA (RF00005) have no full alignment, and
+> together they are 84.4% of structural residues. ... Seeds are curated
+> and shallow where the full alignments are deep and partial, and
+> **shallow-but-present beats deep-but-absent**.
+
+Measured, and it holds exactly:
+
+| family | chains | full alignment? | seed rows |
+|---|---|---|---|
+| tRNA | 3,303 | **no** | 954 |
+| 5S_rRNA | 2,235 | yes | 712 |
+| LSU_rRNA_bacteria | 1,787 | **no** | 102 |
+| SSU_rRNA_bacteria | 1,663 | **no** | 99 |
+| 5_8S_rRNA | 723 | yes | 61 |
+
+### What the argument does not cover
+
+It argues against full-**only**. It does not argue against a **union**:
+full where one exists, seed otherwise. Over the corpus:
+
+| | |
+|---|---|
+| families with an Rfam family assigned | 234, over 14,083 chains |
+| of those, a full alignment exists for | **213 (91.0%)** |
+| chains those families cover | **5,415 (38.5%)** |
+| median depth, seed vs full (60 families) | 13 vs **101** |
+| 5S_rRNA, the 2nd-largest family | 712 vs **594,154** (834x) |
+| 5_8S_rRNA | 61 vs **47,585** (780x) |
+
+So a union would deepen the alignment behind the coevolution feature for
+**38.5% of family-assigned chains**, including the second and seventh
+largest families, by between 8x and 834x — while leaving tRNA and the
+rRNAs exactly as they are. The docstring anticipates this: *"that is a
+later, heavier path and this module is written so it can be swapped
+in."*
+
+Not done here, because it means rebuilding the coevolution cache (a pass
+over 213 alignments, one of them 594k rows) and then re-running stage 5
+to see whether a deeper MI changes anything. Recorded with the numbers so
+the decision is a decision and not an oversight.
+
+### 68, while in the area
+
+`neff_over_l` is declared on `RouterFeatures`, read by `moe.py:115` into
+`extra[:, 0]`, and set by **no caller** in any stage — so that
+conditioning slot has been a constant zero throughout. The trainer's note
+that *"Neff/L is not in the 3D set, so it is left absent rather than
+invented"* was true when written; `precompute_coevolution.py` has since
+stored `n_rows` beside every cached family and nothing read it.
+
+`family_depth()` now exposes it and `--router-neff` supplies
+`log1p(rows / L)`. Off by default, and labelled as **seed row count**
+rather than Neff, because by the measurements above it is a curated
+sample size and not an alignment depth. 68 stays `OPEN` until an A/B says
+whether a weak signal beats a constant zero.
