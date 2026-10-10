@@ -305,6 +305,12 @@ def check_loss_trend(F: List[Tuple[str, str, str]], stage: str,
                       f"sd above its own mean {mu:.4f}"))
 
 
+#: A run is "live" if its telemetry moved this recently. Stage 5 writes a
+#: row per epoch at roughly 150 s, so 30 min is several missed rows and
+#: not a tight race. Used to tell "still happening" from "happened".
+LIVE_MIN: float = 30.0
+
+
 def check_oom(F: List[Tuple[str, str, str]], stage: str,
               rs: List[Dict]) -> None:
     v = series(rs, "n_oom")
@@ -312,11 +318,26 @@ def check_oom(F: List[Tuple[str, str, str]], stage: str,
         return
     # Only while it is still happening. A finished run's OOM count is
     # history, and re-reporting it every half hour forever is noise.
-    fresh = len(v) > 1 and v[-1] > v[-2]
+    #
+    # That was the intent and `v[-1] > v[-2]` was not it. Those are the last
+    # two ROWS of a csv, so once a run ends on a rising count the comparison
+    # is true forever: a run that died at 16:03 was still being reported at
+    # 16:13 as "still taking them", in the same report whose liveness line
+    # said no trainer was running. Rising-in-the-file is a property of the
+    # file; still-happening is a property of the clock, and needs one.
+    rising = len(v) > 1 and v[-1] > v[-2]
+    c = newest_run(stage.split("/")[0])
+    age = (time.time() - c.stat().st_mtime) / 60.0 if c is not None else 1e9
+    live = age < LIVE_MIN
+    fresh = rising and live
     sev = "CRIT" if (fresh and v[-1] > 20) else ("WARN" if fresh else "INFO")
-    F.append((sev, "oom", f"{stage} has taken {v[-1]:.0f} OOMs"
-                          + (" and is still taking them" if fresh
-                             else " (not rising)")))
+    if fresh:
+        why = " and is still taking them"
+    elif rising:
+        why = f" and ended on a rising count ({age:.0f} min ago)"
+    else:
+        why = " (not rising)"
+    F.append((sev, "oom", f"{stage} has taken {v[-1]:.0f} OOMs" + why))
 
 
 def check_gates(F: List[Tuple[str, str, str]]) -> None:

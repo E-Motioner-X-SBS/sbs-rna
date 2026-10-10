@@ -1389,3 +1389,102 @@ of 2.375.
 Taken together with finding 100's earlier 10.89 → 2.03 GiB chunking, the
 decoder's geometric bias now costs about a twentieth of what the first
 working version did, for a bit-identical result.
+
+## 105 — the watch said "still taking them" about a run that had been dead for four hours
+
+| # | what | status |
+|---|---|---|
+| 105 | `check_oom` decided whether a run was *still* taking OOMs by comparing the last two **rows of a csv**. That is a property of the file, not of the clock, so once a run ended on a rising count the test stayed true forever | `FIXED` |
+
+The report at 16:13 read:
+
+```
+**1 CRIT, 0 WARN, 7 INFO**
+## CRIT
+- oom — stage5_3d/20261010T054625Z has taken 46 OOMs and is still taking them
+## INFO
+- liveness — no trainer process is running
+- run — stage5_3d/20261010T054625Z: 109 rows, last written 231 min ago
+```
+
+A CRIT contradicted by two INFO lines in its own report. The check's
+comment states the intent exactly — *"Only while it is still happening. A
+finished run's OOM count is history, and re-reporting it every half hour
+forever is noise"* — and the implementation never expressed it. Same
+class as the rest of this register, in the monitor instead of the model,
+and the monitor is where it costs most: 22 of this script's first 23
+warnings were false, and a CRIT that is wrong teaches its reader to skip
+the one that is right.
+
+`fresh` is now `rising AND live`, where `live` means the run's telemetry
+moved within `LIVE_MIN = 30` minutes — several missed rows at stage 5's
+~150 s per epoch. A run that ended on a rising count now reads
+`INFO ... and ended on a rising count (247 min ago)`, which is what was
+true. The ALERT cleared on the next pass.
+
+**The 46 OOMs themselves were real** and are finding 104: that run took
+them because `GeometricBias` was double-width, and it then died of one.
+
+`scripts/test_training_watch.py` is new — the watch had **no test module
+at all**, which for a script with that false-positive record is its own
+finding. Seven assertions, each on a *severity* rather than a message:
+live+rising+large is CRIT, the same rows from a dead run are INFO, a flat
+count is INFO, zero OOMs is silence, and live+rising+small is WARN.
+
+## 106 — the physics bias is wired, trains, and the model has switched it off
+
+| # | what | status |
+|---|---|---|
+| 106 | The screened-Coulomb pair bias reaches the attention logits at a magnitude of **2.6e-04**. It is not broken and not frozen; the model has driven it to numerically nothing | `MEASURED` — not a defect |
+
+Every gate on the physics path is open, and all of them are tiny:
+
+| parameter | trained value |
+|---|---|
+| `elec.log_scale` | +0.00738, so amplitude `exp(·)` = **1.0074** |
+| `elec.site_scale` | −0.00335 |
+| `trunk.blocks.{7,15}.mixer.bias_scale` | mean 0.0088, max 0.0269 |
+| `B_elec` itself (documented range) | −0.0097 to −0.0064 |
+
+The product is what reaches a logit:
+
+| | contribution |
+|---|---|
+| low salt, largest head | **2.63e-04** |
+| high salt, largest head | 1.73e-04 |
+
+A logit perturbation of 2.6e-04 multiplies an attention weight by
+`exp(2.6e-04) = 1.00026`. The physics module changes where the model
+attends by **0.03%**.
+
+### Why "rescale it" is the wrong fix, and would have been a false positive
+
+The tempting reading is a scale handicap: `B_elec` is O(1e-2) while
+other gated features are O(1), so `bias_scale`'s gradient is ~100x
+smaller and the gate cannot open. Normalise `B_elec` to unit scale and
+let it compete fairly.
+
+That argument is wrong, and checking it is the point of writing it down.
+Stage 5 optimises with **AdamW** (`train_pharos.py:1434`), whose update
+is `lr · m̂/(√v̂ + ε)` — **invariant to a uniform rescaling of the
+gradient**. Multiplying `B_elec` by 100 would leave the step size on
+`bias_scale` unchanged and AdamW would simply settle at a `bias_scale`
+100x smaller, for an identical product. The fix is a no-op.
+
+Nor is weight decay suppressing it: decoupled decay pulls `bias_scale`
+by `lr·wd = 2e-4 × 0.01 = 2e-6` per step, a factor of 0.994 over all
+3,069 steps.
+
+What is left is the honest reading: given a scale-invariant optimiser,
+3,069 steps and a gradient it demonstrably receives, the model put the
+physics bias at 2.6e-04 of a logit **because that is where it wanted
+it**. The docstring's claim that `bias_scale` "reaches 1e-2 within 200
+steps" is true and was read as the gate opening; the longer measurement
+is that it reaches 1e-2 and then **stops**, for the remaining 2,800.
+
+This does not say the physics is wrong — `manning.py` is validated
+against `md_rnaions` to 1.2e-4 on the Bjerrum length. It says the
+screened-Coulomb term, as delivered through two full-attention blocks of
+eighteen, is not something this model finds useful at this scale of
+training. Recorded so the next person does not rediscover the tempting
+fix and ship it.
