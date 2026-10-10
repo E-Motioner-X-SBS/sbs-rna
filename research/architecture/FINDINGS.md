@@ -1968,3 +1968,39 @@ Three assertions in `scripts/test_training_watch.py`, on a synthetic run
 directory with a real record and a newer header-only one: that
 `newest_run` picks the real one, that the watch says so, and that it
 says so as INFO.
+
+### 112, built and measured
+
+The union cache is built: `data/derived/coevolution_full/`, 364 families,
+**1,092 s** of CPU, **273 of 367 families from a full alignment** and the
+rest from their seed. Chain-weighted over the 14,083 family-assigned
+chains:
+
+| effective depth | seed-only | union |
+|---|---|---|
+| Neff < 10 | 1,745 (12.4%) | 1,598 (11.3%) |
+| 10 ≤ Neff < 50 | 7,721 (**54.8%**) | 4,122 (29.3%) |
+| 50 ≤ Neff < 100 | 1,108 (7.9%) | 827 (5.9%) |
+| Neff ≥ 100 | 3,384 (**24.0%**) | 7,411 (**52.6%**) |
+
+**Chains with a usable alignment (Neff ≥ 50) go from 31.9% to 58.5%** —
+the feature stops being noise for 3,746 more chains. Largest gains by
+chains affected:
+
+| family | chains | seed Neff | union Neff | gain |
+|---|---|---|---|---|
+| 5S_rRNA | 2,235 | 12.2 | **433.5** | 35.5x |
+| 5_8S_rRNA | 723 | 16.6 | **266.2** | 16.0x |
+| U6 | 104 | 11.2 | **605.8** | 54.1x |
+| U5 | 102 | 51.6 | 549.3 | 10.6x |
+| U2 | 93 | 54.7 | 781.8 | 14.3x |
+
+The ceiling finding 110 identified still holds and is visible in the
+table: 11.3% of chains stay under Neff 10, because tRNA and the large
+rRNAs have no full alignment and keep their seeds. This buys the half of
+the corpus it can reach and nothing for the other half.
+
+Selected with `PHAROS_COEV_CACHE=data/derived/coevolution_full`, and
+**not** the default — a deeper MI is a different input distribution under
+a trained checkpoint, so it is the fourth queued A/B arm and not a fix.
+112 stays `OPEN` until that arm reports.

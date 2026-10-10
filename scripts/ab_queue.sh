@@ -28,6 +28,10 @@ ARMS=(
   "geom|$CKDIR/pharos_shared400_geom.pt||$AN/pred_geom|$AN/blind_geom.json"
   "tri|$CKDIR/pharos_shared400_tri.pt|--triangle-layers 2|$AN/pred_tri|$AN/blind_tri.json"
   "bigdn|$CKDIR/pharos_shared400_bigdn.pt|--bidirectional-gdn|$AN/pred_bigdn|$AN/blind_bigdn.json"
+  # Finding 112: the union coevolution cache. Not a train-time flag but an
+  # environment selection, so the arm carries ENV= in its flags field and
+  # `run_arm` exports it. Deeper MI for 58.5% of chains against 31.9%.
+  "coevfull|$CKDIR/pharos_shared400_coevfull.pt|ENV:PHAROS_COEV_CACHE=data/derived/coevolution_full|$AN/pred_coevfull|$AN/blind_coevfull.json"
 )
 
 done_at_40() {   # $1 = checkpoint path
@@ -63,15 +67,24 @@ for spec in "${ARMS[@]}"; do
     # Resume if a checkpoint exists, otherwise start from the stage-4 init.
     if [ -f "$CK" ]; then INITARG=""; else INITARG="--init-from $INIT"; fi
     say "$NAME training (${f} MiB free) $FLAGS"
+    # An arm may select its data with an environment variable rather than
+    # a flag; `ENV:` marks that and the rest of FLAGS stays CLI.
+    ENVARG=""; CLIFLAGS="$FLAGS"
+    case "$FLAGS" in
+      ENV:*) ENVARG="${FLAGS#ENV:}"; CLIFLAGS="" ;;
+    esac
     # shellcheck disable=SC2086
-    PYTHONPATH=src nice -n 5 "$PY" -u scripts/train_pharos.py \
+    env ${ENVARG:+$ENVARG} PYTHONPATH=src nice -n 5 "$PY" -u scripts/train_pharos.py \
         --device cuda --min-free-gib 60 --size shared400 --epochs 40 \
-        --token-budget 16384 --ckpt "$CK" $INITARG $FLAGS >> "$LOG" 2>&1
+        --token-budget 16384 --ckpt "$CK" $INITARG $CLIFLAGS >> "$LOG" 2>&1
     say "$NAME trainer rc=$?"
   done
 
   say "$NAME at epoch 40; predicting"
-  PYTHONPATH=src nice -n 5 "$PY" -u scripts/predict_structure.py \
+  ENVARG=""; case "$FLAGS" in ENV:*) ENVARG="${FLAGS#ENV:}" ;; esac
+  # The SAME data selection at inference. Scoring an arm against a
+  # different coevolution cache than it trained on measures neither.
+  env ${ENVARG:+$ENVARG} PYTHONPATH=src nice -n 5 "$PY" -u scripts/predict_structure.py \
       --ckpt "$CK" --size shared400 --targets rna_puzzles \
       --out "$PRED" >> "$LOG" 2>&1
   say "$NAME predict rc=$?"

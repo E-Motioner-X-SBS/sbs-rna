@@ -30,6 +30,7 @@ ARMS = {
     "100  GeometricBias": AN / "blind_geom.json",
     "109  triangle update": AN / "blind_tri.json",
     "103  bidirectional gdn": AN / "blind_bigdn.json",
+    "112  union coevolution": AN / "blind_coevfull.json",
 }
 NOISE_FLOOR = 0.0023
 SPREAD = 0.0046
