@@ -3,7 +3,10 @@ name = "sbs-rna"
 version = "0.1.0"
 description = "RNA data repository and tooling for the PHAROS RNA foundation model"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+# <3.14 excluded the interpreter the venv was rebuilt onto on 2026-10-09
+# (cpython 3.14.2). Everything imported here works on it, so the bound moves
+# rather than the venv.
+requires-python = ">=3.10,<3.15"
 dependencies = [
     "pdb-hunter",
     "requests>=2.28.0",
@@ -11,7 +14,23 @@ dependencies = [
     "pandas>=2.0",
     "pyarrow>=14.0",
     "tqdm>=4.64.0",
+    # Structure parsing for the blind-test path: `pharos.eval.structure` and
+    # `pharos.eval.base_pairs` both `import gemmi`. It was installed ad hoc
+    # and NOT declared here, so when the venv was rebuilt onto 3.14.2 it was
+    # the one package that did not come back -- torch, numpy, pandas,
+    # pyarrow and scipy all did. Nothing noticed until the gate ran
+    # `test_metrics.py`, which is the only thing in the tree that reads a
+    # deposition on CPU. See finding 94.
+    "gemmi>=0.6",
 ]
+
+# STILL UNDECLARED, deliberately, and recorded rather than left silent:
+# `torch` (39 files), `scipy` (5) and `matplotlib` (2) are imported and not
+# listed. torch is the dangerous one -- a plain "torch" spec resolves to the
+# CPU wheel on a machine whose venv must carry +cu130, so adding it here
+# without an index pin would quietly break every GPU run. Declaring it needs
+# a [tool.uv.sources] entry for the CUDA index, which is a change to make
+# deliberately and not while a training job is live.
 
 [dependency-groups]
 dev = [

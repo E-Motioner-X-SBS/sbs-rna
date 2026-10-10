@@ -937,6 +937,62 @@ three declared scalars and the test's explicit exercise of it are all
 gone: a flag that defaults to off and does nothing is the dead-parameter
 class this register exists for.
 
+## 94–95 — the venv was rebuilt and one dependency did not come back
+
+| # | what | status |
+|---|---|---|
+| 94 | `gemmi` is imported by `pharos.eval.structure` and `pharos.eval.base_pairs` — the entire blind-test path — and was **not declared in `pyproject.toml`**. On 2026-10-09 16:30 the venv was rebuilt from cpython **3.13.5 to 3.14.2**; the old `lib/python3.13/` tree is gone. torch, numpy, pandas, pyarrow and scipy all came back. gemmi did not, because nothing listed it | `FIXED` |
+| 95 | The pipeline driver reported `FAIL gate rc=0` **and trained anyway**, defeating the one guard whose job is to stop training against a tree whose checks fail | `FIXED` |
+
+**94 was caught by the gate and by nothing else.** `test_metrics.py` is the
+only module in the tree that reads a deposition on CPU, so it is the only
+thing that touches gemmi before the GPU stages do. Had the gate not run,
+the failure would have surfaced ninety minutes later at
+`predict_structure`, after a full stage-5 run.
+
+Two more facts worth keeping: `requires-python` was `>=3.10,<3.14` while
+the venv is now 3.14.2, so the rebuild put the project on an interpreter
+its own manifest excludes — the bound is widened rather than the venv
+moved, because everything imported works on it. And **torch (39 files),
+scipy (5) and matplotlib (2) are still undeclared**. torch is left that way
+deliberately: a plain `"torch"` spec resolves to the CPU wheel on a machine
+whose venv must carry `+cu130`, so declaring it without an index pin would
+quietly break every GPU run. It is written into `pyproject.toml` as a
+comment rather than left silent.
+
+`uv pip install gemmi` was used rather than `uv add`, because **`uv add`
+runs a sync and a sync prunes undeclared packages** — with torch
+undeclared and a stage-5 run live on the card, that would have deleted
+torch out from under a training job.
+
+### 95, and why `if` is the wrong shape for this
+
+```bash
+if "$@" >> "$log" 2>&1; then
+    say "OK"; return 0
+fi
+local rc=$?          # <-- 0, always
+```
+
+A compound `if` whose condition fails and which has **no `else`** returns
+**0**. So `$?` after `fi` is 0, `return $rc` returns 0, and the caller's
+`|| exit 1` never fires. Reproduced directly:
+
+```
+=== old shape, command exits 1 ===     === new shape, command exits 1 ===
+START gate                             START gate
+FAIL gate rc=0                         FAIL gate rc=1
+                                         -> caller saw failure
+```
+
+The fix is to capture the status before any compound command touches it:
+`"$@" >> "$log" 2>&1; local rc=$?` then branch on `$rc`.
+
+**The production runner does not have this bug** — `gpu_cron_runner.sh`
+uses `if cmd; then ...; else ...; exit 1; fi`, which is correct. This was
+my scratchpad driver, and it had already mis-reported `FAIL reverify2
+rc=0` the day before; I read that as cosmetic and it was not.
+
 ## Checked and not defects
 
 Recorded so the same ground is not re-covered. Each looked like the register's
