@@ -409,7 +409,7 @@ stage 5 1,062 s, prediction 38 s, scoring 73 s.
 |---|---|---|
 | 82 | `probe_channels.py` perturbed `mod_ids` with `m2[0, 0] = 1` against a `mod` drawn from `randint(1, 4)`. When the draw was already 1 the "perturbed" input WAS the original and the delta was exactly 0.00e+00 — a dead channel reported for a live one. `torch.manual_seed(0)` is set three lines before the MODEL is built, and initialisation consumes the stream, so adding head 11 and `theta_head` shifted every subsequent draw, `mod[0,0]` became 1, and a probe that had passed all night started failing the gate and blocking the pipeline. **The seed made it deterministic, not correct** | `FIXED` |
 | 83 | stage 5 runs **317 optimiser steps over 8 epochs** — 40 per epoch, 1,062 s in total. A denoising diffusion decoder is being asked to learn a generative model of RNA backbone geometry in three hundred steps. At inference the consequence is unambiguous: consecutive P–P distances come out at **16–19 Å against a 5.88 Å target**, bond violation 0.79–0.93, and the structures are not connected chains | **ADDRESSED** — 3,069 steps since, and P–P came to 5.67–6.69 Å; the step count is no longer the binding constraint (93) |
-| 84 | head 11 learns on the training batches and **does not generalise**: `tors_theta_lift` reaches **+9.79°** at step 250 and the same epoch's validation reads **−0.74°**; η +5.71 train against −1.27 val. On 317 steps and 6,585 chains that is the expected shape, but it is recorded rather than assumed, and the family-disjoint test agrees (η −0.60, θ −0.26, χ̃ **+0.45**, the only one positive) | `OPEN` |
+| 84 | head 11 learns on the training batches and **does not generalise**: `tors_theta_lift` reaches **+9.79°** at step 250 and the same epoch's validation reads **−0.74°**; η +5.71 train against −1.27 val. On 317 steps and 6,585 chains that is the expected shape, but it is recorded rather than assumed, and the family-disjoint test agrees (η −0.60, θ −0.26, χ̃ **+0.45**, the only one positive) | `RESOLVED` — see below |
 
 Finding 83 is the one that matters, and the inference guard of finding 74 is
 what made it visible rather than flattering: every one of the seventeen
@@ -1156,6 +1156,9 @@ a false positive costs exactly as much as one that misses a real defect.
 | distance bins documented as "2–40 Å" actually span 2–41 Å | `CORRECTED` |
 | `prewarm` divided `ru_maxrss` by 1e6 and called the result GiB | `FIXED` |
 | Muon had no test module at all | `FIXED` |
+| the training watch had no test module at all, and 22 of its first 23 warnings were false | `FIXED` |
+| the new watch test module was not in the gate's suite list, so it would never have run — caught by the gate's own drift check on the first try | `FIXED` |
+| head 11's new claims were written as **R8**, a label already used by the chemistry-dimension group, making every `R8` citation ambiguous. Renamed **R16**; the gate now checks that no label names two non-contiguous groups, and that check reports `R8` if the collision is reinstated | `FIXED` |
 
 ## Open questions, recorded and not acted on
 
@@ -1622,3 +1625,115 @@ to compare.
 This does not resolve 97 — it removes a wrong reason for an answer, and
 supplies the instrument that can give a right one on the next stage-6
 run. 97 stays `OPEN`.
+
+## 84 RESOLVED — head 11 does generalise; it had been trained for 317 steps
+
+Finding 84 was measured on a run of **317 steps**. The current run has
+**3,069**, and the symptom is gone. Lift is baseline MAE minus model MAE
+in degrees, against a circular-mean baseline, so positive is better than
+predicting one angle everywhere.
+
+| split | η | θ | χ̃ |
+|---|---|---|---|
+| **84's measurement, 317 steps** | | | |
+| train | +5.71 | +9.79 | — |
+| val | **−1.27** | **−0.74** | — |
+| family-disjoint | −0.60 | −0.26 | +0.45 |
+| **now, 3,069 steps** | | | |
+| val | **+1.30** | **+2.19** | **+1.53** |
+| test | **+5.38** | **+3.47** | **+2.03** |
+| test_ribosomal (family-disjoint) | **−0.05** | **+1.05** | **+1.24** |
+
+Every validation and test figure that was negative is positive, and on
+test the η lift of +5.38° against a 27.93° baseline is a 19% reduction
+in angular error.
+
+84 hedged itself correctly — *"on 317 steps and 6,585 chains that is the
+expected shape, but it is recorded rather than assumed"* — and the
+assumption it declined to make turns out to have been right. The
+generalisation gap was training duration.
+
+**The one place it still does not generalise** is η on the
+family-disjoint ribosomal split: **−0.05**, which is exactly its
+baseline. θ (+1.05) and χ̃ (+1.24) hold there and η does not. η is the
+pseudotorsion spanning three residues (C4′ᵢ₋₁, Pᵢ, C4′ᵢ, Pᵢ₊₁) and so is
+the most backbone-conformation-dependent of the three; that it survives
+on test and dies on an unseen rRNA family is a real, narrow limitation
+and is recorded rather than averaged away.
+
+All six numbers are now pinned as claim **R16** in the gate, including
+the negative one, so a regression is caught instead of rediscovered.
+
+## 109 — the pair representation cannot be three-dimensionally embeddable
+
+| # | what | status |
+|---|---|---|
+| 109 | `DiffusionPairFeatures` is an outer sum `A s_i + B s_j`, so `z[i,j]` is a function of its two endpoints and of **nothing else**. Pair `(i,j)` never hears from pair `(i,k)` or `(k,j)`, and the model has **no triangle operation anywhere** — no triangle multiplicative update, no triangle attention, no IPA, no outer-product pair stack | `FIX BUILT, OFF BY DEFAULT` |
+
+Measured rather than read off the source. Perturb one residue's hidden
+state and count which entries of the pair tensor move:
+
+| | pairs that move by >1e-4 |
+|---|---|
+| pairs involving the perturbed residue | 48 of 48 |
+| pairs **not** involving it | **0 of 342** |
+
+Exactly zero, which is what an outer sum must give.
+
+### Why this is the shape of the failure
+
+Distances obey the triangle inequality. A predictor whose pairs are
+mutually independent has no mechanism that can know
+`d(i,j) ≤ d(i,k) + d(k,j)`, and can therefore emit a set of pairwise
+distances **for which no three-dimensional structure exists at all** —
+every pair locally plausible, the whole set globally incoherent.
+
+Seen from outside, that is lDDT 0.269 beside TM 0.094: bonds inside
+tolerance, local neighbourhoods sane, and the fold wrong. It is a
+different gap from finding 100 in the same failure — 100 was the decoder
+not seeing current geometry, this is the pair track not being
+constrained to be geometry at all.
+
+The triangle multiplicative update (Jumper et al. 2021, Algorithms 11
+and 12) is the standard remedy and is the one ingredient of that
+architecture this model never had.
+
+### The fix
+
+`src/pharos/model/triangle.py`. `z[i,j] ← Σ_k a[i,k]·b[j,k]` (outgoing)
+and `Σ_k a[k,i]·b[k,j]` (incoming), gated, residual, two rounds by
+default at `c = 32` channels against `d_pair = 160` — the triangle term
+is a *constraint* on the pair track, not a replacement for it.
+
+The same probe, after:
+
+| | pairs that move |
+|---|---|
+| shipped outer sum | **0 of 342** |
+| triangle update | **306 of 306** (max 1.14, mean 0.18) |
+
+Properties pinned in `test_triangle.py`, whose headline assertion is
+that contrast rather than a property of the new module alone:
+
+| property | measured |
+|---|---|
+| bit-identical at the zero init | `0.000e+00` |
+| gate takes gradient there | `35.8` |
+| padded batch == unpadded rows | `0.000e+00` |
+| **and without the mask it really would leak** | `4.07` |
+
+That last one failed first time round, for a reason worth keeping: the
+probe filled the pad with a **constant**, `norm_in` maps a constant
+vector to exactly zero, and the bias-free `lin_a` keeps it there — so a
+constant pad contributes nothing whether masked or not. A leak test that
+cannot fail is not a leak test. The pad is filled with noise now.
+
+Cost is `O(L³c)` per direction: at `L = 1024`, batch 16, `c = 32` that is
+about 1.1 TFLOP, single-digit milliseconds on this card, with `(B,L,L,c)`
+intermediates near 1 GiB each — so the stack is checkpointable and the
+channel count is a knob.
+
+`triangle_layers` defaults to **0**. Off for the same reason finding
+103's bidirectional `gdn` is off: finding 100's A/B is parked at epoch 24
+of 40, and two unmeasured architecture changes landing together would
+confound all three. The queue is 100, then 109, then 103.

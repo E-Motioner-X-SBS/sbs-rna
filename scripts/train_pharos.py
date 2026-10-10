@@ -947,7 +947,7 @@ def step_losses(model: Pharos, t: Dict, cfg, n_neg: int,
             v = t["coev_val"].to(cv_dense.dtype)
             cv_dense[bb[ok], ii2[ok], jj2[ok]] = v[ok]
             cv_dense = cv_dense + cv_dense.transpose(1, 2)   # couplings are symmetric
-        pair_feat = model.diff_pair(out["hidden"], cv_dense)
+        pair_feat = model.diff_pair(out["hidden"], cv_dense, t["mask"])
         dl = model.heads.structure.loss(
             t["coords"].to(out["hidden"].dtype), out["hidden"], pair_feat, cm)
         total = total + structure_weight * (dl["loss"] * w.mean())
@@ -1219,7 +1219,7 @@ def evaluate(model: Pharos, ds: Pharos3DDataset, device, cfg,
                     cvd[_bb[_ok], _ii[_ok], _jj[_ok]] = \
                         t["coev_val"].to(cvd.dtype)[_ok]
                     cvd = cvd + cvd.transpose(1, 2)
-                pair3 = model.diff_pair(out["hidden"], cvd)
+                pair3 = model.diff_pair(out["hidden"], cvd, t["mask"])
                 with torch.autocast(device.type, dtype=torch.bfloat16,
                                     enabled=(device.type == "cuda")):
                     # `torch.Generator()` is a CPU generator whatever the

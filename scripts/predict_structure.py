@@ -132,7 +132,11 @@ def predict(model: Pharos, seq: str, device, *, n_samples: int = 5,
     # absent and zero are the same tensor; the relative-position embedding,
     # which is the part the backbone needs, is built from the length.
     with torch.no_grad():
-        pair = model.diff_pair(out["hidden"], None)
+        # `msk` explicitly, though this path is batch-1 and unpadded.
+        # The triangle update (finding 109) sums over every k, so a
+        # pad left unmasked there contributes to every real pair --
+        # and passing the mask that is already in scope costs nothing.
+        pair = model.diff_pair(out["hidden"], None, msk)
     draws, clashes, bonds = [], [], []
     for s in range(n_samples):
         g = torch.Generator(device="cpu").manual_seed(seed + s)

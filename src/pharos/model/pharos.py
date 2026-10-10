@@ -90,6 +90,11 @@ class PharosConfig:
     #: Default OFF; zero-gated, so turning it on does not change a loaded
     #: checkpoint's forward pass.
     bidirectional_gdn: bool = False
+    #: Finding 109: rounds of triangle multiplicative update on the decoder's
+    #: pair representation. 0 disables it. Zero-gated, so switching it on
+    #: does not change a loaded checkpoint's forward pass.
+    triangle_layers: int = 0
+    triangle_c: int = 32
 
     @classmethod
     def shared400(cls) -> "PharosConfig":
@@ -419,7 +424,10 @@ class Pharos(nn.Module):
         # The pair representation head 3 reads as an attention bias. Built here
         # rather than inside the head because it is a function of the TRUNK's
         # output, which is what the rest of the pair track is built from too.
-        self.diff_pair = DiffusionPairFeatures(cfg.d_model, cfg.d_pair)
+        self.diff_pair = DiffusionPairFeatures(
+            cfg.d_model, cfg.d_pair,
+            triangle_layers=cfg.triangle_layers,
+            triangle_c=cfg.triangle_c)
         self.elec = ElectrostaticBias(d_model=cfg.d_model)
         # §6.2's missing half: the distance estimate the bias is a function
         # of. See `VirtualDistance` -- three numbers per residue, so the

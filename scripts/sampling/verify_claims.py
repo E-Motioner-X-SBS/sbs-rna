@@ -490,6 +490,37 @@ def main() -> int:
         # projection is trained for exactly one application. Stage 5 samples
         # 1..cfg.n_loops. The configs advertise 8 loops and 144 effective
         # layers; training exercises 2 and 36.
+        # ---- R16: head 11 generalises, which finding 84 said it did not --
+        #
+        # 84 was measured at 317 steps and read train theta +9.79 against
+        # val -0.74. It hedged correctly -- "on 317 steps and 6,585 chains
+        # that is the expected shape, but it is recorded rather than
+        # assumed" -- and at 3,069 steps the shape is gone. Pinned here so a
+        # regression to negative lift is caught rather than rediscovered.
+        #
+        # Lift is baseline MAE minus model MAE in DEGREES, against a
+        # circular-mean baseline, so positive means better than predicting
+        # the same angle everywhere.
+        pr = ROOT / "data/samples/analysis/pharos_shared400_results.json"
+        if pr.exists():
+            pj = _rjson.loads(pr.read_text())
+            for _sp, _want in (("test", {"tors_eta_lift_pooled": 5.38,
+                                         "tors_theta_lift_pooled": 3.47,
+                                         "tors_chi_tilde_lift_pooled": 2.03}),):
+                _d = pj.get(_sp, {})
+                for _k, _v in _want.items():
+                    chk(f"R16 head 11 {_k.replace('tors_', '').replace('_lift_pooled','')} "
+                        f"lift on {_sp}", _d.get(_k), _v, abs_tol=0.005)
+            # The family-disjoint split is the hard one, and it is where the
+            # remaining weakness is: eta sits AT its baseline there.
+            _rb = pj.get("test_ribosomal", {})
+            chk("R16 theta still generalises on the family-disjoint split",
+                _rb.get("tors_theta_lift_pooled"), 1.05, abs_tol=0.005)
+            chk("R16 chi_tilde likewise", _rb.get("tors_chi_tilde_lift_pooled"),
+                1.24, abs_tol=0.005)
+            chk("R16 eta does NOT, and is recorded as such",
+                _rb.get("tors_eta_lift_pooled"), -0.05, abs_tol=0.005)
+
         ld = ROOT / "data/samples/analysis/loop_depth_sweep.json"
         if ld.exists():
             lj = _rjson.loads(ld.read_text())
@@ -1309,8 +1340,20 @@ def main() -> int:
               # stage on a GPU for hours. Two defects in head 11's wiring
               # survived review and were found by running them.
               ROOT / "scripts/test_stage5_losses.py",
+              # The durable training watch. It had no test module at all,
+              # which for a script whose first 23 warnings were 22 false is
+              # its own finding (105): a monitor that cries wolf trains its
+              # reader to skip the one real alarm. Every assertion there is
+              # on a SEVERITY rather than a message.
+              ROOT / "scripts/test_training_watch.py",
               ROOT / "src/pharos/eval/test_metrics.py",
               ROOT / "src/pharos/model/test_shared_moe.py",
+              # Finding 109's triangle update. Its headline assertion is a
+              # CONTRAST -- the shipped outer sum moves 0 of 342 pairs that
+              # exclude a perturbed residue, the triangle update moves 306
+              # of 306 -- because a test of the new module alone would not
+              # say why it exists.
+              ROOT / "src/pharos/model/test_triangle.py",
               # Not named `test_*`, so the drift check below cannot see it and
               # it has to be listed deliberately. It is the standing check for
               # the defect class this whole register is about: a channel that
@@ -1337,6 +1380,33 @@ def main() -> int:
           + (f" -- NOT RUN: {_ungated}" if _ungated else ""))
     if _ungated:
         fails.append(f"{len(_ungated)} test modules are never run: {_ungated}")
+
+    # ---- claim labels must be unique to one group -----------------------
+    #
+    # `R2 mean routing width` and the rest are cited by name from
+    # FINDINGS.md, so a label used by two unrelated groups makes every
+    # citation of it ambiguous. This check exists because the head-11
+    # claims were first written as R8, which was already the
+    # chemistry-dimension group -- caught by reading the gate's own output,
+    # which is not a method that scales.
+    #
+    # A group is contiguous: labels are allowed to repeat on consecutive
+    # claims, and not to reappear after a different label has intervened.
+    import re as _re
+    _labels = [m.group(1) for m in
+               _re.finditer(r'chk\(f?"(R\d+)[ "]', Path(__file__).read_text())]
+    _runs, _prev = [], None
+    for _l in _labels:
+        if _l != _prev:
+            _runs.append(_l)
+            _prev = _l
+    _dup = sorted({l for l in _runs if _runs.count(l) > 1})
+    print(f"  {'OK ' if not _dup else 'FAIL'} "
+          f"{'every claim label names one group':38s} "
+          f"{len(set(_labels))} labels over {len(_labels)} claims"
+          + (f" -- REUSED: {_dup}" if _dup else ""))
+    if _dup:
+        fails.append(f"claim labels used by more than one group: {_dup}")
     if _ghost:
         print(f"  FAIL {'a gated suite does not exist':38s} {_ghost}")
         fails.append(f"gated but missing: {_ghost}")

@@ -56,6 +56,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
+from .triangle import TrianglePairStack
+
 #: Measured over deposited RNA backbones (RNA-Puzzles reference structures):
 #: the intra-residue C4'-N bond is 3.38 +/- 0.07 A, and consecutive phosphates
 #: sit at 6.01 +/- 1.70 A -- the wide spread is chain breaks, not flexibility,
@@ -554,9 +556,19 @@ class DiffusionPairFeatures(nn.Module):
     switched on.
     """
 
-    def __init__(self, d_model: int, d_pair: int, max_rel: int = 32):
+    def __init__(self, d_model: int, d_pair: int, max_rel: int = 32,
+                 triangle_layers: int = 0, triangle_c: int = 32):
         super().__init__()
         self.max_rel = max_rel
+        #: Finding 109. The outer sum below makes `z[i,j]` a function of
+        #: endpoints `i` and `j` and of NOTHING else -- measured, 0 of 342
+        #: pairs sharing no endpoint with a perturbed residue move -- so
+        #: the pair track has no mechanism by which a distogram could be
+        #: three-dimensionally embeddable. `triangle_layers > 0` adds the
+        #: triangle multiplicative update that supplies it. Zero-gated, so
+        #: a loaded checkpoint is unchanged; 0 by default.
+        self.triangle = (TrianglePairStack(d_pair, triangle_c, triangle_layers)
+                         if triangle_layers > 0 else None)
         self.a = nn.Linear(d_model, d_pair, bias=False)
         self.b = nn.Linear(d_model, d_pair, bias=False)
         self.rel = nn.Embedding(2 * max_rel + 2, d_pair)
@@ -565,7 +577,8 @@ class DiffusionPairFeatures(nn.Module):
         self.norm = nn.LayerNorm(d_pair)
 
     def forward(self, single: torch.Tensor,
-                coev: Optional[torch.Tensor] = None) -> torch.Tensor:
+                coev: Optional[torch.Tensor] = None,
+                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         B, L, _ = single.shape
         p = self.a(single).unsqueeze(2) + self.b(single).unsqueeze(1)
         idx = torch.arange(L, device=single.device)
@@ -573,4 +586,9 @@ class DiffusionPairFeatures(nn.Module):
         p = p + self.rel(d + self.max_rel)[None]
         if coev is not None:
             p = p + self.coev(coev.unsqueeze(-1).to(p.dtype))
-        return self.norm(p)
+        p = self.norm(p)
+        # After the norm, so the triangle update sees the representation the
+        # decoder will actually use, and is a residual correction to it.
+        if self.triangle is not None:
+            p = self.triangle(p, mask)
+        return p
