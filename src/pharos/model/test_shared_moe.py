@@ -219,6 +219,33 @@ def main() -> int:
         f"{_pc['active']:,} active of {_pc['total']:,} total; the old "
         f"assumed-width number was 326,258,698")
 
+    # ---- and it must survive a config recorded before the field existed -
+    # `PharosConfig(**saved)` fills fields the saved dict lacks with their
+    # dataclass defaults, and `typical_width`'s default is None -- which
+    # means "fall back to max_k // 4". Every stage-5 run loads a config
+    # recorded by stage 2/3, so without this the 8.4x overstatement comes
+    # back on exactly the runs anyone reads. Measured: a resumed smoke test
+    # reported 326,466,074 active where the measured width gives
+    # 306,001,570.
+    print("\n== an OLD recorded config must not resurrect the assumption ==")
+    _old_dict = {k: v for k, v in PharosConfig.shared400().__dict__.items()
+                 if k != "typical_width"}
+    _resumed = PharosConfig(**{k: v for k, v in _old_dict.items()
+                               if k in PharosConfig.__dataclass_fields__})
+    chk("a config without the field reloads as None, i.e. the old fallback",
+        _resumed.typical_width is None,
+        "which is max_k // 4 = 128 against a measured 15.28")
+
+    _trainer = (Path(__file__).resolve().parents[3]
+                / "scripts/train_pharos.py").read_text()
+    chk("the stage-5 trainer restores it after the checkpoint override",
+        "cfg.typical_width = MEASURED_WIDTH_SHARED400" in _trainer
+        and _trainer.index("cfg = _from_ckpt")
+            < _trainer.index("cfg.typical_width = MEASURED_WIDTH_SHARED400"),
+        "and AFTER, not before -- the recorded config overwrites whatever "
+        "was set ahead of it, which is the same ordering trap the A/B "
+        "architecture flags sit in")
+
     print()
     if fails:
         print(f"FAILURES ({len(fails)}): " + ", ".join(fails))

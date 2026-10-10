@@ -69,7 +69,7 @@ PY
     echo "[resume] $(date -Is) eval rc=$?" | tee -a "$LOG"
 
     # And the comparison, written where it cannot be missed.
-    PYTHONPATH=src /store/shuvam/.venv/bin/python scripts/geom_ab_report.py \
+    PYTHONPATH=src /store/shuvam/.venv/bin/python scripts/ab_report.py \
       >> "$LOG" 2>&1
     echo "[resume] $(date -Is) A/B COMPLETE -- see geom_ab/RESULT.md" | tee -a "$LOG"
     exit 0

@@ -75,3 +75,9 @@
 [resume] 2026-10-10T17:44:51+05:30 10477 MiB free, need 62000
 [resume] 2026-10-10T17:46:53+05:30 10477 MiB free, need 62000
 [resume] 2026-10-10T17:47:43+05:30 10477 MiB free, need 62000
+[resume] 2026-10-10T17:49:45+05:30 10477 MiB free, need 62000
+[resume] 2026-10-10T17:51:48+05:30 10477 MiB free, need 62000
+[resume] 2026-10-10T17:53:52+05:30 10477 MiB free, need 62000
+[queue] 2026-10-10T18:08:12+05:30 geom waiting: 10477 MiB free, need 62000
+[queue] 2026-10-10T18:18:21+05:30 geom waiting: 10477 MiB free, need 62000
+[queue] 2026-10-10T18:20:23+05:30 geom waiting: 10477 MiB free, need 62000

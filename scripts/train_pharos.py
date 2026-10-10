@@ -87,6 +87,7 @@ from pharos.model.moe import (LENGTH_BIN_MAX as _LENGTH_BIN_MAX,  # noqa: E402
                               RouterFeatures)
 from pharos.model.diffusion import BOND_C4_N, BOND_P_P
 from pharos.model.heads import distance_bin        # noqa: E402
+from pharos.model.shared_moe import MEASURED_WIDTH_SHARED400  # noqa: E402
 from pharos.model.pharos import Pharos, PharosConfig
 from pharos.train.telemetry import RunLog
 from pharos.train.checkpoint import (BackgroundSaver,      # noqa: E402
@@ -1375,6 +1376,32 @@ def main() -> None:
                          "on CPU. For checking that stage 5 STARTS -- which "
                          "has never been verified, because the only card is "
                          "busy with stage 1.")
+    # ---- architecture A/B switches --------------------------------------
+    #
+    # Applied AFTER the checkpoint's recorded cfg overrides --size, which is
+    # the only correct place: these are deliberate changes for THIS run, not
+    # settings inherited from the stage that produced the init. Put them
+    # before that override and the checkpoint silently discards them, and the
+    # run reports an architecture it is not using.
+    #
+    # Every one is zero-gated, so turning it on does not change the loaded
+    # checkpoint's forward pass; it only gives the model something new it may
+    # learn to use.
+    ap.add_argument("--triangle-layers", type=int, default=None,
+                    help="finding 109: rounds of triangle multiplicative "
+                         "update on the decoder's pair representation. The "
+                         "pair track is an outer sum, so no distogram it "
+                         "produces is constrained to be embeddable in 3D. "
+                         "0 disables. Costs O(L^3 c) per direction.")
+    ap.add_argument("--triangle-c", type=int, default=None,
+                    help="channels inside the triangle update (default 32 "
+                         "against d_pair 160: a constraint, not a replacement)")
+    ap.add_argument("--bidirectional-gdn", dest="bidirectional_gdn",
+                    action="store_true", default=None,
+                    help="finding 103: run each gdn block's scan in both "
+                         "directions. Twelve of eighteen trunk blocks are "
+                         "strictly causal and PHAROS is an encoder. Costs "
+                         "n_heads parameters per gdn block.")
     ap.add_argument("--from-scratch", action="store_true",
                     help="train stage 5 from random weights. This is a known "
                          "bad configuration -- it produced r = 0.049 on unseen "
@@ -1417,6 +1444,36 @@ def main() -> None:
                       f"{_from_ckpt.n_blocks} blocks, {_from_ckpt.n_experts} experts",
                       flush=True)
             cfg = _from_ckpt
+
+    # A config recorded by an EARLIER run predates fields added since, and
+    # `PharosConfig(**saved)` fills those with their dataclass defaults --
+    # which for `typical_width` is None, i.e. fall back to `max_k // 4`.
+    # That silently resurrects finding 102's 8.4x overstatement on every
+    # resumed run: this smoke test reported 326,466,074 active where the
+    # measured width gives 306,001,570. The number is reporting rather than
+    # behaviour, but a budget figure that is wrong only when resumed is
+    # worse than one that is always wrong, because nobody looks twice.
+    if getattr(cfg, "shared_experts", False) and cfg.typical_width is None:
+        cfg.typical_width = MEASURED_WIDTH_SHARED400
+        print(f"[pharos] routing width for the active count restored to the "
+              f"measured {MEASURED_WIDTH_SHARED400} (the loaded config "
+              f"predates the field)", flush=True)
+
+    # ---- and NOW the A/B switches, on top of whatever cfg we settled on ---
+    _arch = []
+    if args.triangle_layers is not None:
+        cfg.triangle_layers = args.triangle_layers
+        _arch.append(f"triangle_layers={cfg.triangle_layers}")
+    if args.triangle_c is not None:
+        cfg.triangle_c = args.triangle_c
+        _arch.append(f"triangle_c={cfg.triangle_c}")
+    if args.bidirectional_gdn is not None:
+        cfg.bidirectional_gdn = bool(args.bidirectional_gdn)
+        _arch.append(f"bidirectional_gdn={cfg.bidirectional_gdn}")
+    if _arch:
+        print(f"[pharos] architecture overrides for this run: "
+              f"{', '.join(_arch)}", flush=True)
+
     tr = Pharos3DDataset(args.data, split="train", max_length=args.max_length)
     va = Pharos3DDataset(args.data, split="val", max_length=args.max_length)
     te = Pharos3DDataset(args.data, split="test", max_length=args.max_length)
