@@ -379,11 +379,41 @@ cost is $O(L^3 c)$ per direction, about $1.1$\,TFLOP at $L = 1024$ and
 batch 16, and $W_o$ is zero-initialised so a loaded checkpoint is
 bit-identical until the update earns its way in.
 
-\paragraph{It is implemented and switched off.} \code{triangle\_layers}
-defaults to $0$, as does finding 103's bidirectional \code{gdn}. Three
-unmeasured architecture changes landing together would confound all
-three; the queue is 100, then 109, then 103, and \S\ref{sec:results}
-reports no outcome for any of them.
+\paragraph{And the pair feature is the wrong shape for base pairing.}
+The outer sum has a second defect, separate from the triangle one and
+sharper. ``$i$ pairs with $j$'' is a statement about the two
+\emph{together}; a sum of per-endpoint terms cannot express it. Fitted to
+a toy A--U/C--G rule ($\mathrm{type}_i + \mathrm{type}_j = 3$):
+
+\begin{center}\small
+\begin{tabular}{lr}
+\toprule
+shape & accuracy \\
+\midrule
+outer sum $A h_i + B h_j$ & \textbf{0.681} \\
+always-zero baseline & \textbf{0.743} \\
+bilinear $\langle U h_i, V h_j\rangle$ & \textbf{1.000} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The sum does not merely do worse --- it cannot beat predicting ``no
+pair'' everywhere, while a bilinear form fits the rule exactly. This is
+one toy problem rather than a corpus measurement, and that is the weight
+it should carry; but base pairing \emph{is} complementarity, and the
+pair track is additive in its endpoints.
+
+\code{ContactBias} supplies the bilinear form to the trunk's two
+\code{full} blocks through the \code{pair\_bias\_fn} recycling hook they
+already have --- computed from loop $k$, biasing loop $k{+}1$, so it
+needs no extra pass. 50,689 parameters at rank 32, zero-gated.
+
+\paragraph{Everything in this section is implemented and switched off.}
+\code{triangle\_layers} defaults to $0$, as do \code{bidirectional\_gdn}
+and \code{contact\_bias}. Five unmeasured changes landing together would
+confound all five, so each is a separate queued arm from the same
+stage-4 initialisation at the baseline's settings, and
+\S\ref{sec:results} reports no outcome for any of them.
 
 % =========================================================================
 \section{Heads, losses and curriculum}
@@ -625,11 +655,27 @@ equal in value to fixing the model.
   endpoints, and three recycled passes carry right-context back
   (finding 103).
 
-\item \textbf{The trunk's global attention does not attend to contacts.}
-  The two \code{full} blocks score AUROC $0.44$--$0.52$ against the
-  contact map while the contact head reaches AP $0.890$ --- so contacts
-  are being read off the pair features, not built by attention
+\item \textbf{The trunk's global attention does not attend to contacts
+  --- and was never asked to.} The two \code{full} blocks score AUROC
+  $0.44$--$0.52$ against the contact map. On reread that is the expected
+  outcome rather than an anomaly: the contact head reads $h_i$ and $h_j$
+  directly through the pair track, so it needs nothing from attention;
+  the only pair signal those blocks receive is the electrostatic bias,
+  measured at $2.6\times10^{-4}$ of a logit; and they are 2 blocks of 18.
+  Nothing in the architecture asks attention to encode contacts.
+  \code{ContactBias} is the missing mechanism, built and queued
   (finding 92, open).
+
+\item \textbf{The coevolution feature is below its own noise floor for
+  most of the corpus.} Chain-weighted, $67.2\,\%$ of family-assigned
+  chains sit behind an alignment with Henikoff $N_{\text{eff}} < 50$ and
+  the median family reads $4.0$, against a stated MI noise floor of 8
+  sequences. A union cache --- full alignment where one exists, seed
+  otherwise --- lifts the fraction at $N_{\text{eff}} \ge 50$ from
+  $31.9\,\%$ to $58.5\,\%$, with 5S~rRNA (2,235 chains) going
+  $12.2 \to 433.5$. Built, measured, queued; $11.3\,\%$ of chains stay
+  under $N_{\text{eff}}\,10$ because tRNA and the large rRNAs have no
+  full alignment at all (findings 110 and 112).
 
 \item \textbf{Three heads are emitted and untrained}, and one declared
   router feature is read by the model and written by no caller
@@ -647,7 +693,17 @@ equal in value to fixing the model.
 
 \paragraph{The honest summary.} \pharos{} is a working multi-task RNA
 model with a non-functioning structure decoder. The discriminative heads
-do what they were built to do. The generative head does not, we believe
-we know why, and the experiment that would settle it is running.
+do what they were built to do. The generative head does not.
+
+We think we know why, and the account is specific: the decoder could not
+see where the atoms were (100), the pair track is not constrained to be
+three-dimensionally embeddable (109), it is additive where base pairing
+is multiplicative (92), two thirds of the trunk cannot see to its right
+(103), and the coevolution channel is below its own noise floor for two
+thirds of the corpus (112). Each has an implementation whose effect is
+demonstrable on synthetic input and \textbf{none has been measured
+against the baseline}. Until they are, this section is a set of
+hypotheses with code attached, and the only number that describes the
+model is TM $0.094$.
 
 \end{document}
