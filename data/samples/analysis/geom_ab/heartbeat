@@ -116,3 +116,6 @@
 [queue] 2026-10-10T19:31:47+05:30 geom waiting: 10477 MiB free, need 62000
 [queue] 2026-10-12T18:49:19+05:30 geom waiting: 81916 MiB free, need 62000
 [queue] 2026-10-12T19:30:14+05:30 tri waiting: 81916 MiB free, need 62000
+[queue] 2026-10-12T19:57:02+05:30 bigdn waiting: 81916 MiB free, need 62000
+[queue] 2026-10-12T22:18:45+05:30 coevfull waiting: 81369 MiB free, need 62000
+[queue] 2026-10-13T00:18:16+05:30 cbias waiting: 81790 MiB free, need 62000

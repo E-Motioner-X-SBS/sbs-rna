@@ -9,11 +9,19 @@ The baselines span **0.0046** at identical settings and the init-RNG noise floor
 | 100  GeometricBias | run 1 (blind_tests_v2) | 17 | 0.0907 | 0.0913 | -0.0006 | 6/17 | 0.332 |
 | 100  GeometricBias | run 2 (blind_ab_A) | 17 | 0.0907 | 0.0890 | +0.0017 | 11/17 | 0.332 |
 | 100  GeometricBias | run 3 (blind_tests_v3) | 17 | 0.0907 | 0.0936 | -0.0029 | 5/17 | 0.143 |
+| 103  bidirectional gdn | run 1 (blind_tests_v2) | 17 | 0.0862 | 0.0913 | -0.0051 | 6/17 | 0.332 |
+| 103  bidirectional gdn | run 2 (blind_ab_A) | 17 | 0.0862 | 0.0890 | -0.0028 | 7/17 | 0.629 |
+| 103  bidirectional gdn | run 3 (blind_tests_v3) | 17 | 0.0862 | 0.0936 | -0.0074 | 6/17 | 0.332 |
+| 112  union coevolution | run 1 (blind_tests_v2) | 17 | 0.0867 | 0.0913 | -0.0045 | 7/17 | 0.629 |
+| 112  union coevolution | run 2 (blind_ab_A) | 17 | 0.0867 | 0.0890 | -0.0022 | 10/17 | 0.629 |
+| 112  union coevolution | run 3 (blind_tests_v3) | 17 | 0.0867 | 0.0936 | -0.0069 | 4/17 | 0.049 |
 
 ## Verdicts
 
 | arm | mean delta | best p | verdict |
 |---|---|---|---|
 | 100  GeometricBias | -0.0006 | 0.143 | **NO EFFECT** — inside the spread three identical runs give |
+| 103  bidirectional gdn | -0.0051 | 0.332 | **WORSE** — below the baselines by more than their spread |
+| 112  union coevolution | -0.0046 | 0.049 | **WORSE, weakly** — mean -0.0046 is inside the 0.0046 spread, but a paired sign test reaches p = 0.049; directionally negative, not neutral |
 
-Not yet run: 109  triangle update, 103  bidirectional gdn, 112  union coevolution, 92   bilinear contact bias.
+Not yet run: 109  triangle update, 92   bilinear contact bias.

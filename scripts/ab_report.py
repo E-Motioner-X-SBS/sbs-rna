@@ -115,10 +115,24 @@ def main() -> int:
     lines += ["", "## Verdicts", "",
               "| arm | mean delta | best p | verdict |", "|---|---|---|---|"]
     for aname, (md, bp) in summary.items():
+        # ORDER MATTERS, and the first version had it wrong. It tested
+        # `abs(md) <= SPREAD` before testing for worse, so an arm at
+        # -0.0046 against a 0.0046 spread with a significant paired sign
+        # test (112: 4/17, p = 0.049) was labelled "NO EFFECT". A mean
+        # sitting on the band edge with a significant test is not neutral,
+        # and a verdict line that says it is, is the same defect class as
+        # everything else here: a number displayed without being checked
+        # against what it claims.
         if md > SPREAD and bp < 0.05:
             v = "**KEEP** — clears the spread and is significant"
         elif md > SPREAD:
             v = "**INCONCLUSIVE, leaning positive** — clears the spread, not significant"
+        elif md < -SPREAD:
+            v = "**WORSE** — below the baselines by more than their spread"
+        elif md < 0 and bp < 0.05:
+            v = (f"**WORSE, weakly** — mean {md:+.4f} is inside the "
+                 f"{SPREAD:.4f} spread, but a paired sign test reaches "
+                 f"p = {bp:.3f}; directionally negative, not neutral")
         elif abs(md) <= SPREAD:
             v = "**NO EFFECT** — inside the spread three identical runs give"
         else:

@@ -2143,3 +2143,66 @@ Not done now. The three remaining arms (103, 112, 92) are cheap — +144
 parameters, a data selection, and +50,689 parameters — and run on the
 card as it stands, so they go first. Finding 109's claim about the pair
 representation is untouched by this; only its implementation is.
+
+## 100, 103, 112 — all three refuted, and the pattern is the finding
+
+Three arms, 40 epochs each from the same stage-4 init at the baseline's
+settings, scored on 17 RNA-Puzzles targets against three baseline runs:
+
+| arm | mean TM | mean delta | best p | verdict |
+|---|---|---|---|---|
+| baseline (3 runs) | 0.0913 / 0.0890 / 0.0936 | — | — | — |
+| **100** GeometricBias | **0.0907** | −0.0006 | 0.143 | `NO EFFECT` |
+| **103** bidirectional gdn | **0.0862** | −0.0051 | 0.332 | `WORSE` |
+| **112** union coevolution | **0.0867** | −0.0046 | **0.049** | `WORSE, weakly` |
+
+Not one helped. Two made it worse. That is the result, and the pattern
+matters more than any single entry.
+
+**Each had a real, measured mechanism.**
+
+- **100**: the decoder genuinely could not see where the atoms were — 0
+  of 342 non-adjacent pairs responded to a moved residue — and the bias
+  genuinely learned the right sign structure, positive at 6–12 Å and
+  negative at 23–40 Å across all eight heads. The fold did not move.
+- **103**: `gdn` is genuinely causal, measured at exactly 0.000e+00, and
+  PHAROS is an encoder. Removing an "unforced restriction" made it
+  **worse**. The capacity argument was right and the conclusion was
+  wrong: the causal form was load-bearing, most likely through what the
+  recurrence carries across loops.
+- **112**: the union cache genuinely lifted chains at usable Neff from
+  31.9% to 58.5%, with 5S_rRNA going 12.2 → 433.5. Deeper couplings did
+  not produce a better fold.
+
+**What this rules out.** The global-structure failure is not the
+decoder's access to current geometry (100, and 93 before it), not the
+trunk's inability to see rightward (103), and not the depth of the
+coevolution signal (112). Four mechanisms have now been proposed,
+implemented, measured and refuted. Every one was plausible; the register
+exists so that the next one is cheaper to kill.
+
+**What remains open.** Finding 109's claim — that the pair track is an
+outer sum and cannot be constrained to 3D-embeddability — is the one
+structural hypothesis still standing, and its implementation does not
+fit on this card (finding 114). Finding 92's bilinear arm is running.
+
+## 115 — the verdict line said "no effect" about a significant result
+
+| # | what | status |
+|---|---|---|
+| 115 | `ab_report.py` tested `abs(mean) <= SPREAD` **before** testing for worse, so arm 112 — mean **−0.0046** against a 0.0046 spread, with a paired sign test at 4/17, **p = 0.049** — was labelled `NO EFFECT` | `FIXED` |
+
+The only significant sign test in the whole table, reported as neutral.
+A mean sitting on the band edge with a significant paired test is
+directionally negative, not nothing, and the verdict line is the one
+part of the report anyone actually reads.
+
+Ordering is now: clears-spread-and-significant, clears-spread,
+below-spread, **inside-spread-but-negative-and-significant**,
+inside-spread, else. Checked on four cases including 112's exact numbers
+and the neutral case it has to stay distinct from — same mean, p = 0.400
+— which still reads `NO EFFECT`.
+
+Written by me, three arms into the experiment it exists to judge. The
+register's class, applied to the instrument rather than the model: a
+number computed, displayed, and never checked against what it claims.
