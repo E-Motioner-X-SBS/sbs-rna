@@ -2206,3 +2206,55 @@ and the neutral case it has to stay distinct from — same mean, p = 0.400
 Written by me, three arms into the experiment it exists to judge. The
 register's class, applied to the instrument rather than the model: a
 number computed, displayed, and never checked against what it claims.
+
+## 116 — the A/B is confounded: `GeometricBias` was never gated
+
+| # | what | status |
+|---|---|---|
+| 116 | `GeometricBias` (finding 100) is **unconditional** — `self.geom = GeometricBias(cfg.n_heads)` with no config flag — so it was active and training in **every** arm. Arms 103, 112 and 92 measured *their change on top of finding 100*, not against the baseline. The baselines predate finding 100 entirely | `OPEN` — the arms stand as reported, the attribution does not |
+
+Verified on the cbias checkpoint: `heads.structure.net.geom.proj.weight`
+is present with `|w|max = 0.121`, so it trained in that arm too.
+
+I gated 103, 109, 112 and 92 behind flags precisely so they could not
+confound each other, and left the fifth change ungated because it had
+already shipped. That is the error: "already in the tree" is not the
+same as "part of the baseline", and the baselines were run on
+2026-10-07 and 2026-10-10, before finding 100 existed.
+
+### What the numbers still support, and what they do not
+
+| arm | mean TM | vs baseline | vs geom-alone (0.0907) |
+|---|---|---|---|
+| 100 GeometricBias | 0.0907 | −0.0006 | — |
+| 103 bidirectional gdn | 0.0862 | −0.0051 | **−0.0045** |
+| 112 union coevolution | 0.0867 | −0.0046 | **−0.0040** |
+| 92 bilinear contact bias | 0.0861 | −0.0052 | **−0.0046** |
+
+Every arm is below geom-alone as well as below the baseline, so **no
+arm is rescued** by the correction — each made things worse than the
+thing it was stacked on. What is not supported is the clean attribution
+"change X costs 0.005 TM against the baseline": the honest statement is
+"geom + X costs that, and X costs about 0.0045 against geom".
+
+### The pattern that is more interesting than any arm
+
+Three mechanisms with nothing in common — a trunk scan change (+144
+parameters), a pure data change (**0** parameters), and a pair-head
+change (+50,689 parameters) — land within **0.0006 of each other**, at
+0.0861, 0.0867 and 0.0862, all below geom-alone and all below every
+baseline.
+
+Three unrelated interventions converging on the same slightly-worse
+number is not three mechanisms failing in three ways. It points at
+something shared, and the shared things are: `GeometricBias` active in
+all of them, and a fresh 40-epoch run on current code against baselines
+trained on older code. **Neither has been isolated**, and until one is,
+these four arms do not separate "this mechanism does not help" from
+"anything trained this way lands at 0.086".
+
+The experiment that would settle it is the cheapest one available and
+has not been run: **the current code with every flag off**, 40 epochs
+from the same init. If that also lands near 0.086, the arms measured
+the code change, not their mechanisms, and all four verdicts need
+rewriting. That run is the next thing to do and it costs two hours.

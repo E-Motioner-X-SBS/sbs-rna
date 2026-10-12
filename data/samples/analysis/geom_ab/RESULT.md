@@ -15,6 +15,9 @@ The baselines span **0.0046** at identical settings and the init-RNG noise floor
 | 112  union coevolution | run 1 (blind_tests_v2) | 17 | 0.0867 | 0.0913 | -0.0045 | 7/17 | 0.629 |
 | 112  union coevolution | run 2 (blind_ab_A) | 17 | 0.0867 | 0.0890 | -0.0022 | 10/17 | 0.629 |
 | 112  union coevolution | run 3 (blind_tests_v3) | 17 | 0.0867 | 0.0936 | -0.0069 | 4/17 | 0.049 |
+| 92   bilinear contact bias | run 1 (blind_tests_v2) | 17 | 0.0861 | 0.0913 | -0.0052 | 5/17 | 0.143 |
+| 92   bilinear contact bias | run 2 (blind_ab_A) | 17 | 0.0861 | 0.0890 | -0.0029 | 6/17 | 0.332 |
+| 92   bilinear contact bias | run 3 (blind_tests_v3) | 17 | 0.0861 | 0.0936 | -0.0075 | 5/17 | 0.143 |
 
 ## Verdicts
 
@@ -23,5 +26,6 @@ The baselines span **0.0046** at identical settings and the init-RNG noise floor
 | 100  GeometricBias | -0.0006 | 0.143 | **NO EFFECT** — inside the spread three identical runs give |
 | 103  bidirectional gdn | -0.0051 | 0.332 | **WORSE** — below the baselines by more than their spread |
 | 112  union coevolution | -0.0046 | 0.049 | **WORSE, weakly** — mean -0.0046 is inside the 0.0046 spread, but a paired sign test reaches p = 0.049; directionally negative, not neutral |
+| 92   bilinear contact bias | -0.0052 | 0.143 | **WORSE** — below the baselines by more than their spread |
 
-Not yet run: 109  triangle update, 92   bilinear contact bias.
+Not yet run: 109  triangle update.
