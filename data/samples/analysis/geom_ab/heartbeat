@@ -114,3 +114,5 @@
 [queue] 2026-10-10T19:27:43+05:30 geom waiting: 10477 MiB free, need 62000
 [queue] 2026-10-10T19:29:45+05:30 geom waiting: 10477 MiB free, need 62000
 [queue] 2026-10-10T19:31:47+05:30 geom waiting: 10477 MiB free, need 62000
+[queue] 2026-10-12T18:49:19+05:30 geom waiting: 81916 MiB free, need 62000
+[queue] 2026-10-12T19:30:14+05:30 tri waiting: 81916 MiB free, need 62000

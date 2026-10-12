@@ -47,7 +47,7 @@ bit-identical until the update earns its way in -- the same rule as
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -64,10 +64,13 @@ class TriangleMultiplication(nn.Module):
     of the other once the projections differ.
     """
 
-    def __init__(self, d_pair: int, c: int = 32, outgoing: bool = True):
+    def __init__(self, d_pair: int, c: int = 32, outgoing: bool = True,
+                 chunk: int = 128, grad_ckpt: bool = True):
         super().__init__()
         self.outgoing = outgoing
         self.c = c
+        self.chunk = chunk
+        self.grad_ckpt = grad_ckpt
         self.norm_in = nn.LayerNorm(d_pair)
         self.lin_a = nn.Linear(d_pair, c, bias=False)
         self.lin_b = nn.Linear(d_pair, c, bias=False)
@@ -78,6 +81,30 @@ class TriangleMultiplication(nn.Module):
         self.proj_out = nn.Linear(c, d_pair, bias=False)
         nn.init.zeros_(self.proj_out.weight)      # inert at load
 
+    def _ab(self, z: torch.Tensor,
+            mask: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """The two `c`-channel projections, which are the CHEAP part."""
+        s = self.norm_in(z)
+        a = torch.sigmoid(self.gate_a(s)) * self.lin_a(s)
+        b = torch.sigmoid(self.gate_b(s)) * self.lin_b(s)
+        if mask is not None:
+            m = (mask[:, :, None] & mask[:, None, :]).unsqueeze(-1).to(a.dtype)
+            a = a * m
+            b = b * m
+        return a, b
+
+    def _rows(self, z: torch.Tensor, a: torch.Tensor, b: torch.Tensor,
+              lo: int, hi: int) -> torch.Tensor:
+        """Update for query rows `lo:hi`. Separate so `checkpoint` has a
+        function, and so the `d_pair`-wide gate and output projection are
+        only ever built for a slice."""
+        zs = self.norm_in(z[:, lo:hi])
+        if self.outgoing:
+            t = torch.einsum("bikc,bjkc->bijc", a[:, lo:hi], b)
+        else:
+            t = torch.einsum("bkic,bkjc->bijc", a[:, :, lo:hi], b)
+        return torch.sigmoid(self.gate_out(zs)) * self.proj_out(self.norm_out(t))
+
     def forward(self, z: torch.Tensor,
                 mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """`z` is (B, L, L, d_pair) -> the same shape, to be added to `z`.
@@ -86,19 +113,30 @@ class TriangleMultiplication(nn.Module):
         rather than masked afterwards, because the sum over `k` runs over
         every position: a pad left in `a` contributes a real product to
         every real pair, which is a leak and not a rounding error.
+
+        **Chunked over query rows, because the first version was not and
+        could not run.** The cost model that sized it counted the einsum,
+        which is the cheap part: `gate_out` and `proj_out` are `d_pair`
+        wide, so each builds a `(B, L, L, 160)` tensor -- **5 GiB** at the
+        stage-5 shape -- several times per layer, against the `c = 32`
+        einsum's 1 GiB. Measured, unchunked: the stack ALONE OOMs at
+        B=16, L=1024 even at `c=16` with one layer, and needs **72.4 GiB**
+        at L=512 with no model on the card. In the A/B it took **150 OOMs
+        by step 501**, skipping 30% of batches, which makes an arm that
+        cannot be compared to anything.
+
+        Chunking makes the wide tensors `(B, chunk, L, d_pair)` instead.
         """
-        s = self.norm_in(z)
-        a = torch.sigmoid(self.gate_a(s)) * self.lin_a(s)
-        b = torch.sigmoid(self.gate_b(s)) * self.lin_b(s)
-        if mask is not None:
-            m = (mask[:, :, None] & mask[:, None, :]).unsqueeze(-1).to(a.dtype)
-            a = a * m
-            b = b * m
-        if self.outgoing:
-            t = torch.einsum("bikc,bjkc->bijc", a, b)
-        else:
-            t = torch.einsum("bkic,bkjc->bijc", a, b)
-        return torch.sigmoid(self.gate_out(s)) * self.proj_out(self.norm_out(t))
+        L = z.shape[1]
+        a, b = self._ab(z, mask)
+        ck = self.grad_ckpt and self.training and torch.is_grad_enabled()
+        rows = []
+        for lo in range(0, L, self.chunk):
+            hi = min(lo + self.chunk, L)
+            rows.append(checkpoint(self._rows, z, a, b, lo, hi,
+                                   use_reentrant=False)
+                        if ck else self._rows(z, a, b, lo, hi))
+        return rows[0] if len(rows) == 1 else torch.cat(rows, dim=1)
 
 
 class TrianglePairStack(nn.Module):
@@ -116,14 +154,16 @@ class TrianglePairStack(nn.Module):
         self.grad_checkpoint = grad_checkpoint
         self.layers = nn.ModuleList()
         for _ in range(n_layers):
-            self.layers.append(TriangleMultiplication(d_pair, c, outgoing=True))
-            self.layers.append(TriangleMultiplication(d_pair, c, outgoing=False))
+            self.layers.append(TriangleMultiplication(
+                d_pair, c, outgoing=True, grad_ckpt=grad_checkpoint))
+            self.layers.append(TriangleMultiplication(
+                d_pair, c, outgoing=False, grad_ckpt=grad_checkpoint))
 
     def forward(self, z: torch.Tensor,
                 mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        ck = self.grad_checkpoint and self.training and torch.is_grad_enabled()
+        # Each layer checkpoints its own row chunks, so the stack does not
+        # wrap them again -- nesting checkpoint around a checkpointed call
+        # recomputes the inner one twice for no saving.
         for layer in self.layers:
-            upd = (checkpoint(layer, z, mask, use_reentrant=False) if ck
-                   else layer(z, mask))
-            z = z + upd
+            z = z + layer(z, mask)
         return z

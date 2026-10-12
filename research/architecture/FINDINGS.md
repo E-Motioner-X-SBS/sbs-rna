@@ -2090,3 +2090,56 @@ rather than a shrug:
 Immaterial against the quantity it perturbs, so the arm is resumed
 rather than restarted — which also costs an hour less of a card that is
 busy. Recorded because "immaterial" is a measurement and not an opinion.
+
+## 114 — finding 109's triangle update does not fit, and my cost model said it would
+
+| # | what | status |
+|---|---|---|
+| 114 | The triangle stack cannot run at the stage-5 shape on this card. I sized it by counting the einsum and missed what dominates: `gate_out` and `proj_out` are `d_pair` wide, so each builds a `(B, L, L, 160)` tensor — **5 GiB** — and the residual chain retains one per layer | `ARM BLOCKED` — measured, not yet redesigned |
+
+### What the A/B did
+
+Arm 2 took **150 OOMs by step 501**, roughly 30% of batches skipped. An
+arm training on 70% of its data cannot be compared to a baseline that
+trained on all of it, so the run was stopped rather than left to produce
+a number that would have to be thrown away. The geom arm's result was
+already written and is unaffected.
+
+### The measurements I should have taken first
+
+Triangle stack **alone**, nothing else on the card:
+
+| B | L | c | layers | peak |
+|---|---|---|---|---|
+| 16 | 1024 | 32 | 2 | **OOM** |
+| 16 | 1024 | 16 | 2 | **OOM** |
+| 16 | 1024 | 32 | 1 | **OOM** |
+| 8 | 1024 | 32 | 2 | **OOM** |
+| 16 | 512 | 32 | 2 | **72.39 GiB** |
+
+Row-chunking it the way `GeometricBias` is chunked (finding 100c) does
+not rescue it — OOM at chunk 32, `c = 16`, one layer. Chunking shrinks
+the transients; it cannot shrink what autograd **retains**, and the
+residual `z + layer(z)` keeps a 5 GiB `(B, L, L, 160)` tensor per layer.
+Four layers is 20 GiB before the model, which already occupies most of
+the 80 GB card.
+
+Finding 109 states the cost as *"about 1.1 TFLOP ... single-digit
+milliseconds ... intermediates near 1 GiB each"*. The FLOP figure is
+right and irrelevant: this is a memory wall, not an arithmetic one, and
+the 1 GiB figure is the `c = 32` einsum — the cheap part. **The error is
+the same shape as the register's recurring class, in my own work: I
+measured a component and not the thing that dominates.**
+
+### What would make it fit
+
+Run the whole stack in a reduced channel space — project `160 → c` once,
+do every triangle layer in `c`, project back and add — so the retained
+tensors are `(B, L, L, 32)` at 1 GiB rather than 5. That is a different
+module from the one finding 109 describes and it has to be measured, not
+assumed, which is the whole lesson here.
+
+Not done now. The three remaining arms (103, 112, 92) are cheap — +144
+parameters, a data selection, and +50,689 parameters — and run on the
+card as it stands, so they go first. Finding 109's claim about the pair
+representation is untouched by this; only its implementation is.

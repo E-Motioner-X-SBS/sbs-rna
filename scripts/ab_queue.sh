@@ -26,7 +26,9 @@ say() { echo "[queue] $(date -Is) $*" | tee -a "$LOG"; }
 # name | checkpoint | extra train flags | predictions dir | blind json
 ARMS=(
   "geom|$CKDIR/pharos_shared400_geom.pt||$AN/pred_geom|$AN/blind_geom.json"
-  "tri|$CKDIR/pharos_shared400_tri.pt|--triangle-layers 2|$AN/pred_tri|$AN/blind_tri.json"
+  # tri (finding 109) is REMOVED until it is redesigned: it took 150
+  # OOMs by step 501 and the stack alone does not fit at this shape.
+  # See finding 114. The claim is untouched; the implementation is not.
   "bigdn|$CKDIR/pharos_shared400_bigdn.pt|--bidirectional-gdn|$AN/pred_bigdn|$AN/blind_bigdn.json"
   # Finding 112: the union coevolution cache. Not a train-time flag but an
   # environment selection, so the arm carries ENV= in its flags field and
